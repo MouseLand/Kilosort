@@ -1,0 +1,16 @@
+Follow the instructions at https://github.com/kwikteam/phy to install phy with the template-gui extension. 
+
+Then run 
+
+phy template-gui params.py (--debug, if you get an error)
+
+where params.py is a text file that KiloSort should produce. In case of errors, check that params.py contains information like this:
+
+dat_path = '20160330_ap_CAR.dat' % filename
+n_channels_dat = 32 % number of channels 
+dtype = 'int16'
+offset = 0
+sample_rate = 30000.
+hp_filtered = False
+
+
