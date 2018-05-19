@@ -694,7 +694,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
       }
       
       // extract template features before subtraction
-      // extractFEAT<<<64, tpF>>>(d_Params, d_st, d_id, d_x, d_counter, d_dout, d_iList, d_mu, d_feat);
+      if (Params[12])      
+         extractFEAT<<<64, tpF>>>(d_Params, d_st, d_id, d_x, d_counter, d_dout, d_iList, d_mu, d_feat);
       
       // subtract spikes from raw data here
       subtract_spikes<<<Nfilt,tpS>>>(d_Params,  d_st, d_id, d_x, d_y, d_counter, d_draw, d_W, d_W2, d_U);

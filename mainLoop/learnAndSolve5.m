@@ -11,14 +11,10 @@ ops.Nfilt = 512;
 
 NchanNear   = 32;
 Nnearest    = 32;
-nfullpasses = 3;
+nfullpasses = ops.nfullpasses;
 
-ops.Th       = [10 10];
-ops.ThS      = [10 15];
-ops.lam      = [40 40].^2;
-ops.momentum = 1./[20 400];
+sigmaMask  = ops.sigmaMask;
 
-sigmaMask  = 30;
 
 ops.spkTh = -6;  
 
@@ -62,7 +58,7 @@ t0 = ceil(rez.ops.trange(1) * ops.fs);
 nInnerIter  = 20;
 
 Params     = double([NT Nfilt Thi(1) nInnerIter nt0 Nnearest ...
-    Nrank lami(1) pmi(1) Nchan NchanNear ThSi(1)]);
+    Nrank lami(1) pmi(1) Nchan NchanNear ThSi(1) 0]);
 
 W0 = permute(wPCA, [1 3 2]);
 
@@ -153,6 +149,12 @@ for ibatch = 1:niter
         flag_remember = 1;
         flag_resort   = 0;
         
+        % extract features on the last pass
+        Params(13) = 1;
+        
+        % don't discard bad spikes on last pass
+        Params(12) = 1e3;
+        
         cc = UtU;
         [~, isort] = sort(cc, 1, 'descend');
         iList = int32(gpuArray(isort(1:Nnearest, :)));
@@ -163,12 +165,12 @@ for ibatch = 1:niter
     end
     
     if ~flag_remember && Nfilt<512    && rem(ibatch, 5)==0     
-        figure(2)
-        plot(ss0(:,2), ss0(:,1), 'o')
-        hold on 
-        plot([0 100], [0 100], '-k')
-        hold off
-        drawnow
+%         figure(2)
+%         plot(ss0(:,2), ss0(:,1), 'o')
+%         hold on 
+%         plot([0 100], [0 100], '-k')
+%         hold off
+%         drawnow
         
         W(:,nsp<1/10,:) = [];
         U(:,nsp<1/10,:) = [];
