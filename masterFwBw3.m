@@ -20,8 +20,6 @@ ops.useRAM      = 0; % whether to use RAM for all data, or no data
 ops.spkTh       = -4; % spike threshold
 ops.nSkipCov    = 5; % how many batches to skip when computing whitening matrix (for speed)
 
-ops.NT          = 64*1024+ ops.ntbuff;% this is the batch size (try decreasing if out of GPU memory) 
-
 dset = 'c46';
 
 root = fullfile('H:\DATA\Spikes\', dset);
@@ -32,9 +30,9 @@ ops.dir_rez     = 'H:\DATA\Spikes\';
 
 % preprocess data
 rez = preprocessDataSub(ops);
-%%
+
 learnAndSolve5;
-%
+%%
 fGTname = sprintf('%s_spike_samples_npx.npy', dset);
 sGT  = readNPY(fullfile('H:\DATA\Spikes\', fGTname));
 

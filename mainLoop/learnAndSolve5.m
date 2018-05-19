@@ -1,12 +1,11 @@
 ops = rez.ops;
 
-wPCA    = extractPCfromSnippets(rez, 3);
-wPCA = gpuArray(wPCA);
-% wPCA = gpuArray(ops.wPCA(:,1:3)); 
+% wPCA    = extractPCfromSnippets(rez, 3);
+% wPCA = gpuArray(wPCA);
+wPCA = gpuArray(ops.wPCA(:,1:3)); 
 wPCA(:,1) = - wPCA(:,1) * sign(wPCA(21,1));
 
-rng('default');
-rng(1);
+rng('default'); rng(1);
 
 ops.Nfilt = 512;
 
@@ -19,7 +18,11 @@ ops.ThS      = [10 15];
 ops.lam      = [40 40].^2;
 ops.momentum = 1./[20 400];
 
+sigmaMask  = 30;
+
 ops.spkTh = -6;  
+
+
 nt0 = ops.nt0;
 nt0min  = ceil(20 * nt0/61);
 rez.ops.nt0min  = nt0min;
@@ -37,7 +40,7 @@ Nchan 	= ops.Nchan;
 
 
 % make iW, a matrix of neighbouring channels for each channel 
-sigmaMask  = 30;
+
 [iC, mask] = getClosestChannels(rez, sigmaMask, NchanNear);
 
 irounds = [1:nBatches nBatches:-1:1]; 
@@ -73,7 +76,6 @@ nsp = gpuArray.zeros(0,1, 'single');
 
 fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 
-tic
 fid = fopen(ops.fproc, 'r');
 
 ntot = 0;
@@ -111,6 +113,7 @@ for ibatch = 1:niter
     
     if flag_update
         if ibatch==1
+            
             dWU = mexGetSpikes(Params, dataRAW, wPCA);
             dWU = reshape(wPCA * (wPCA' * dWU(:,:)), size(dWU));
             W = W0(:,ones(1,size(dWU,3)),:);
@@ -251,6 +254,16 @@ rez.st3 = st3(isort, :);
 [WtW, iList] = getMeWtW(W, U, Nnearest);
 rez.simScore = gather(WtW(:,:,nt0));
 
+rez.cProj    = fW(:, isort)';
+rez.iNeigh   = gather(iList);
+
+rez.ops = ops;
+
+rez.W = Wall(:,:,:, round(nBatches/2));
+rez.W = cat(1, zeros(nt0 - (ops.nt0-1-nt0min), Nfilt, Nrank), rez.W);
+
+rez.U = Uall(:,:,:,round(nBatches/2));
+rez.mu = muall(:,round(nBatches/2));
 
 % mkdir(savePath)
 % rezToPhy0(rez, savePath);

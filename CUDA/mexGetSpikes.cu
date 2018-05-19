@@ -52,9 +52,6 @@ __global__ void	Conv1D(const double *Params, const float *data, const float *W, 
 		  #pragma unroll 4
           for(i=0;i<nt0;i++)
               y    += sW[i + nid*nt0] * sdata[i+tid + nid*(Nthreads+nt0)];
-          
-          if (nid==0 && y<0)
-              break;
 
            x += y*y;
       }
@@ -113,7 +110,10 @@ __global__ void	cleanup_spikes(const double *Params, const float *err,
   while(tid0<NT-Nthreads-lockout+1){
       if (tid<2*lockout)
           sdata[tid] = err[tid0 + tid];
-      sdata[tid+2*lockout] = err[2*lockout + tid0 + tid];
+      if (tid0+tid+2*lockout<NT)
+          sdata[tid+2*lockout] = err[2*lockout + tid0 + tid];
+      else
+          sdata[tid+2*lockout] = 0.0f;
       
       __syncthreads();
       
