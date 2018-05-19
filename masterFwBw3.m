@@ -1,24 +1,25 @@
 addpath(genpath('D:\GitHub\KiloSort2')) % path to kilosort folder
 addpath('D:\GitHub\npy-matlab')
 
-% mexcuda('D:\CODE\GitHub\FwBwAddon\mexClustering.cu');
-
 pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github folder and put it somewhere else (together with the master_file)
 run(fullfile(pathToYourConfigFile, 'configFileBench384.m'))
 
 % common options for every probe
-ops.chanMap     = 'D:\Github\neuropixels\neuropixPhase3A_kilosortChanMap.mat';
+ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap_385.mat';
 % ops.trange      = [3300 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 % ops.trange      = [3400 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
 ops.Nfilt       = 512; % how many clusters to use
 ops.nfullpasses = 6; % how many forward backward passes to do
-ops.nPCs        = 3; % how many PCs to project the spikes into
+ops.nPCs        = 7; % how many PCs to project the spikes into
 
 ops.useRAM      = 0; % whether to use RAM for all data, or no data
 ops.spkTh       = -4; % spike threshold
-ops.nSkipCov    = 5; % how many batches to skip when computing whitening matrix (for speed)
+ops.nSkipCov    = 5; % how many batches to skip when computing whitening matrix
+
+ops.lam = [5 40 40];
+ops.NT          = 64*1024+ ops.ntbuff;% this is the batch size (try decreasing if out of memory) 
 
 dset = 'c46';
 
@@ -30,9 +31,9 @@ ops.dir_rez     = 'H:\DATA\Spikes\';
 
 % preprocess data
 rez = preprocessDataSub(ops);
-
-learnAndSolve5;
 %%
+learnAndSolve5;
+%
 fGTname = sprintf('%s_spike_samples_npx.npy', dset);
 sGT  = readNPY(fullfile('H:\DATA\Spikes\', fGTname));
 
@@ -42,6 +43,19 @@ sGT  = readNPY(fullfile('H:\DATA\Spikes\', fGTname));
 
 testClu = rez.st3(:,2);
 testRes = rez.st3(:,1);
+
+% ik = 371;
+% testClu = rez.st3(rez.st3(:,2)==ik,2);
+% testRes = rez.st3(rez.st3(:,2)==ik,1);
+% testMu  = rez.st3(rez.st3(:,2)==ik,3);
+% testClu = testClu(testMu>0);
+% testRes = testRes(testMu>0);
+
+% testClu = rez.clu(rez.clu>0);
+% testRes = rez.st(rez.clu>0);
+
+% gtClu = rez.clu(rez.clu==960);
+% gtRes = rez.st(rez.clu==960);
 
 gtClu = zeros(numel(sGT), 1, 'int32');
 gtRes = sGT;
