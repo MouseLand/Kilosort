@@ -12,6 +12,8 @@ end
 
 GTcluIDs = unique(cluGT);
 testCluIDs = unique(cluTest);
+
+% jitter = 21;
 jitter = 12;
 
 nSp = zeros(max(testCluIDs), 1);
@@ -77,8 +79,8 @@ for cGT = 1:length(GTcluIDs)
     falsePos(end+1) = fps(best);
     missRate(end+1) = misses(best);
     
-%     fprintf(1, '  found initial best %d: score %.2f (%d spikes, %.2f FP, %.2f miss)\n', ...
-%         mergeIDs(1), scores(1), sum(cluTest==mergeIDs(1)), fps(best), misses(best));
+    fprintf(1, '  found initial best %d: score %.2f (%d spikes, %.2f FP, %.2f miss)\n', ...
+        mergeIDs(1), scores(1), sum(cluTest==mergeIDs(1)), fps(best), misses(best));
     
     S0 = S(:, best);
     nSp = nSp + nSp0(best);
@@ -97,8 +99,8 @@ for cGT = 1:length(GTcluIDs)
         falsePos(end+1) = fps(best);
         missRate(end+1) = misses(best);
         
-%         fprintf(1, '    best merge with %d: score %.2f (%d/%d new/total spikes, %.2f FP, %.2f miss)\n', ...
-%             mergeIDs(end), scores(end), nSp0(best), nSp(best), fps(best), misses(best));
+        fprintf(1, '    best merge with %d: score %.2f (%d/%d new/total spikes, %.2f FP, %.2f miss)\n', ...
+            mergeIDs(end), scores(end), nSp0(best), nSp(best), fps(best), misses(best));
         
         S0 = S(:, best);
         nSp = nSp + nSp0(best);

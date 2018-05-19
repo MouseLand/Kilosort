@@ -1,14 +1,6 @@
 # Fast spike sorting for hundreds of channels #
 
-Implements an integrated template matching framework for detecting and clustering spikes from multi-channel electrophysiological recordings. Very fast when a GPU is available, but can also run on the CPU side. Described in this NIPS paper
-
-Pachitariu M, Steinmetz NA, Kadir S, Carandini M and Harris KD (2016). Fast and accurate spike sorting of high-channel count probes with Kilosort. Advances In Neural Information Processing Systems. 4448-4456
-https://papers.nips.cc/paper/6326-fast-and-accurate-spike-sorting-of-high-channel-count-probes-with-kilosort
-
-The following preprint contains slightly different information:
-
-Pachitariu M, Steinmetz NA, Kadir S, Carandini M and Harris KD (2016). Kilosort: realtime spike-sorting for extracellular electrophysiology with hundreds of channels. 
-bioRxiv dx.doi.org/10.1101/061481, [link](http://biorxiv.org/content/early/2016/06/30/061481). 
+Implements an integrated template matching framework for detecting and clustering spikes from multi-channel electrophysiological recordings. Very fast when a GPU is available, but can also run on the CPU side. 
 
 ### Installation ###
 If you are running on the GPU, you must run mexGPUall in the CUDA folder after setting up mexcuda in Matlab. Steps for achieving this in Windows 10 are below; see the Docs folder for more details and other operating systems.

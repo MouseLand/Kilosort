@@ -17,7 +17,7 @@
 #include <iostream>
 using namespace std;
 
-const int Nthreads = 1024,   nblock = 32;
+const int nblock = 32;
 //////////////////////////////////////////////////////////////////////////////////////////
 
 __global__ void	crossFilter(const double *Params, const float *W1, const float *W2,
@@ -25,34 +25,50 @@ __global__ void	crossFilter(const double *Params, const float *W1, const float *
   __shared__ float shW1[nblock*81], shW2[nblock*81]; 
 
   float x;
-  int nt0, tidx, tidy , bidx, bidy, i, NT, Nfilt, t;
+  int nt0, tidx, tidy , bidx, bidy, i, Nfilt, t, tid1, tid2;
 
   tidx 		= threadIdx.x;
   tidy 		= threadIdx.y;
   bidx 		= blockIdx.x;
   bidy 		= blockIdx.y;
   
-  Nfilt = (int) Params[1];
+  Nfilt     = (int) Params[1];
   nt0       = (int) Params[9];
   
-  while(tidx<nt0){
-    shW1[tidx + tidy * nt0] = W1[tidx + (tidy+bidx*nblock) * nt0];
-    shW2[tidx + tidy * nt0] = W2[tidx + (tidy+bidy*nblock) * nt0];
-    tidx+= nblock;
+  tid1 = tidx + bidx*nblock;
+  
+  tid2 = tidy + bidx*nblock;
+  if (tid2<Nfilt){
+      while(tidx<nt0){
+          shW1[tidx + tidy * nt0] = W1[tidx + tid2 * nt0];
+          tidx+= nblock;
+      }
   }
   tidx 		= threadIdx.x;
+  tid2      = tidy + bidy*nblock;
+  if (tid2<Nfilt){
+      while(tidx<nt0){
+          shW2[tidx + tidy * nt0] = W2[tidx + tid2 * nt0];
+          tidx+= nblock;
+      }
+  }
+  tidx 		= threadIdx.x;
+
   __syncthreads();
-	 	 
-  for(i=0;i<2*nt0-1;i++){
-      x = 0.0f;
-      if(i<nt0)
-          for(t=0;t<i+1;t++)
-              x += shW1[t + nt0 * tidx] * shW2[t + (nt0-i-1) + nt0 * tidy];
-      else
-          for(t=i-nt0+1;t<nt0;t++)
-              x += shW1[t + nt0 * tidx] * shW2[t + (nt0-i-1) + nt0 * tidy];
-      WtW[tidx+bidx*nblock + (tidy + bidy*nblock)*Nfilt +  i*Nfilt*Nfilt] =
-              x * UtU[tidx+bidx*nblock + (tidy + bidy*nblock)*Nfilt];
+      
+  if (tid2<Nfilt && tid1<Nfilt){
+      for(i=0;i<2*nt0-1;i++){
+          x = 0.0f;
+          if(i<nt0)
+              for(t=0;t<i+1;t++)
+                  x += shW1[t + nt0 * tidx] * shW2[t + (nt0-i-1) + nt0 * tidy];
+          else
+              for(t=i-nt0+1;t<nt0;t++)
+                  x += shW1[t + nt0 * tidx] * shW2[t + (nt0-i-1) + nt0 * tidy];
+          
+          WtW[tid1 + tid2*Nfilt +  i*Nfilt*Nfilt] =
+                  x * UtU[tid1 + tid2*Nfilt];
+      }
   }
 }
 
@@ -67,14 +83,13 @@ void mexFunction(int nlhs, mxArray *plhs[],
 {
     /* Declare input variables*/
   double *Params, *d_Params;
-  int nt0, Nfilt, NT;
+  int nt0, Nfilt;
 
   /* Initialize the MathWorks GPU API. */
   mxInitGPU();
 
   /* read Params and copy to GPU */
   Params  	= (double*) mxGetData(prhs[0]);
-  NT		= (int) Params[0];
   Nfilt		= (int) Params[1];
   nt0       = (int) Params[9];
   
@@ -99,7 +114,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   WtW 		= mxGPUCreateGPUArray(3, dimsu, mxSINGLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);  
   d_WtW 		= (float *)(mxGPUGetData(WtW));
 
-  dim3 grid(Nfilt/nblock, Nfilt/nblock);
+  dim3 grid(1 + (Nfilt/nblock), 1 + (Nfilt/nblock));
   dim3 block(nblock, nblock);
   crossFilter<<<grid, block>>>(d_Params, d_W1, d_W2, d_UtU, d_WtW); 
 
