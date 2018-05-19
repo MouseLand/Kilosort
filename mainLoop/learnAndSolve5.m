@@ -265,6 +265,12 @@ rez.W = cat(1, zeros(nt0 - (ops.nt0-1-nt0min), Nfilt, Nrank), rez.W);
 rez.U = Uall(:,:,:,round(nBatches/2));
 rez.mu = muall(:,round(nBatches/2));
 
+nNeighPC        = ops.nNeighPC;
+rez.cProjPC     = zeros(size(st3,1), 3*nNeighPC, 'single');
+[~, iNch]       = sort(abs(rez.U(:,:,1)), 1, 'descend');
+maskPC          = zeros(Nchan, Nfilt, 'single');
+rez.iNeighPC    = iNch(1:nNeighPC, :);
+
 % mkdir(savePath)
 % rezToPhy0(rez, savePath);
 
