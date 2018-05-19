@@ -63,8 +63,8 @@ templatesInds = repmat([0:size(templates,3)-1], size(templates,1), 1); % we incl
 
 templateFeatures = rez.cProj;
 templateFeatureInds = uint32(rez.iNeigh);
-% pcFeatures = rez.cProjPC;
-% pcFeatureInds = uint32(rez.iNeighPC);
+pcFeatures = rez.cProjPC;
+pcFeatureInds = uint32(rez.iNeighPC);
 
 if ~isempty(savePath)
     
@@ -90,8 +90,8 @@ if ~isempty(savePath)
     
     writeNPY(templateFeatures, fullfile(savePath, 'template_features.npy'));
     writeNPY(templateFeatureInds'-1, fullfile(savePath, 'template_feature_ind.npy'));% -1 for zero indexing
-%     writeNPY(pcFeatures, fullfile(savePath, 'pc_features.npy'));
-%     writeNPY(pcFeatureInds'-1, fullfile(savePath, 'pc_feature_ind.npy'));% -1 for zero indexing
+    writeNPY(pcFeatures, fullfile(savePath, 'pc_features.npy'));
+    writeNPY(pcFeatureInds'-1, fullfile(savePath, 'pc_feature_ind.npy'));% -1 for zero indexing
     
     whiteningMatrix = rez.Wrot/200;
     whiteningMatrixInv = whiteningMatrix^-1;
