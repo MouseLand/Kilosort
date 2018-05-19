@@ -149,15 +149,14 @@ for ibatch = 1:niter
         flag_remember = 1;
         flag_resort   = 0;
         
+        [WtW, iList] = getMeWtW(W, U, Nnearest);
+        
         % extract features on the last pass
         Params(13) = 1;
         
         % don't discard bad spikes on last pass
         Params(12) = 1e3;
-        
-        cc = UtU;
-        [~, isort] = sort(cc, 1, 'descend');
-        iList = int32(gpuArray(isort(1:Nnearest, :)));
+       
         
         Wall  = zeros(nt0, Nfilt, Nrank, nBatches, 'single');
         Uall  = zeros(Nchan, Nfilt,Nrank,  nBatches, 'single');
@@ -253,7 +252,6 @@ ntot
 
 rez.st3 = st3(isort, :);
 
-[WtW, iList] = getMeWtW(W, U, Nnearest);
 rez.simScore = gather(WtW(:,:,nt0));
 
 rez.cProj    = fW(:, isort)';

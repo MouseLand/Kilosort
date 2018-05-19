@@ -14,7 +14,7 @@ for i = 1:Nrank
 end
 
 if nargin>2 && nargout>1
-    cc = WtW(:,:,nt0);
+    cc = max(WtW(:,:,:), [], 3);
     [~, isort] = sort(cc, 1, 'descend');
     iList = int32(gpuArray(isort(1:Nnearest, :)));
 end
