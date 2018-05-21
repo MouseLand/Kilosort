@@ -94,7 +94,7 @@ __global__ void  bestFilter(const double *Params, const float *data,
 __global__ void	cleanup_spikes(const double *Params, const float *err, 
 	const int *ftype, float *x, int *st, int *id, int *counter){
     
-  int lockout, indx, tid, bid, NT, tid0,  j;
+  int lockout, indx, tid, bid, NT, tid0,  j, t0;
   volatile __shared__ float sdata[Nthreads+2*81+1];
   bool flag=0;
   float err0, Th;
@@ -118,7 +118,8 @@ __global__ void	cleanup_spikes(const double *Params, const float *err,
       __syncthreads();
       
       err0 = sdata[tid+lockout];
-      if(err0>2*Th*Th){
+      t0 = tid+lockout         + tid0;
+      if(err0>Th*Th && t0<NT-lockout-1){
           flag = 0;
           for(j=-lockout;j<=lockout;j++)
               if(sdata[tid+lockout+j]>err0){
@@ -128,8 +129,8 @@ __global__ void	cleanup_spikes(const double *Params, const float *err,
           if(flag==0){
               indx = atomicAdd(&counter[0], 1);
               if (indx<maxFR){
-                  st[indx] = tid+lockout         + tid0;
-                  id[indx] = ftype[tid+lockout   + tid0];
+                  st[indx] = t0;
+                  id[indx] = ftype[t0];
                   x[indx]  = err0;
               }
           }
@@ -143,7 +144,7 @@ __global__ void	cleanup_spikes(const double *Params, const float *err,
 __global__ void	cleanup_heights(const double *Params, const float *x, 
         const int *st, const int *id, int *st1, int *id1, int *counter){
     
-  int indx, tid, bid, t, d;
+  int indx, tid, bid, t, d, Nmax;
   volatile __shared__ float s_id[maxFR], s_x[maxFR];
   bool flag=0;
   float xmax;
@@ -151,7 +152,9 @@ __global__ void	cleanup_heights(const double *Params, const float *x,
   tid 		= threadIdx.x;
   bid 		= blockIdx.x;
     
-  while (tid<counter[0]){
+  Nmax = min(maxFR, counter[0]);
+  
+  while (tid<Nmax){
       s_x[tid]  = x[tid];
       s_id[tid] = id[tid];
       tid+=blockDim.x;
@@ -160,10 +163,10 @@ __global__ void	cleanup_heights(const double *Params, const float *x,
    
   tid = bid*blockDim.x + threadIdx.x;
           
-  if (tid<counter[0]){
+  if (tid<Nmax){
       xmax = s_x[tid];
       flag = 1;
-      for (t=0; t<counter[0];t++){
+      for (t=0; t<Nmax;t++){
           d = abs(s_id[t] - s_id[tid]);
           if (d<5 && xmax< s_x[t]){
               flag = 0;
@@ -173,8 +176,10 @@ __global__ void	cleanup_heights(const double *Params, const float *x,
       // if flag, then your thread is the max across nearby channels
       if(flag){
           indx = atomicAdd(&counter[1], 1);
-          st1[indx] = st[tid];
-          id1[indx] = s_id[tid];
+          if (indx<maxFR){
+              st1[indx] = st[tid];
+              id1[indx] = s_id[tid];
+          }
       }
   }
   
@@ -185,7 +190,7 @@ __global__ void	cleanup_heights(const double *Params, const float *x,
 __global__ void extract_snips(const double *Params, const int *st, const int *id,
         const int *counter, const float *dataraw,  float *WU){
     
-  int nt0, tidx, tidy, bid, ind, NT, Nchan;
+  int nt0, tidx, tidy, bid, ind, NT, Nchan, Nmax;
   
   NT        = (int) Params[0];
   nt0       = (int) Params[4];
@@ -194,7 +199,9 @@ __global__ void extract_snips(const double *Params, const int *st, const int *id
   tidx 		= threadIdx.x;
   bid 		= blockIdx.x;
   
-  for(ind=0; ind<counter[1];ind++)
+  Nmax = min(maxFR, counter[1]);
+  
+  for(ind=0; ind<Nmax;ind++)
       if (id[ind]==bid){
 		  tidy 		= threadIdx.y;
 		  while (tidy<Nchan){	
@@ -250,9 +257,10 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMalloc(&d_ftype, NT * sizeof(int));  
   cudaMalloc(&d_st,    maxFR * sizeof(int));
   cudaMalloc(&d_id,    maxFR * sizeof(int));
+  cudaMalloc(&d_x,     maxFR * sizeof(float));
   cudaMalloc(&d_st1,    maxFR * sizeof(int));
   cudaMalloc(&d_id1,    maxFR * sizeof(int));
-  cudaMalloc(&d_x,     maxFR * sizeof(float));
+  
   
   cudaMalloc(&d_WU,    maxFR*nt0*Nchan * sizeof(float));
   cudaMalloc(&d_counter,   2*sizeof(int));
@@ -264,9 +272,10 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemset(d_ftype,   0, NT * sizeof(int));
   cudaMemset(d_st,      0, maxFR *   sizeof(int));
   cudaMemset(d_id,      0, maxFR *   sizeof(int));
+  cudaMemset(d_x,       0, maxFR *   sizeof(float));
   cudaMemset(d_st1,      0, maxFR *   sizeof(int));
   cudaMemset(d_id1,      0, maxFR *   sizeof(int));
-  cudaMemset(d_x,      0, maxFR *   sizeof(float));
+  
   
   
   int *counter;
@@ -280,10 +289,10 @@ void mexFunction(int nlhs, mxArray *plhs[],
   
   // ignore peaks that are smaller than another nearby peak
   cleanup_spikes<<<NT/Nthreads,Nthreads>>>(d_Params,
-          d_err, d_ftype, d_x, d_st, d_id, d_counter);
+          d_err, d_ftype, d_x, d_st, d_id, d_counter); // NT/Nthreads
   
   // ignore peaks that are smaller than another nearby peak
-  cleanup_heights<<<1 + maxFR/32, 32>>>(d_Params, d_x, d_st, d_id, d_st1, d_id1, d_counter);
+  cleanup_heights<<<1 + maxFR/32 , 32>>>(d_Params, d_x, d_st, d_id, d_st1, d_id1, d_counter); // 1 + maxFR/32
   
   // add new spikes to 2nd counter
   cudaMemcpy(counter,     d_counter+1, sizeof(int), cudaMemcpyDeviceToHost);
@@ -291,13 +300,16 @@ void mexFunction(int nlhs, mxArray *plhs[],
   // update dWU here by adding back to subbed spikes
   extract_snips<<<Nchan,tpS>>>(  d_Params, d_st1, d_id1, d_counter, d_data, d_WU);
   
+  counter[0] = min(maxFR, counter[0]);
+  
   mxGPUArray *WU1;
   float  *d_WU1;
   const mwSize dimsu[] 	= {nt0, Nchan, counter[0]};
   WU1 		= mxGPUCreateGPUArray(3, dimsu, mxSINGLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);  
   d_WU1 		= (float *)(mxGPUGetData(WU1));
   
-  cudaMemcpy(d_WU1, d_WU, nt0*Nchan*counter[0]*sizeof(float), cudaMemcpyDeviceToDevice);
+  if (counter[0]>0)
+      cudaMemcpy(d_WU1, d_WU, nt0*Nchan*counter[0]*sizeof(float), cudaMemcpyDeviceToDevice);
   
   // dWU stays a GPU array
   plhs[0] 	= mxGPUCreateMxArrayOnGPU(WU1);
