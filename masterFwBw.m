@@ -6,24 +6,23 @@ run(fullfile(pathToYourConfigFile, 'configFileBench384.m'))
 
 % common options for every probe
 ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap_385.mat';
-% ops.trange      = [3300 Inf]; % TIME RANGE IN SECONDS TO PROCESS
-% ops.trange      = [3400 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 ops.trange      = [3750 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
-ops.Th       = [10 10];
-ops.ThS      = [10 15];
-ops.lam      = [40 40].^2;
-ops.momentum = 1./[20 400];
+ % these settings overwrite any settings from config
+ops.Th       = 10;     % threshold on projections (like in Kilosort1)
+ops.lam      = 40^2;   % weighting on the amplitude penalty (like in Kilosort1, but it has to be much larger)
+
+ops.ThS      = [10 15];  % lower bound on acceptable single spike quality
+ops.momentum = [20 400]; % number of samples to average over
+ops.minFR = 1/50;
+
 ops.sigmaMask  = 30;
 
 ops.Nfilt       = 512; % max number of clusters
 ops.nfullpasses = 3; % how many forward backward passes to do
-ops.nPCs        = 7; % how many PCs to project the spikes into
+ops.nPCs        = 3; % how many PCs to project the spikes into
 
-ops.useRAM      = 0; % whether to use RAM for all data, or no data
-ops.spkTh       = -4; % spike threshold
-ops.nSkipCov    = 5; % how many batches to skip when computing whitening matrix
-
+ops.useRAM = 0;
 
 probeName = {'K1', 'K2', 'K3', 'ZNP1', 'ZNP2', 'ZNP3', 'ZNP4', 'ZO'};
 mname = 'Robbins'; %'Waksman'; %'Krebs'; %'Robbins';
@@ -40,15 +39,15 @@ for j = 4
     
     % preprocess data
     rez = preprocessDataSub(ops);
-
-    fname = fullfile(ops.dir_rez,  ...
-        sprintf('rez_%s_%s_%s.mat', mname, datexp, probeName{j}));
-    save(fname, 'rez');
-
+    
+   
+%     fname = fullfile(ops.dir_rez,  ...
+%         sprintf('rez_%s_%s_%s.mat', mname, datexp, probeName{j}));
+%     save(fname, 'rez');
     
     % cluster the threshold crossings
-    learnAndSolve5;
-    
+    learnAndSolve6;
+    %%
     savePath = fullfile('H:\DATA\Spikes\', mname);    
     rezToPhy(rez, savePath);
 

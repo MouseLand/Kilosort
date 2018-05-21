@@ -18,7 +18,7 @@ ops.nNeigh              = 16; % visualization only (Phy): number of neighboring 
 
 % options for channel whitening
 ops.whitening           = 'full'; % type of whitening (default 'full', for 'noSpikes' set options for spike detection below)
-ops.nSkipCov            = 10; % compute whitening matrix from every N-th batch (1)
+ops.nSkipCov            = 5; % compute whitening matrix from every N-th batch (1)
 ops.whiteningRange      = 32; % how many channels to whiten together (Inf for whole probe whitening, should be fine if Nchan<=128)
 
 % define the channel map as a filename (string) or simply an array
@@ -40,16 +40,11 @@ ops.NT                  = 64*1024+ ops.ntbuff;% this is the batch size (try decr
 % the following options can improve/deteriorate results. 
 % when multiple values are provided for an option, the first two are beginning and ending anneal values, 
 % the third is the value used in the final pass. 
-ops.Th               = [4 12 12];    % threshold for detecting spikes on template-filtered data ([4 10 10])
-ops.lam              = [5 20 20];   % large means amplitudes are forced around the mean ([5 20 20])
-ops.nannealpasses    = 4;            % should be less than nfullpasses (4)
-ops.momentum         = 1./[20 400];  % start with high momentum and anneal (1./[20 400])
 ops.shuffle_clusters = 1;            % allow merges and splits during optimization (1)
 ops.mergeT           = .1;           % upper threshold for merging (.1)
 ops.splitT           = .1;           % lower threshold for splitting (.1)
 
-% options for initializing spikes from data
-ops.initialize      = 'no'; %'fromData' or 'no'
+% options for determining PCs
 ops.spkTh           = -6;      % spike threshold in standard deviations (-6)
 ops.loc_range       = [5  4];  % ranges to detect peaks; plus/minus in time and channel ([3 1])
 ops.long_range      = [30  6]; % ranges to detect isolated peaks ([30 6])
@@ -57,19 +52,9 @@ ops.maskMaxChannels = 5;       % how many channels to mask up/down ([5])
 ops.crit            = .65;     % upper criterion for discarding spike repeates (0.65)
 ops.nFiltMax        = 10000;   % maximum "unique" spikes to consider (10000)
 
-% load predefined principal components (visualization only (Phy): used for features)
+% load predefined principal components 
 dd                  = load('PCspikes2.mat'); % you might want to recompute this from your own data
 ops.wPCA            = dd.Wi(:,1:7);   % PCs 
 
 % options for posthoc merges (under construction)
 ops.fracse  = 0.1; % binning step along discriminant axis for posthoc merges (in units of sd)
-ops.epu     = Inf;
-
-ops.ForceMaxRAMforDat   = 0e9; % maximum RAM the algorithm will try to use; on Windows it will autodetect.
-
-ops.Drift.chSmooth      = 5;
-ops.Drift.tSmooth       = 20;
-ops.doDriftCorrection   = 1;
-ops.sigDrift            = 15;
-ops.sigShift            = 20;
-ops.initialize          = 'fromDriftCorrection';

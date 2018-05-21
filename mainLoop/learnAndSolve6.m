@@ -18,7 +18,6 @@ sigmaMask  = ops.sigmaMask;
 
 ops.spkTh = -6;  
 
-
 nt0 = ops.nt0;
 nt0min  = ceil(20 * nt0/61);
 rez.ops.nt0min  = nt0min;
@@ -62,12 +61,13 @@ W0 = permute(wPCA, [1 3 2]);
 
 iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
 
-st3 = zeros(1e7, 3);
+st3 = zeros(1e7, 4);
 
 fW  = zeros(Nnearest, 1e7, 'single');
 
+flag = gpuArray.zeros(1,0, 'single');
 nsp = gpuArray.zeros(0,1, 'single');
-
+his = gpuArray.zeros(1,0, 'single');
 fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 
 fid = fopen(ops.fproc, 'r');
@@ -86,8 +86,7 @@ for ibatch = 1:niter
         W  = gpuArray(Wall(:,:,:,k));
         U  = gpuArray(Uall(:,:,:,k));
         mu = gpuArray(muall(:,k));
-    end
-   
+    end   
     
     
     % dat load \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -105,6 +104,9 @@ for ibatch = 1:niter
             W = W0(:,ones(1,size(dWU,3)),:);
             Nfilt = size(W,2);            
             nsp(Nfilt) = 0;
+            flag(1,Nfilt) = 0;
+            his(:, Nfilt) = 0;
+            
         end
         Params(2) = Nfilt; 
         
@@ -117,22 +119,23 @@ for ibatch = 1:niter
             W = W(:,isort, :);
             dWU = dWU(:,:,isort);
             nsp = nsp(isort);
+            his = his(:, isort);
+            flag = flag(isort);
         end
         
         [W, U, mu] = mexSVDsmall(Params, dWU, W, iC-1, iW-1);
-       
-        [W0, nmax] = get_diffW(W);
-        nmax(:) = 0;
-        
+      
         % this needs to change
         [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
     end
     
     % needs an iList for computing features
-    [st0, id0, x0, featW, dWU, drez, nsp0, ss0] = mexMPnu5(Params, dataRAW, dWU, ...
-        U, W, mu, iC-1, iW-1, UtU, iList-1, W0, nmax, wPCA, maskU);    
+    [st0, id0, x0, y0, featW, dWU, drez, nsp0, ss0, his0] = ...
+        mexMPnu6(Params, dataRAW, dWU, U, W, mu, iC-1,...
+        iW-1, UtU, iList-1, wPCA, maskU);    
     
     nsp = nsp * .95 + .05 * nsp0;
+    his = his * .95 + .05 * his0;
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -162,33 +165,35 @@ for ibatch = 1:niter
         muall = zeros(Nfilt, nBatches, 'single');
     end
     
-    if ~flag_remember && Nfilt<512    && rem(ibatch, 5)==0     
-%         figure(2)
-%         plot(ss0(:,2), ss0(:,1), 'o')
-%         hold on 
-%         plot([0 100], [0 100], '-k')
-%         hold off
-%         drawnow
+    if ~flag_remember && rem(ibatch, 5)==0
+        if rem(ibatch,100)==0
+            [W, U, dWU, mu, nsp, his, flag] = ...
+                triageHIST(ops, W, U, dWU, mu, nsp, his, flag);            
+        end
+        [W, U, dWU, mu, nsp, his, flag] = ...
+            triageTemplates(ops, W, U, dWU, mu, nsp, his, flag);
         
-        W(:,nsp<1/10,:) = [];
-        U(:,nsp<1/10,:) = [];
-        dWU(:,:, nsp<1/10) = [];
-        mu(nsp<1/10) = [];
-        nsp(nsp<1/10) = [];
         Nfilt = size(W,2);
-       
-        dWU0 = mexGetSpikes(Params, drez, wPCA);        
-        dWU0 = reshape(wPCA * (wPCA' * dWU0(:,:)), size(dWU0));        
-        dWU = cat(3, dWU, dWU0);
         
-        W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:);
-        Nfilt = min(512, size(W,2));
-        
-        W = W(:, 1:Nfilt, :);
-        dWU = dWU(:, :, 1:Nfilt);        
-        nsp(Nfilt) = 0;
-        mu(Nfilt)  = 0;
-   end
+        if Nfilt<ops.Nfilt
+            dWU0 = mexGetSpikes(Params, drez, wPCA);
+            if size(dWU0,3)>0
+                dWU0 = reshape(wPCA * (wPCA' * dWU0(:,:)), size(dWU0));
+                dWU = cat(3, dWU, dWU0);
+                
+                W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:);
+                
+                Nfilt = min(512, size(W,2));
+                
+                W = W(:, 1:Nfilt, :);
+                dWU = dWU(:, :, 1:Nfilt);
+                nsp(Nfilt) = 0;
+                mu(Nfilt)  = 0;
+                flag(1,Nfilt) = 0;
+                his(:, Nfilt) = 0;
+            end
+        end
+    end
     
     
     if flag_lastpass
@@ -202,6 +207,8 @@ for ibatch = 1:niter
         st3(irange,1) = double(st);
         st3(irange,2) = double(id0+1);
         st3(irange,3) = double(x0);
+        st3(irange,4) = double(y0);
+        
         fW(:, irange) = gather(featW);
         ntot = ntot + numel(x0);
     end
