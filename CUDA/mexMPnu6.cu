@@ -479,7 +479,7 @@ __global__ void average_snips(const double *Params, const int *st, const int *id
               
               // add to the histogram of this cluster
               y0 = y[ind];
-              y0 = min(.999f, max(0.0f, y0 - 0.5f));
+              y0 = min(.999f, max(0.0f, y0 - 0.8f)/0.4f);
               HIST[((int)(y0 * 100)) + bid * 100] ++;
           }
           

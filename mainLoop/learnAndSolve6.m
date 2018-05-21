@@ -233,10 +233,14 @@ for ibatch = 1:niter
        
        subplot(2,2,3)
        plot(mu)
+
        
        subplot(2,2,4)
        semilogx(1+nsp, mu, '.')
-       
+
+       figure(2)
+              imagesc(log(1+his))
+              
        drawnow
     end
 end
