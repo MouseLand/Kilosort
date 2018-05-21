@@ -20,9 +20,9 @@ if nargin>6
     ipair = (cc>0.9 & r0<0.2 & rdir);
     amax = max(ipair, [], 2);
     
-    figure(2)
-    plot(max(cc, [], 2))
-    drawnow
+%     figure(2)
+%     plot(max(cc, [], 2))
+%     drawnow
     
     idrop= amax>0;    
     
