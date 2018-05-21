@@ -14,7 +14,7 @@ ops.lam      = 40^2;   % weighting on the amplitude penalty (like in Kilosort1, 
 
 ops.ThS      = [10 15];  % lower bound on acceptable single spike quality
 ops.momentum = [20 400]; % number of samples to average over
-ops.minFR = 1/50;
+ops.minFR    = 1/50; % minimum spike rate (Hz)
 
 ops.sigmaMask  = 30;
 
@@ -38,8 +38,7 @@ for j = 4
     ops.dir_rez     = 'H:\DATA\Spikes\';
     
     % preprocess data
-    rez = preprocessDataSub(ops);
-    
+    rez = preprocessDataSub(ops);    
    
 %     fname = fullfile(ops.dir_rez,  ...
 %         sprintf('rez_%s_%s_%s.mat', mname, datexp, probeName{j}));

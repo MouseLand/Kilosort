@@ -8,7 +8,7 @@ Nfilt = size(W,2);
 % plot(mh)
 % drawnow
 
-isplit = find((mh > ops.splitT) & flag>10);
+isplit = find((mh > ops.splitT) & nsp'>.1);
 % isplit = find((mh > ops.splitT) & flag>10 & nsp'>2);
 n_new = numel(isplit);
 

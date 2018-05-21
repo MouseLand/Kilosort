@@ -165,10 +165,10 @@ for ibatch = 1:niter
         muall = zeros(Nfilt, nBatches, 'single');
     end
     
-    if ~flag_remember && rem(ibatch, 5)==0
+    if ~flag_remember%% && rem(ibatch, 5)==0
         if rem(ibatch,100)==0
-            [W, U, dWU, mu, nsp, his, flag] = ...
-                triageHIST(ops, W, U, dWU, mu, nsp, his, flag);            
+%             [W, U, dWU, mu, nsp, his, flag] = ...
+%                 triageHIST(ops, W, U, dWU, mu, nsp, his, flag);            
         end
         [W, U, dWU, mu, nsp, his, flag] = ...
             triageTemplates(ops, W, U, dWU, mu, nsp, his, flag);
@@ -223,25 +223,25 @@ for ibatch = 1:niter
     end
     
     if rem(ibatch, 100)==1
-       fprintf('%2.2f sec, %d batches \n', toc, ibatch) 
-       figure(1)
-       subplot(2,2,1)
-       imagesc(W(:,:,1))
-       
-       subplot(2,2,2)
-       imagesc(U(:,:,1))
-       
-       subplot(2,2,3)
-       plot(mu)
-
-       
-       subplot(2,2,4)
-       semilogx(1+nsp, mu, '.')
-
-       figure(2)
-              imagesc(log(1+his))
-              
-       drawnow
+        fprintf('%2.2f sec, %d batches \n', toc, ibatch)
+        figure(1)
+        subplot(2,2,1)
+        imagesc(W(:,:,1))
+        
+        subplot(2,2,2)
+        imagesc(U(:,:,1))
+        
+        subplot(2,2,3)
+        plot(mu)
+        
+        
+        subplot(2,2,4)
+        semilogx(1+nsp, mu, '.')
+        
+        figure(2)
+        imagesc(log(1+his))
+        
+        drawnow
     end
 end
 

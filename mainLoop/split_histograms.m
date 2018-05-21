@@ -7,7 +7,7 @@ his2 = his;
 his2(end, :) = 0;
 
 % how much smoothing here matters! (adaptive?)
-his2 = my_conv2(his2,1, 1);
+% his2 = my_conv2(his2,1, 1);
 
 Nfilt = size(his2,2);
 his2max = zeros(Nbins, Nfilt, 2, 'single');
