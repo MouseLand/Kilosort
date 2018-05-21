@@ -167,8 +167,7 @@ for ibatch = 1:niter
     
     if ~flag_remember && rem(ibatch, 5)==0
         
-        [W, U, dWU, mu, nsp, his, flag] = ...
-            triageTemplates(ops, W, U, dWU, mu, nsp, his, flag);
+        [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp);
         
         Nfilt = size(W,2);
         

@@ -29,11 +29,11 @@ mname = 'Robbins'; %'Waksman'; %'Krebs'; %'Robbins';
 datexp = '2017-06-13'; %'2017-06-10'; %'2017-06-13';
 rootZ = 'H:\DATA\Spikes';
 
-load('H:\DATA\Spikes\rez_Robbins_2017-06-13_ZNP1.mat')
-rez.ops.minFR = 1/50;
+% rez.ops.minFR = 1/50;
 
 tic
 %%
+
 for j = 4
     fname = sprintf('%s_%s_%s_g0_t0.imec.ap_CAR.bin', mname, datexp, probeName{j});
     ops.fbinary     = fullfile(rootZ,  mname, fname);    
@@ -41,14 +41,14 @@ for j = 4
     ops.dir_rez     = 'H:\DATA\Spikes\';
     
     % preprocess data
-%     rez = preprocessDataSub(ops);    
-   
+    rez = preprocessDataSub(ops);    
+   %%
     fname = fullfile(ops.dir_rez,  ...
         sprintf('rez_%s_%s_%s.mat', mname, datexp, probeName{j}));
     save(fname, 'rez');
     
     % cluster the threshold crossings
-    learnAndSolve6;
+    learnAndSolve7;
     %%
     savePath = fullfile('H:\DATA\Spikes\', mname);    
     rezToPhy(rez, savePath);

@@ -36,7 +36,7 @@ ops.dir_rez     = 'H:\DATA\Spikes\';
 % preprocess data
 rez = preprocessDataSub(ops);
 %%
-learnAndSolve6;
+learnAndSolve7;
 
 
 %%

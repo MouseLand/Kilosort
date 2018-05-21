@@ -17,7 +17,7 @@
 #include <iostream>
 using namespace std;
 
-const int  Nthreads = 1024, maxFR = 500, NrankMax = 3;
+const int  Nthreads = 1024, maxFR = 5000, NrankMax = 3;
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	Conv1D(const double *Params, const float *data, const float *W, float *conv_sig){    
   volatile __shared__ float  sW[81*NrankMax], sdata[(Nthreads+81)*NrankMax]; 
@@ -262,10 +262,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMalloc(&d_id1,    maxFR * sizeof(int));
   
   
-  cudaMalloc(&d_WU,    maxFR*nt0*Nchan * sizeof(float));
   cudaMalloc(&d_counter,   2*sizeof(int));
-  
-  cudaMemset(d_WU,      0, maxFR*nt0*Nchan * sizeof(float));
+
   cudaMemset(d_counter, 0, 2*sizeof(int));
   cudaMemset(d_dout,    0, NT * Nchan * sizeof(float));
   cudaMemset(d_err,     0, NT * sizeof(float));
@@ -297,10 +295,14 @@ void mexFunction(int nlhs, mxArray *plhs[],
   // add new spikes to 2nd counter
   cudaMemcpy(counter,     d_counter+1, sizeof(int), cudaMemcpyDeviceToHost);
   
+  counter[0] = min(maxFR, counter[0]);
+  
+  cudaMalloc(&d_WU,    counter[0]*nt0*Nchan * sizeof(float));  
+  cudaMemset(d_WU,      0, counter[0]*nt0*Nchan * sizeof(float));
+  
   // update dWU here by adding back to subbed spikes
   extract_snips<<<Nchan,tpS>>>(  d_Params, d_st1, d_id1, d_counter, d_data, d_WU);
   
-  counter[0] = min(maxFR, counter[0]);
   
   mxGPUArray *WU1;
   float  *d_WU1;

@@ -87,8 +87,6 @@ for ibatch = 1:niter
         U  = gpuArray(Uall(:,:,:,k));
         mu = gpuArray(muall(:,k));
     end
-   
-    
     
     % dat load \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -162,32 +160,27 @@ for ibatch = 1:niter
         muall = zeros(Nfilt, nBatches, 'single');
     end
     
-    if ~flag_remember && Nfilt<512    && rem(ibatch, 5)==0     
-%         figure(2)
-%         plot(ss0(:,2), ss0(:,1), 'o')
-%         hold on 
-%         plot([0 100], [0 100], '-k')
-%         hold off
-%         drawnow
+    if ~flag_remember && Nfilt<512  && rem(ibatch, 5)==0     
+        [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp, 1);
         
-        W(:,nsp<1/10,:) = [];
-        U(:,nsp<1/10,:) = [];
-        dWU(:,:, nsp<1/10) = [];
-        mu(nsp<1/10) = [];
-        nsp(nsp<1/10) = [];
         Nfilt = size(W,2);
-       
-        dWU0 = mexGetSpikes(Params, drez, wPCA);        
-        dWU0 = reshape(wPCA * (wPCA' * dWU0(:,:)), size(dWU0));        
-        dWU = cat(3, dWU, dWU0);
         
-        W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:);
-        Nfilt = min(512, size(W,2));
-        
-        W = W(:, 1:Nfilt, :);
-        dWU = dWU(:, :, 1:Nfilt);        
-        nsp(Nfilt) = 0;
-        mu(Nfilt)  = 0;
+        if Nfilt<ops.Nfilt
+            dWU0 = mexGetSpikes(Params, drez, wPCA);
+            if size(dWU0,3)>0
+                dWU0 = reshape(wPCA * (wPCA' * dWU0(:,:)), size(dWU0));
+                dWU = cat(3, dWU, dWU0);
+                
+                W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:);
+                
+                Nfilt = min(512, size(W,2));
+                
+                W = W(:, 1:Nfilt, :);
+                dWU = dWU(:, :, 1:Nfilt);
+                nsp(Nfilt) = 0;
+                mu(Nfilt)  = 0;                
+            end
+        end
    end
     
     
@@ -249,7 +242,7 @@ ntot
 
 rez.st3 = st3(isort, :);
 
-rez.simScore = gather(WtW(:,:,nt0));
+rez.simScore = gather(max(WtW, [], 3));
 
 rez.cProj    = fW(:, isort)';
 rez.iNeigh   = gather(iList);
