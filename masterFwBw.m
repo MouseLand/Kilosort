@@ -25,8 +25,8 @@ ops.nPCs        = 3; % how many PCs to project the spikes into
 ops.useRAM = 0;
 
 probeName = {'K1', 'K2', 'K3', 'ZNP1', 'ZNP2', 'ZNP3', 'ZNP4', 'ZO'};
-mname = 'Robbins'; %'Waksman'; %'Krebs'; %'Robbins';
-datexp = '2017-06-13'; %'2017-06-10'; %'2017-06-13';
+mname = 'Waksman'; %'Waksman'; %'Krebs'; %'Robbins';
+datexp = '2017-06-10'; %'2017-06-13'; %'2017-06-10'; %'2017-06-13';
 rootZ = 'H:\DATA\Spikes';
 
 % rez.ops.minFR = 1/50;
@@ -34,7 +34,7 @@ rootZ = 'H:\DATA\Spikes';
 tic
 %%
 
-for j = 4
+for j = 1
     fname = sprintf('%s_%s_%s_g0_t0.imec.ap_CAR.bin', mname, datexp, probeName{j});
     ops.fbinary     = fullfile(rootZ,  mname, fname);    
     ops.fproc       = 'H:\DATA\Spikes\temp_wh.dat'; % residual from RAM of preprocessed data
@@ -46,7 +46,7 @@ for j = 4
     fname = fullfile(ops.dir_rez,  ...
         sprintf('rez_%s_%s_%s.mat', mname, datexp, probeName{j}));
     save(fname, 'rez');
-    
+    %%
     % cluster the threshold crossings
     learnAndSolve7;
     %%

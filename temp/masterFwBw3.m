@@ -35,12 +35,9 @@ ops.dir_rez     = 'H:\DATA\Spikes\';
 
 % preprocess data
 rez = preprocessDataSub(ops);
-%%
+
 learnAndSolve7;
-
-
 %%
-
 fGTname = sprintf('%s_spike_samples_npx.npy', dset);
 sGT  = readNPY(fullfile('H:\DATA\Spikes\', fGTname));
 

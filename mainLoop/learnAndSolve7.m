@@ -70,10 +70,11 @@ nsp = gpuArray.zeros(0,1, 'single');
 
 fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 
+%%
 fid = fopen(ops.fproc, 'r');
 
 ntot = 0;
-%%
+
 for ibatch = 1:niter
     k = irounds(rem(ibatch-1 + Boffset, 2*nBatches)+1);
     
@@ -117,11 +118,15 @@ for ibatch = 1:niter
             nsp = nsp(isort);
         end
         
-        [W, U, mu] = mexSVDsmall(Params, dWU, W, iC-1, iW-1);
+        if ~flag_lastpass
+            [W, U, mu] = mexSVDsmall(Params, dWU, W, iC-1, iW-1);
+        else
+            % combine W,U,mu from the forward pass with the average from
+            % this pass. 
+            Wrec = mexRECONSTRUCT(Params, W, U, mu);
+            [W, U, mu] = mexSVDsmall(Params, (dWU + Wrec)/2, W, iC-1, iW-1);          
+        end
        
-        [W0, nmax] = get_diffW(W);
-        nmax(:) = 0;
-        
         % this needs to change
         [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
     end
@@ -160,7 +165,7 @@ for ibatch = 1:niter
         muall = zeros(Nfilt, nBatches, 'single');
     end
     
-    if ~flag_remember && Nfilt<512  && rem(ibatch, 5)==0     
+    if ~flag_remember && Nfilt<512  %&& rem(ibatch, 5)==0             
         [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp, 1);
         
         Nfilt = size(W,2);
@@ -201,7 +206,7 @@ for ibatch = 1:niter
     
     if ibatch==niter-nBatches
         flag_lastpass = 1;
-        flag_update = 0;
+%         flag_update = 0;
     end
     if ibatch==100
         flag_update = 1;
