@@ -5,7 +5,7 @@ pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github fol
 run(fullfile(pathToYourConfigFile, 'configFileBench384.m'))
 
 % common options for every probe
-ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap.mat';
+ops.chanMap = 'D:\DATA\Neuropixels\forPRBimecToWhisper.mat';
 ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
  % these settings overwrite any settings from config
@@ -24,8 +24,9 @@ ops.nPCs        = 3; % how many PCs to project the spikes into
 
 ops.useRAM = 0;
 
-% rootZ = 'D:\DATA\ALLEN\mouse366119\probeC_2018-03-02_15-18-32_SN619041624\experiment1\recording1\continuous\Neuropix-120.0\';
-rootZ = 'D:\DATA\ALLEN\mouse366119\probeA_2018-03-02_15-17-32_SN641251526\experiment1\recording1\continuous\Neuropix-104.0\';
+
+rootZ = '';
+
 rootH = 'H:\DATA\Spikes\temp\';
 fname = 'continuous.dat';
 

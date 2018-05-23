@@ -119,7 +119,7 @@ __global__ void	cleanup_spikes(const double *Params, const float *err,
       
       err0 = sdata[tid+lockout];
       t0 = tid+lockout         + tid0;
-      if(err0>Th*Th && t0<NT-lockout-1){
+      if(err0 > Th*Th && t0<NT-lockout-1){
           flag = 0;
           for(j=-lockout;j<=lockout;j++)
               if(sdata[tid+lockout+j]>err0){

@@ -298,11 +298,6 @@ __global__ void	cleanup_spikes(const double *Params, const float *data,
                   id[indx] = id0;
                   
                   x[indx]  = (x0 + lam/mu[id0]) / (1.0f + lam/(mu[id0] * mu[id0]));
-
-//                   st[indx] = tid+lockout         + tid0;
-//                   id[indx] = ftype[tid+lockout   + tid0];
-//                   x[indx]  = xbest[tid+lockout     + tid0];
-//                   y[indx]  = ybest[tid+lockout     + tid0];
               }
           }
       }

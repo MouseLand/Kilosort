@@ -104,8 +104,8 @@ for ibatch = 1:niter
             W = W0(:,ones(1,size(dWU,3)),:);
             Nfilt = size(W,2);            
             nsp(Nfilt) = 0;
+            Params(2) = Nfilt; 
         end
-        Params(2) = Nfilt; 
         
         % decompose dWU by svd of time and space (61 by 61)
         [~, iW] = max(abs(dWU(nt0min, :, :)), [], 2);
@@ -118,22 +118,21 @@ for ibatch = 1:niter
             nsp = nsp(isort);
         end
         
-        if ~flag_lastpass
-            [W, U, mu] = mexSVDsmall(Params, dWU, W, iC-1, iW-1);
-        else
-            % combine W,U,mu from the forward pass with the average from
-            % this pass. 
-            Wrec = mexRECONSTRUCT(Params, W, U, mu);
-            [W, U, mu] = mexSVDsmall(Params, (dWU + Wrec)/2, W, iC-1, iW-1);          
+        Wrec = dWU;
+        if flag_lastpass
+%             Wrec = (Wrec + mexRECONSTRUCT(Params, W, U, mu))/2;            
         end
-       
+        
+        [W, U, mu] = mexSVDsmall(Params, Wrec, W, iC-1, iW-1);
+        
         % this needs to change
         [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
     end
     
     % needs an iList for computing features
-    [st0, id0, x0, featW, dWU, drez, nsp0, ss0] = mexMPnu7(Params, dataRAW, dWU, ...
-        U, W, mu, iC-1, iW-1, UtU, iList-1, wPCA, maskU);    
+    [st0, id0, x0, featW, dWU, drez, nsp0, ss0] = ...
+        mexMPnu7(Params, dataRAW, dWU, U, W, mu, iC-1, iW-1, UtU, iList-1, ...
+        wPCA, maskU);    
     
     nsp = nsp * .95 + .05 * nsp0;
     
@@ -151,6 +150,11 @@ for ibatch = 1:niter
         flag_remember = 1;
         flag_resort   = 0;
         
+        % final clean up
+        [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp, 1);        
+        Nfilt = size(W,2);
+        Params(2) = Nfilt; 
+        
         [WtW, iList] = getMeWtW(W, U, Nnearest);
         
         % extract features on the last pass
@@ -158,19 +162,22 @@ for ibatch = 1:niter
         
         % don't discard bad spikes on last pass
         Params(12) = 1e3;
-       
         
         Wall  = zeros(nt0, Nfilt, Nrank, nBatches, 'single');
         Uall  = zeros(Nchan, Nfilt,Nrank,  nBatches, 'single');
         muall = zeros(Nfilt, nBatches, 'single');
     end
     
-    if ~flag_remember && Nfilt<512  %&& rem(ibatch, 5)==0             
-        [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp, 1);
-        
-        Nfilt = size(W,2);
+    if ~flag_remember 
+        if rem(ibatch, 3)==1        
+            % this drops templates
+            [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp, 1);
+            Nfilt = size(W,2);
+            Params(2) = Nfilt;
+        end
         
         if Nfilt<ops.Nfilt
+            % this adds templates
             dWU0 = mexGetSpikes(Params, drez, wPCA);
             if size(dWU0,3)>0
                 dWU0 = reshape(wPCA * (wPCA' * dWU0(:,:)), size(dWU0));
@@ -179,19 +186,21 @@ for ibatch = 1:niter
                 W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:);
                 
                 Nfilt = min(512, size(W,2));
+                Params(2) = Nfilt;
                 
                 W = W(:, 1:Nfilt, :);
                 dWU = dWU(:, :, 1:Nfilt);
                 nsp(Nfilt) = 0;
-                mu(Nfilt)  = 0;                
+                mu(Nfilt)  = 0;
             end
         end
+        
    end
     
     
     if flag_lastpass
         ioffset         = ops.ntbuff;
-        if k==1
+        if k==1; 
             ioffset         = 0;
         end
         toff = nt0min + t0 -ioffset + (NT-ops.ntbuff)*(k-1);
@@ -206,7 +215,7 @@ for ibatch = 1:niter
     
     if ibatch==niter-nBatches
         flag_lastpass = 1;
-%         flag_update = 0;
+        flag_update = 0;
     end
     if ibatch==100
         flag_update = 1;

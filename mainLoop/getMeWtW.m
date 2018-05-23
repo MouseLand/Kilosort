@@ -16,5 +16,7 @@ end
 if nargin>2 && nargout>1
     cc = max(WtW(:,:,:), [], 3);
     [~, isort] = sort(cc, 1, 'descend');
-    iList = int32(gpuArray(isort(1:Nnearest, :)));
+    
+    iNear = rem([1:Nnearest]-1, Nfilt) + 1;
+    iList = int32(gpuArray(isort(iNear, :)));
 end
