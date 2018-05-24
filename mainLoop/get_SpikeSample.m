@@ -3,7 +3,7 @@ function clips = get_SpikeSample(dataRAW, row, col, dc)
 [nT, nChan] = size(dataRAW);
 
 % times around the peak to consider
-dt = -21 + [1:61];
+dt = -20 + [1:61];
 
 % temporal indices
 indsT = repmat(row', numel(dt), 1) + repmat(dt', 1, numel(row));

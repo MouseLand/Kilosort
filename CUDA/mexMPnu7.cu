@@ -241,9 +241,9 @@ __global__ void  bestFilterUpdate(const double *Params, const float *data,
               
               if (Cf > Cbest + 1e-6){
                   Cbest 	= Cf;
-//                   xb        = Ci / (1.0f + lam/(mu[i] * mu[i]));
                   ibest 	= i;
-//                   yb       = y;
+                  //                   xb        = Ci / (1.0f + lam/(mu[i] * mu[i]));
+                  //                   yb       = y;
               }
           }
           err[t] 	= Cbest;
@@ -256,7 +256,7 @@ __global__ void  bestFilterUpdate(const double *Params, const float *data,
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	cleanup_spikes(const double *Params, const float *data, 
         const float *mu, const float *err, const int *ftype, int *st, 
-        int *id, float *x,  int *counter){
+        int *id, float *x, float *y,  int *counter){
     
   int lockout, indx, tid, bid, NT, tid0,  j, id0, t0;
   volatile __shared__ float sdata[Nthreads+2*81+1];
@@ -298,6 +298,7 @@ __global__ void	cleanup_spikes(const double *Params, const float *data,
                   id[indx] = id0;
                   
                   x[indx]  = (x0 + lam/mu[id0]) / (1.0f + lam/(mu[id0] * mu[id0]));
+                  y[indx]  = x0;
               }
           }
       }
@@ -340,6 +341,7 @@ __global__ void	extractFEAT(const double *Params, const int *st, const int *id,
         ind += NthreadsX * Nblocks;
     }
 }
+
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	subtract_spikes(const double *Params,  const int *st, 
         const int *id, const float *x, const int *counter, float *dataraw, 
@@ -493,6 +495,64 @@ __global__ void average_snips(const double *Params, const int *st, const int *id
           }
       }
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////
+__global__ void	computePCfeatures(const double *Params, const int *counter, 
+        const float *dataraw,  const int *st, const int *id, const float *x, 
+        const float *W, const float *U, const float *mu, const int *iW, const int *iC,
+        const float *wPCA, float *featPC){
+    
+  volatile __shared__ float  sPCA[81 * NrankMax], sW[81 * NrankMax], sU[NchanMax * NrankMax];
+  volatile __shared__ int iU[NchanMax];
+
+  int bid, nt0, t, tidx, tidy, k, NT, ind, Nchan, NchanU, Nfilt, Nrank;
+  float X = 0.0f, Y = 0.0f;
+
+  NT        = (int) Params[0];
+  nt0       = (int) Params[4];
+  Nchan     = (int) Params[9];
+  Nfilt    	= (int) Params[1];
+  Nrank     = (int) Params[6];  
+  NchanU    = (int) Params[10];
+  
+  tidx 		= threadIdx.x;
+  tidy 		= threadIdx.y;
+  bid       = blockIdx.x;
+  
+  if (tidy==0)
+      iU[tidx] = iC[tidx + NchanU * iW[bid]];
+  __syncthreads();
+
+  sU[tidx + tidy*NchanU]= U[iU[tidx] + Nchan * bid + Nchan * Nfilt * tidy];
+  
+  while (tidx<nt0){
+     sW[tidx + tidy*nt0]  = W[tidx + bid*nt0 + Nfilt * nt0 * tidy];
+      sPCA[tidx + tidy*nt0]  = wPCA[tidx + nt0 * tidy];
+      tidx += blockDim.x;
+  }
+  
+  tidx 		= threadIdx.x;
+  __syncthreads();
+    
+//   first, compute wPCA projections of the filter  
+  Y = 0.0f;
+  for (k =0; k<Nrank; k++){
+      X = 0.0f;
+      for (t=0;t<nt0;t++)
+          X += sW[t + k*nt0] * sPCA[t + tidy * nt0];
+      Y += X * sU[tidx + k*NchanU];
+  }
+  
+  //now for each matching spike, compute the features
+  for(ind=0; ind<counter[0];ind++)
+      if (id[ind]==bid){          
+          X = Y * (x[ind] - mu[bid]); 
+          for (t=0;t<nt0; t++)
+              X  += dataraw[st[ind] + t + NT * iU[tidx]] * sPCA[t + nt0*tidy];
+          featPC[tidx + tidy*NchanU + ind * NchanU*Nrank] = X;
+      }
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	addback_spikes(const double *Params,  const int *st, 
         const int *id, const float *x, const int *count, float *dataraw, 
@@ -528,7 +588,6 @@ __global__ void	addback_spikes(const double *Params,  const int *st,
       ind += gridDim.x;
   }
 }
-
 //////////////////////////////////////////////////////////////////////////////////////////
 
 /*
@@ -600,7 +659,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
     
   
   /* allocate new GPU variables*/  
-  float *d_err, *d_x, *d_dout, *d_feat, *d_data, *d_spkscore;
+  float *d_err, *d_x, *d_y, *d_dout, *d_feat, *d_data, *d_spkscore, *d_featPC;
   int *d_st,  *d_ftype,  *d_id, *d_counter, *d_count;
 
   cudaMalloc(&d_dout,   2*NT * Nfilt* sizeof(float));
@@ -611,11 +670,13 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMalloc(&d_st,    maxFR * sizeof(int));
   cudaMalloc(&d_id,    maxFR * sizeof(int));
   cudaMalloc(&d_x,     maxFR * sizeof(float));
+  cudaMalloc(&d_y,     maxFR * sizeof(float));
   cudaMalloc(&d_spkscore,     2*maxFR * sizeof(float));
   
   cudaMalloc(&d_counter,   2*sizeof(int));
   cudaMalloc(&d_count,   nmaxiter*sizeof(int));
   cudaMalloc(&d_feat,     maxFR * Nnearest * sizeof(float));
+  cudaMalloc(&d_featPC,     maxFR * NchanU*Nrank * sizeof(float));
   
   cudaMemset(d_nsp,    0, Nfilt * sizeof(float));
   cudaMemset(d_dout,    0, NT * Nfilt * sizeof(float));
@@ -626,7 +687,9 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemset(d_id,      0, maxFR *   sizeof(int));
   cudaMemset(d_spkscore,      0, 2*maxFR *   sizeof(float));
   cudaMemset(d_x,       0, maxFR *    sizeof(float));
+  cudaMemset(d_y,       0, maxFR *    sizeof(float));
   cudaMemset(d_feat,    0, maxFR * Nnearest *   sizeof(float));
+  cudaMemset(d_featPC,    0, maxFR * NchanU*Nrank *   sizeof(float));
   
   int *counter;
   counter = (int*) calloc(1,2 * sizeof(int));
@@ -634,7 +697,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemset(d_err,     0, NT * sizeof(float));
   cudaMemset(d_ftype,   0, NT * sizeof(int));
   
-  dim3 tpB(8, 2*nt0-1), tpF(16, Nnearest), tpS(nt0, 16), tpW(NchanU, Nrank);
+  dim3 tpB(8, 2*nt0-1), tpF(16, Nnearest), tpS(nt0, 16), tpW(Nnearest, Nrank), tpPC(NchanU, Nrank);
   
   // filter the data with the spatial templates
   spaceFilter<<<Nfilt, Nthreads>>>(d_Params, d_draw, d_U, d_iC, d_iW, d_data);
@@ -649,7 +712,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   for(int k=0;k<(int) Params[3];k++){
       // ignore peaks that are smaller than another nearby peak
       cleanup_spikes<<<NT/Nthreads,Nthreads>>>(d_Params, d_dout, d_mu, d_err,
-              d_ftype, d_st, d_id, d_x, d_counter);
+              d_ftype, d_st, d_id, d_x, d_y, d_counter);
       
       // add new spikes to 2nd counter
       cudaMemcpy(counter, d_counter, 2*sizeof(int), cudaMemcpyDeviceToHost);
@@ -659,7 +722,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
       }
       
       // extract template features before subtraction
-      if (Params[12])      
+      if (Params[12]>1)      
          extractFEAT<<<64, tpF>>>(d_Params, d_st, d_id, d_x, d_counter, d_dout, d_iList, d_mu, d_feat);
       
       // subtract spikes from raw data here
@@ -687,6 +750,11 @@ void mexFunction(int nlhs, mxArray *plhs[],
   computeSpikeGoodness<<<Nfilt, tpW>>>(d_Params, d_counter, d_draw, d_dorig, d_st, d_id, 
           d_iW, d_iC, d_mask, d_wPCA, d_spkscore);
   
+  // compute PC features from reziduals + subtractions
+  if (Params[12]>0)
+     computePCfeatures<<<Nfilt, tpPC>>>(d_Params, d_counter, d_draw, d_st,
+             d_id, d_x, d_W, d_U, d_mu, d_iW, d_iC, d_wPCA, d_featPC);
+  
   // update dWU here by adding back to subbed spikes.  
   average_snips<<<Nfilt,tpS>>>(d_Params, d_st, d_id, d_x, d_counter, 
           d_draw, d_W, d_U, d_dWU, d_nsp, d_spkscore);
@@ -697,13 +765,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
       addback_spikes<<<Nfilt,tpS>>>(d_Params,  d_st, d_id, d_x, 
               d_count, d_draw, d_W, d_U, iter, d_spkscore);  
   
-  // dWU stays a GPU array
-  plhs[4] 	= mxGPUCreateMxArrayOnGPU(dWU);
-  plhs[5] 	= mxGPUCreateMxArrayOnGPU(draw);
-  plhs[6] 	= mxGPUCreateMxArrayOnGPU(nsp);
-  
- 
-  float *x, *feat, *spkscore;
+   
+  float *x, *feat, *spkscore, *featPC;
   int *st, *id;
   int minSize;
   if (counter[0]<maxFR)  minSize = counter[0];
@@ -716,19 +779,29 @@ void mexFunction(int nlhs, mxArray *plhs[],
   plhs[2] = mxCreateNumericArray(2, dimst, mxSINGLE_CLASS, mxREAL);
   x =  (float*) mxGetData(plhs[2]);  
   
-  const mwSize dimst2[] 	= {minSize,2}; 
-  plhs[7] = mxCreateNumericArray(2, dimst2, mxSINGLE_CLASS, mxREAL);
-  spkscore =  (float*) mxGetData(plhs[7]);
-  
   const mwSize dimsf[] 	= {Nnearest, minSize}; 
   plhs[3] = mxCreateNumericArray(2, dimsf, mxSINGLE_CLASS, mxREAL);
   feat =  (float*) mxGetData(plhs[3]);  
   
+  // dWU stays a GPU array
+  plhs[4] 	= mxGPUCreateMxArrayOnGPU(dWU);
+  plhs[5] 	= mxGPUCreateMxArrayOnGPU(draw);
+  plhs[6] 	= mxGPUCreateMxArrayOnGPU(nsp);
+  
+  const mwSize dimst2[] 	= {minSize,2}; 
+  plhs[7] = mxCreateNumericArray(2, dimst2, mxSINGLE_CLASS, mxREAL);
+  spkscore =  (float*) mxGetData(plhs[7]);
+    
+  const mwSize dimsfPC[] 	= {NchanU, Nrank, minSize}; 
+  plhs[8] = mxCreateNumericArray(3, dimsfPC, mxSINGLE_CLASS, mxREAL);
+  featPC =  (float*) mxGetData(plhs[8]);  
+  
   cudaMemcpy(st, d_st, minSize * sizeof(int),   cudaMemcpyDeviceToHost);
   cudaMemcpy(id, d_id, minSize * sizeof(int),   cudaMemcpyDeviceToHost);
-  cudaMemcpy(x,   d_x, minSize * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(x,   d_y, minSize * sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(spkscore,  d_spkscore, 2*minSize * sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(feat,   d_feat, minSize * Nnearest*sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(featPC,   d_featPC, minSize * NchanU*Nrank*sizeof(float), cudaMemcpyDeviceToHost);
   
   cudaFree(d_counter);
   cudaFree(d_Params);
@@ -737,8 +810,10 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaFree(d_st);
   cudaFree(d_id);
   cudaFree(d_x);  
+  cudaFree(d_y); 
   cudaFree(d_spkscore);
   cudaFree(d_feat);
+  cudaFree(d_featPC);
   cudaFree(d_dout);
   cudaFree(d_data);
   
