@@ -546,7 +546,7 @@ __global__ void	computePCfeatures(const double *Params, const int *counter,
   //now for each matching spike, compute the features
   for(ind=0; ind<counter[0];ind++)
       if (id[ind]==bid){          
-          X = Y * (x[ind] - mu[bid]); 
+          X = Y * x[ind]; // - mu[bid]); 
           for (t=0;t<nt0; t++)
               X  += dataraw[st[ind] + t + NT * iU[tidx]] * sPCA[t + nt0*tidy];
           featPC[tidx + tidy*NchanU + ind * NchanU*Nrank] = X;
