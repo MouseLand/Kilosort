@@ -11,8 +11,6 @@ wPCA(:,1) = - wPCA(:,1) * sign(wPCA(20,1));
 
 rng('default'); rng(1);
 
-ops.Nfilt = 512;
-
 NchanNear   = 32;
 Nnearest    = 32;
 nfullpasses = ops.nfullpasses;
@@ -68,7 +66,7 @@ iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
 
 nsp = gpuArray.zeros(0,1, 'single');
 
-% Params(13) = 1;
+Params(13) = 1;
 %%
 
 
@@ -78,7 +76,7 @@ fid = fopen(ops.fproc, 'r');
 
 ntot = 0;
 
-for ibatch = niter-nBatches+1:niter
+for ibatch = 1:niter
     k = irounds(rem(ibatch-1 + Boffset, 2*nBatches)+1);
     
     if ibatch<=niter-2*nBatches
@@ -198,10 +196,10 @@ for ibatch = niter-nBatches+1:niter
                 Nfilt = min(ops.Nfilt, size(W,2));
                 Params(2) = Nfilt;
                 
-                W = W(:, 1:Nfilt, :);
+                W   = W(:, 1:Nfilt, :);
                 dWU = dWU(:, :, 1:Nfilt);
                 nsp = nsp(1:Nfilt);
-                mu = mu(1:Nfilt);
+                mu  = mu(1:Nfilt);
                 
                 
             end
@@ -221,6 +219,8 @@ for ibatch = niter-nBatches+1:niter
         st3(irange,1) = double(st);
         st3(irange,2) = double(id0+1);
         st3(irange,3) = double(x0);
+        st3(irange,4) = double(ss0(:,1));
+        
         fW(:, irange) = gather(featW);        
         
         fWpc(:, :, irange) = gather(featPC);
@@ -232,7 +232,7 @@ for ibatch = niter-nBatches+1:niter
         flag_lastpass = 1;
         flag_update = 0;
         
-        st3 = zeros(1e7, 3);
+        st3 = zeros(1e7, 4);
         fW  = zeros(Nnearest, 1e7, 'single');
         fWpc = zeros(NchanNear, Nrank, 1e7, 'single');
     end

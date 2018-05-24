@@ -212,8 +212,8 @@ __global__ void reNormalize(const double *Params, float *W, float *U, float *mu)
     xmax = 0.0f;
     imax = 0;
     for(t=0;t<nt0;t++)
-        if (sW[t] < xmax){
-            xmax = sW[t];
+        if (abs(sW[t]) > xmax){
+            xmax = abs(sW[t]);
             imax = t;
         }
      
