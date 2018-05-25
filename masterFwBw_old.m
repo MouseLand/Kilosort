@@ -9,17 +9,17 @@ ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanM
 ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
  % these settings overwrite any settings from config
-ops.Th       = 10;     % threshold on projections (like in Kilosort1)
+ops.Th       = 12;     % threshold on projections (like in Kilosort1)
 ops.lam      = 40^2;   % weighting on the amplitude penalty (like in Kilosort1, but it has to be much larger)
 
-ops.ThS      = [8 8];  % lower bound on acceptable single spike quality
+ops.ThS      = [10 15];  % lower bound on acceptable single spike quality
 ops.momentum = [20 400]; % number of samples to average over
 ops.minFR    = 1/50; % minimum spike rate (Hz)
 
 ops.sigmaMask  = 30;
 
-ops.Nfilt       = 1024; % max number of clusters
-ops.nfullpasses = 1; % how many forward backward passes to do
+ops.Nfilt       = 512; % max number of clusters
+ops.nfullpasses = 3; % how many forward backward passes to do
 ops.nPCs        = 3; % how many PCs to project the spikes into
 
 ops.useRAM = 0;
@@ -36,13 +36,10 @@ ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % residual from RAM of preproc
 % preprocess data
 rez = preprocessDataSub(ops);
 
-% fname = fullfile(rootZ, 'rez.mat');
-% save(fname, 'rez');
+fname = fullfile(rootZ, 'rez.mat');
+save(fname, 'rez');
 
 % cluster the threshold crossings
-% learnAndSolve7;
-rez = learnAndSolve8(rez);
-
+learnAndSolve7;
 
 rezToPhy(rez, rootZ);
-

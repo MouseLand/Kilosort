@@ -454,7 +454,7 @@ __global__ void computeSpikeGoodness(const double *Params, const int *counter, c
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void average_snips(const double *Params, const int *st, const int *id,
         const float *x,  const int *counter, const float *dataraw, 
-        const float *W, const float *U, float *WU, float *nsp, const float *spkscore){
+        const float *W, const float *U, float *WU, float *nsp, const float *spkscore, const float *p){
     
   int nt0, tidx, tidy, bid, ind, NT, Nchan,k, Nrank, Nfilt;
   float xsum, pm, X, ThS; 
@@ -488,8 +488,8 @@ __global__ void average_snips(const double *Params, const int *st, const int *id
               
               xsum = dataraw[st[ind]+tidx + NT * tidy] + x[ind] * X;
               
-              WU[tidx+tidy*nt0 + nt0*Nchan * bid] *= pm;
-              WU[tidx+tidy*nt0 + nt0*Nchan * bid] +=(1-pm) * xsum;
+              WU[tidx+tidy*nt0 + nt0*Nchan * bid] *= p[bid];
+              WU[tidx+tidy*nt0 + nt0*Nchan * bid] +=(1-p[bid]) * xsum;
               
               tidy+=blockDim.y;
           }
@@ -617,8 +617,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemcpy(d_Params,Params,sizeof(double)*mxGetNumberOfElements(prhs[0]),cudaMemcpyHostToDevice);
 
    /* collect input GPU variables*/
-  mxGPUArray const  *W, *iList,  *U, *iC, *iW, *mu, *UtU, *mask, *wPCA, *dorig;
-  const float     *d_W, *d_U,  *d_mu, *d_wPCA, *d_mask, *d_dorig;
+  mxGPUArray const  *W, *iList,  *U, *iC, *iW, *mu, *UtU, *mask, *wPCA, *dorig, *p;
+  const float  *d_p,   *d_W, *d_U,  *d_mu, *d_wPCA, *d_mask, *d_dorig;
   const int *d_iList, *d_iC, *d_iW;
   float *d_draw, *d_dWU, *d_nsp;
   const bool *d_UtU;
@@ -645,6 +645,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   d_wPCA        	= (float const *)(mxGPUGetDataReadOnly(wPCA));
   mask             = mxGPUCreateFromMxArray(prhs[11]);
   d_mask        	= (float const *)(mxGPUGetDataReadOnly(mask));
+  p              = mxGPUCreateFromMxArray(prhs[12]);
+  d_p        	= (float const *)(mxGPUGetDataReadOnly(p));
   
    // dWU is not a constant , so the data has to be "copied" over
   mxGPUArray *dWU, *draw, *nsp;
@@ -757,7 +759,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   
   // update dWU here by adding back to subbed spikes.  
   average_snips<<<Nfilt,tpS>>>(d_Params, d_st, d_id, d_x, d_counter, 
-          d_draw, d_W, d_U, d_dWU, d_nsp, d_spkscore);
+          d_draw, d_W, d_U, d_dWU, d_nsp, d_spkscore, d_p);
 
   
   // add back to the residuals the spikes with unexplained variance
@@ -817,6 +819,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaFree(d_dout);
   cudaFree(d_data);
   
+  mxGPUDestroyGPUArray(p);
   mxGPUDestroyGPUArray(draw);
   mxGPUDestroyGPUArray(dorig);
   mxGPUDestroyGPUArray(mask);

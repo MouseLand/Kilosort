@@ -5,7 +5,7 @@ pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github fol
 run(fullfile(pathToYourConfigFile, 'configFileBench384.m'))
 
 % common options for every probe
-ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap.mat';
+ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap_385.mat';
 ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
  % these settings overwrite any settings from config
@@ -19,19 +19,21 @@ ops.minFR    = 1/50; % minimum spike rate (Hz)
 ops.sigmaMask  = 30;
 
 ops.Nfilt       = 1024; % max number of clusters
-ops.nfullpasses = 1; % how many forward backward passes to do
+ops.nfullpasses = 3; % how many forward backward passes to do
 ops.nPCs        = 3; % how many PCs to project the spikes into
 
 ops.useRAM = 0;
 
+
 % rootZ = 'D:\DATA\ALLEN\mouse366119\probeC_2018-03-02_15-18-32_SN619041624\experiment1\recording1\continuous\Neuropix-120.0\';
-rootZ = 'D:\DATA\ALLEN\mouse366119\probeA_2018-03-02_15-17-32_SN641251526\experiment1\recording1\continuous\Neuropix-104.0\';
+rootZ = 'D:\DATA\Neuropixels\Robbins\ZNP1';
 rootH = 'H:\DATA\Spikes\temp\';
-fname = 'continuous.dat';
+
+fs = dir(fullfile(rootZ, '*.bin'));
+fname = fs(1).name;
 
 ops.fbinary     = fullfile(rootZ,  fname);
 ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % residual from RAM of preprocessed data
-
 
 % preprocess data
 rez = preprocessDataSub(ops);
@@ -42,7 +44,6 @@ rez = preprocessDataSub(ops);
 % cluster the threshold crossings
 % learnAndSolve7;
 rez = learnAndSolve8(rez);
-
 
 rezToPhy(rez, rootZ);
 

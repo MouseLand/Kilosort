@@ -13,14 +13,14 @@ ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 ops.Th       = 10;     % threshold on projections (like in Kilosort1)
 ops.lam      = 40^2;   % weighting on the amplitude penalty (like in Kilosort1, but it has to be much larger)
 
-ops.ThS      = [10 15];  % lower bound on acceptable single spike quality
+ops.ThS      = [8 8];  % lower bound on acceptable single spike quality
 ops.momentum = [20 400]; % number of samples to average over
 ops.minFR = 1/50;
 
 ops.sigmaMask  = 30;
 
-ops.Nfilt       = 512; % max number of clusters
-ops.nfullpasses = 3; % how many forward backward passes to do
+ops.Nfilt       = 768; % max number of clusters
+ops.nfullpasses = 1; % how many forward backward passes to do
 ops.nPCs        = 3; % how many PCs to project the spikes into
 
 ops.useRAM = 0;
@@ -36,8 +36,9 @@ ops.dir_rez     = 'H:\DATA\Spikes\';
 % preprocess data
 rez = preprocessDataSub(ops);
 
-learnAndSolve7;
-%%
+% learnAndSolve7;
+rez = learnAndSolve8(rez);
+
 fGTname = sprintf('%s_spike_samples_npx.npy', dset);
 sGT  = readNPY(fullfile('H:\DATA\Spikes\', fGTname));
 
