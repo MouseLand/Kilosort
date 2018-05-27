@@ -7,7 +7,7 @@ classdef ksGUI < handle
     % run kilosort
     %
     % Kilosort by M. Pachitariu
-    % This GUI by N. Steinmetz
+    % GUI by N. Steinmetz
     
     properties
         figHandle % handle to the figure
@@ -80,8 +80,7 @@ classdef ksGUI < handle
                 'DeleteFcn', @(~,~)obj.cleanup(), 'Visible', 'on', ...
                 'Padding', 5);
             
-            % - Root sections
-            
+            % - Root sections            
             obj.guiHandles.titleBar = uicontrol(...
                 'Parent', obj.guiHandles.root,...
                 'Style', 'text', 'HorizontalAlignment', 'left', ...
@@ -116,8 +115,7 @@ classdef ksGUI < handle
             
             obj.guiHandles.mainSection.Sizes = [-1 -1 -2];
                         
-            % --- Settings panel
-            
+            % --- Settings panel            
             obj.guiHandles.settingsVBox = uiextras.VBox(...
                 'Parent', obj.guiHandles.settingsPanel);
             
@@ -198,6 +196,17 @@ classdef ksGUI < handle
             end
             
         end
+        
+        function updateDataView(obj)
+            
+            % get currently selected time and channels
+            
+            % if there is a file and enough properties to load it, show raw
+            % data traces
+            
+            % if the preprocessing is complete, add whitened data
+            
+            % if kilosort is finished running, add residuals
         
         function writeScript(obj)
             % write a .m file script that the user can use later to run 
