@@ -9,8 +9,9 @@ U(:,idrop,:) = [];
 dWU(:,:, idrop) = [];
 mu(idrop) = [];
 nsp(idrop) = [];
+% uniqid(idrop) = [];
 
-if nargin>6    
+if nargin>6  
     WtW = getMeWtW(W, U);
     cc = max(WtW, [], 3);
     
@@ -31,5 +32,5 @@ if nargin>6
     dWU(:,:, idrop) = [];
     mu(idrop) = [];
     nsp(idrop) = [];
-
+%     uniqid(idrop) = [];
 end

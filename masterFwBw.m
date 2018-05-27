@@ -22,6 +22,8 @@ ops.Nfilt       = 1024; % max number of clusters
 ops.nfullpasses = 1; % how many forward backward passes to do
 ops.nPCs        = 3; % how many PCs to project the spikes into
 
+ops.ccsplit = 0.99;
+
 ops.useRAM = 0;
 
 % rootZ = 'D:\DATA\ALLEN\mouse366119\probeC_2018-03-02_15-18-32_SN619041624\experiment1\recording1\continuous\Neuropix-120.0\';
@@ -43,6 +45,9 @@ rez = preprocessDataSub(ops);
 % learnAndSolve7;
 rez = learnAndSolve8(rez);
 
+
+% this does splits
+rez    = splitAllClusters(rez);
 
 rezToPhy(rez, rootZ);
 

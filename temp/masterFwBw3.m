@@ -36,7 +36,7 @@ ops.dir_rez     = 'H:\DATA\Spikes\';
 % preprocess data
 rez = preprocessDataSub(ops);
 
-% learnAndSolve7;
+%% learnAndSolve7;
 rez = learnAndSolve8(rez);
 
 fGTname = sprintf('%s_spike_samples_npx.npy', dset);

@@ -6,7 +6,6 @@ ops = rez.ops;
 wPCA    = extractPCfromSnippets(rez, 3);
 wPCA = gpuArray(wPCA);
 
-ops.wPCA = wPCA;
 % wPCA = gpuArray(ops.wPCA(:,1:3)); 
 
 wPCA(:,1) = - wPCA(:,1) * sign(wPCA(20,1));
@@ -40,7 +39,6 @@ Nchan 	= ops.Nchan;
 
 [iC, mask] = getClosestChannels(rez, sigmaMask, NchanNear);
 
-% irounds = [1:nBatches nBatches:-1:1]; 
 irounds = [1:nBatches nBatches:-1:1]; 
 % irounds = [1:400 400:-1:1 1:400 400:-1:1 1:nBatches]; 
 % niter   = numel(irounds); 
@@ -69,10 +67,6 @@ nsp = gpuArray.zeros(0,1, 'single');
 
 Params(13) = 0;
 %%
-
-p1 = .95; % decay of nsp estimate
-p2 = 1 - p1;
-
 fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 
 fid = fopen(ops.fproc, 'r');
@@ -103,6 +97,9 @@ for ibatch = 1:niter
         Nfilt = size(W,2);
         nsp(Nfilt) = 0;
         Params(2) = Nfilt;
+        
+        uniqid = int32(1:Nfilt);
+        idmax =  Nfilt;
     end
     
     if flag_resort
@@ -113,6 +110,7 @@ for ibatch = 1:niter
         W = W(:,isort, :);
         dWU = dWU(:,:,isort);
         nsp = nsp(isort);
+        uniqid = uniqid(isort);
     end
     
     % decompose dWU by svd of time and space (61 by 61)
@@ -121,21 +119,11 @@ for ibatch = 1:niter
     % this needs to change
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
 
-    
-%     if ibatch<niter-nBatches     
-%         pm = exp(-1./(200 * nsp));
-%     else
-% %         pm = exp(-1./max(400, 100 * nsp));
-%         pm = exp(-1/400) * gpuArray.ones(1, Nfilt, 'single');
-%     end
-    
-    pm = exp(-1./max(400, 100 * nsp));
-
     [st0, id0, x0, featW, dWU, drez, nsp0, ss0, featPC] = ...
         mexMPnu7(Params, dataRAW, dWU, U, W, mu, iC-1, iW-1, UtU, iList-1, ...
         wPCA, maskU, pm);    
     
-    nsp = nsp * p1 + p2 * nsp0;
+    nsp = nsp * .95 + .05 * nsp0;
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
@@ -143,7 +131,8 @@ for ibatch = 1:niter
         flag_resort   = 0;
         
         % final clean up
-        [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp, 1);        
+        [W, U, dWU, mu, nsp, uniqid] = triageTemplates(ops, W, U, dWU, mu, nsp, uniqid, 1);        
+        
         Nfilt = size(W,2);
         Params(2) = Nfilt; 
         
@@ -154,13 +143,14 @@ for ibatch = 1:niter
         
         % extract ALL features on the last pass
         Params(13) = 2;
-   
+        
+        igood = true(Nfilt, 1);
     end
     
     if ibatch<niter-nBatches-50
         if rem(ibatch, 5)==1    
             % this drops templates
-            [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp, 1);
+            [W, U, dWU, mu, nsp, uniqid] = triageTemplates(ops, W, U, dWU, mu, nsp, uniqid, 1);     
         end
         Nfilt = size(W,2);
         Params(2) = Nfilt;
@@ -175,6 +165,8 @@ for ibatch = 1:niter
             
             nsp(Nfilt + [1:size(dWU0,3)]) = .05;
             mu(Nfilt + [1:size(dWU0,3)])  = 10;
+            uniqid(Nfilt + [1:size(dWU0,3)]) = idmax + [1:size(dWU0,3)];
+            idmax =  idmax + size(dWU0,3);
             
             Nfilt = min(ops.Nfilt, size(W,2));
             Params(2) = Nfilt;
@@ -182,9 +174,8 @@ for ibatch = 1:niter
             W   = W(:, 1:Nfilt, :);
             dWU = dWU(:, :, 1:Nfilt);
             nsp = nsp(1:Nfilt);
-            mu  = mu(1:Nfilt);
-        end
-        
+            mu  = mu(1:Nfilt);            
+        end        
     end
     
     if ibatch>niter-nBatches
@@ -209,7 +200,6 @@ for ibatch = 1:niter
     
     if ibatch==niter-nBatches        
         flag_lastpass = 1;
-        
         st3 = zeros(1e7, 4);
         fW  = zeros(Nnearest, 1e7, 'single');
         fWpc = zeros(NchanNear, Nrank, 1e7, 'single');
@@ -267,7 +257,6 @@ rez.W = cat(1, zeros(nt0 - (ops.nt0-1-nt0min), Nfilt, Nrank), rez.W);
 
 rez.U = gather(U);
 rez.mu = mu;
-rez.nsp = nsp;
 
 nNeighPC        = size(fWpc,1);
 rez.cProjPC     = permute(fWpc, [3 2 1]); %zeros(size(st3,1), 3, nNeighPC, 'single');
@@ -277,6 +266,6 @@ maskPC          = zeros(Nchan, Nfilt, 'single');
 rez.iNeighPC    = gather(iC(:, iW));
 
 
-% rez.muall = muall;
-% rez.Wall = Wall;
-% rez.Uall = Uall;
+rez.muall = muall;
+rez.Wall = Wall;
+rez.Uall = Uall;
