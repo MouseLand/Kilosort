@@ -8,7 +8,10 @@ classdef ksGUI < handle
     %
     % Kilosort by M. Pachitariu
     % GUI by N. Steinmetz
-    
+    %
+    % TODO: 
+    % - test that path adding and compilation work on a fresh install
+
     properties
         figHandle % handle to the figure
         
@@ -37,12 +40,12 @@ classdef ksGUI < handle
             end
             
             % add paths
-            fprintf(1, '%s\n', mfilename);
+            mfPath = mfilename('fullpath');
             if ~exist('preprocessDataSub')
-                addpath(genpath(fileparts(mfilename)));
+                addpath(genpath(fileparts(mfPath)));
             end
             if ~exist('readNPY')
-                githubDir = fileparts(fileparts(mfilename)); % taking a guess that they have a directory with all github repos
+                githubDir = fileparts(fileparts(mfPath)); % taking a guess that they have a directory with all github repos
                 if exist(fullfile(githubDir, 'npy-matlab'))
                     addpath(genpath(fullfile(githubDir, 'npy-matlab')));
                 end
@@ -57,7 +60,7 @@ classdef ksGUI < handle
                 fprintf(1, 'Compiled Kilosort files not found. Attempting to compile now.\n');
                 try
                     oldDir = pwd;
-                    cd(fullfile(fileparts(mfilename), 'CUDA'));
+                    cd(fullfile(fileparts(mfPath), 'CUDA'));
                     mexGPUall;
                     fprintf(1, 'Success!\n');
                     cd(oldDir);
@@ -65,7 +68,7 @@ classdef ksGUI < handle
                     fprintf(1, 'Compilation failed. Check installation instructions at https://github.com/cortex-lab/Kilosort\n');
                     rethrow(ex);
                 end
-            end         
+            end
             
             obj.ops = ksGUI.defaultOps();
             
@@ -80,7 +83,7 @@ classdef ksGUI < handle
                 'DeleteFcn', @(~,~)obj.cleanup(), 'Visible', 'on', ...
                 'Padding', 5);
             
-            % - Root sections            
+            % - Root sections
             obj.guiHandles.titleBar = uicontrol(...
                 'Parent', obj.guiHandles.root,...
                 'Style', 'text', 'HorizontalAlignment', 'left', ...
@@ -114,8 +117,8 @@ classdef ksGUI < handle
                 'FontName', 'Myriad Pro');
             
             obj.guiHandles.mainSection.Sizes = [-1 -1 -2];
-                        
-            % --- Settings panel            
+            
+            % --- Settings panel
             obj.guiHandles.settingsVBox = uiextras.VBox(...
                 'Parent', obj.guiHandles.settingsPanel);
             
@@ -146,7 +149,7 @@ classdef ksGUI < handle
             
             set( obj.guiHandles.settingsGrid, ...
                 'ColumnSizes', [-1 -1], 'RowSizes', -1 );%-1*ones(1,7)
-
+            
             
             % button for advanced options
             
@@ -187,7 +190,7 @@ classdef ksGUI < handle
             catch ex
                 log(sprintf('Error running kilosort! %s', ex.message));
             end
-                        
+            
             % save results
             try
                 rezToPhy(obj.rez, obj.ops.saveDir);
@@ -207,9 +210,11 @@ classdef ksGUI < handle
             % if the preprocessing is complete, add whitened data
             
             % if kilosort is finished running, add residuals
+            
+        end
         
         function writeScript(obj)
-            % write a .m file script that the user can use later to run 
+            % write a .m file script that the user can use later to run
             % directly, i.e. skipping the gui
             
         end
@@ -248,5 +253,5 @@ classdef ksGUI < handle
     end
     
 end
-    
+
 
