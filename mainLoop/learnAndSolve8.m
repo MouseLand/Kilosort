@@ -69,9 +69,7 @@ nsp = gpuArray.zeros(0,1, 'single');
 
 Params(13) = 0;
 %%
-
 p1 = .95; % decay of nsp estimate
-p2 = 1 - p1;
 
 fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 
@@ -129,13 +127,13 @@ for ibatch = 1:niter
 %         pm = exp(-1/400) * gpuArray.ones(1, Nfilt, 'single');
 %     end
     
-    pm = exp(-1./max(400, 100 * nsp));
+%     pm = exp(-1./max(400, 100 * nsp));
 
     [st0, id0, x0, featW, dWU, drez, nsp0, ss0, featPC] = ...
         mexMPnu7(Params, dataRAW, dWU, U, W, mu, iC-1, iW-1, UtU, iList-1, ...
         wPCA, maskU, pm);    
     
-    nsp = nsp * p1 + p2 * nsp0;
+    nsp = nsp * p1 + (1-p1) * nsp0;
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
