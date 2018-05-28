@@ -165,13 +165,14 @@ for ibatch = 1:niter
         
         % this adds templates
         dWU0 = mexGetSpikes(Params, drez, wPCA);
+        
         if size(dWU0,3)>0
             dWU0 = reshape(wPCA * (wPCA' * dWU0(:,:)), size(dWU0));
             dWU = cat(3, dWU, dWU0);
             
             W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:);
             
-            nsp(Nfilt + [1:size(dWU0,3)]) = .05;
+            nsp(Nfilt + [1:size(dWU0,3)]) = ops.minFR * NT/ops.fs;
             mu(Nfilt + [1:size(dWU0,3)])  = 10;
             
             Nfilt = min(ops.Nfilt, size(W,2));

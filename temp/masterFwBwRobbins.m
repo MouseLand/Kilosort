@@ -43,9 +43,10 @@ rez = preprocessDataSub(ops);
 
 % cluster the threshold crossings
 % learnAndSolve7;
+%%
 rez = learnAndSolve8(rez);
 
- rez2    = splitAllClusters(rez);
+rez2    = splitAllClusters(rez);
 
 rezToPhy(rez2, rootZ);
 
