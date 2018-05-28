@@ -1,6 +1,12 @@
 function k = kilosort
 % Call this to open the kilosort gui. 
 
+% add kilosort to path
+mfPath = mfilename('fullpath');
+if ~exist('preprocessDataSub')
+    addpath(genpath(fileparts(mfPath)));
+end
+
 f = figure('Name', 'Kilosort',...
         'MenuBar', 'none',...
         'Toolbar', 'none',...
