@@ -6,11 +6,12 @@ ccsplit = rez.ops.ccsplit;
 
 ik = 0;
 Nfilt = size(rez.W,2);
-while ik<Nfilt
-    ik = ik+1;
+nsplits= 0;
+while ik<Nfilt    
     if rem(ik, 100)==1
-       fprintf('Checking splits %d/%d clusters \n', ik, Nfilt) 
+       fprintf('Found %d splits, checked %d/%d clusters \n', nsplits, ik, Nfilt) 
     end
+    ik = ik+1;
     
     isp = find(rez.st3(:,2)==ik);
     
@@ -110,6 +111,8 @@ while ik<Nfilt
        
        % try this cluster again
        ik = ik-1;
+       
+       nsplits = nsplits + 1;
     end    
     
     

@@ -6,7 +6,7 @@ run(fullfile(pathToYourConfigFile, 'configFileBench384.m'))
 
 % common options for every probe
 ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap_385.mat';
-ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
+ops.trange      = [3750 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
  % these settings overwrite any settings from config
 ops.Th       = 10;     % threshold on projections (like in Kilosort1)
@@ -23,7 +23,7 @@ ops.nfullpasses = 3; % how many forward backward passes to do
 ops.nPCs        = 3; % how many PCs to project the spikes into
 
 ops.useRAM = 0;
-
+ops.ccsplit = .99;
 
 % rootZ = 'D:\DATA\ALLEN\mouse366119\probeC_2018-03-02_15-18-32_SN619041624\experiment1\recording1\continuous\Neuropix-120.0\';
 rootZ = 'D:\DATA\Neuropixels\Robbins\ZNP1';
@@ -43,7 +43,10 @@ rez = preprocessDataSub(ops);
 
 % cluster the threshold crossings
 % learnAndSolve7;
-rez = learnAndSolve8(rez);
 %%
-rezToPhy(rez, rootZ);
+rez = learnAndSolve8(rez);
+
+rez2    = splitAllClusters(rez);
+
+rezToPhy(rez2, rootZ);
 
