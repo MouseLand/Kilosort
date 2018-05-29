@@ -1,9 +1,13 @@
-function clips = get_SpikeSample(dataRAW, row, col, dc)
+function clips = get_SpikeSample(dataRAW, row, col, dc, flag)
 
 [nT, nChan] = size(dataRAW);
 
 % times around the peak to consider
-dt = -20 + [1:61];
+dt = [1:61];
+
+if nargin<5 || flag == 0
+    dt = -20 + dt;
+end
 
 % temporal indices
 indsT = repmat(row', numel(dt), 1) + repmat(dt', 1, numel(row));

@@ -34,17 +34,17 @@ fname = 'continuous.dat';
 ops.fbinary     = fullfile(rootZ,  fname);
 ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % residual from RAM of preprocessed data
 
-
 % preprocess data
 rez = preprocessDataSub(ops);
 
-% fname = fullfile(rootZ, 'rez.mat');
-% save(fname, 'rez');
+fname = fullfile(rootZ, 'rez.mat');
+save(fname, 'rez');
+
+rez = clusterSingleBatches(rez);
 
 % cluster the threshold crossings
 % learnAndSolve7;
 rez = learnAndSolve8(rez);
-
 
 % this does splits
 rez    = splitAllClusters(rez);

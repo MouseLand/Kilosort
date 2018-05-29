@@ -140,7 +140,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
 {
     /* Declare input variables*/
   double *Params, *d_Params;
-  int Nfeatures, Nspikes, Nfilters, Nnearest;
+  int Nfeatures, Nspikes, Nfilters;
   
   /* Initialize the MathWorks GPU API. */
   mxInitGPU();
@@ -150,7 +150,6 @@ void mexFunction(int nlhs, mxArray *plhs[],
   Nspikes               = (int) Params[0];
   Nfeatures             = (int) Params[1];
   Nfilters              = (int) Params[2];
-  Nnearest              = (int) Params[6];
   
   // copy Params to GPU
   cudaMalloc(&d_Params,      sizeof(double)*mxGetNumberOfElements(prhs[0]));
@@ -183,14 +182,13 @@ void mexFunction(int nlhs, mxArray *plhs[],
   d_dWU     = (float *)(mxGPUGetData(dWU));  
   
   /* Define new GPU variables*/
-  float *d_cmax, *d_cf;
+  float *d_cmax;
   int *d_id, *d_nsp;
   
   // allocate a lot of GPU variables
   cudaMalloc(&d_cmax,    Nspikes * Nfilters *  sizeof(float));
   cudaMalloc(&d_id,      Nspikes  *  sizeof(int));
   cudaMalloc(&d_nsp,      Nfilters  *  sizeof(int));
-  cudaMalloc(&d_cf,      Nspikes  * Nnearest * sizeof(float));
    
   cudaMemset(d_nsp,      0, Nfilters *   sizeof(int));
   
@@ -214,7 +212,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   int *id, *nsp;
   float *cmax;
   
-  const mwSize dimst[] 	= {Nspikes,1};  
+  const mwSize dimst[]      = {Nspikes,1};  
   const mwSize dimst2[] 	= {Nspikes,Nfilters};  
   const mwSize dimst4[] 	= {Nfilters,1};  
 
@@ -234,6 +232,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaFree(d_Params);
   cudaFree(d_cmax);
   cudaFree(d_id);
+  cudaFree(d_nsp);
+  
 
   //do this for the constant variables
   mxGPUDestroyGPUArray(uproj);

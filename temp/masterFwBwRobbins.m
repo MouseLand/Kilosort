@@ -6,7 +6,7 @@ run(fullfile(pathToYourConfigFile, 'configFileBench384.m'))
 
 % common options for every probe
 ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap_385.mat';
-ops.trange      = [3750 Inf]; % TIME RANGE IN SECONDS TO PROCESS
+ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
  % these settings overwrite any settings from config
 ops.Th       = 10;     % threshold on projections (like in Kilosort1)
@@ -44,8 +44,14 @@ rez = preprocessDataSub(ops);
 % cluster the threshold crossings
 % learnAndSolve7;
 %%
-rez = learnAndSolve8(rez);
+rez = clusterSingleBatches(rez);
 
+figure(189);
+imagesc(rez.ccb, [20 100])
+
+learnAndSolve8;
+% rez = learnAndSolve8(rez);
+%%
 rez2    = splitAllClusters(rez);
 
 rezToPhy(rez2, rootZ);

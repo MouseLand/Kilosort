@@ -1,4 +1,4 @@
-function rez = learnAndSolve8(rez)
+% function rez = learnAndSolve8(rez)
 
 ops = rez.ops;
 
@@ -40,15 +40,26 @@ Nchan 	= ops.Nchan;
 
 [iC, mask] = getClosestChannels(rez, sigmaMask, NchanNear);
 
+
+isortbatches = rez.iorig(:);
+nhalf = ceil(nBatches/2);
+
+ischedule = [nhalf:nBatches nBatches:-1:nhalf];
+i1 = [(nhalf-1):-1:1];
+i2 = [nhalf:nBatches];
+    
+irounds = cat(2, ischedule, i1, i2);
+
+% irounds = [isortbatches; isortbatches(end:-1:1)];
 % irounds = [1:nBatches nBatches:-1:1]; 
-irounds = [1:nBatches nBatches:-1:1]; 
-% irounds = [1:400 400:-1:1 1:400 400:-1:1 1:nBatches]; 
-% niter   = numel(irounds); 
-niter   = nfullpasses * numel(irounds); 
+
+niter   = numel(irounds); 
+if irounds(niter - nBatches)~=nhalf
+    error('mismatch between number of batches');
+end
 
 flag_resort      = 1;
 flag_lastpass    = 0;
-
 
 t0 = ceil(rez.ops.trange(1) * ops.fs);    
 
@@ -68,7 +79,7 @@ iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
 nsp = gpuArray.zeros(0,1, 'single');
 
 Params(13) = 0;
-%%
+
 p1 = .95; % decay of nsp estimate
 
 fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
@@ -76,14 +87,19 @@ fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 fid = fopen(ops.fproc, 'r');
 
 ntot = 0;
-
+%%
 for ibatch = 1:niter
     %     k = irounds(ibatch);
-    k = irounds(rem(ibatch-1, 2*nBatches)+1);
+    korder = irounds(ibatch);    
+    k = isortbatches(korder); 
+    
+    if ibatch>niter-nBatches && korder==nhalf
+        [W, dWU] = revertW(rez);
+        fprintf('reverted back to middle timepoint \n')
+    end
     
     if ibatch<=niter-nBatches
         Params(9) = pmi(ibatch);
-%         Params(12) = ThSi(ibatch);
         pm = pmi(ibatch) * gpuArray.ones(1, Nfilt, 'single');
     end
     
@@ -119,15 +135,6 @@ for ibatch = 1:niter
     % this needs to change
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
 
-    
-%     if ibatch<niter-nBatches     
-%         pm = exp(-1./(200 * nsp));
-%     else
-% %         pm = exp(-1./max(400, 100 * nsp));
-%         pm = exp(-1/400) * gpuArray.ones(1, Nfilt, 'single');
-%     end
-    
-%     pm = exp(-1./max(400, 100 * nsp));
 
     [st0, id0, x0, featW, dWU, drez, nsp0, ss0, featPC] = ...
         mexMPnu7(Params, dataRAW, dWU, U, W, mu, iC-1, iW-1, UtU, iList-1, ...
@@ -152,8 +159,11 @@ for ibatch = 1:niter
         
         % extract ALL features on the last pass
         Params(13) = 2;
-   
+
+        rez = memorizeW(rez, W, dWU);
+        fprintf('memorized middle timepoint \n')
     end
+    
     
     if ibatch<niter-nBatches-50
         if rem(ibatch, 5)==1    

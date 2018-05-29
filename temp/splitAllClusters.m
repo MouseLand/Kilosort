@@ -26,7 +26,7 @@ while ik<Nfilt
     clp = clp0 - mean(clp0,1);
     
     clp = gpuArray(clp(:,:));    
-%     clp = clp - my_conv2(clp, 1e3, 1);
+    clp = clp - my_conv2(clp, 250, 1);
     
     [u s v] = svdecon(clp');
     
