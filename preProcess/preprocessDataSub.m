@@ -117,6 +117,8 @@ while ibatch<=Nbatch
     dataRAW = single(dataRAW);
     dataRAW = dataRAW(:, chanMapConn);
     
+    dataRAW = dataRAW - mean(dataRAW, 1);
+    
     datr = filter(b1, a1, dataRAW);
     datr = flipud(datr);
     datr = filter(b1, a1, datr);
@@ -180,6 +182,8 @@ for ibatch = 1:Nbatch
     dataRAW = dataRAW';
     dataRAW = single(dataRAW);
     dataRAW = dataRAW(:, chanMapConn);
+    
+    dataRAW = dataRAW - mean(dataRAW, 1);
     
     datr = filter(b1, a1, dataRAW);
     datr = flipud(datr);
