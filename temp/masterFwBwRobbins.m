@@ -48,7 +48,7 @@ rez.iorig = 1:rez.temp.Nbatch;
 
 %% clusterSingleBatches;
 rez.ops.Th = [10 8];
-rez = clusterSingleBatches;
+clusterSingleBatches;
 
 % figure(191);
 % imagesc(rez.ccb(rez.iorig, rez.iorig), [20 100])

@@ -1,4 +1,4 @@
-% function rez = learnAndSolve8(rez)
+function rez = learnAndSolve8(rez)
 
 ops = rez.ops;
 
@@ -161,7 +161,7 @@ for ibatch = 1:niter
         Params(13) = 2;
         
         % different threshold on last pass?
-        Params(3) = ops.Th(2);
+        Params(3) = ops.Th(end);
 
         rez = memorizeW(rez, W, dWU);
         fprintf('memorized middle timepoint \n')

@@ -1,4 +1,4 @@
-% function rez = clusterSingleBatches(rez)
+function rez = clusterSingleBatches(rez)
 rez.ops.ThPre = 8;
 nPCs    = rez.ops.nPCs;
 % Nfilt   = rez.ops.Nfilt;
