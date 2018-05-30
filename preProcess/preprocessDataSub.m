@@ -123,7 +123,7 @@ while ibatch<=Nbatch
     datr = flipud(datr);
 
     % common average referencing
-    datr = datr - mean(datr, 2);
+    datr = datr - median(datr, 2);
     
     CC        = CC + (datr' * datr)/NT;    
     
@@ -186,7 +186,7 @@ for ibatch = 1:Nbatch
     datr = filter(b1, a1, datr);
     datr = flipud(datr);
      % common average referencing
-    datr = datr - mean(datr, 2);
+    datr = datr - median(datr, 2);
     
     datr = datr(ioffset + (1:NT),:);
     

@@ -25,6 +25,8 @@ ops.nPCs        = 3; % how many PCs to project the spikes into
 
 ops.useRAM = 0;
 ops.ccsplit = .99;
+ops.NchanTOT = 385;
+ops.nPCs = 3;
 
 % rootZ = 'D:\DATA\ALLEN\mouse366119\probeC_2018-03-02_15-18-32_SN619041624\experiment1\recording1\continuous\Neuropix-120.0\';
 % rootZ = 'H:\DATA\Spikes\Robbins\ZNP1';
@@ -43,21 +45,23 @@ ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % residual from RAM of preproc
 % preprocess data
 rez = preprocessDataSub(ops);
 
+rez.ops.NchanTOT
+
 rez.iorig = 1:rez.temp.Nbatch;
 
 % fname = fullfile(rootZ, 'rez.mat');
 % save(fname, 'rez');
-
+%%
 
 % clusterSingleBatches;
 clusterSingleBatches;
 
 % figure(191);
 % imagesc(rez.ccb(rez.iorig, rez.iorig), [20 100])
-%
+%%
 rez = learnAndSolve8(rez);
 
 rez2    = splitAllClusters(rez);
-%%
+
 rezToPhy(rez2, rootZ);
 
