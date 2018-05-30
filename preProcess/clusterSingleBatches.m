@@ -1,8 +1,8 @@
-% function rez = clusterSingleBatches(rez)
+function rez = clusterSingleBatches(rez)
 rez.ops.ThPre = 8;
 nPCs    = rez.ops.nPCs;
 % Nfilt   = rez.ops.Nfilt;
-Nfilt = ceil(ops.Nchan/2);
+Nfilt = ceil(rez.ops.Nchan/2);
 
 
 % extract PC projections here
