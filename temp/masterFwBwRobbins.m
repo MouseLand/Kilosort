@@ -26,7 +26,8 @@ ops.useRAM = 0;
 ops.ccsplit = .99;
 
 % rootZ = 'D:\DATA\ALLEN\mouse366119\probeC_2018-03-02_15-18-32_SN619041624\experiment1\recording1\continuous\Neuropix-120.0\';
-rootZ = 'D:\DATA\Neuropixels\Robbins\ZNP1';
+% rootZ = 'D:\DATA\Neuropixels\Robbins\K3';
+rootZ = 'H:\DATA\Spikes\Robbins\ZNP1';
 rootH = 'H:\DATA\Spikes\temp\';
 
 fs = dir(fullfile(rootZ, '*.bin'));
@@ -35,24 +36,27 @@ fname = fs(1).name;
 ops.fbinary     = fullfile(rootZ,  fname);
 ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % residual from RAM of preprocessed data
 
+
 % preprocess data
 rez = preprocessDataSub(ops);
+
+rez.iorig = 1:rez.temp.Nbatch;
 
 % fname = fullfile(rootZ, 'rez.mat');
 % save(fname, 'rez');
 
-% cluster the threshold crossings
-% learnAndSolve7;
-%%
-rez = clusterSingleBatches(rez);
 
-figure(189);
-imagesc(rez.ccb, [20 100])
+%% clusterSingleBatches;
+rez.ops.Th = [10 8];
+rez = clusterSingleBatches;
+
+% figure(191);
+% imagesc(rez.ccb(rez.iorig, rez.iorig), [20 100])
 
 learnAndSolve8;
 % rez = learnAndSolve8(rez);
-%%
-rez2    = splitAllClusters(rez);
 
+rez2    = splitAllClusters(rez);
+%%
 rezToPhy(rez2, rootZ);
 

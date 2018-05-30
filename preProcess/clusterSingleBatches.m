@@ -1,5 +1,5 @@
-function rez = clusterSingleBatches(rez)
-
+% function rez = clusterSingleBatches(rez)
+rez.ops.ThPre = 8;
 nPCs    = rez.ops.nPCs;
 % Nfilt   = rez.ops.Nfilt;
 Nfilt = 128;
@@ -28,9 +28,10 @@ Whs = gpuArray.zeros(Nfilt, nBatches, 'single');
 
 i0 = 0;
 
-
 flag_resort = 1;
 
+
+tic
 for ibatch = 1:nBatches    
     [uproj, call, muall, tsall] = extractPCbatch(rez, wPCA, ibatch);  
 
@@ -43,34 +44,38 @@ for ibatch = 1:nBatches
     Params  = [1 size(uproj,1) Nfilt pm size(W,1) 0 Nnearest];
     Params(1) = size(uproj,2);
     
+    
+    nu = sum(uproj.^2,1);
+    nu = nu(:);
+    
     for i = 1:niter
-        dWU     = gpuArray.zeros(size(W), 'single');
-        
+        dWU     = gpuArray.zeros(size(W), 'single');        
         
         %  boolean variable: should we compute spike x filter
         iW = abs(call - Wheights) < 10;
         
         % get iclust and update W
-        [dWU, iclust, cmax, nsp] = mexClustering(Params, uproj, W, ioff, ...
+        [dWU, iclust, dx, nsp, dV] = mexClustering(Params, uproj, W, ioff, ...
             iW, dWU, mu);
         
         dWU = dWU./(1e-5 + single(nsp'));
         
+        [dWU, nnew] = triageKmeans(dWU, nsp, uproj,ioff, dx./nu);
+        
         mu = sum(dWU.^2,1).^.5;
         W = dWU./(1e-5 + mu);
         
-         if flag_resort
-            W = reshape(W, nPCs, Nchan, Nfilt);
-            nW = sq(sum(W(1, :, :).^2,1));
-            W = reshape(W, Nchan * nPCs, Nfilt);
-            
-            [~, Wheights] = max(nW,[], 1);
-            [Wheights, isort] = sort(Wheights);            
-            
-            W   = W(:, isort);
-            dWU = dWU(:, isort);
-            mu  = mu(isort);
-         end
+        W = reshape(W, nPCs, Nchan, Nfilt);
+        nW = sq(sum(W(1, :, :).^2,1));
+        W = reshape(W, Nchan * nPCs, Nfilt);
+        
+        [~, Wheights] = max(nW,[], 1);
+        [Wheights, isort] = sort(Wheights);
+        
+        W   = W(:, isort);
+        mu  = mu(isort);
+        
+        
     end
 
     Wheights = min(max(Wheights, nch+1), Nchan-nch);
@@ -87,9 +92,12 @@ for ibatch = 1:nBatches
     Whs(:, ibatch)     = Wheights;
     
     i0 = i0 + Nfilt;
+    
+    if rem(ibatch,500)==1
+        fprintf('time %2.2f, pre clustered %d / %d batches \n', toc, ibatch, nBatches)
+    end
 end
 
-%%
 ns = reshape(ns, Nfilt, []);
 
 Params  = [1 size(uproj,1) Nfilt pm size(W,1) 0 Nnearest];
@@ -117,15 +125,36 @@ for ibatch = 1:nBatches    %:nBatches
     ds = reshape(ds, Nfilt, []);
     ccb(ibatch,:) = mean(ds .* ns, 1)./mean(ns,1);
 end
+%%
 
-ccb0 = zscore(ccb, 1, 2);
+ccb0 = zscore(ccb, 1, 1);
 ccb0 = ccb0 + ccb0';
+ccb  = ccb0;
+
+[u, s, v] = svdecon(ccb0);
+[~, isort] = sort(u(:,1));
+
+% [iclustup, iorig] = embed1D(ccb0, 30, iPCA);
+
+% iorig = get1Dordering(ccbo);
+
+nc = 10;
+ccb0 = u(:,1:nc) * s(1:nc, 1:nc) * v(:, 1:nc)';
+ccb0 = gpuArray(ccb0);
+
+% [iclustup, isort] = embed1D(ccb0, 10, isort);
 
 iorig = 1:nBatches;
+ccb0 = ccb0(isort, isort);
+iorig = iorig(isort);    
+
 for t = 1:50
     ccs = my_conv2(ccb0, 100, 1);
+    
     ccs = zscore(ccs, 1, 2)/nBatches;
     ch = ccb0 * ccs';
+    
+    ch = ch - diag(diag(ch));
     
     [~, imax]  = max(ch, [], 2);
     [~, isort] = sort(imax);
@@ -137,4 +166,6 @@ end
 
 rez.iorig = iorig;
 rez.ccb = gather(ccb);
+
+fprintf('time %2.2f, Re-ordered %d batches. \n', toc, nBatches)
 %% 

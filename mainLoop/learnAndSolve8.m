@@ -69,7 +69,7 @@ ThSi = ops.ThS(1);
 
 pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter-nBatches));
 
-Params     = double([NT Nfilt ops.Th nInnerIter nt0 Nnearest ...
+Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
     Nrank ops.lam pmi(1) Nchan NchanNear ThSi(1) 1]);
 
 W0 = permute(wPCA, [1 3 2]);
@@ -159,13 +159,16 @@ for ibatch = 1:niter
         
         % extract ALL features on the last pass
         Params(13) = 2;
+        
+        % different threshold on last pass?
+        Params(3) = ops.Th(2);
 
         rez = memorizeW(rez, W, dWU);
         fprintf('memorized middle timepoint \n')
     end
     
     
-    if ibatch<niter-nBatches-50
+    if ibatch<niter-nBatches %-50
         if rem(ibatch, 5)==1    
             % this drops templates
             [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp, 1);
