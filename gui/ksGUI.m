@@ -42,7 +42,7 @@ classdef ksGUI < handle
             % add paths
             mfPath = mfilename('fullpath');            
             if ~exist('readNPY')
-                githubDir = fileparts(fileparts(mfPath)); % taking a guess that they have a directory with all github repos
+                githubDir = fileparts(fileparts(fileparts(mfPath))); % taking a guess that they have a directory with all github repos
                 if exist(fullfile(githubDir, 'npy-matlab'))
                     addpath(genpath(fullfile(githubDir, 'npy-matlab')));
                 end
@@ -57,7 +57,7 @@ classdef ksGUI < handle
                 fprintf(1, 'Compiled Kilosort files not found. Attempting to compile now.\n');
                 try
                     oldDir = pwd;
-                    cd(fullfile(fileparts(mfPath), 'CUDA'));
+                    cd(fullfile(fileparts(fileparts(mfPath)), 'CUDA'));
                     mexGPUall;
                     fprintf(1, 'Success!\n');
                     cd(oldDir);
@@ -114,12 +114,12 @@ classdef ksGUI < handle
             obj.guiHandles.probePanel = uiextras.Panel(...
                 'Parent', obj.guiHandles.mainSection, ...
                 'Title', 'Probe view', 'FontSize', 18,...
-                'FontName', 'Myriad Pro');
+                'FontName', 'Myriad Pro', 'Padding', 10);
             
             obj.guiHandles.dataPanel = uiextras.Panel(...
                 'Parent', obj.guiHandles.mainSection, ...
                 'Title', 'Data view', 'FontSize', 18,...
-                'FontName', 'Myriad Pro');
+                'FontName', 'Myriad Pro', 'Padding', 10);
             
             obj.guiHandles.mainSection.Sizes = [-1 -1 -2];
             
@@ -239,6 +239,17 @@ classdef ksGUI < handle
                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
                 'String', 'Save these as defaults', ...
                 'Callback', @(~,~)obj.saveDefaults());
+            
+            % -- Probe view
+            obj.guiHandles.probeAx = axes(obj.guiHandles.probePanel);
+            
+            % -- Data view
+            obj.guiHandles.dataVBox = uiextras.VBox('Parent', ...
+                obj.guiHandles.dataPanel, 'Padding', 20);
+            
+            obj.guiHandles.dataAx = axes(obj.guiHandles.dataVBox);
+            obj.guiHandles.timeAx = axes(obj.guiHandles.dataVBox);
+            obj.guiHandles.dataVBox.Sizes = [-6 -1];
             
             % -- Message log
             obj.guiHandles.logBox = uicontrol(...
