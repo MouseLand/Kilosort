@@ -5,7 +5,8 @@ pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github fol
 run(fullfile(pathToYourConfigFile, 'configFileBench384.m'))
 
 % common options for every probe
-ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap_385.mat';
+% ops.chanMap     = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap_385.mat';
+ops.chanMap = 'H:\DATA\Spikes\Bekesy\neuropixPhase3B1_kilosortChanMap.mat';
 ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
  % these settings overwrite any settings from config
@@ -27,7 +28,7 @@ ops.ccsplit = .99;
 
 % rootZ = 'D:\DATA\ALLEN\mouse366119\probeC_2018-03-02_15-18-32_SN619041624\experiment1\recording1\continuous\Neuropix-120.0\';
 % rootZ = 'H:\DATA\Spikes\Robbins\ZNP1';
-rootZ = 'H:\DATA\Spikes\WillAllen';
+rootZ = 'H:\DATA\Spikes\Bekesy';
 rootH = 'H:\DATA\Spikes\temp\';
 
 fs = dir(fullfile(rootZ, '*.bin'));
@@ -36,7 +37,7 @@ fs = dir(fullfile(rootZ, '*.bin'));
 fname = fs(1).name;
 
 ops.fbinary     = fullfile(rootZ,  fname);
-ops.fproc       = fullfile(rootH, 'temp_wh2.dat'); % residual from RAM of preprocessed data
+ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % residual from RAM of preprocessed data
 
 %%
 % preprocess data
@@ -48,12 +49,12 @@ rez.iorig = 1:rez.temp.Nbatch;
 % save(fname, 'rez');
 
 
-%% clusterSingleBatches;
+% clusterSingleBatches;
 clusterSingleBatches;
 
 % figure(191);
 % imagesc(rez.ccb(rez.iorig, rez.iorig), [20 100])
-%%
+%
 rez = learnAndSolve8(rez);
 
 rez2    = splitAllClusters(rez);

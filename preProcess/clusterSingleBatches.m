@@ -1,8 +1,8 @@
-function rez = clusterSingleBatches(rez)
+% function rez = clusterSingleBatches(rez)
 rez.ops.ThPre = 8;
 nPCs    = rez.ops.nPCs;
 % Nfilt   = rez.ops.Nfilt;
-Nfilt = 128;
+Nfilt = ceil(ops.Nchan/2);
 
 
 % extract PC projections here
@@ -129,43 +129,42 @@ end
 
 ccb0 = zscore(ccb, 1, 1);
 ccb0 = ccb0 + ccb0';
-ccb  = ccb0;
+rez.ccb = gather(ccb0);
 
 [u, s, v] = svdecon(ccb0);
 [~, isort] = sort(u(:,1));
+iorig = isort;    
+ccb0 = ccb0(isort, isort);
 
 % [iclustup, iorig] = embed1D(ccb0, 30, iPCA);
 
 % iorig = get1Dordering(ccbo);
 
-nc = 10;
-ccb0 = u(:,1:nc) * s(1:nc, 1:nc) * v(:, 1:nc)';
-ccb0 = gpuArray(ccb0);
-
-% [iclustup, isort] = embed1D(ccb0, 10, isort);
-
-iorig = 1:nBatches;
-ccb0 = ccb0(isort, isort);
-iorig = iorig(isort);    
-
-for t = 1:50
-    ccs = my_conv2(ccb0, 100, 1);
-    
-    ccs = zscore(ccs, 1, 2)/nBatches;
-    ch = ccb0 * ccs';
-    
-    ch = ch - diag(diag(ch));
-    
-    [~, imax]  = max(ch, [], 2);
-    [~, isort] = sort(imax);
-    
-    iorig = iorig(isort);    
-    
-    ccb0 = ccb0(isort, isort);
-end
+% nc = 10;
+% ccb0 = u(:,1:nc) * s(1:nc, 1:nc) * v(:, 1:nc)';
+% ccb0 = gpuArray(ccb0);
+% %%
+% % [iclustup, isort] = embed1D(ccb0, 10, isort);
+% 
+% iorig = 1:nBatches;
+% 
+% for t = 1:50
+%     ccs = my_conv2(ccb0, 100, 1);
+%     
+%     ccs = zscore(ccs, 1, 2)/nBatches;
+%     ch = ccb0 * ccs';
+%     
+%     ch = ch - diag(diag(ch));
+%     
+%     [~, imax]  = max(ch, [], 2);
+%     [~, isort] = sort(imax);
+%     
+%     iorig = iorig(isort);    
+%     
+%     ccb0 = ccb0(isort, isort);
+% end
 
 rez.iorig = iorig;
-rez.ccb = gather(ccb);
 
 fprintf('time %2.2f, Re-ordered %d batches. \n', toc, nBatches)
 %% 
