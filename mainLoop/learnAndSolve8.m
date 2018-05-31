@@ -30,7 +30,7 @@ NT  	= ops.NT;
 batchstart = 0:NT:NT*nBatches;
 Nfilt 	= ops.Nfilt; 
 
-Nrank   = ops.Nrank;
+Nrank   = 3; %ops.Nrank;
 Nchan 	= ops.Nchan;
 
 [iC, mask] = getClosestChannels(rez, sigmaMask, NchanNear);
@@ -45,16 +45,12 @@ i2 = [nhalf:nBatches];
     
 irounds = cat(2, ischedule, i1, i2);
 
-% irounds = [isortbatches; isortbatches(end:-1:1)];
-% irounds = [1:nBatches nBatches:-1:1]; 
-
 niter   = numel(irounds); 
 if irounds(niter - nBatches)~=nhalf
     error('mismatch between number of batches');
 end
 
 flag_resort      = 1;
-flag_lastpass    = 0;
 
 t0 = ceil(rez.ops.trange(1) * ops.fs);    
 

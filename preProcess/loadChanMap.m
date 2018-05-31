@@ -1,6 +1,6 @@
 
 
-function [chanMap, xcoords, ycoords, kcoords] = loadChanMap(cmIn)
+function [chanMap, xcoords, ycoords, kcoords, NchanTOT] = loadChanMap(cmIn)
 % function [chanMap, xcoords, ycoords, kcoords] = loadChanMap(cmIn)
 %
 % Load and sanitize a channel map provided to Kilosort
@@ -66,5 +66,13 @@ if isfield(cmIn, 'connected') && ~isempty(cmIn.connected)
     chanMap = chanMap(connected);
     xcoords = xcoords(connected);
     ycoords = ycoords(connected);
+    
     kcoords = kcoords(connected);
+    
+    NchanTOT = sum(connected);
 end
+
+if ~exist('NchanTOT', 'var')
+   NchanTOT = numel(chanMap); 
+end
+

@@ -33,7 +33,6 @@ rootH = 'H:\DATA\Spikes\temp\';
 
 fs = dir(fullfile(rootZ, '*.bin'));
 
-
 fname = fs(1).name;
 
 ops.fbinary     = fullfile(rootZ,  fname);

@@ -27,17 +27,6 @@ amplitudes = rez.st3(:,3);
 
 Nchan = rez.ops.Nchan;
 
-% try
-%     load(rez.ops.chanMap);
-% catch
-%    chanMap0ind  = [0:Nchan-1]';
-%    connected    = ones(Nchan, 1);
-%    xcoords      = ones(Nchan, 1);
-%    ycoords      = (1:Nchan)';
-% end
-% chanMap0 = chanMap(connected>1e-6);
-
-connected   = rez.connected(:);
 xcoords     = rez.xcoords(:);
 ycoords     = rez.ycoords(:);
 chanMap     = rez.ops.chanMap(:);
@@ -48,11 +37,6 @@ U = rez.U;
 W = rez.W;
 
 Nfilt = size(W,2);
-
-% for i = 1:length(chanMap0)
-%     chanMap0(i) = chanMap0(i) - sum(chanMap0(i) > chanMap(connected<1e-6));
-% end
-% [~, invchanMap0] = sort(chanMap0);
 
 templates = zeros(Nchan, nt0, Nfilt, 'single');
 for iNN = 1:size(templates,3)
@@ -79,14 +63,10 @@ if ~isempty(savePath)
     writeNPY(templates, fullfile(savePath, 'templates.npy'));
     writeNPY(templatesInds, fullfile(savePath, 'templates_ind.npy'));
     
-%     Fs = rez.ops.fs;
-    conn        = logical(connected);
     chanMap0ind = int32(chanMap0ind);
     
-    writeNPY(chanMap0ind(conn), fullfile(savePath, 'channel_map.npy'));
-    %writeNPY(connected, fullfile(savePath, 'connected.npy'));
-%     writeNPY(Fs, fullfile(savePath, 'Fs.npy'));
-    writeNPY([xcoords(conn) ycoords(conn)], fullfile(savePath, 'channel_positions.npy'));
+    writeNPY(chanMap0ind, fullfile(savePath, 'channel_map.npy'));
+    writeNPY([xcoords ycoords], fullfile(savePath, 'channel_positions.npy'));
     
     writeNPY(templateFeatures, fullfile(savePath, 'template_features.npy'));
     writeNPY(templateFeatureInds'-1, fullfile(savePath, 'template_feature_ind.npy'));% -1 for zero indexing

@@ -5,7 +5,7 @@ pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github fol
 run(fullfile(pathToYourConfigFile, 'configFile384.m'))
 
 % common options for every probe
-% ops.NchanTOT    = 385; % total number of channels in your recording
+ops.NchanTOT    = 385; % total number of channels in your recording
 ops.trange      = [3750 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
 % find the binary file in this folder
@@ -25,16 +25,16 @@ rez = preprocessDataSub(ops);
 % pre-clustering to re-order batches by depth
 rez = clusterSingleBatches(rez);
 
-% main optimization
+%% main optimization
 rez = learnAndSolve8(rez);
 
 % this does splits
 rez    = splitAllClusters(rez);
 
-% this saves to Phy
+%% this saves to Phy
 rezToPhy(rez, rootZ);
 
-fname = fullfile(rootZ, 'rez.mat');
-save(fname, 'rez');
+% fname = fullfile(rootZ, 'rez.mat');
+% save(fname, 'rez', '-v7.3');
 
 
