@@ -95,7 +95,7 @@ for ibatch = 1:nBatches
     
     i0 = i0 + Nfilt;
     
-    if rem(ibatch,100)==1
+    if rem(ibatch, 500)==1
         fprintf('time %2.2f, pre clustered %d / %d batches \n', toc, ibatch, nBatches)
     end
 end

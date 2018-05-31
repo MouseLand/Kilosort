@@ -39,11 +39,11 @@ fname = fs(1).name;
 ops.fbinary     = fullfile(rootZ,  fname);
 ops.fproc       = fullfile(rootH, 'temp_wh2.dat'); % residual from RAM of preprocessed data
 
-%%
+
 % preprocess data
 rez = preprocessDataSub(ops);
-%%
-clusterSingleBatches;
+
+rez = clusterSingleBatches(rez);
 
 % figure(191);
 % imagesc(rez.ccb(rez.iorig, rez.iorig), [20 100])
