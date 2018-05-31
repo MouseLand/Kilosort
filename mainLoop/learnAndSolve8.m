@@ -163,7 +163,7 @@ for ibatch = 1:niter
         % different threshold on last pass?
         Params(3) = ops.Th(end);
 
-        rez = memorizeW(rez, W, dWU);
+        rez = memorizeW(rez, W, dWU, U, mu);
         fprintf('memorized middle timepoint \n')
     end
     
@@ -274,11 +274,7 @@ rez.iNeigh   = gather(iList);
 
 rez.ops = ops;
 
-rez.W = gather(W);
 rez.W = cat(1, zeros(nt0 - (ops.nt0-1-nt0min), Nfilt, Nrank), rez.W);
-
-rez.U = gather(U);
-rez.mu = mu;
 rez.nsp = nsp;
 
 nNeighPC        = size(fWpc,1);

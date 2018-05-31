@@ -1,4 +1,4 @@
 function [W, dWU] = revertW(rez)
 
-W = rez.W;
-dWU = rez.dWU;
+W = gpuArray(rez.W);
+dWU = gpuArray(rez.dWU);
