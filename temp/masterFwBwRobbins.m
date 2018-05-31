@@ -51,6 +51,6 @@ clusterSingleBatches;
 rez = learnAndSolve8(rez);
 
 rez2    = splitAllClusters(rez);
-%%
+
 rezToPhy(rez2, rootZ);
 
