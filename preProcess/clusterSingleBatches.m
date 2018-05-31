@@ -1,7 +1,7 @@
-function rez = clusterSingleBatches(rez)
+% function rez = clusterSingleBatches(rez)
 rez.ops.ThPre = 8;
 
-nPCs    = rez.ops.nPCs;
+nPCs    = getOr(rez.ops, 'nPCs', 3);
 % Nfilt   = rez.ops.Nfilt;
 Nfilt = ceil(rez.ops.Nchan/2);
 
@@ -33,9 +33,10 @@ flag_resort = 1;
 
 
 tic
-for ibatch = 1:nBatches    
-    [uproj, call, muall, tsall] = extractPCbatch(rez, wPCA, ibatch);  
-
+for ibatch = 1:nBatches        
+    [uproj, call, muall, tsall] = extractPCbatch(rez, wPCA, min(nBatches-1, ibatch));  
+    
+    
     
     ioff = nPCs * gpuArray(int32(call - nch - 1));
     
@@ -61,7 +62,7 @@ for ibatch = 1:nBatches
         
         dWU = dWU./(1e-5 + single(nsp'));
         
-        [dWU, nnew] = triageKmeans(dWU, nsp, uproj,ioff, dx./nu);
+%         [dWU, nnew] = triageKmeans(dWU, nsp, uproj,ioff, dx./nu);
         
         mu = sum(dWU.^2,1).^.5;
         W = dWU./(1e-5 + mu);
@@ -94,11 +95,11 @@ for ibatch = 1:nBatches
     
     i0 = i0 + Nfilt;
     
-    if rem(ibatch,500)==1
+    if rem(ibatch,100)==1
         fprintf('time %2.2f, pre clustered %d / %d batches \n', toc, ibatch, nBatches)
     end
 end
-
+%%
 ns = reshape(ns, Nfilt, []);
 
 Params  = [1 size(uproj,1) Nfilt pm size(W,1) 0 Nnearest];
@@ -141,29 +142,29 @@ ccb0 = ccb0(isort, isort);
 
 % iorig = get1Dordering(ccbo);
 %%
-nc = 10;
-ccb0 = u(:,1:nc) * s(1:nc, 1:nc) * v(:, 1:nc)';
-ccb0 = gpuArray(ccb0);
-
-% [iclustup, isort] = embed1D(ccb0, 10, isort);
-
-iorig = 1:nBatches;
-
-for t = 1:50
-    ccs = my_conv2(ccb0, 100, 1);
-    
-    ccs = zscore(ccs, 1, 2)/nBatches;
-    ch = ccb0 * ccs';
-    
-    ch = ch - diag(diag(ch));
-    
-    [~, imax]  = max(ch, [], 2);
-    [~, isort] = sort(imax);
-    
-    iorig = iorig(isort);    
-    
-    ccb0 = ccb0(isort, isort);
-end
+% nc = 10;
+% ccb0 = u(:,1:nc) * s(1:nc, 1:nc) * v(:, 1:nc)';
+% ccb0 = gpuArray(ccb0);
+% 
+% % [iclustup, isort] = embed1D(ccb0, 10, isort);
+% 
+% iorig = 1:nBatches;
+% 
+% for t = 1:50
+%     ccs = my_conv2(ccb0, 100, 1);
+%     
+%     ccs = zscore(ccs, 1, 2)/nBatches;
+%     ch = ccb0 * ccs';
+%     
+%     ch = ch - diag(diag(ch));
+%     
+%     [~, imax]  = max(ch, [], 2);
+%     [~, isort] = sort(imax);
+%     
+%     iorig = iorig(isort);    
+%     
+%     ccb0 = ccb0(isort, isort);
+% end
 
 rez.iorig = iorig;
 
