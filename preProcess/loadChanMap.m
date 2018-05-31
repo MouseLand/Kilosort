@@ -34,7 +34,7 @@ if ischar(cmIn)
     if exist(cmIn, 'file')        
         cmIn = load(cmIn);
     else
-        error('ksLoadChanMap:FileNotFound', 'Could not find channel map file: %s', chanMap);
+        error('ksLoadChanMap:FileNotFound', 'Could not find channel map file: %s', cmIn);
     end
 end
 
