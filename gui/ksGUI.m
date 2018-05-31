@@ -11,11 +11,17 @@ classdef ksGUI < handle
     %
     % TODO: 
     % - test that path adding and compilation work on a fresh install
+    % - add a welcome/new user/help button
+    % - indicate selected chans on probe view
+    % - implement clicking on probe view
+    % - save selected settings for next time
+    % - make function to preprocess channel maps
+    
 
-    properties
-        figHandle % handle to the figure
+    properties        
+        H % struct of handles to useful parts of the gui
         
-        guiHandles % struct of handles to useful parts of the gui
+        P % struct of parameters of the gui to remember, like last working directory        
         
         ops % struct for kilosort to run
         
@@ -29,6 +35,8 @@ classdef ksGUI < handle
             obj.init();
             
             obj.build(parent);
+            
+            obj.initPars(); % happens after build since graphical elements are needed
             
         end
         
@@ -67,193 +75,204 @@ classdef ksGUI < handle
                 end
             end
             
-            obj.ops = ksGUI.defaultOps();
-            
+                     
+                        
         end
         
         
         function build(obj, f)
             % construct the GUI with appropriate panels
-            obj.figHandle = f;
+            obj.H.fig = f;
             
-            obj.guiHandles.root = uiextras.VBox('Parent', f,...
+            obj.H.root = uiextras.VBox('Parent', f,...
                 'DeleteFcn', @(~,~)obj.cleanup(), 'Visible', 'on', ...
                 'Padding', 5);
             
             % - Root sections
-            obj.guiHandles.titleBar = uicontrol(...
-                'Parent', obj.guiHandles.root,...
+            obj.H.titleBar = uicontrol(...
+                'Parent', obj.H.root,...
                 'Style', 'text', 'HorizontalAlignment', 'left', ...
                 'String', 'Kilosort', 'FontSize', 36,...
                 'FontName', 'Myriad Pro', 'FontWeight', 'bold');
             
-            obj.guiHandles.mainSection = uiextras.HBox(...
-                'Parent', obj.guiHandles.root);
+            obj.H.mainSection = uiextras.HBox(...
+                'Parent', obj.H.root);
             
-            obj.guiHandles.logPanel = uiextras.Panel(...
-                'Parent', obj.guiHandles.root, ...
+            obj.H.logPanel = uiextras.Panel(...
+                'Parent', obj.H.root, ...
                 'Title', 'Message Log', 'FontSize', 18,...
                 'FontName', 'Myriad Pro');
             
-            obj.guiHandles.root.Sizes = [-1 -8 -2];
+            obj.H.root.Sizes = [-1 -8 -2];
             
             % -- Main section
-            obj.guiHandles.setRunVBox = uiextras.VBox(...
-                'Parent', obj.guiHandles.mainSection);
+            obj.H.setRunVBox = uiextras.VBox(...
+                'Parent', obj.H.mainSection);
             
-            obj.guiHandles.settingsPanel = uiextras.Panel(...
-                'Parent', obj.guiHandles.setRunVBox, ...
+            obj.H.settingsPanel = uiextras.Panel(...
+                'Parent', obj.H.setRunVBox, ...
                 'Title', 'Settings', 'FontSize', 18,...
                 'FontName', 'Myriad Pro');
-            obj.guiHandles.runPanel = uiextras.Panel(...
-                'Parent', obj.guiHandles.setRunVBox, ...
+            obj.H.runPanel = uiextras.Panel(...
+                'Parent', obj.H.setRunVBox, ...
                 'Title', 'Run', 'FontSize', 18,...
                 'FontName', 'Myriad Pro');
-            obj.guiHandles.setRunVBox.Sizes = [-2 -1];
+            obj.H.setRunVBox.Sizes = [-2 -1];
             
-            obj.guiHandles.probePanel = uiextras.Panel(...
-                'Parent', obj.guiHandles.mainSection, ...
+            obj.H.probePanel = uiextras.Panel(...
+                'Parent', obj.H.mainSection, ...
                 'Title', 'Probe view', 'FontSize', 18,...
                 'FontName', 'Myriad Pro', 'Padding', 10);
             
-            obj.guiHandles.dataPanel = uiextras.Panel(...
-                'Parent', obj.guiHandles.mainSection, ...
+            obj.H.dataPanel = uiextras.Panel(...
+                'Parent', obj.H.mainSection, ...
                 'Title', 'Data view', 'FontSize', 18,...
                 'FontName', 'Myriad Pro', 'Padding', 10);
             
-            obj.guiHandles.mainSection.Sizes = [-1 -1 -2];
+            obj.H.mainSection.Sizes = [-1 -1 -2];
             
             % --- Settings panel
-            obj.guiHandles.settingsVBox = uiextras.VBox(...
-                'Parent', obj.guiHandles.settingsPanel);
+            obj.H.settingsVBox = uiextras.VBox(...
+                'Parent', obj.H.settingsPanel);
             
-            obj.guiHandles.settingsGrid = uiextras.Grid(...
-                'Parent', obj.guiHandles.settingsVBox, ...
+            obj.H.settingsGrid = uiextras.Grid(...
+                'Parent', obj.H.settingsVBox, ...
                 'Spacing', 10, 'Padding', 5);
             
             % choose file
-            obj.guiHandles.settings.ChooseFileTxt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.ChooseFileTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'pushbutton', ...
-                'String', 'Select data file');
+                'String', 'Select data file', ...
+                'Callback', @(~,~)obj.selectFileDlg);
                         
             % choose temporary directory
-            obj.guiHandles.settings.ChooseTempdirTxt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.ChooseTempdirTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'pushbutton', ...
                 'String', 'Select working directory');
                         
             % choose output path
-            obj.guiHandles.settings.ChooseOutputTxt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.ChooseOutputTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'pushbutton', ...
                 'String', 'Select results output directory');
                         
+            % choose probe
+            obj.H.settings.setProbeTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'Select probe layout');
+            
             % set nChannels
-            obj.guiHandles.settings.setnChanTxt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.setnChanTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
                 'String', 'Number of channels');
                         
             % set Fs
-            obj.guiHandles.settings.setFsTxt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.setFsTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
                 'String', 'Sampling frequency (Hz)');
                         
-            % choose probe
-            obj.guiHandles.settings.setProbeTxt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
-                'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'Select probe layout');
-            
             % choose max number of clusters
-            obj.guiHandles.settings.setNfiltTxt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.setNfiltTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
                 'String', 'Number of templates');
             
             % advanced options
-            obj.guiHandles.settings.setAdvancedTxt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.setAdvancedTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'pushbutton', ...
                 'String', 'Set advanced options', ...
                 'Callback', @(~,~)obj.advancedPopup());
             
-            obj.guiHandles.settings.ChooseFileEdt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.ChooseFileEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '...', 'Callback', @(~,~)obj.updateFileSettings());
-            obj.guiHandles.settings.ChooseTempdirEdt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.ChooseTempdirEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
-                'String', '...');
-            obj.guiHandles.settings.ChooseOutputEdt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+                'String', '...', 'Callback', @(~,~)obj.updateFileSettings());
+            obj.H.settings.ChooseOutputEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
-                'String', '...');
-            obj.guiHandles.settings.setnChanEdt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
-                'Style', 'edit', 'HorizontalAlignment', 'left', ...
-                'String', '', 'Callback', @(~,~)obj.updateFileSettings());
-            obj.guiHandles.settings.setFsEdt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
-                'Style', 'edit', 'HorizontalAlignment', 'left', ...
-                'String', '30000', 'Callback', @(~,~)obj.updateFileSettings());
-            obj.guiHandles.settings.setProbeEdt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+                'String', '...', 'Callback', @(~,~)obj.updateFileSettings());
+            obj.H.settings.setProbeEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'popupmenu', 'HorizontalAlignment', 'left', ...
                 'String', {'Neuropixels Phase3A', '[new]', 'other...'}, ...
                 'Callback', @(~,~)obj.updateProbeView());
-            obj.guiHandles.settings.setNfiltEdt = uicontrol(...
-                'Parent', obj.guiHandles.settingsGrid,...
+            obj.H.settings.setnChanEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '', 'Callback', @(~,~)obj.updateFileSettings());
+            obj.H.settings.setFsEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '30000', 'Callback', @(~,~)obj.updateFileSettings());            
+            obj.H.settings.setNfiltEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '');
             
-            set( obj.guiHandles.settingsGrid, ...
+            set( obj.H.settingsGrid, ...
                 'ColumnSizes', [-1 -1], 'RowSizes', -1*ones(1,8) );%
             
-                        
-            
-            obj.guiHandles.runVBox = uiextras.VBox(...
-                'Parent', obj.guiHandles.runPanel,...
+            obj.H.runVBox = uiextras.VBox(...
+                'Parent', obj.H.runPanel,...
                 'Spacing', 10, 'Padding', 5);
             
             % button for run
-            obj.guiHandles.settings.runBtn = uicontrol(...
-                'Parent', obj.guiHandles.runVBox,...
+            obj.H.settings.runBtn = uicontrol(...
+                'Parent', obj.H.runVBox,...
                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
                 'String', 'Run Kilosort', 'enable', 'off', ...
                 'Callback', @(~,~)obj.run());
             
             % button for write script
-            obj.guiHandles.settings.writeBtn = uicontrol(...
-                'Parent', obj.guiHandles.runVBox,...
+            obj.H.settings.writeBtn = uicontrol(...
+                'Parent', obj.H.runVBox,...
                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
                 'String', 'Write this run to script', ...
                 'Callback', @(~,~)obj.writeScript());
             
             % button for save defaults
-            obj.guiHandles.settings.savedefBtn = uicontrol(...
-                'Parent', obj.guiHandles.runVBox,...
+            obj.H.settings.savedefBtn = uicontrol(...
+                'Parent', obj.H.runVBox,...
                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
                 'String', 'Save these as defaults', ...
                 'Callback', @(~,~)obj.saveDefaults());
             
             % -- Probe view
-            obj.guiHandles.probeAx = axes(obj.guiHandles.probePanel);
+            obj.H.probeAx = axes(obj.H.probePanel);
+            hold(obj.H.probeAx, 'on');
+            obj.H.probeSelScat = scatter(obj.H.probeAx, 0, NaN, 20, 'k');
+            obj.H.probeScat = scatter(obj.H.probeAx, 0, NaN, 10, 'k');
+            axis(obj.H.probeAx, 'equal');
+            axis(obj.H.probeAx, 'off');
             
             % -- Data view
-            obj.guiHandles.dataVBox = uiextras.VBox('Parent', ...
-                obj.guiHandles.dataPanel, 'Padding', 20);
+            obj.H.dataVBox = uiextras.VBox('Parent', ...
+                obj.H.dataPanel, 'Padding', 20);
             
-            obj.guiHandles.dataAx = axes(obj.guiHandles.dataVBox);
-            obj.guiHandles.timeAx = axes(obj.guiHandles.dataVBox);
-            obj.guiHandles.dataVBox.Sizes = [-6 -1];
+            obj.H.dataAx = axes(obj.H.dataVBox);   
+            box(obj.H.dataAx, 'off');
+            
+            set(obj.H.fig, 'WindowScrollWheelFcn', @(src,evt)obj.updateVScale(src,evt))
+
+            
+            obj.H.timeAx = axes(obj.H.dataVBox);
+            obj.H.dataVBox.Sizes = [-6 -1];
+            
+            
             
             % -- Message log
-            obj.guiHandles.logBox = uicontrol(...
-                'Parent', obj.guiHandles.logPanel,...
+            obj.H.logBox = uicontrol(...
+                'Parent', obj.H.logPanel,...
                 'Style', 'listbox', 'Enable', 'inactive', 'String', {}, ...
                 'Tag', 'Logging Display', 'FontSize', 14);
             
@@ -261,23 +280,102 @@ classdef ksGUI < handle
             
         end
         
+        function initPars(obj)
+            
+            % get ops
+            obj.ops = ksGUI.defaultOps();  
+            
+            % get gui defaults/remembered settings
+            
+            obj.P.currT = 0.1;
+            obj.P.tWin = [0 0.1];
+            obj.P.currY = 0;
+            obj.P.currX = 0;
+            obj.P.nChanToPlot = 16;
+            obj.P.selChans = 1:16;
+            obj.P.vScale = 0.1;
+            obj.P.dataGood = false;
+            obj.P.probeGood = false;
+            
+            obj.updateProbeView();
+            
+        end
+        
+        function selectFileDlg(obj)
+            [filename, pathname] = uigetfile('*.*', 'Pick a data file.');
+            
+            if filename~=0 % 0 when cancel
+                obj.H.settings.ChooseFileEdt.String = ...
+                    fullfile(pathname, filename);
+                obj.log(sprintf('Selected file %s', obj.H.settings.ChooseFileEdt.String));
+                
+                obj.P.lastDir = pathname;                
+                obj.updateGUIdefs();
+                
+                obj.updateFileSettings();
+            end
+            
+        end
+        
         function updateFileSettings(obj)
-            fprintf(1, 'update file settings\n');
+            fprintf(1, 'update file settings\n');                        
             
             % check whether there's a data file and exists
+            if ~exist(obj.H.settings.ChooseFileEdt.String)
+                obj.log('Data file does not exist.');
+                return;
+            end
+            
+            % **check file extension
             
             % if data file exists and output/temp are empty, pre-fill
+            if strcmp(obj.H.settings.ChooseTempdirEdt.String, '...')||...
+                isempty(obj.H.settings.ChooseTempdirEdt.String)
+                pathname = fileparts(obj.H.settings.ChooseFileEdt.String);
+                obj.H.settings.ChooseTempdirEdt.String = pathname;
+            end
+            if strcmp(obj.H.settings.ChooseOutputEdt.String, '...')||...
+                isempty(obj.H.settings.ChooseOutputEdt.String)
+                pathname = fileparts(obj.H.settings.ChooseFileEdt.String);
+                obj.H.settings.ChooseOutputEdt.String = pathname;
+            end
             
             % if nChan is set, see whether it makes any sense
+            if ~isempty(obj.H.settings.setnChanEdt.String)
+                nChan = str2num(obj.H.settings.setnChanEdt.String);
+                
+                d = dir(obj.H.settings.ChooseFileEdt.String);
+                b = d.bytes;
+                
+                bytesPerSamp = 2; % hard-coded for now, int16
+                
+                if mod(b,bytesPerSamp)==0 && mod(b/bytesPerSamp,nChan)==0
+                    % if all that looks good, make the plot
+                    obj.P.nSamp = b/bytesPerSamp/nChan;
+                    obj.P.dataGood = true;
+                    obj.updateDataView()                    
+                else
+                    obj.log('Doesn''t look like the number of channels is correct.');
+                    
+                    % try figuring it out
+                    testNC = ceil(nChan*0.9):floor(nChan*1.1);
+                    possibleVals = testNC(mod(b/bytesPerSamp, testNC)==0);
+                    obj.log(sprintf('Consider trying: %s', num2str(possibleVals)));
+                end
+            end
+                    
+        end
+        
+        function updateGUIdefs(obj)
+            % update the gui defaults to remember things the user has
+            % chosen
             
-            % if all that looks good, make the plot
-            obj.updateDataView()
         end
         
         function advancedPopup(obj)
             
             % bring up popup window to set other ops
-            
+            obj.log('setting advanced options not yet implemented.');
             
         end
         
@@ -314,25 +412,104 @@ classdef ksGUI < handle
         
         function updateDataView(obj)
             
-            % get currently selected time and channels
-            
-            % if there is a file and enough properties to load it, show raw
-            % data traces
-            
-            % if the preprocessing is complete, add whitened data
-            
-            % if kilosort is finished running, add residuals
-            
+            if obj.P.dataGood && obj.P.probeGood
+                % get currently selected time and channels
+
+                t = obj.P.currT;                
+                chList = obj.P.selChans;
+                tWin = obj.P.tWin;
+
+                % show raw data traces
+                if ~isfield(obj.P, 'datMMfile') || isempty(obj.P.datMMfile)
+                    filename = obj.H.settings.ChooseFileEdt.String;
+                    datatype = 'int16';
+                    chInFile = str2num(obj.H.settings.setnChanEdt.String);                
+                    nSamp = obj.P.nSamp;
+                    mmf = memmapfile(filename, 'Format', {datatype, [chInFile nSamp], 'x'});
+                    obj.P.datMMfile = mmf;
+                    obj.P.datSize = [chInFile nSamp];
+                else
+                    mmf = obj.P.datMMfile;
+                end
+
+                Fs = str2double(obj.H.settings.setFsEdt.String);
+                samps = ceil(Fs*(t+tWin));
+                if all(samps>0 & samps<obj.P.datSize(2))
+                    dat = mmf.Data.x(obj.ops.chanMap.chanMap(chList),samps(1):samps(2));
+                           
+                    if ~isfield(obj.H, 'dataTr') || numel(obj.H.dataTr)~=numel(chList)
+                        % initialize traces
+                        hold(obj.H.dataAx, 'off');
+                        for q = 1:numel(chList)
+                            obj.H.dataTr(q) = plot(obj.H.dataAx, 0, NaN, 'k');
+                            hold(obj.H.dataAx, 'on');
+                        end
+                    end
+                    
+                    for q = 1:size(dat,1)
+                        set(obj.H.dataTr(q), 'XData', (samps(1):samps(2))/Fs, ...
+                            'YData', q+double(dat(q,:)).*obj.P.vScale);
+                    end
+                    
+                end
+
+                % if the preprocessing is complete, add whitened data
+
+                % if kilosort is finished running, add residuals
+            end
+        end
+        
+        function updateVScale(obj,~,evt)
+            if evt.VerticalScrollCount>0
+                obj.P.vScale = obj.P.vScale/1.2;
+            elseif evt.VerticalScrollCount<0
+                obj.P.vScale = obj.P.vScale*1.2;
+            end
+            obj.updateDataView();
         end
         
         function updateProbeView(obj)
+            obj.P.probeGood = false; % might have just selected a new one
             
             % if probe file exists, load it
+            selProbe = obj.H.settings.setProbeEdt.String{obj.H.settings.setProbeEdt.Value};
             
-            % if it is valid, plot it
+            cm = [];
+            switch selProbe
+                case 'Neuropixels Phase3A'
+                    cm = load('neuropixPhase3A_kilosortChanMap.mat');
+                case '[new]'
+                    obj.log('New probe creator not yet implemented.');
+                    return;
+                case 'other...'
+                    [filename, pathname] = uigetfile('*.mat', 'Pick a channel map file.');
             
-            % if data file is also valid, compute RMS and plot
+                    if filename~=0 % 0 when cancel
+                        obj.log('choosing a different channel map not yet implemented.');
+                        q = load(fullfile(pathname, filename)); 
+                        % ** check for all the right data, get a name for
+                        % it, add to defaults                        
+                    end
+                    return;
+            end
             
+            if ~isempty(cm)
+                % if it is valid, plot it
+                set(obj.H.probeScat, 'XData', cm.xcoords, 'YData', cm.ycoords,...
+                    'SizeData', 20*double(cm.connected)+1);
+
+                y = obj.P.currY;
+                x = obj.P.currX;
+                nCh = obj.P.nChanToPlot;
+                
+                dists = ((cm.xcoords-x).^2 + (cm.ycoords-y).^2).^(0.5);
+                [~, ii] = sort(dists);
+                obj.P.selChans = ii(1:nCh);
+                
+                obj.ops.chanMap = cm;
+                obj.P.probeGood = true;
+                % if data file is also valid, compute RMS and plot that here
+            end
         end
         
         function writeScript(obj)
@@ -349,8 +526,8 @@ classdef ksGUI < handle
             % show a message to the user in the log box
             timestamp = datestr(now, 'dd-mm-yyyy HH:MM:SS');
             str = sprintf('[%s] %s', timestamp, message);
-            current = get(obj.guiHandles.logBox, 'String');
-            set(obj.guiHandles.logBox, 'String', [current; str], ...
+            current = get(obj.H.logBox, 'String');
+            set(obj.H.logBox, 'String', [current; str], ...
                 'Value', numel(current) + 1);
         end
     end
