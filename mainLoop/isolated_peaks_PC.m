@@ -8,8 +8,8 @@ nt0 = ops.nt0;
 
 Th = ops.ThPre;
 
-loc_range = [30  6];
-long_range = [30  6];
+% loc_range = [30  6];
+% long_range = [30  6];
 
 % loc_range = long_range;
 

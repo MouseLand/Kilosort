@@ -15,7 +15,6 @@ rng('default'); rng(1);
 
 NchanNear   = 32;
 Nnearest    = 32;
-nfullpasses = ops.nfullpasses;
 
 sigmaMask  = ops.sigmaMask;
 
@@ -30,13 +29,9 @@ nBatches  = rez.temp.Nbatch;
 NT  	= ops.NT;
 batchstart = 0:NT:NT*nBatches;
 Nfilt 	= ops.Nfilt; 
-ntbuff  = ops.ntbuff;
 
 Nrank   = ops.Nrank;
-maxFR 	= ops.maxFR;
-
 Nchan 	= ops.Nchan;
-
 
 [iC, mask] = getClosestChannels(rez, sigmaMask, NchanNear);
 

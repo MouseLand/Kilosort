@@ -1,5 +1,4 @@
 function rez = clusterSingleBatches(rez)
-rez.ops.ThPre = 8;
 
 nPCs    = getOr(rez.ops, 'nPCs', 3);
 % Nfilt   = rez.ops.Nfilt;
@@ -29,26 +28,16 @@ Whs = gpuArray.zeros(Nfilt, nBatches, 'single');
 
 i0 = 0;
 
-flag_resort = 1;
-
-
 tic
 for ibatch = 1:nBatches        
     [uproj, call, muall, tsall] = extractPCbatch(rez, wPCA, min(nBatches-1, ibatch));  
     
-    
-    
     ioff = nPCs * gpuArray(int32(call - nch - 1));
     
-    % [W, Wheights]       = initializeW(Nfilt, nCHmax, nPCs);
     [W, mu, Wheights] = initializeWdata(ioff, uproj, Nchan, nPCs, Nfilt);
     
     Params  = [1 size(uproj,1) Nfilt pm size(W,1) 0 Nnearest];
     Params(1) = size(uproj,2);
-    
-    
-    nu = sum(uproj.^2,1);
-    nu = nu(:);
     
     for i = 1:niter
         dWU     = gpuArray.zeros(size(W), 'single');        
@@ -76,8 +65,6 @@ for ibatch = 1:nBatches
         
         W   = W(:, isort);
         mu  = mu(isort);
-        
-        
     end
 
     Wheights = min(max(Wheights, nch+1), Nchan-nch);
@@ -85,6 +72,8 @@ for ibatch = 1:nBatches
     
     W0 = reshape(W(ioffW + [1:size(uproj,1)]' + ([1:Nfilt]-1)*size(W,1)),...
         size(uproj,1), Nfilt);
+    
+    W0 = W0 ./ (1e-5 + sum(W0.^2,1).^.5);
     
     Ws(:, :, ibatch)   = W0;    
     mus(:, ibatch)     = mu;
@@ -99,7 +88,7 @@ for ibatch = 1:nBatches
         fprintf('time %2.2f, pre clustered %d / %d batches \n', toc, ibatch, nBatches)
     end
 end
-%%
+
 ns = reshape(ns, Nfilt, []);
 
 Params  = [1 size(uproj,1) Nfilt pm size(W,1) 0 Nnearest];
@@ -107,27 +96,29 @@ Params(1) = size(Ws,2) * size(Ws,3);
 
 ccb = gpuArray.zeros(nBatches, 'single');
 
-
-for ibatch = 1:nBatches    %:nBatches            
+[ncoefs, Nfilt, nBatches] = size(Ws);
+for ibatch = 1:nBatches 
     Wh0 = Whs(:, ibatch);    
-    W0  = Ws(:, :, ibatch);
+    W0  = Ws(:, :, ibatch);    
     
-    nfilters = size(W0,2);
+    W = gpuArray.zeros(nPCs * Nchan, Nfilt, 'single');
+    ioffW = double(ioffWs(:, ibatch))';
+    irange = [1:ncoefs]' + ioffW;
     
-    W = gpuArray.zeros(nPCs * Nchan, nfilters, 'single');
-    W(double(ioffWs(:, ibatch))' + [1:size(uproj,1)]' + ...
-        ([1:nfilters]-1)*size(W,1)) = W0;    
+    W(irange + [0:Nfilt-1]*nPCs * Nchan) = W0;    
     
-    iW = abs(Whs(:) - Wh0') < 5;
+    iW = abs(Whs(:) - Wh0') < 5;    
     
     mu = mus(:, ibatch);
     
     [iclust, ds] = mexDistances(Params, Ws, W, ioffWs(:), iW, mus, mu);
     
     ds = reshape(ds, Nfilt, []);
-    ccb(ibatch,:) = mean(ds .* ns, 1)./mean(ns,1);
+    ds = max(0, ds);
+    
+    ccb(ibatch,:) = mean(sqrt(ds) .* ns, 1)./mean(ns,1);
 end
-%%
+
 
 ccb0 = zscore(ccb, 1, 1);
 ccb0 = ccb0 + ccb0';
@@ -137,34 +128,6 @@ rez.ccb = gather(ccb0);
 [~, isort] = sort(u(:,1));
 iorig = isort;    
 ccb0 = ccb0(isort, isort);
-
-% [iclustup, iorig] = embed1D(ccb0, 30, iPCA);
-
-% iorig = get1Dordering(ccbo);
-%%
-% nc = 10;
-% ccb0 = u(:,1:nc) * s(1:nc, 1:nc) * v(:, 1:nc)';
-% ccb0 = gpuArray(ccb0);
-% 
-% % [iclustup, isort] = embed1D(ccb0, 10, isort);
-% 
-% iorig = 1:nBatches;
-% 
-% for t = 1:50
-%     ccs = my_conv2(ccb0, 100, 1);
-%     
-%     ccs = zscore(ccs, 1, 2)/nBatches;
-%     ch = ccb0 * ccs';
-%     
-%     ch = ch - diag(diag(ch));
-%     
-%     [~, imax]  = max(ch, [], 2);
-%     [~, isort] = sort(imax);
-%     
-%     iorig = iorig(isort);    
-%     
-%     ccb0 = ccb0(isort, isort);
-% end
 
 rez.iorig = iorig;
 

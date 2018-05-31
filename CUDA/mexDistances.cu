@@ -38,6 +38,7 @@ __global__ void computeCost(const double *Params, const float *Ws, const float *
           xsum = 0.0f;
           for (k=0;k<Nfeatures;k++)
               xsum += Ws[k + Nfeatures * tid] * W[k + ioff[tid] +  NfeatW * bid];
+          
           Ci = mu[bid]*mu[bid] + mus[tid]*mus[tid] -2*mus[tid]*mu[bid]*xsum;
           cmax[tid + bid*Nspikes] = Ci;          
       }

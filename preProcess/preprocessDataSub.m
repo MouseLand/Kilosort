@@ -14,8 +14,7 @@ if ~isempty(ops.chanMap)
             xc = zeros(numel(chanMapConn), 1);
             yc = [1:1:numel(chanMapConn)]';
         end
-        ops.Nchan    = getOr(ops, 'Nchan', sum(connected>1e-6));
-        ops.NchanTOT = getOr(ops, 'NchanTOT', numel(connected));
+        
         if exist('fs', 'var')
             ops.fs       = getOr(ops, 'fs', fs);
         end
@@ -24,10 +23,7 @@ if ~isempty(ops.chanMap)
         chanMapConn = ops.chanMap;
         xc = zeros(numel(chanMapConn), 1);
         yc = [1:1:numel(chanMapConn)]';
-        connected = true(numel(chanMap), 1);      
-        
-        ops.Nchan    = numel(connected);
-        ops.NchanTOT = numel(connected);
+        connected = true(numel(chanMap), 1);              
     end
 else
     chanMap  = 1:ops.Nchan;
@@ -37,6 +33,10 @@ else
     xc = zeros(numel(chanMapConn), 1);
     yc = [1:1:numel(chanMapConn)]';
 end
+
+ops.Nchan    = getOr(ops, 'Nchan', sum(connected>1e-6));
+ops.NchanTOT = getOr(ops, 'NchanTOT', numel(connected));
+
 if exist('kcoords', 'var')
     kcoords = kcoords(connected);
 else
@@ -117,6 +117,7 @@ while ibatch<=Nbatch
     dataRAW = single(dataRAW);
     dataRAW = dataRAW(:, chanMapConn);
     
+    % subtract the mean from each channel
     dataRAW = dataRAW - mean(dataRAW, 1);
     
     datr = filter(b1, a1, dataRAW);
@@ -124,8 +125,10 @@ while ibatch<=Nbatch
     datr = filter(b1, a1, datr);
     datr = flipud(datr);
 
-    % common average referencing
-    datr = datr - median(datr, 2);
+    % CAR, common average referencing by median
+    if getOr(ops, 'CAR', 1)
+        datr = datr - median(datr, 2);
+    end
     
     CC        = CC + (datr' * datr)/NT;    
     
@@ -140,9 +143,8 @@ if ops.whiteningRange<Inf
     ops.whiteningRange = min(ops.whiteningRange, Nchan);
     Wrot = whiteningLocal(gather_try(CC), yc, xc, ops.whiteningRange);
 else
-    %
     [E, D] 	= svd(CC);
-    D = diag(D);
+    D       = diag(D);
     eps 	= 1e-6;
     Wrot 	= E * diag(1./(D + eps).^.5) * E';
 end
@@ -183,14 +185,18 @@ for ibatch = 1:Nbatch
     dataRAW = single(dataRAW);
     dataRAW = dataRAW(:, chanMapConn);
     
+    % CAR, common average referencing by median
     dataRAW = dataRAW - mean(dataRAW, 1);
     
     datr = filter(b1, a1, dataRAW);
     datr = flipud(datr);
     datr = filter(b1, a1, datr);
     datr = flipud(datr);
-     % common average referencing
-    datr = datr - median(datr, 2);
+    
+    % CAR, common average referencing by median
+    if getOr(ops, 'CAR', 1)
+        datr = datr - median(datr, 2);
+    end
     
     datr = datr(ioffset + (1:NT),:);
     
