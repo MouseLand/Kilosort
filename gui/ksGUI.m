@@ -16,6 +16,7 @@ classdef ksGUI < handle
     % - implement clicking on probe view
     % - save selected settings for next time
     % - make function to preprocess channel maps
+    % - allow better setting of probe site shape/size
     
 
     properties        
@@ -249,11 +250,8 @@ classdef ksGUI < handle
             
             % -- Probe view
             obj.H.probeAx = axes(obj.H.probePanel);
-            hold(obj.H.probeAx, 'on');
-            obj.H.probeSelScat = scatter(obj.H.probeAx, 0, NaN, 20, 'k');
-            obj.H.probeScat = scatter(obj.H.probeAx, 0, NaN, 10, 'k');
-            axis(obj.H.probeAx, 'equal');
-            axis(obj.H.probeAx, 'off');
+            set(obj.H.probeAx, 'ButtonDownFcn', @(f,k)obj.probeClickCB(f, k));
+            hold(obj.H.probeAx, 'on');            
             
             % -- Data view
             obj.H.dataVBox = uiextras.VBox('Parent', ...
@@ -262,8 +260,8 @@ classdef ksGUI < handle
             obj.H.dataAx = axes(obj.H.dataVBox);   
             box(obj.H.dataAx, 'off');
             
-            set(obj.H.fig, 'WindowScrollWheelFcn', @(src,evt)obj.updateVScale(src,evt))
-
+            set(obj.H.fig, 'WindowScrollWheelFcn', @(src,evt)obj.scrollCB(src,evt))
+            set(obj.H.fig, 'WindowButtonMotionFcn', @(src, evt)any(1));
             
             obj.H.timeAx = axes(obj.H.dataVBox);
             obj.H.dataVBox.Sizes = [-6 -1];
@@ -456,16 +454,49 @@ classdef ksGUI < handle
                 % if the preprocessing is complete, add whitened data
 
                 % if kilosort is finished running, add residuals
+                
             end
         end
         
-        function updateVScale(obj,~,evt)
-            if evt.VerticalScrollCount>0
-                obj.P.vScale = obj.P.vScale/1.2;
-            elseif evt.VerticalScrollCount<0
-                obj.P.vScale = obj.P.vScale*1.2;
+        function scrollCB(obj,~,evt)
+            disp(get(gcf,'CurrentModifier')))
+            if obj.isInLims(obj.H.dataAx)
+                % in data axis                
+                if evt.VerticalScrollCount>0
+                    obj.P.vScale = obj.P.vScale/1.2;
+                elseif evt.VerticalScrollCount<0
+                    obj.P.vScale = obj.P.vScale*1.2;
+                end
+                obj.updateDataView();
+                
+            elseif obj.isInLims(obj.H.probeAx)
+                % in probe axis
+                if obj.P.probeGood
+                    cpP = get(obj.H.probeAx, 'CurrentPoint');
+                    yl = get(obj.H.probeAx, 'YLim');
+                    dyl = diff(yl);
+                    currY = cpP(1,2);
+                    yc = obj.ops.chanMap.ycoords;
+                    mx = max(yc)+obj.ops.chanMap.siteSize/2;
+                    mn = min(yc)-obj.ops.chanMap.siteSize/2;
+                    if currY>mx; currY = mx; end
+                    if currY<mn; currY = mn; end
+                    if evt.VerticalScrollCount<0
+                        dyl = dyl/1.2;
+                    elseif evt.VerticalScrollCount>0
+                        dyl = dyl*1.2;
+                    end
+                    
+                    if dyl>(mx-mn); dyl = mx-mn; end
+                    newyl = currY+[-0.5 0.5]*dyl;
+                    if newyl(1)<min(yc)
+                        newyl = newyl+min(yc)-newyl(1);
+                    elseif newyl(2)>max(yc)
+                        newyl = newyl+max(yc)-newyl(2);
+                    end                    
+                    set(obj.H.probeAx, 'YLim', newyl);
+                end
             end
-            obj.updateDataView();
         end
         
         function updateProbeView(obj)
@@ -486,7 +517,7 @@ classdef ksGUI < handle
             
                     if filename~=0 % 0 when cancel
                         obj.log('choosing a different channel map not yet implemented.');
-                        q = load(fullfile(pathname, filename)); 
+                        %q = load(fullfile(pathname, filename)); 
                         % ** check for all the right data, get a name for
                         % it, add to defaults                        
                     end
@@ -495,9 +526,34 @@ classdef ksGUI < handle
             
             if ~isempty(cm)
                 % if it is valid, plot it
-                set(obj.H.probeScat, 'XData', cm.xcoords, 'YData', cm.ycoords,...
-                    'SizeData', 20*double(cm.connected)+1);
+%                 set(obj.H.probeScat, 'XData', cm.xcoords, 'YData', cm.ycoords,...
+%                     'SizeData', 20*double(cm.connected)+1);
 
+                nSites = numel(cm.chanMap);
+                ux = unique(cm.xcoords); uy = unique(cm.ycoords);
+                
+                if isfield(cm, 'siteSize') && ~isempty(cm.siteSize)
+                    ss = cm.siteSize(1);
+                else
+                    ss = min(diff(uy)); 
+                end
+                cm.siteSize = ss;
+                    
+                
+                if ~isfield(obj.H, 'probeSites') || isempty(obj.H.probeSites) || ...
+                        numel(obj.H.probeSites)~=nSites
+                    obj.H.probeSites = [];
+                    hold(obj.H.probeAx, 'on');                    
+                    sq = ss*([0 0; 0 1; 1 1; 1 0]-[0.5 0.5]);
+                    for q = 1:nSites
+                        obj.H.probeSites(q) = fill(obj.H.probeAx, sq(:,1), sq(:,2), 'g');
+                        set(obj.H.probeSites(q), 'HitTest', 'off');
+                    end
+                    axis(obj.H.probeAx, 'equal');
+                    set(obj.H.probeAx, 'XTick', [], 'YTick', []);
+                    %axis(obj.H.probeAx, 'off');
+                end
+                
                 y = obj.P.currY;
                 x = obj.P.currX;
                 nCh = obj.P.nChanToPlot;
@@ -506,10 +562,29 @@ classdef ksGUI < handle
                 [~, ii] = sort(dists);
                 obj.P.selChans = ii(1:nCh);
                 
+                sq = ss*([0 0; 0 1; 1 1; 1 0]-[0.5 0.5]);
+                for q = 1:nSites
+                    set(obj.H.probeSites(q), 'XData', sq(:,1)+cm.xcoords(q), ...
+                        'YData', sq(:,2)+cm.ycoords(q));
+                    
+                    if ismember(q, obj.P.selChans)
+                        set(obj.H.probeSites(q), 'FaceColor', [0 0 1]);
+                    else
+                        set(obj.H.probeSites(q), 'FaceColor', [0 1 0]);
+                    end
+                end
+                
                 obj.ops.chanMap = cm;
                 obj.P.probeGood = true;
                 % if data file is also valid, compute RMS and plot that here
             end
+        end
+        
+        function probeClickCB(obj, ~, keydata)
+            obj.P.currX = round(keydata.IntersectionPoint(1));
+            obj.P.currY = round(keydata.IntersectionPoint(2));
+            obj.updateProbeView;
+            obj.updateDataView;
         end
         
         function writeScript(obj)
@@ -547,6 +622,14 @@ classdef ksGUI < handle
                 case 'NchanTOT'; docString = 'Total number of rows in the data file';
                 case 'Th'; docString = 'Threshold on projections (like in Kilosort1)';
             end
+        end
+        
+        function isIn = isInLims(ax)
+            cp = get(ax, 'CurrentPoint');
+            xl = get(ax, 'XLim');
+            yl = get(ax, 'YLim');
+            
+            isIn = cp(1)>xl(1) && cp(1)<xl(2) && cp(1,2)>yl(1) && cp(1,2)<yl(2);
         end
         
     end
