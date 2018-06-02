@@ -2,60 +2,21 @@ function [rez, DATA] = preprocessDataSub(ops)
 tic;
 ops.nt0 	= getOr(ops, {'nt0'}, 61);
 
-if ~isempty(ops.chanMap)
-    if ischar(ops.chanMap)
-        load(ops.chanMap);
-        try
-            chanMapConn = chanMap(connected>1e-6);
-            xc = xcoords(connected>1e-6);
-            yc = ycoords(connected>1e-6);
-        catch
-            chanMapConn = 1+chanNums(connected>1e-6);
-            xc = zeros(numel(chanMapConn), 1);
-            yc = [1:1:numel(chanMapConn)]';
-        end
-        ops.Nchan    = getOr(ops, 'Nchan', sum(connected>1e-6));
-        ops.NchanTOT = getOr(ops, 'NchanTOT', numel(connected));
-        if exist('fs', 'var')
-            ops.fs       = getOr(ops, 'fs', fs);
-        end
-    else
-        chanMap = ops.chanMap;
-        chanMapConn = ops.chanMap;
-        xc = zeros(numel(chanMapConn), 1);
-        yc = [1:1:numel(chanMapConn)]';
-        connected = true(numel(chanMap), 1);      
-        
-        ops.Nchan    = numel(connected);
-        ops.NchanTOT = numel(connected);
-    end
-else
-    chanMap  = 1:ops.Nchan;
-    connected = true(numel(chanMap), 1);
-    
-    chanMapConn = 1:ops.Nchan;    
-    xc = zeros(numel(chanMapConn), 1);
-    yc = [1:1:numel(chanMapConn)]';
-end
-if exist('kcoords', 'var')
-    kcoords = kcoords(connected);
-else
-    kcoords = ones(ops.Nchan, 1);
-end
+[chanMap, xc, yc, kcoords, NchanTOTdefault] = loadChanMap(ops.chanMap);
+ops.Nchan = numel(chanMap);
+ops.NchanTOT = getOr(ops, 'NchanTOT', NchanTOTdefault);
+
 NchanTOT = ops.NchanTOT;
 NT       = ops.NT ;
 
 rez.ops         = ops;
 rez.xc = xc;
 rez.yc = yc;
-if exist('xcoords', 'var')
-   rez.xcoords = xcoords;
-   rez.ycoords = ycoords;
-else
-   rez.xcoords = xc;
-   rez.ycoords = yc;
-end
-rez.connected   = connected;
+
+rez.xcoords = xc;
+rez.ycoords = yc;
+
+% rez.connected   = connected;
 rez.ops.chanMap = chanMap;
 rez.ops.kcoords = kcoords; 
 
@@ -115,15 +76,20 @@ while ibatch<=Nbatch
     end
     dataRAW = dataRAW';
     dataRAW = single(dataRAW);
-    dataRAW = dataRAW(:, chanMapConn);
+    dataRAW = dataRAW(:, chanMap);
+    
+    % subtract the mean from each channel
+    dataRAW = dataRAW - mean(dataRAW, 1);
     
     datr = filter(b1, a1, dataRAW);
     datr = flipud(datr);
     datr = filter(b1, a1, datr);
     datr = flipud(datr);
 
-    % common average referencing
-    datr = datr - mean(datr, 2);
+    % CAR, common average referencing by median
+    if getOr(ops, 'CAR', 1)
+        datr = datr - median(datr, 2);
+    end
     
     CC        = CC + (datr' * datr)/NT;    
     
@@ -138,9 +104,8 @@ if ops.whiteningRange<Inf
     ops.whiteningRange = min(ops.whiteningRange, Nchan);
     Wrot = whiteningLocal(gather_try(CC), yc, xc, ops.whiteningRange);
 else
-    %
     [E, D] 	= svd(CC);
-    D = diag(D);
+    D       = diag(D);
     eps 	= 1e-6;
     Wrot 	= E * diag(1./(D + eps).^.5) * E';
 end
@@ -179,14 +144,20 @@ for ibatch = 1:Nbatch
     end
     dataRAW = dataRAW';
     dataRAW = single(dataRAW);
-    dataRAW = dataRAW(:, chanMapConn);
+    dataRAW = dataRAW(:, chanMap);
+    
+    % CAR, common average referencing by median
+    dataRAW = dataRAW - mean(dataRAW, 1);
     
     datr = filter(b1, a1, dataRAW);
     datr = flipud(datr);
     datr = filter(b1, a1, datr);
     datr = flipud(datr);
-     % common average referencing
-    datr = datr - mean(datr, 2);
+    
+    % CAR, common average referencing by median
+    if getOr(ops, 'CAR', 1)
+        datr = datr - median(datr, 2);
+    end
     
     datr = datr(ioffset + (1:NT),:);
     
@@ -205,11 +176,8 @@ rez.Wrot    = Wrot;
 
 fclose(fidW);
 fclose(fid);
-if ops.verbose
-    fprintf('Time %3.2f. Whitened data written to disk... \n', toc);
-    fprintf('Time %3.2f. Preprocessing complete!\n', toc);
-end
 
+fprintf('Time %3.0fs. Finished preprocessing %d batches. \n', toc, Nbatch);
 
 rez.temp.Nbatch = Nbatch;
 

@@ -15,7 +15,6 @@ rng('default'); rng(1);
 
 NchanNear   = 32;
 Nnearest    = 32;
-nfullpasses = ops.nfullpasses;
 
 sigmaMask  = ops.sigmaMask;
 
@@ -30,25 +29,28 @@ nBatches  = rez.temp.Nbatch;
 NT  	= ops.NT;
 batchstart = 0:NT:NT*nBatches;
 Nfilt 	= ops.Nfilt; 
-ntbuff  = ops.ntbuff;
 
-Nrank   = ops.Nrank;
-maxFR 	= ops.maxFR;
-
+Nrank   = 3; %ops.Nrank;
 Nchan 	= ops.Nchan;
-
 
 [iC, mask] = getClosestChannels(rez, sigmaMask, NchanNear);
 
-% irounds = [1:nBatches nBatches:-1:1]; 
-irounds = [1:nBatches nBatches:-1:1]; 
-% irounds = [1:400 400:-1:1 1:400 400:-1:1 1:nBatches]; 
-% niter   = numel(irounds); 
-niter   = nfullpasses * numel(irounds); 
+
+isortbatches = rez.iorig(:);
+nhalf = ceil(nBatches/2);
+
+ischedule = [nhalf:nBatches nBatches:-1:nhalf];
+i1 = [(nhalf-1):-1:1];
+i2 = [nhalf:nBatches];
+    
+irounds = cat(2, ischedule, i1, i2);
+
+niter   = numel(irounds); 
+if irounds(niter - nBatches)~=nhalf
+    error('mismatch between number of batches');
+end
 
 flag_resort      = 1;
-flag_lastpass    = 0;
-
 
 t0 = ceil(rez.ops.trange(1) * ops.fs);    
 
@@ -58,7 +60,7 @@ ThSi = ops.ThS(1);
 
 pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter-nBatches));
 
-Params     = double([NT Nfilt ops.Th nInnerIter nt0 Nnearest ...
+Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
     Nrank ops.lam pmi(1) Nchan NchanNear ThSi(1) 1]);
 
 W0 = permute(wPCA, [1 3 2]);
@@ -68,7 +70,7 @@ iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
 nsp = gpuArray.zeros(0,1, 'single');
 
 Params(13) = 0;
-%%
+
 p1 = .95; % decay of nsp estimate
 
 fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
@@ -76,14 +78,19 @@ fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 fid = fopen(ops.fproc, 'r');
 
 ntot = 0;
-
+%%
 for ibatch = 1:niter
     %     k = irounds(ibatch);
-    k = irounds(rem(ibatch-1, 2*nBatches)+1);
+    korder = irounds(ibatch);    
+    k = isortbatches(korder); 
+    
+    if ibatch>niter-nBatches && korder==nhalf
+        [W, dWU] = revertW(rez);
+        fprintf('reverted back to middle timepoint \n')
+    end
     
     if ibatch<=niter-nBatches
         Params(9) = pmi(ibatch);
-%         Params(12) = ThSi(ibatch);
         pm = pmi(ibatch) * gpuArray.ones(1, Nfilt, 'single');
     end
     
@@ -119,15 +126,6 @@ for ibatch = 1:niter
     % this needs to change
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
 
-    
-%     if ibatch<niter-nBatches     
-%         pm = exp(-1./(200 * nsp));
-%     else
-% %         pm = exp(-1./max(400, 100 * nsp));
-%         pm = exp(-1/400) * gpuArray.ones(1, Nfilt, 'single');
-%     end
-    
-%     pm = exp(-1./max(400, 100 * nsp));
 
     [st0, id0, x0, featW, dWU, drez, nsp0, ss0, featPC] = ...
         mexMPnu7(Params, dataRAW, dWU, U, W, mu, iC-1, iW-1, UtU, iList-1, ...
@@ -152,10 +150,16 @@ for ibatch = 1:niter
         
         % extract ALL features on the last pass
         Params(13) = 2;
-   
+        
+        % different threshold on last pass?
+        Params(3) = ops.Th(end);
+
+        rez = memorizeW(rez, W, dWU, U, mu);
+        fprintf('memorized middle timepoint \n')
     end
     
-    if ibatch<niter-nBatches-50
+    
+    if ibatch<niter-nBatches %-50
         if rem(ibatch, 5)==1    
             % this drops templates
             [W, U, dWU, mu, nsp] = triageTemplates(ops, W, U, dWU, mu, nsp, 1);
@@ -218,7 +222,7 @@ for ibatch = 1:niter
         fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.2f, mu: %2.2f \n', ...
             toc, ibatch, niter, Nfilt, median(nsp), median(mu))
         
-        figure(1)
+       figure(2)
        subplot(2,2,1)
        imagesc(W(:,:,1))
        
@@ -261,11 +265,7 @@ rez.iNeigh   = gather(iList);
 
 rez.ops = ops;
 
-rez.W = gather(W);
 rez.W = cat(1, zeros(nt0 - (ops.nt0-1-nt0min), Nfilt, Nrank), rez.W);
-
-rez.U = gather(U);
-rez.mu = mu;
 rez.nsp = nsp;
 
 nNeighPC        = size(fWpc,1);

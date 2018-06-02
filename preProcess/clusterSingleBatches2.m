@@ -158,7 +158,7 @@ rez.ccb = gather(ccb0);
 
 [ccb1, iorig] = sortBatches(ccb0);
 
-figure(1); 
+figure; 
 subplot(1,2,1)
 imagesc(ccb0, [-5 5]); drawnow
 xlabel('batches')
@@ -171,7 +171,7 @@ xlabel('sorted batches')
 ylabel('sorted batches')
 title('AFTER sorting')
 
-rez.iorig = gather(iorig);
+rez.iorig = iorig;
 rez.ccbsort = gather(ccb1);
 
 fprintf('time %2.2f, Re-ordered %d batches. \n', toc, nBatches)

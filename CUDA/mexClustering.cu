@@ -51,7 +51,7 @@ __global__ void computeCost(const double *Params, const float *uproj, const floa
 
 
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void bestFilter(const double *Params, const bool *iW, const float *cmax, int *id){
+__global__ void bestFilter(const double *Params, const bool *iW, const float *cmax, int *id, float *cx){
     
   int tid,tind,bid, ind, Nspikes, Nfilters, Nthreads, Nblocks;
   float max_running = 0.0f; 
@@ -77,6 +77,8 @@ __global__ void bestFilter(const double *Params, const bool *iW, const float *cm
                   max_running = cmax[tind + ind*Nspikes];
               }
               
+      cx[tind] = max_running; 
+      
       tind += Nblocks*Nthreads; 
   }  
 }
@@ -104,7 +106,7 @@ __global__ void average_snips(const double *Params, const int *ioff, const int *
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void count_spikes(const double *Params, const int *id, int *nsp){
+__global__ void count_spikes(const double *Params, const int *id, int *nsp, const float *x, float *V){
     
   int tid, tind, bid, ind, Nspikes, Nfilters, Nthreads, Nblocks;
   
@@ -120,8 +122,11 @@ __global__ void count_spikes(const double *Params, const int *id, int *nsp){
   
   while (tind<Nfilters){
       for(ind=0; ind<Nspikes;ind++)
-          if (id[ind]==tind)
+          if (id[ind]==tind){
               nsp[tind] ++;
+              V[tind] += x[tind];
+          }
+      V[tind] = V[tind] / (.001f + (float) nsp[tind]);
       
       tind += Nthreads * Nblocks;
   }
@@ -140,7 +145,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
 {
     /* Declare input variables*/
   double *Params, *d_Params;
-  int Nfeatures, Nspikes, Nfilters, Nnearest;
+  int Nfeatures, Nspikes, Nfilters;
   
   /* Initialize the MathWorks GPU API. */
   mxInitGPU();
@@ -150,7 +155,6 @@ void mexFunction(int nlhs, mxArray *plhs[],
   Nspikes               = (int) Params[0];
   Nfeatures             = (int) Params[1];
   Nfilters              = (int) Params[2];
-  Nnearest              = (int) Params[6];
   
   // copy Params to GPU
   cudaMalloc(&d_Params,      sizeof(double)*mxGetNumberOfElements(prhs[0]));
@@ -183,14 +187,15 @@ void mexFunction(int nlhs, mxArray *plhs[],
   d_dWU     = (float *)(mxGPUGetData(dWU));  
   
   /* Define new GPU variables*/
-  float *d_cmax, *d_cf;
+  float *d_cmax,  *d_x, *d_V;
   int *d_id, *d_nsp;
   
   // allocate a lot of GPU variables
   cudaMalloc(&d_cmax,    Nspikes * Nfilters *  sizeof(float));
   cudaMalloc(&d_id,      Nspikes  *  sizeof(int));
+  cudaMalloc(&d_x,      Nspikes  *  sizeof(float));
   cudaMalloc(&d_nsp,      Nfilters  *  sizeof(int));
-  cudaMalloc(&d_cf,      Nspikes  * Nnearest * sizeof(float));
+   cudaMalloc(&d_V,      Nfilters  *  sizeof(float));
    
   cudaMemset(d_nsp,      0, Nfilters *   sizeof(int));
   
@@ -199,41 +204,48 @@ void mexFunction(int nlhs, mxArray *plhs[],
           d_iW, d_cmax);
 
   // loop through cmax to find best template
-  bestFilter<<<40, 256>>>(d_Params, d_iW, d_cmax, d_id);
+  bestFilter<<<40, 256>>>(d_Params, d_iW, d_cmax, d_id, d_x);
   
   // average all spikes for same template
   average_snips<<<Nfilters, Nfeatures>>>(d_Params, d_ioff, d_id, d_uproj, 
           d_cmax, d_dWU);
   
-  count_spikes<<<7, 256>>>(d_Params, d_id, d_nsp);
+  count_spikes<<<7, 256>>>(d_Params, d_id, d_nsp, d_x, d_V);
 
   // dWU stays a GPU array
   plhs[0] 	= mxGPUCreateMxArrayOnGPU(dWU);
   
   // put these ones on the CPU side: id, cmax, cf, nsp 
   int *id, *nsp;
-  float *cmax;
+  float *x, *V;
   
-  const mwSize dimst[] 	= {Nspikes,1};  
+  const mwSize dimst[]      = {Nspikes,1};  
   const mwSize dimst2[] 	= {Nspikes,Nfilters};  
   const mwSize dimst4[] 	= {Nfilters,1};  
 
   plhs[1]   = mxCreateNumericArray(2, dimst,  mxINT32_CLASS,  mxREAL);
-  plhs[2]   = mxCreateNumericArray(2, dimst2, mxSINGLE_CLASS, mxREAL);  
-  plhs[3]   = mxCreateNumericArray(2, dimst4, mxINT32_CLASS,  mxREAL);
+  plhs[2]   = mxCreateNumericArray(2, dimst, mxSINGLE_CLASS, mxREAL);  
+  plhs[3]   = mxCreateNumericArray(2, dimst4, mxINT32_CLASS,  mxREAL);  
+  plhs[4]   = mxCreateNumericArray(2, dimst4, mxSINGLE_CLASS, mxREAL);  
 
   id        = (int*) mxGetData(plhs[1]);  
-  cmax      = (float*) mxGetData(plhs[2]);  
+  x        = (float*) mxGetData(plhs[2]);  
   nsp       = (int*) mxGetData(plhs[3]);  
+  V        = (float*) mxGetData(plhs[4]);  
   
   cudaMemcpy(id,   d_id,  Nspikes * sizeof(int),   cudaMemcpyDeviceToHost);
-  cudaMemcpy(cmax, d_cmax,Nspikes * Nfilters* sizeof(float),  cudaMemcpyDeviceToHost);
+  cudaMemcpy(x, d_x,Nspikes * sizeof(float),  cudaMemcpyDeviceToHost);
   cudaMemcpy(nsp,  d_nsp, Nfilters * sizeof(int),   cudaMemcpyDeviceToHost);
+  cudaMemcpy(V, d_V, Nfilters * sizeof(float),  cudaMemcpyDeviceToHost);
   
   //we are done, clear everything from the GPU
   cudaFree(d_Params);
   cudaFree(d_cmax);
+  cudaFree(d_x);
+  cudaFree(d_V);
   cudaFree(d_id);
+  cudaFree(d_nsp);
+  
 
   //do this for the constant variables
   mxGPUDestroyGPUArray(uproj);
