@@ -16,7 +16,7 @@ classdef ksGUI < handle
     % - allow better setting of probe site shape/size
     % - deal properly with channel maps, connected channels
     % - up/down arrows to change number of channels displayed
-    
+    % - fix displayed channel numbers
 
     properties        
         H % struct of handles to useful parts of the gui
@@ -258,6 +258,7 @@ classdef ksGUI < handle
             
             obj.H.dataAx = axes(obj.H.dataVBox);   
             box(obj.H.dataAx, 'off');
+            title(obj.H.dataAx, 'scroll and shift+scroll to scale, alt/ctrl+scroll to move');
             
             set(obj.H.fig, 'WindowScrollWheelFcn', @(src,evt)obj.scrollCB(src,evt))
             set(obj.H.fig, 'WindowButtonMotionFcn', @(src, evt)any(1));
@@ -268,7 +269,7 @@ classdef ksGUI < handle
             obj.H.timeBckg = fill(obj.H.timeAx, sq(:,1), sq(:,2), [0.3 0.3 0.3]);
             hold(obj.H.timeAx, 'on');
             obj.H.timeLine = plot(obj.H.timeAx, [0 0], [0 1], 'r', 'LineWidth', 2.0);
-            title(obj.H.timeAx, 'time in recording');
+            title(obj.H.timeAx, 'time in recording - click to jump');
             axis(obj.H.timeAx, 'off');
             set(obj.H.timeBckg, 'ButtonDownFcn', @(f,k)obj.timeClickCB(f,k));
             
@@ -302,6 +303,8 @@ classdef ksGUI < handle
             obj.P.vScale = 0.005;
             obj.P.dataGood = false;
             obj.P.probeGood = false;
+            obj.P.preprocDone = false;
+            obj.P.ksDone = false;
             
             obj.updateProbeView('new');
             
@@ -395,30 +398,54 @@ classdef ksGUI < handle
             
             % TODO check that everything is set up correctly to run
             
+            obj.ops.fbinary = obj.H.settings.ChooseFileEdt.String;
+            if ~exist(obj.ops.fbinary, 'file')
+                obj.log('Data file not found.');
+            end
+            
+            wd = obj.H.settings.ChooseTempdirEdt.String;
+            if ~exist(wd, 'dir')
+                obj.log('Working directory not found.');
+            end
+            obj.ops.fproc = fullfile(wd, 'temp_wh.dat');
+            
+            obj.ops.saveDir = obj.H.settings.ChooseOutputEdt.String;
+            if ~exist(obj.ops.saveDir, 'dir')
+                mkdir(obj.ops.saveDir);
+            end
+            
+            obj.ops.Nfilt = str2double(obj.H.settings.setNfiltEdt.String);
+            if isempty(obj.ops.Nfilt)
+                obj.ops.Nfilt = numel(obj.ops.chanMap.chanMap)*2.5;
+            end
+            if mod(obj.ops.Nfilt,32)~=0
+                obj.ops.Nfilt = ceil(obj.ops.Nfilt/32)*32;
+            end
+            
             % do preprocessing
             obj.ops.gui = obj; % for kilosort to access, e.g. calling "log"
             try
                 obj.rez = preprocessDataSub(obj.ops);
             catch ex
-                log(sprintf('Error preprocessing! %s', ex.message));
+                obj.log(sprintf('Error preprocessing! %s', ex.message));
             end
             
             % update gui with results of preprocessing
             obj.updateDataView();
             
             % fit templates
-            try
-                obj.rez = learnAndSolve8(obj.rez);
-            catch ex
-                log(sprintf('Error running kilosort! %s', ex.message));
-            end
-            
-            % save results
-            try
-                rezToPhy(obj.rez, obj.ops.saveDir);
-            catch ex
-                log(sprintf('Error saving data for phy! %s', ex.message));
-            end
+%             try
+%                 obj.rez = learnAndSolve8(obj.rez);
+%             catch ex
+%                 log(sprintf('Error running kilosort! %s', ex.message));
+%             end
+%             
+%             % save results
+%             try
+%                 rezToPhy(obj.rez, obj.ops.saveDir);
+%             catch ex
+%                 log(sprintf('Error saving data for phy! %s', ex.message));
+%             end
             
         end
         
@@ -472,56 +499,25 @@ classdef ksGUI < handle
 
                 % if the preprocessing is complete, add whitened data
 
+                if obj.P.preprocDone
+%                     if ~isfield(obj.P, 'ppMMfile') || isempty(obj.P.ppMMfile)
+%                         filename = obj.H.settings.ChooseFileEdt.String;
+%                         datatype = 'int16';
+%                         chInFile = numel(obj.ops.chanMap.chanMap);
+%                         nSamp = obj.P.nSamp;
+%                         mmf = memmapfile(filename, 'Format', {datatype, [chInFile nSamp], 'x'});
+%                         obj.P.datMMfile = mmf;
+%                         obj.P.datSize = [chInFile nSamp];
+%                     else
+%                         mmf = obj.P.datMMfile;
+%                     end
+                end
                 % if kilosort is finished running, add residuals
                 
             end
         end
         
-        function scrollCB(obj,~,evt)
-            
-            if obj.isInLims(obj.H.dataAx)
-                % in data axis                
-                if obj.P.dataGood
-                    m = get(obj.H.fig,'CurrentModifier');
-
-                    if isempty(m)  
-                        obj.P.vScale = obj.P.vScale*1.2^(-evt.VerticalScrollCount); 
-                    elseif strcmp(m, 'shift')
-                        nSamp = obj.P.datMMfile.Format{2}(2);
-                        maxT = nSamp/obj.ops.fs;
-                        obj.P.tWin = ksGUI.chooseNewRange(obj.P.tWin, ...
-                            1.2^evt.VerticalScrollCount,...
-                            diff(obj.P.tWin)/2+obj.P.tWin(1), [0 maxT]);
-                    elseif strcmp(m, 'control')
-                        nSamp = obj.P.datMMfile.Format{2}(2);
-                        maxT = nSamp/obj.ops.fs;
-                        winSize = diff(obj.P.tWin);
-                        shiftSize = -evt.VerticalScrollCount*winSize*0.1;
-                        obj.P.tWin = ksGUI.chooseNewRange(obj.P.tWin, 1, ...                            
-                            winSize/2+obj.P.tWin(1)+shiftSize, [0 maxT]);
-                    elseif strcmp(m, 'alt')
-                        obj.P.currY = obj.P.currY-evt.VerticalScrollCount*...
-                            min(diff(unique(obj.ops.chanMap.ycoords)));
-                        obj.updateProbeView();
-                    end
-                    obj.updateDataView();
-                end
-            elseif obj.isInLims(obj.H.probeAx)
-                % in probe axis
-                if obj.P.probeGood
-                    cpP = get(obj.H.probeAx, 'CurrentPoint');
-                    yl = get(obj.H.probeAx, 'YLim');
-                    currY = cpP(1,2);
-                    yc = obj.ops.chanMap.ycoords;
-                    mx = max(yc)+obj.ops.chanMap.siteSize;
-                    mn = min(yc)-obj.ops.chanMap.siteSize;
-                    newyl = ksGUI.chooseNewRange(yl, ...
-                        1.2^evt.VerticalScrollCount,...
-                        currY, [mn mx]);          
-                    set(obj.H.probeAx, 'YLim', newyl);
-                end
-            end
-        end
+        
         
         function updateProbeView(obj, varargin)
             
@@ -617,6 +613,52 @@ classdef ksGUI < handle
 
                     % TODO if data file is also valid, compute RMS and plot that here
 
+                end
+            end
+        end
+        
+        function scrollCB(obj,~,evt)
+            
+            if obj.isInLims(obj.H.dataAx)
+                % in data axis                
+                if obj.P.dataGood
+                    m = get(obj.H.fig,'CurrentModifier');
+
+                    if isempty(m)  
+                        obj.P.vScale = obj.P.vScale*1.2^(-evt.VerticalScrollCount); 
+                    elseif strcmp(m, 'shift')
+                        nSamp = obj.P.datMMfile.Format{2}(2);
+                        maxT = nSamp/obj.ops.fs;
+                        obj.P.tWin = ksGUI.chooseNewRange(obj.P.tWin, ...
+                            1.2^evt.VerticalScrollCount,...
+                            diff(obj.P.tWin)/2+obj.P.tWin(1), [0 maxT]);
+                    elseif strcmp(m, 'control')
+                        nSamp = obj.P.datMMfile.Format{2}(2);
+                        maxT = nSamp/obj.ops.fs;
+                        winSize = diff(obj.P.tWin);
+                        shiftSize = -evt.VerticalScrollCount*winSize*0.1;
+                        obj.P.tWin = ksGUI.chooseNewRange(obj.P.tWin, 1, ...                            
+                            winSize/2+obj.P.tWin(1)+shiftSize, [0 maxT]);
+                    elseif strcmp(m, 'alt')
+                        obj.P.currY = obj.P.currY-evt.VerticalScrollCount*...
+                            min(diff(unique(obj.ops.chanMap.ycoords)));
+                        obj.updateProbeView();
+                    end
+                    obj.updateDataView();
+                end
+            elseif obj.isInLims(obj.H.probeAx)
+                % in probe axis
+                if obj.P.probeGood
+                    cpP = get(obj.H.probeAx, 'CurrentPoint');
+                    yl = get(obj.H.probeAx, 'YLim');
+                    currY = cpP(1,2);
+                    yc = obj.ops.chanMap.ycoords;
+                    mx = max(yc)+obj.ops.chanMap.siteSize;
+                    mn = min(yc)-obj.ops.chanMap.siteSize;
+                    newyl = ksGUI.chooseNewRange(yl, ...
+                        1.2^evt.VerticalScrollCount,...
+                        currY, [mn mx]);          
+                    set(obj.H.probeAx, 'YLim', newyl);
                 end
             end
         end
