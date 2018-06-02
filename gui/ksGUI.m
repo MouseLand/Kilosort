@@ -12,7 +12,6 @@ classdef ksGUI < handle
     % TODO: 
     % - test that path adding and compilation work on a fresh install
     % - add a welcome/new user/help button
-    % - save selected settings for next time
     % - allow better setting of probe site shape/size
     % - deal properly with channel maps, connected channels
     % - up/down arrows to change number of channels displayed
@@ -92,11 +91,8 @@ classdef ksGUI < handle
                 'Padding', 5);
             
             % - Root sections
-            obj.H.titleBar = uicontrol(...
-                'Parent', obj.H.root,...
-                'Style', 'text', 'HorizontalAlignment', 'left', ...
-                'String', 'Kilosort', 'FontSize', 36,...
-                'FontName', 'Myriad Pro', 'FontWeight', 'bold');
+            
+            obj.H.titleHBox = uiextras.HBox('Parent', obj.H.root, 'Spacing', 50);                        
             
             obj.H.mainSection = uiextras.HBox(...
                 'Parent', obj.H.root);
@@ -107,6 +103,22 @@ classdef ksGUI < handle
                 'FontName', 'Myriad Pro');
             
             obj.H.root.Sizes = [-1 -8 -2];
+            
+            % -- Title bar
+            
+            obj.H.titleBar = uicontrol(...
+                'Parent', obj.H.titleHBox,...
+                'Style', 'text', 'HorizontalAlignment', 'left', ...
+                'String', 'Kilosort', 'FontSize', 36,...
+                'FontName', 'Myriad Pro', 'FontWeight', 'bold');
+            
+            obj.H.helpButton = uicontrol(...
+                'Parent', obj.H.titleHBox,...
+                'Style', 'pushbutton', ...
+                'String', 'First time? Click here!', ...
+                'Callback', @(~,~)obj.help);
+            
+            obj.H.titleHBox.Sizes = [-5 -1];
             
             % -- Main section
             obj.H.setRunVBox = uiextras.VBox(...
@@ -230,11 +242,40 @@ classdef ksGUI < handle
                 'Spacing', 10, 'Padding', 5);
             
             % button for run
-            obj.H.settings.runBtn = uicontrol(...
+            obj.H.runHBox = uiextras.HBox(...
                 'Parent', obj.H.runVBox,...
+                'Spacing', 10, 'Padding', 5);
+            
+            obj.H.settings.runBtn = uicontrol(...
+                'Parent', obj.H.runHBox,...
                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
-                'String', 'Run Kilosort', 'enable', 'off', ...
-                'Callback', @(~,~)obj.run());
+                'String', 'Run All', 'enable', 'off', ...
+                'FontSize', 20,...
+                'Callback', @(~,~)obj.runAll());
+            
+            obj.H.settings.runEachVBox = uiextras.VBox(...
+                'Parent', obj.H.runHBox,...
+                'Spacing', 3, 'Padding', 3);
+            
+            obj.H.runHBox.Sizes = [-3 -1];
+            
+            obj.H.settings.runPreprocBtn = uicontrol(...
+                'Parent', obj.H.settings.runEachVBox,...
+                'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
+                'String', 'Preprocess', 'enable', 'off', ...
+                'Callback', @(~,~)obj.runPreproc());
+            
+            obj.H.settings.runSpikesortBtn = uicontrol(...
+                'Parent', obj.H.settings.runEachVBox,...
+                'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
+                'String', 'Spikesort', 'enable', 'off', ...
+                'Callback', @(~,~)obj.runSpikesort());
+            
+            obj.H.settings.runSaveBtn = uicontrol(...
+                'Parent', obj.H.settings.runEachVBox,...
+                'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
+                'String', 'Save for Phy', 'enable', 'off', ...
+                'Callback', @(~,~)obj.runSaveToPhy());
             
             % button for write script
             obj.H.settings.writeBtn = uicontrol(...
@@ -244,11 +285,13 @@ classdef ksGUI < handle
                 'Callback', @(~,~)obj.writeScript());
             
             % button for save defaults
-            obj.H.settings.savedefBtn = uicontrol(...
+            obj.H.settings.saveBtn = uicontrol(...
                 'Parent', obj.H.runVBox,...
                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
-                'String', 'Save these as defaults', ...
-                'Callback', @(~,~)obj.saveDefaults());
+                'String', 'Save state', ...
+                'Callback', @(~,~)obj.saveGUIsettings());
+            
+            obj.H.runVBox.Sizes = [-3 -1 -1];
             
             % -- Probe view
             obj.H.probeAx = axes(obj.H.probePanel);
@@ -260,8 +303,6 @@ classdef ksGUI < handle
                 obj.H.dataPanel, 'Padding', 20);
             
             obj.H.dataAx = axes(obj.H.dataVBox);   
-            box(obj.H.dataAx, 'off');
-            title(obj.H.dataAx, 'scroll and shift+scroll to scale, alt/ctrl+scroll to move');
             
             set(obj.H.fig, 'WindowScrollWheelFcn', @(src,evt)obj.scrollCB(src,evt))
             set(obj.H.fig, 'WindowButtonMotionFcn', @(src, evt)any(1));
@@ -295,8 +336,6 @@ classdef ksGUI < handle
             % get ops
             obj.ops = ksGUI.defaultOps();  
             
-            % get gui defaults/remembered settings
-            
             obj.P.currT = 0.1;
             obj.P.tWin = [0 0.1];
             obj.P.currY = 0;
@@ -309,6 +348,18 @@ classdef ksGUI < handle
             obj.P.preprocDone = false;
             obj.P.ksDone = false;
             
+            % get gui defaults/remembered settings
+            mfPath = fileparts(mfilename('fullpath'));
+            obj.P.settingsPath = fullfile(mfPath, 'userSettings.mat');
+            if exist(obj.P.settingsPath, 'file')
+                savedSettings = load(obj.P.settingsPath);
+                if isfield(savedSettings, 'lastFile')
+                    obj.H.settings.ChooseFileEdt.String = savedSettings.lastFile;
+                    obj.updateFileSettings();
+                    obj.restoreGUIsettings();
+                end
+            end
+            
             obj.updateProbeView('new');
             
         end
@@ -320,17 +371,13 @@ classdef ksGUI < handle
                 obj.H.settings.ChooseFileEdt.String = ...
                     fullfile(pathname, filename);
                 obj.log(sprintf('Selected file %s', obj.H.settings.ChooseFileEdt.String));
-                
-                obj.P.lastDir = pathname;                
-                obj.updateGUIdefs();
-                
+                                
                 obj.updateFileSettings();
             end
             
         end
         
         function updateFileSettings(obj)
-            fprintf(1, 'update file settings\n');                        
             
             % check whether there's a data file and exists
             if ~exist(obj.H.settings.ChooseFileEdt.String)
@@ -365,11 +412,15 @@ classdef ksGUI < handle
                     % if all that looks good, make the plot
                     obj.P.nSamp = b/bytesPerSamp/nChan;
                     obj.P.dataGood = true;
-                    obj.P.datMMfile = [];
+                    obj.P.datMMfile = [];                    
                     obj.updateDataView()
+                    
+                    lastFile = obj.H.settings.ChooseFileEdt.String;
+                    save(obj.P.settingsPath, 'lastFile');
                     
                     if obj.P.probeGood
                         set(obj.H.settings.runBtn, 'enable', 'on');
+                        set(obj.H.settings.runPreprocBtn, 'enable', 'on');
                     end
                 else
                     obj.log('Doesn''t look like the number of channels is correct.');
@@ -385,12 +436,6 @@ classdef ksGUI < handle
                     
         end
         
-        function updateGUIdefs(obj)
-            % update the gui defaults to remember things the user has
-            % chosen
-            
-        end
-        
         function advancedPopup(obj)
             
             % bring up popup window to set other ops
@@ -398,8 +443,16 @@ classdef ksGUI < handle
             
         end
         
-        function run(obj)
+        function runAll(obj)
             
+            obj.prepareForRun;
+            obj.runPreproc;
+            obj.runSpikesort;
+            obj.runSaveToPhy;
+            
+        end
+        
+        function prepareForRun(obj)
             % TODO check that everything is set up correctly to run
             
             obj.ops.fbinary = obj.H.settings.ChooseFileEdt.String;
@@ -425,34 +478,54 @@ classdef ksGUI < handle
             if mod(obj.ops.Nfilt,32)~=0
                 obj.ops.Nfilt = ceil(obj.ops.Nfilt/32)*32;
             end
+            obj.H.settings.setNfiltEdt.String = num2str(obj.ops.Nfilt);
+            
+            
+        end
+        
+        function runPreproc(obj)
+            
+            obj.prepareForRun;
             
             % do preprocessing
             obj.ops.gui = obj; % for kilosort to access, e.g. calling "log"
             try
                 obj.rez = preprocessDataSub(obj.ops);
+                
+                set(obj.H.settings.runSpikesortBtn, 'enable', 'on');
+                
+                % update gui with results of preprocessing
+                obj.updateDataView();
             catch ex
                 obj.log(sprintf('Error preprocessing! %s', ex.message));
             end
             
-            % update gui with results of preprocessing
-            obj.updateDataView();
-            
-            % fit templates
-%             try
-%                 obj.rez = learnAndSolve8(obj.rez);
-%             catch ex
-%                 log(sprintf('Error running kilosort! %s', ex.message));
-%             end
-%             
-%             % save results
-%             try
-%                 rezToPhy(obj.rez, obj.ops.saveDir);
-%             catch ex
-%                 log(sprintf('Error saving data for phy! %s', ex.message));
-%             end
-            
         end
         
+        function runSpikesort(obj)
+            % fit templates
+            try
+                obj.rez = learnAndSolve8(obj.rez);
+                log('Kilosort finished!');
+                set(obj.H.settings.runSaveBtn, 'enable', 'on');
+                obj.updateDataView();
+            catch ex
+                log(sprintf('Error running kilosort! %s', ex.message));
+            end   
+                        
+        end
+        
+        function runSaveToPhy(obj)
+            
+            % save results
+            try
+                rezToPhy(obj.rez, obj.ops.saveDir);
+            catch ex
+                log(sprintf('Error saving data for phy! %s', ex.message));
+            end            
+            
+        end
+            
         function updateDataView(obj)
             
             if obj.P.dataGood && obj.P.probeGood
@@ -491,6 +564,8 @@ classdef ksGUI < handle
                             obj.H.dataTr(q) = plot(obj.H.dataAx, 0, NaN, 'k');
                             hold(obj.H.dataAx, 'on');
                         end
+                        box(obj.H.dataAx, 'off');
+                        title(obj.H.dataAx, 'scroll and shift+scroll to scale, alt/ctrl+scroll to move');                        
                     end
                     
                     conn = obj.ops.chanMap.connected(chList);
@@ -506,7 +581,7 @@ classdef ksGUI < handle
 
                 % if the preprocessing is complete, add whitened data
 
-                if obj.P.preprocDone
+                if false%obj.P.preprocDone
                     if ~isfield(obj.P, 'ppMMfile') || isempty(obj.P.ppMMfile)
                         filename = obj.ops.fproc;
                         datatype = 'int16';
@@ -549,8 +624,13 @@ classdef ksGUI < handle
                     end
                     
                 end
-                % if kilosort is finished running, add residuals
                 
+                
+                % if kilosort is finished running, add residuals
+                if obj.P.ksDone
+                    
+                end
+                    
             end
         end
         
@@ -602,6 +682,7 @@ classdef ksGUI < handle
                 
                 if obj.P.dataGood
                     set(obj.H.settings.runBtn, 'enable', 'on');
+                    set(obj.H.settings.runPreprocBtn, 'enable', 'on');
                 end
             end
             
@@ -672,11 +753,17 @@ classdef ksGUI < handle
                         maxT = obj.P.nSamp/obj.ops.fs;
                         winSize = diff(obj.P.tWin);
                         shiftSize = -evt.VerticalScrollCount*winSize*0.1;
-                        obj.P.tWin = ksGUI.chooseNewRange(obj.P.tWin, 1, ...                            
-                            winSize/2+obj.P.tWin(1)+shiftSize, [0 maxT]);
+                        obj.P.currT = obj.P.currT+shiftSize;
+                        if obj.P.currT>maxT; obj.P.currT = maxT; end
+                        if obj.P.currT<0; obj.P.currT = 0; end
                     elseif strcmp(m, 'alt')
                         obj.P.currY = obj.P.currY-evt.VerticalScrollCount*...
                             min(diff(unique(obj.ops.chanMap.ycoords)));
+                        yc = obj.ops.chanMap.ycoords;
+                        mx = max(yc)+obj.ops.chanMap.siteSize;
+                        mn = min(yc)-obj.ops.chanMap.siteSize;
+                        if obj.P.currY>mx; obj.P.currY = mx; end
+                        if obj.P.currY<mn; obj.P.currY = mn; end
                         obj.updateProbeView();
                     end
                     obj.updateDataView();
@@ -718,6 +805,53 @@ classdef ksGUI < handle
             
         end
             
+        
+        function saveGUIsettings(obj)
+            
+            saveDat.settings.ChooseFileEdt.String = obj.H.settings.ChooseFileEdt.String;
+            saveDat.settings.ChooseTempdirEdt.String = obj.H.settings.ChooseTempdirEdt.String;
+            saveDat.settings.setProbeEdt.String = obj.H.settings.setProbeEdt.String;
+            saveDat.settings.setProbeEdt.Value = obj.H.settings.setProbeEdt.Value;
+            saveDat.settings.setnChanEdt.String = obj.H.settings.setnChanEdt.String;
+            saveDat.settings.setFsEdt.String = obj.H.settings.setFsEdt.String;
+            saveDat.settings.setNfiltEdt.String = obj.H.settings.setNfiltEdt.String;
+            
+            saveDat.ops = obj.ops;
+            saveDat.rez = obj.rez;
+            saveDat.P = obj.P;
+            
+            [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);            
+            savePath = fullfile(p, [fn '_ksSettings.mat']);
+            
+            save(savePath, 'saveDat');
+                        
+        end
+        
+        function restoreGUIsettings(obj)
+            [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);            
+            savePath = fullfile(p, [fn '_ksSettings.mat']);
+            
+            if exist(savePath, 'file')
+                obj.log('Restoring saved session...');
+                
+                load(savePath);
+                
+                obj.H.settings.ChooseFileEdt.String = saveDat.settings.ChooseFileEdt.String;
+                obj.H.settings.ChooseTempdirEdt.String = saveDat.settings.ChooseTempdirEdt.String;
+                obj.H.settings.setProbeEdt.String = saveDat.settings.setProbeEdt.String;
+                obj.H.settings.setProbeEdt.Value = saveDat.settings.setProbeEdt.Value;
+                obj.H.settings.setnChanEdt.String = saveDat.settings.setnChanEdt.String;
+                obj.H.settings.setFsEdt.String = saveDat.settings.setFsEdt.String;
+                obj.H.settings.setNfiltEdt.String = saveDat.settings.setNfiltEdt.String;
+                
+                obj.ops = saveDat.ops;
+                obj.rez = saveDat.rez;
+                obj.P = saveDat.P;
+                
+                obj.updateProbeView;
+                obj.updateDataView;
+            end
+        end
             
         function writeScript(obj)
             % write a .m file script that the user can use later to run
