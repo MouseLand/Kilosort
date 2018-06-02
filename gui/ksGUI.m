@@ -17,6 +17,9 @@ classdef ksGUI < handle
     % - deal properly with channel maps, connected channels
     % - up/down arrows to change number of channels displayed
     % - fix displayed channel numbers
+    % - add preprocess/run/save buttons, rename to run all
+    % - save state of processing to reload next time a file in a directory
+    % is selected
 
     properties        
         H % struct of handles to useful parts of the gui
@@ -362,6 +365,7 @@ classdef ksGUI < handle
                     % if all that looks good, make the plot
                     obj.P.nSamp = b/bytesPerSamp/nChan;
                     obj.P.dataGood = true;
+                    obj.P.datMMfile = [];
                     obj.updateDataView()
                     
                     if obj.P.probeGood
@@ -468,7 +472,7 @@ classdef ksGUI < handle
                     datatype = 'int16';
                     chInFile = str2num(obj.H.settings.setnChanEdt.String);                
                     nSamp = obj.P.nSamp;
-                    mmf = memmapfile(filename, 'Format', {datatype, [chInFile nSamp], 'x'});
+                    mmf = memmapfile(filename, 'Format', {datatype, [chInFile nSamp], 'x'});                    
                     obj.P.datMMfile = mmf;
                     obj.P.datSize = [chInFile nSamp];
                 else
@@ -478,7 +482,7 @@ classdef ksGUI < handle
                 Fs = str2double(obj.H.settings.setFsEdt.String);
                 samps = ceil(Fs*(t+tWin));
                 if all(samps>0 & samps<obj.P.datSize(2))
-                    dat = mmf.Data.x(obj.ops.chanMap.chanMap(chList),samps(1):samps(2));
+                    dat = mmf.Data.x(obj.ops.chanMap.chanMap(chList),samps(1):samps(2));                    
                            
                     if ~isfield(obj.H, 'dataTr') || numel(obj.H.dataTr)~=numel(chList)
                         % initialize traces
@@ -489,9 +493,12 @@ classdef ksGUI < handle
                         end
                     end
                     
+                    conn = obj.ops.chanMap.connected(chList);
                     for q = 1:size(dat,1)
                         set(obj.H.dataTr(q), 'XData', (samps(1):samps(2))/Fs, ...
                             'YData', q+double(dat(q,:)).*obj.P.vScale);
+                        if conn(q); set(obj.H.dataTr(q), 'Color', 'k'); 
+                        else; set(obj.H.dataTr(q), 'Color', 0.8*[1 1 1]); end
                     end
                     
                     set(obj.H.dataAx, 'XLim', t+tWin);
@@ -500,17 +507,47 @@ classdef ksGUI < handle
                 % if the preprocessing is complete, add whitened data
 
                 if obj.P.preprocDone
-%                     if ~isfield(obj.P, 'ppMMfile') || isempty(obj.P.ppMMfile)
-%                         filename = obj.H.settings.ChooseFileEdt.String;
-%                         datatype = 'int16';
-%                         chInFile = numel(obj.ops.chanMap.chanMap);
-%                         nSamp = obj.P.nSamp;
-%                         mmf = memmapfile(filename, 'Format', {datatype, [chInFile nSamp], 'x'});
-%                         obj.P.datMMfile = mmf;
-%                         obj.P.datSize = [chInFile nSamp];
-%                     else
-%                         mmf = obj.P.datMMfile;
-%                     end
+                    if ~isfield(obj.P, 'ppMMfile') || isempty(obj.P.ppMMfile)
+                        filename = obj.ops.fproc;
+                        datatype = 'int16';
+                        chInFile = sum(obj.ops.chanMap.connected);
+                        d = dir(filename); b = d.bytes; bytesPerSamp = 2;                     
+                        nSamp = b/bytesPerSamp/chInFile;
+                        mmf = memmapfile(filename, 'Format', {datatype, [nSamp chInFile], 'x'});
+                        obj.P.ppMMfile = mmf;
+                        obj.P.ppSize = [chInFile nSamp];
+                    else
+                        mmf = obj.P.ppMMfile;
+                    end
+                    
+                    Fs = str2double(obj.H.settings.setFsEdt.String);
+                    samps = ceil(Fs*(t+tWin));
+                    if all(samps>0 & samps<obj.P.ppSize(2))
+                        cm = obj.ops.chanMap;
+                        allProbeChans = 1:numel(cm.chanMap);
+                        allConnChans = allProbeChans(cm.connected);
+                        dat = zeros(numel(chList), numel(samps(1):samps(2)));
+                        for q = 1:numel(chList)
+                            if cm.connected(chList(q))
+                                thisCh = allConnChans(chList(q));
+                                dat(q,:) = mmf.Data.x(samps(1):samps(2), thisCh)';
+                            end
+                        end
+                        
+                        if ~isfield(obj.H, 'ppTr') || numel(obj.H.ppTr)~=numel(chList)
+                            % initialize traces                            
+                            for q = 1:numel(chList)
+                                obj.H.ppTr(q) = plot(obj.H.dataAx, 0, NaN, 'b');
+                            end
+                        end
+                        
+                        for q = 1:size(dat,1)
+                            set(obj.H.ppTr(q), 'XData', (samps(1):samps(2))/Fs, ...
+                                'YData', q+double(dat(q,:)).*obj.P.vScale);
+                        end                                                
+                        
+                    end
+                    
                 end
                 % if kilosort is finished running, add residuals
                 
@@ -627,14 +664,12 @@ classdef ksGUI < handle
                     if isempty(m)  
                         obj.P.vScale = obj.P.vScale*1.2^(-evt.VerticalScrollCount); 
                     elseif strcmp(m, 'shift')
-                        nSamp = obj.P.datMMfile.Format{2}(2);
-                        maxT = nSamp/obj.ops.fs;
+                        maxT = obj.P.nSamp/obj.ops.fs;
                         obj.P.tWin = ksGUI.chooseNewRange(obj.P.tWin, ...
                             1.2^evt.VerticalScrollCount,...
                             diff(obj.P.tWin)/2+obj.P.tWin(1), [0 maxT]);
                     elseif strcmp(m, 'control')
-                        nSamp = obj.P.datMMfile.Format{2}(2);
-                        maxT = nSamp/obj.ops.fs;
+                        maxT = obj.P.nSamp/obj.ops.fs;
                         winSize = diff(obj.P.tWin);
                         shiftSize = -evt.VerticalScrollCount*winSize*0.1;
                         obj.P.tWin = ksGUI.chooseNewRange(obj.P.tWin, 1, ...                            
@@ -687,7 +722,7 @@ classdef ksGUI < handle
         function writeScript(obj)
             % write a .m file script that the user can use later to run
             % directly, i.e. skipping the gui
-            
+            obj.log('Writing to script not yet implemented.');
         end
         
         function cleanup(obj)
