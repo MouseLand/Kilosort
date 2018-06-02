@@ -222,7 +222,7 @@ for ibatch = 1:niter
         fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.2f, mu: %2.2f \n', ...
             toc, ibatch, niter, Nfilt, median(nsp), median(mu))
         
-        figure(1)
+       figure(2)
        subplot(2,2,1)
        imagesc(W(:,:,1))
        

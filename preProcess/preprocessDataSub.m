@@ -177,6 +177,7 @@ rez.Wrot    = Wrot;
 fclose(fidW);
 fclose(fid);
 
+fprintf('Time %3.0fs. Finished preprocessing %d batches. \n', toc, Nbatch);
 
 rez.temp.Nbatch = Nbatch;
 

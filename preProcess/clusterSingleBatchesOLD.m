@@ -1,8 +1,9 @@
-function rez = clusterSingleBatches(rez)
+% function rez = clusterSingleBatches(rez)
 
 nPCs    = getOr(rez.ops, 'nPCs', 3);
 % Nfilt   = rez.ops.Nfilt;
 Nfilt = ceil(rez.ops.Nchan/2);
+
 
 % extract PC projections here
 tic
@@ -21,6 +22,7 @@ nBatches      = rez.temp.Nbatch;
 Ws = gpuArray.zeros(nPCs * (2*nch+1), Nfilt, nBatches, 'single');
 mus = gpuArray.zeros(Nfilt, nBatches, 'single');
 ns = gpuArray.zeros(Nfilt, nBatches, 'single');
+ib = gpuArray.zeros(Nfilt, nBatches, 'int32');
 ioffWs = gpuArray.zeros(Nfilt, nBatches, 'int32');
 Whs = gpuArray.zeros(Nfilt, nBatches, 'single');
 
@@ -49,6 +51,8 @@ for ibatch = 1:nBatches
         
         dWU = dWU./(1e-5 + single(nsp'));
         
+%         [dWU, nnew] = triageKmeans(dWU, nsp, uproj,ioff, dx./nu);
+        
         mu = sum(dWU.^2,1).^.5;
         W = dWU./(1e-5 + mu);
         
@@ -61,7 +65,6 @@ for ibatch = 1:nBatches
         
         W   = W(:, isort);
         mu  = mu(isort);
-        nsp = nsp(isort);
     end
 
     Wheights = min(max(Wheights, nch+1), Nchan-nch);
@@ -75,6 +78,7 @@ for ibatch = 1:nBatches
     Ws(:, :, ibatch)   = W0;    
     mus(:, ibatch)     = mu;
     ns(:, ibatch)      = nsp;    
+    ib(:, ibatch)      = ibatch;
     ioffWs(:, ibatch)  = ioffW;
     Whs(:, ibatch)     = Wheights;
     
@@ -85,23 +89,7 @@ for ibatch = 1:nBatches
     end
 end
 %%
-dshift = 20 * [0];
-dsmooth = 30;
-Kshift = cell(length(dshift), 1);
-nfeatures = nPCs * Nchan;
 
-for t = 1:length(dshift)
-    K0 = kernelD(rez.xcoords, rez.ycoords, dsmooth, dshift(t));
-    K0 = gpuArray(single(K0));
-    
-    Kshift{t} = K0;
-    for k = 2:nPCs
-        Kshift{t} = blkdiag(Kshift{t}, K0);
-    end
-    Kshift{t} = reshape(Kshift{t}, [Nchan nPCs Nchan nPCs]);
-    Kshift{t} = permute(Kshift{t}, [2 1 4 3]);
-    Kshift{t} = reshape(Kshift{t}, [nfeatures nfeatures]);
-end
 
 tic
 ns = reshape(ns, Nfilt, []);
@@ -110,7 +98,6 @@ Params  = [1 size(uproj,1) Nfilt pm size(W,1) 0 Nnearest];
 Params(1) = size(Ws,2) * size(Ws,3);
 
 ccb = gpuArray.zeros(nBatches, 'single');
-d1 = gpuArray.zeros(nBatches, 'single');
 
 [ncoefs, Nfilt, nBatches] = size(Ws);
 for ibatch = 1:nBatches 
@@ -127,53 +114,25 @@ for ibatch = 1:nBatches
     
     mu = mus(:, ibatch);
     
-    imin = ones(1, nBatches);
-    cct = Inf * gpuArray.ones(1, nBatches, 'single');
+    [iclust, ds] = mexDistances(Params, Ws, W, ioffWs(:), iW, mus, mu);
     
-    for t = 1:numel(dshift)
-        Wshift = Kshift{t} * W;
-        [iclust, ds] = mexDistances(Params, Ws, Wshift, ioffWs(:), iW, mus, mu);
-        ds = reshape(ds, Nfilt, []);
-        ds = max(0, ds);
-        
-        cct0 = mean(sqrt(ds) .* ns, 1)./mean(ns,1);    
-        
-        ix = cct0 < cct;        
-        cct(ix) = cct0(ix);
-        imin(ix) = t;
-    end
-        
-    ccb(ibatch,:) = cct;
-    d1(ibatch,:) = imin;
+    ds = reshape(ds, Nfilt, []);
+    ds = max(0, ds);
     
-    if rem(ibatch, 500)==1
-        fprintf('time %2.2f, compared %d / %d batches \n', toc, ibatch, nBatches)
-    end
+    ccb(ibatch,:) = mean(sqrt(ds) .* ns, 1)./mean(ns,1);
 end
+
 
 ccb0 = zscore(ccb, 1, 1);
 ccb0 = ccb0 + ccb0';
-
 rez.ccb = gather(ccb0);
 
-[ccb1, iorig] = sortBatches(ccb0);
+[u, s, v] = svdecon(ccb0);
+[~, isort] = sort(u(:,1));
+iorig = isort;    
+ccb0 = ccb0(isort, isort);
 
-figure(1); 
-subplot(1,2,1)
-imagesc(ccb0, [-5 5]); drawnow
-xlabel('batches')
-ylabel('batches')
-title('batch to batch distance')
-
-subplot(1,2,2)
-imagesc(ccb1, [-5 5]); drawnow
-xlabel('sorted batches')
-ylabel('sorted batches')
-title('AFTER sorting')
-
-rez.iorig = gather(iorig);
-rez.ccbsort = gather(ccb1);
+rez.iorig = iorig;
 
 fprintf('time %2.2f, Re-ordered %d batches. \n', toc, nBatches)
 %% 
-

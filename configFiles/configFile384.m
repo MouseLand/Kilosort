@@ -5,7 +5,7 @@ ops.fs                  = 30000;        % sample rate
 
 ops.fshigh              = 150;   % frequency for high pass filtering
 
-ops.Th       = 10;     % threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
+ops.Th       = [12 10];     % threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
 
 ops.lam      = 40^2;   % weighting on the amplitude penalty (like in Kilosort1, but it has to be much larger)
 
