@@ -6,6 +6,9 @@
     mexcuda -largeArrayDims mexSVDsmall.cu
     mexcuda -largeArrayDims mexWtW2.cu
     mexcuda -largeArrayDims mexFilterPCs.cu
+    mexcuda -largeArrayDims mexClustering.cu
+    mexcuda -largeArrayDims mexDistances.cu
+
 
 %    mex -largeArrayDims mexMPmuFEAT.cu
 %    mex -largeArrayDims mexMPregMU.cu
