@@ -5,6 +5,7 @@
     mexcuda -largeArrayDims mexMPnu7.cu
     mexcuda -largeArrayDims mexSVDsmall.cu
     mexcuda -largeArrayDims mexWtW2.cu
+    mexcuda -largeArrayDims mexFilterPCs.cu
 
 %    mex -largeArrayDims mexMPmuFEAT.cu
 %    mex -largeArrayDims mexMPregMU.cu
