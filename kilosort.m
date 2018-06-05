@@ -2,8 +2,8 @@ function k = kilosort
 % Call this to open the kilosort gui. 
 
 % add kilosort to path
-mfPath = mfilename('fullpath');
-if ~exist('preprocessDataSub')
+if ~exist('ksGUI', 'file')
+    mfPath = mfilename('fullpath');
     addpath(genpath(fileparts(mfPath)));
 end
 
