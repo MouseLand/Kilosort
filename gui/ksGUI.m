@@ -9,16 +9,23 @@ classdef ksGUI < handle
     % Kilosort by M. Pachitariu
     % GUI by N. Steinmetz
     %
-    % TODO: 
+    % TODO: (* = before release)
     % - test that path adding and compilation work on a fresh install
-    % - add a welcome/new user/help button
     % - allow better setting of probe site shape/size
-    % - deal properly with channel maps, connected channels
     % - up/down arrows to change number of channels displayed
-    % - fix displayed channel numbers
-    % - add preprocess/run/save buttons, rename to run all
-    % - save state of processing to reload next time a file in a directory
-    % is selected
+    % - *fix displayed channel numbers
+    % - *colormap data view
+    % - *test beginning to end
+    % - *apply whitening/preprocessing for channel display
+    % - auto-load number of channels from meta file when possible;
+    % auto-guess otherwise (number of channels on probe or next largest
+    % value that works with the file size)
+    % - update time plot when scrolling
+    % - show RMS noise level of channels to help selecting ones to drop?
+    % - implement builder for new probe channel maps (cm, xc, yc, name,
+    % site size)
+    % - advanced option setting
+    
 
     properties        
         H % struct of handles to useful parts of the gui
@@ -86,6 +93,8 @@ classdef ksGUI < handle
             % construct the GUI with appropriate panels
             obj.H.fig = f;
             
+            set(f, 'KeyPressFcn', @(f,k)obj.keyboardFcn(f, k));
+            
             obj.H.root = uiextras.VBox('Parent', f,...
                 'DeleteFcn', @(~,~)obj.cleanup(), 'Visible', 'on', ...
                 'Padding', 5);
@@ -115,7 +124,7 @@ classdef ksGUI < handle
             obj.H.helpButton = uicontrol(...
                 'Parent', obj.H.titleHBox,...
                 'Style', 'pushbutton', ...
-                'String', 'First time? Click here!', ...
+                'String', 'Help', 'FontSize', 24,...
                 'Callback', @(~,~)obj.help);
             
             obj.H.titleHBox.Sizes = [-5 -1];
@@ -137,12 +146,12 @@ classdef ksGUI < handle
             obj.H.probePanel = uiextras.Panel(...
                 'Parent', obj.H.mainSection, ...
                 'Title', 'Probe view', 'FontSize', 18,...
-                'FontName', 'Myriad Pro', 'Padding', 10);
+                'FontName', 'Myriad Pro', 'Padding', 5);
             
             obj.H.dataPanel = uiextras.Panel(...
                 'Parent', obj.H.mainSection, ...
                 'Title', 'Data view', 'FontSize', 18,...
-                'FontName', 'Myriad Pro', 'Padding', 10);
+                'FontName', 'Myriad Pro', 'Padding', 5);
             
             obj.H.mainSection.Sizes = [-1 -1 -2];
             
@@ -216,11 +225,13 @@ classdef ksGUI < handle
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '...', 'Callback', @(~,~)obj.updateFileSettings());
+            
+            % TODO: get list of probes
             obj.H.settings.setProbeEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'popupmenu', 'HorizontalAlignment', 'left', ...
                 'String', {'Neuropixels Phase3A', '[new]', 'other...'}, ...
-                'Callback', @(~,~)obj.updateProbeView());
+                'Callback', @(~,~)obj.updateProbeView('reset'));
             obj.H.settings.setnChanEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
@@ -304,6 +315,9 @@ classdef ksGUI < handle
             
             obj.H.dataAx = axes(obj.H.dataVBox);   
             
+            set(obj.H.dataAx, 'ButtonDownFcn', @(f,k)obj.dataClickCB(f, k));
+            hold(obj.H.probeAx, 'on');
+            
             set(obj.H.fig, 'WindowScrollWheelFcn', @(src,evt)obj.scrollCB(src,evt))
             set(obj.H.fig, 'WindowButtonMotionFcn', @(src, evt)any(1));
             
@@ -327,7 +341,7 @@ classdef ksGUI < handle
                 'Style', 'listbox', 'Enable', 'inactive', 'String', {}, ...
                 'Tag', 'Logging Display', 'FontSize', 14);
             
-            obj.log('Initialization success.');
+            obj.log('Initialization success. Select a data file (upper left) to begin.');
             
         end
         
@@ -457,12 +471,14 @@ classdef ksGUI < handle
             
             obj.ops.fbinary = obj.H.settings.ChooseFileEdt.String;
             if ~exist(obj.ops.fbinary, 'file')
-                obj.log('Data file not found.');
+                obj.log('Cannot run: Data file not found.');
+                return;
             end
             
             wd = obj.H.settings.ChooseTempdirEdt.String;
             if ~exist(wd, 'dir')
-                obj.log('Working directory not found.');
+                obj.log('Cannot run: Working directory not found.');
+                return
             end
             obj.ops.fproc = fullfile(wd, 'temp_wh.dat');
             
@@ -470,6 +486,14 @@ classdef ksGUI < handle
             if ~exist(obj.ops.saveDir, 'dir')
                 mkdir(obj.ops.saveDir);
             end
+            
+            % build channel map that includes only the connected channels
+            chanMap = struct();
+            conn = obj.P.chanMap.connected;
+            chanMap.chanMap = obj.P.chanMap.chanMap(conn); 
+            chanMap.xcoords = obj.P.chanMap.xcoords(conn); 
+            chanMap.ycoords = obj.P.chanMap.ycoords(conn); 
+            obj.ops.chanMap = chanMap;
             
             obj.ops.Nfilt = str2double(obj.H.settings.setNfiltEdt.String);
             if isempty(obj.ops.Nfilt)
@@ -532,11 +556,7 @@ classdef ksGUI < handle
                 % get currently selected time and channels
 
                 t = obj.P.currT;                
-                chList = obj.P.selChans;
-                yc = obj.ops.chanMap.ycoords;
-                theseYC = yc(chList);
-                [~,ii] = sort(theseYC);
-                chList = chList(ii);
+                chList = obj.P.selChans;                
                 tWin = obj.P.tWin;
 
                 % show raw data traces
@@ -555,20 +575,22 @@ classdef ksGUI < handle
                 Fs = str2double(obj.H.settings.setFsEdt.String);
                 samps = ceil(Fs*(t+tWin));
                 if all(samps>0 & samps<obj.P.datSize(2))
-                    dat = mmf.Data.x(obj.ops.chanMap.chanMap(chList),samps(1):samps(2));                    
+                    dat = mmf.Data.x(obj.P.chanMap.chanMap(chList),samps(1):samps(2));                    
                            
                     if ~isfield(obj.H, 'dataTr') || numel(obj.H.dataTr)~=numel(chList)
                         % initialize traces
-                        hold(obj.H.dataAx, 'off');
+                        %hold(obj.H.dataAx, 'off');
+                        obj.H.dataTr = [];
+                        hold(obj.H.dataAx, 'on');
                         for q = 1:numel(chList)
                             obj.H.dataTr(q) = plot(obj.H.dataAx, 0, NaN, 'k');
-                            hold(obj.H.dataAx, 'on');
+                            set(obj.H.dataTr(q), 'HitTest', 'off');
                         end
                         box(obj.H.dataAx, 'off');
-                        title(obj.H.dataAx, 'scroll and shift+scroll to scale, alt/ctrl+scroll to move');                        
+                        title(obj.H.dataAx, 'scroll and ctrl+scroll to move, alt/shift+scroll to scale/zoom');                        
                     end
                     
-                    conn = obj.ops.chanMap.connected(chList);
+                    conn = obj.P.chanMap.connected(chList);
                     for q = 1:size(dat,1)
                         set(obj.H.dataTr(q), 'XData', (samps(1):samps(2))/Fs, ...
                             'YData', q+double(dat(q,:)).*obj.P.vScale);
@@ -577,51 +599,54 @@ classdef ksGUI < handle
                     end
                     
                     set(obj.H.dataAx, 'XLim', t+tWin);
+                    
+                    yt = arrayfun(@(x)sprintf('%d (%d)', obj.P.selChans(x), obj.P.chanMap.chanMap(obj.P.selChans(x))), 1:numel(obj.P.selChans), 'uni', false);
+                    set(obj.H.dataAx, 'YTick', 1:numel(obj.P.selChans), 'YTickLabel', yt);
                 end
 
                 % if the preprocessing is complete, add whitened data
 
                 if false%obj.P.preprocDone
-                    if ~isfield(obj.P, 'ppMMfile') || isempty(obj.P.ppMMfile)
-                        filename = obj.ops.fproc;
-                        datatype = 'int16';
-                        chInFile = sum(obj.ops.chanMap.connected);
-                        d = dir(filename); b = d.bytes; bytesPerSamp = 2;                     
-                        nSamp = b/bytesPerSamp/chInFile;
-                        mmf = memmapfile(filename, 'Format', {datatype, [nSamp chInFile], 'x'});
-                        obj.P.ppMMfile = mmf;
-                        obj.P.ppSize = [chInFile nSamp];
-                    else
-                        mmf = obj.P.ppMMfile;
-                    end
-                    
-                    Fs = str2double(obj.H.settings.setFsEdt.String);
-                    samps = ceil(Fs*(t+tWin));
-                    if all(samps>0 & samps<obj.P.ppSize(2))
-                        cm = obj.ops.chanMap;
-                        allProbeChans = 1:numel(cm.chanMap);
-                        allConnChans = allProbeChans(cm.connected);
-                        dat = zeros(numel(chList), numel(samps(1):samps(2)));
-                        for q = 1:numel(chList)
-                            if cm.connected(chList(q))
-                                thisCh = allConnChans(chList(q));
-                                dat(q,:) = mmf.Data.x(samps(1):samps(2), thisCh)';
-                            end
-                        end
-                        
-                        if ~isfield(obj.H, 'ppTr') || numel(obj.H.ppTr)~=numel(chList)
-                            % initialize traces                            
-                            for q = 1:numel(chList)
-                                obj.H.ppTr(q) = plot(obj.H.dataAx, 0, NaN, 'b');
-                            end
-                        end
-                        
-                        for q = 1:size(dat,1)
-                            set(obj.H.ppTr(q), 'XData', (samps(1):samps(2))/Fs, ...
-                                'YData', q+double(dat(q,:)).*obj.P.vScale);
-                        end                                                
-                        
-                    end
+%                     if ~isfield(obj.P, 'ppMMfile') || isempty(obj.P.ppMMfile)
+%                         filename = obj.ops.fproc;
+%                         datatype = 'int16';
+%                         chInFile = sum(obj.P.chanMap.connected);
+%                         d = dir(filename); b = d.bytes; bytesPerSamp = 2;                     
+%                         nSamp = b/bytesPerSamp/chInFile;
+%                         mmf = memmapfile(filename, 'Format', {datatype, [nSamp chInFile], 'x'});
+%                         obj.P.ppMMfile = mmf;
+%                         obj.P.ppSize = [chInFile nSamp];
+%                     else
+%                         mmf = obj.P.ppMMfile;
+%                     end
+%                     
+%                     Fs = str2double(obj.H.settings.setFsEdt.String);
+%                     samps = ceil(Fs*(t+tWin));
+%                     if all(samps>0 & samps<obj.P.ppSize(2))
+%                         cm = obj.P.chanMap;
+%                         allProbeChans = 1:numel(cm.chanMap);
+%                         allConnChans = allProbeChans(cm.connected);
+%                         dat = zeros(numel(chList), numel(samps(1):samps(2)));
+%                         for q = 1:numel(chList)
+%                             if cm.connected(chList(q))
+%                                 thisCh = allConnChans(chList(q));
+%                                 dat(q,:) = mmf.Data.x(samps(1):samps(2), thisCh)';
+%                             end
+%                         end
+%                         
+%                         if ~isfield(obj.H, 'ppTr') || numel(obj.H.ppTr)~=numel(chList)
+%                             % initialize traces                            
+%                             for q = 1:numel(chList)
+%                                 obj.H.ppTr(q) = plot(obj.H.dataAx, 0, NaN, 'b');
+%                             end
+%                         end
+%                         
+%                         for q = 1:size(dat,1)
+%                             set(obj.H.ppTr(q), 'XData', (samps(1):samps(2))/Fs, ...
+%                                 'YData', q+double(dat(q,:)).*obj.P.vScale);
+%                         end                                                
+%                         
+%                     end
                     
                 end
                 
@@ -656,12 +681,11 @@ classdef ksGUI < handle
                         [filename, pathname] = uigetfile('*.mat', 'Pick a channel map file.');
 
                         if filename~=0 % 0 when cancel
-                            obj.log('choosing a different channel map not yet implemented.');
-                            %q = load(fullfile(pathname, filename)); 
+                            %obj.log('choosing a different channel map not yet implemented.');
+                            cm = load(fullfile(pathname, filename)); 
                             % ** check for all the right data, get a name for
                             % it, add to defaults                        
-                        end
-                        return;
+                        end                        
                 end
                 
                 nSites = numel(cm.chanMap);
@@ -677,7 +701,7 @@ classdef ksGUI < handle
                 % TODO validate channel map
                 
                 obj.H.probeSites = [];
-                obj.ops.chanMap = cm;
+                obj.P.chanMap = cm;
                 obj.P.probeGood = true;
                 
                 if obj.P.dataGood
@@ -687,7 +711,7 @@ classdef ksGUI < handle
             end
             
             if obj.P.probeGood
-                cm = obj.ops.chanMap;
+                cm = obj.P.chanMap;
                 
                 if ~isempty(cm)
                     % if it is valid, plot it
@@ -702,35 +726,42 @@ classdef ksGUI < handle
                         for q = 1:nSites
                             obj.H.probeSites(q) = fill(obj.H.probeAx, ...
                                 sq(:,1)+cm.xcoords(q), ...
-                                sq(:,2)+cm.ycoords(q), 'g');
+                                sq(:,2)+cm.ycoords(q), 'b');
                             set(obj.H.probeSites(q), 'HitTest', 'off');
                                                         
                         end
                         axis(obj.H.probeAx, 'equal');
                         set(obj.H.probeAx, 'XTick', [], 'YTick', []);
+                        title(obj.H.probeAx, {'scroll to zoom, click to view channel,', 'right-click to disable channel'});
                         %axis(obj.H.probeAx, 'off');
                     end
 
                     y = obj.P.currY;
                     x = obj.P.currX;
                     nCh = obj.P.nChanToPlot;
+                    conn = obj.P.chanMap.connected;
 
                     dists = ((cm.xcoords-x).^2 + (cm.ycoords-y).^2).^(0.5);
                     [~, ii] = sort(dists);
                     obj.P.selChans = ii(1:nCh);
 
+                    % order by y-coord
+                    yc = obj.P.chanMap.ycoords;
+                    theseYC = yc(obj.P.selChans);
+                    [~,ii] = sort(theseYC);
+                    obj.P.selChans = obj.P.selChans(ii);
+                    
                     for q = 1:nSites
-                        if ismember(q, obj.P.selChans)
+                        if ismember(q, obj.P.selChans) && ~conn(q)
+                            set(obj.H.probeSites(q), 'FaceColor', [1 0 1]);
+                        elseif ismember(q, obj.P.selChans) 
                             set(obj.H.probeSites(q), 'FaceColor', [0 0 1]);
+                        elseif ~conn(q)
+                            set(obj.H.probeSites(q), 'FaceColor', [1 0 0]);
                         else
                             set(obj.H.probeSites(q), 'FaceColor', [0 1 0]);
                         end
                     end
-
-                                        
-
-                    % TODO if data file is also valid, compute RMS and plot that here
-
                 end
             end
         end
@@ -743,12 +774,23 @@ classdef ksGUI < handle
                     m = get(obj.H.fig,'CurrentModifier');
 
                     if isempty(m)  
-                        obj.P.vScale = obj.P.vScale*1.2^(-evt.VerticalScrollCount); 
+                        obj.P.currY = obj.P.currY-evt.VerticalScrollCount*...
+                            min(diff(unique(obj.P.chanMap.ycoords)));
+                        yc = obj.P.chanMap.ycoords;
+                        mx = max(yc)+obj.P.chanMap.siteSize;
+                        mn = min(yc)-obj.P.chanMap.siteSize;
+                        if obj.P.currY>mx; obj.P.currY = mx; end
+                        if obj.P.currY<mn; obj.P.currY = mn; end
+                        obj.updateProbeView();
+                         
                     elseif strcmp(m, 'shift')
                         maxT = obj.P.nSamp/obj.ops.fs;
-                        obj.P.tWin = ksGUI.chooseNewRange(obj.P.tWin, ...
+                        oldWin = obj.P.tWin+obj.P.currT;
+                        newWin = ksGUI.chooseNewRange(oldWin, ...
                             1.2^evt.VerticalScrollCount,...
-                            diff(obj.P.tWin)/2+obj.P.tWin(1), [0 maxT]);
+                            diff(oldWin)/2+oldWin(1), [0 maxT]);
+                        obj.P.tWin = newWin-newWin(1);
+                        obj.P.currT = newWin(1);
                     elseif strcmp(m, 'control')
                         maxT = obj.P.nSamp/obj.ops.fs;
                         winSize = diff(obj.P.tWin);
@@ -757,14 +799,7 @@ classdef ksGUI < handle
                         if obj.P.currT>maxT; obj.P.currT = maxT; end
                         if obj.P.currT<0; obj.P.currT = 0; end
                     elseif strcmp(m, 'alt')
-                        obj.P.currY = obj.P.currY-evt.VerticalScrollCount*...
-                            min(diff(unique(obj.ops.chanMap.ycoords)));
-                        yc = obj.ops.chanMap.ycoords;
-                        mx = max(yc)+obj.ops.chanMap.siteSize;
-                        mn = min(yc)-obj.ops.chanMap.siteSize;
-                        if obj.P.currY>mx; obj.P.currY = mx; end
-                        if obj.P.currY<mn; obj.P.currY = mn; end
-                        obj.updateProbeView();
+                        obj.P.vScale = obj.P.vScale*1.2^(-evt.VerticalScrollCount);
                     end
                     obj.updateDataView();
                 end
@@ -774,9 +809,9 @@ classdef ksGUI < handle
                     cpP = get(obj.H.probeAx, 'CurrentPoint');
                     yl = get(obj.H.probeAx, 'YLim');
                     currY = cpP(1,2);
-                    yc = obj.ops.chanMap.ycoords;
-                    mx = max(yc)+obj.ops.chanMap.siteSize;
-                    mn = min(yc)-obj.ops.chanMap.siteSize;
+                    yc = obj.P.chanMap.ycoords;
+                    mx = max(yc)+obj.P.chanMap.siteSize;
+                    mn = min(yc)-obj.P.chanMap.siteSize;
                     newyl = ksGUI.chooseNewRange(yl, ...
                         1.2^evt.VerticalScrollCount,...
                         currY, [mn mx]);          
@@ -786,8 +821,39 @@ classdef ksGUI < handle
         end
         
         function probeClickCB(obj, ~, keydata)
-            obj.P.currX = round(keydata.IntersectionPoint(1));
-            obj.P.currY = round(keydata.IntersectionPoint(2));
+            if keydata.Button==1 % left click
+                obj.P.currX = round(keydata.IntersectionPoint(1));
+                obj.P.currY = round(keydata.IntersectionPoint(2));
+            else % any other click, disconnect/reconnect the nearest channel
+                thisX = round(keydata.IntersectionPoint(1));
+                thisY = round(keydata.IntersectionPoint(2));
+                xc = obj.P.chanMap.xcoords;
+                yc = obj.P.chanMap.ycoords;
+                dists = ((thisX-xc).^2+(thisY-yc).^2).^(0.5);
+                [~,ii] = sort(dists);
+                obj.P.chanMap.connected(ii(1)) = ~obj.P.chanMap.connected(ii(1));                
+            end
+            obj.updateProbeView;
+            obj.updateDataView;
+        end
+        
+        function dataClickCB(obj, ~, keydata)
+            if keydata.Button==1 % left click, re-center view
+                obj.P.currT = keydata.IntersectionPoint(1)-diff(obj.P.tWin)/2;
+                
+                thisY = round(keydata.IntersectionPoint(2));  
+                if thisY<=0; thisY = 1; end
+                if thisY>=numel(obj.P.selChans); thisY = numel(obj.P.selChans); end
+                thisCh = obj.P.selChans(thisY);
+                obj.P.currY = obj.P.chanMap.ycoords(thisCh);
+                
+            else % any other click, disconnect/reconnect the nearest channel   
+                thisY = round(keydata.IntersectionPoint(2));  
+                if thisY<=0; thisY = 1; end
+                if thisY>=numel(obj.P.selChans); thisY = numel(obj.P.selChans); end
+                thisCh = obj.P.selChans(thisY);
+                obj.P.chanMap.connected(thisCh) = ~obj.P.chanMap.connected(thisCh);                
+            end
             obj.updateProbeView;
             obj.updateDataView;
         end
@@ -803,6 +869,17 @@ classdef ksGUI < handle
                 obj.updateDataView;
             end
             
+        end
+        
+        function keyboardFcn(obj, ~, k)
+            switch k.Key
+                case 'uparrow'
+                    obj.P.nChanToPlot = obj.P.nChanToPlot+1;
+                case 'downarrow'
+                    obj.P.nChanToPlot = obj.P.nChanToPlot-1;
+            end
+            obj.updateProbeView;
+            obj.updateDataView;
         end
             
         
@@ -824,7 +901,7 @@ classdef ksGUI < handle
             savePath = fullfile(p, [fn '_ksSettings.mat']);
             
             save(savePath, 'saveDat');
-                        
+            obj.refocus(obj.H.settings.saveBtn);
         end
         
         function restoreGUIsettings(obj)
@@ -859,7 +936,23 @@ classdef ksGUI < handle
             obj.log('Writing to script not yet implemented.');
         end
         
+        function help(obj)
+            
+            hstr = {'Welcome to Kilosort!',...
+                '',...
+                'See below for troubleshooting and tips.',...
+                '',...
+                '*** Troubleshooting ***', ...
+                '1. Close and restart kilosort gui.', ...
+                '2. Delete the file \myDirectory\myFilename_ksSettings.mat and restart', ...
+                '3. Create an issue at github.com/MouseLand/Kilosort2 with as much detail about the problem as possible.'};
+            
+            h = helpdlg(hstr, 'Kilosort help');
+            
+        end
+        
         function cleanup(obj)
+            obj.saveGUIsettings();
             fclose('all');
         end
         
@@ -874,6 +967,13 @@ classdef ksGUI < handle
     end
     
     methods(Static)
+        
+        function refocus(uiObj)
+            set(uiObj, 'Enable', 'off');
+            drawnow update;
+            set(uiObj, 'Enable', 'on');
+        end
+        
         function ops = defaultOps()
             % look for a default ops file and load it
             if exist('defaultOps.mat')
