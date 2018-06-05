@@ -13,9 +13,7 @@ classdef ksGUI < handle
     % - test that path adding and compilation work on a fresh install
     % - allow better setting of probe site shape/size
     % - up/down arrows to change number of channels displayed
-    % - *fix displayed channel numbers
     % - *colormap data view
-    % - *test beginning to end
     % - *apply whitening/preprocessing for channel display
     % - auto-load number of channels from meta file when possible;
     % auto-guess otherwise (number of channels on probe or next largest
@@ -496,7 +494,7 @@ classdef ksGUI < handle
             obj.ops.chanMap = chanMap;
             
             obj.ops.Nfilt = str2double(obj.H.settings.setNfiltEdt.String);
-            if isempty(obj.ops.Nfilt)
+            if isempty(obj.ops.Nfilt)||isnan(obj.ops.Nfilt)
                 obj.ops.Nfilt = numel(obj.ops.chanMap.chanMap)*2.5;
             end
             if mod(obj.ops.Nfilt,32)~=0
@@ -504,6 +502,7 @@ classdef ksGUI < handle
             end
             obj.H.settings.setNfiltEdt.String = num2str(obj.ops.Nfilt);
             
+            obj.ops.NchanTOT = str2double(obj.H.settings.setnChanEdt.String);
             
         end
         
@@ -514,12 +513,14 @@ classdef ksGUI < handle
             % do preprocessing
             obj.ops.gui = obj; % for kilosort to access, e.g. calling "log"
             try
+                obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
                 
                 set(obj.H.settings.runSpikesortBtn, 'enable', 'on');
                 
                 % update gui with results of preprocessing
                 obj.updateDataView();
+                obj.log('Done preprocessing.'); 
             catch ex
                 obj.log(sprintf('Error preprocessing! %s', ex.message));
             end
@@ -529,12 +530,23 @@ classdef ksGUI < handle
         function runSpikesort(obj)
             % fit templates
             try
+                % pre-clustering to re-order batches by depth
+                obj.log('Pre-clustering to re-order batches by depth')
+                obj.rez = clusterSingleBatches(obj.rez);
+                
+                % main optimization
+                obj.log('Main optimization')
                 obj.rez = learnAndSolve8(obj.rez);
-                log('Kilosort finished!');
+
+                % this does splits
+                obj.log('Splits')
+                obj.rez = splitAllClusters(obj.rez);
+                
+                obj.log('Kilosort finished!');
                 set(obj.H.settings.runSaveBtn, 'enable', 'on');
                 obj.updateDataView();
             catch ex
-                log(sprintf('Error running kilosort! %s', ex.message));
+                obj.log(sprintf('Error running kilosort! %s', ex.message));
             end   
                         
         end
@@ -545,7 +557,7 @@ classdef ksGUI < handle
             try
                 rezToPhy(obj.rez, obj.ops.saveDir);
             catch ex
-                log(sprintf('Error saving data for phy! %s', ex.message));
+                obj.log(sprintf('Error saving data for phy! %s', ex.message));
             end            
             
         end
@@ -579,7 +591,7 @@ classdef ksGUI < handle
                            
                     if ~isfield(obj.H, 'dataTr') || numel(obj.H.dataTr)~=numel(chList)
                         % initialize traces
-                        %hold(obj.H.dataAx, 'off');
+                        if isfield(obj.H, 'dataTr')&&~isempty(obj.H.dataTr); delete(obj.H.dataTr); end
                         obj.H.dataTr = [];
                         hold(obj.H.dataAx, 'on');
                         for q = 1:numel(chList)
@@ -720,6 +732,7 @@ classdef ksGUI < handle
                     
                     if ~isfield(obj.H, 'probeSites') || isempty(obj.H.probeSites) || ...
                             numel(obj.H.probeSites)~=nSites
+                        if isfield(obj.H, 'probeSites')&&~isempty(obj.H.probeSites); delete(obj.H.probeSites); end
                         obj.H.probeSites = [];
                         hold(obj.H.probeAx, 'on');                    
                         sq = ss*([0 0; 0 1; 1 1; 1 0]-[0.5 0.5]);
@@ -894,6 +907,7 @@ classdef ksGUI < handle
             saveDat.settings.setNfiltEdt.String = obj.H.settings.setNfiltEdt.String;
             
             saveDat.ops = obj.ops;
+            saveDat.ops.gui = [];
             saveDat.rez = obj.rez;
             saveDat.P = obj.P;
             
@@ -963,6 +977,7 @@ classdef ksGUI < handle
             current = get(obj.H.logBox, 'String');
             set(obj.H.logBox, 'String', [current; str], ...
                 'Value', numel(current) + 1);
+            drawnow;
         end
     end
     
@@ -976,8 +991,11 @@ classdef ksGUI < handle
         
         function ops = defaultOps()
             % look for a default ops file and load it
-            if exist('defaultOps.mat')
-                load('defaultOps.mat', 'ops');
+%             if exist('defaultOps.mat')
+%                 load('defaultOps.mat', 'ops');
+            if exist('configFile384.m', 'file')
+                configFile384;  
+                ops.trange      = [0 Inf];
             else
                 ops = [];
             end
