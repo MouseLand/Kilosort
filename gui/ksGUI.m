@@ -18,11 +18,14 @@ classdef ksGUI < handle
     % - auto-load number of channels from meta file when possible;
     % auto-guess otherwise (number of channels on probe or next largest
     % value that works with the file size)
-    % - update time plot when scrolling
+    % - update time plot when scrolling in dataview
     % - show RMS noise level of channels to help selecting ones to drop?
     % - implement builder for new probe channel maps (cm, xc, yc, name,
     % site size)
     % - advanced option setting
+    % - saving of probe layouts
+    % - plotting bug: zoom out on probe view should allow all the way out
+    % in x
     
 
     properties        
@@ -695,6 +698,10 @@ classdef ksGUI < handle
                         if filename~=0 % 0 when cancel
                             %obj.log('choosing a different channel map not yet implemented.');
                             cm = load(fullfile(pathname, filename)); 
+                            cm.chanMap = cm.chanMap(:);
+                            cm.xcoords = cm.xcoords(:);
+                            cm.ycoords = cm.ycoords(:);
+                            cm.connected = logical(cm.connected(:));
                             % ** check for all the right data, get a name for
                             % it, add to defaults                        
                         end                        
@@ -712,7 +719,10 @@ classdef ksGUI < handle
                 
                 % TODO validate channel map
                 
-                obj.H.probeSites = [];
+                if isfield(obj.H, 'probeSites')&&~isempty(obj.H.probeSites)
+                    fprintf(1, 'deleting\n');
+                    delete(obj.H.probeSites);
+                end
                 obj.P.chanMap = cm;
                 obj.P.probeGood = true;
                 
@@ -731,11 +741,12 @@ classdef ksGUI < handle
                     ss = cm.siteSize;
                     
                     if ~isfield(obj.H, 'probeSites') || isempty(obj.H.probeSites) || ...
-                            numel(obj.H.probeSites)~=nSites
-                        if isfield(obj.H, 'probeSites')&&~isempty(obj.H.probeSites); delete(obj.H.probeSites); end
+                            numel(obj.H.probeSites)~=nSites 
+                        
                         obj.H.probeSites = [];
                         hold(obj.H.probeAx, 'on');                    
                         sq = ss*([0 0; 0 1; 1 1; 1 0]-[0.5 0.5]);
+                        fprintf(1, 'plotting\n');
                         for q = 1:nSites
                             obj.H.probeSites(q) = fill(obj.H.probeAx, ...
                                 sq(:,1)+cm.xcoords(q), ...
@@ -743,6 +754,8 @@ classdef ksGUI < handle
                             set(obj.H.probeSites(q), 'HitTest', 'off');
                                                         
                         end
+                        yc = cm.ycoords;
+                        ylim(obj.H.probeAx, [min(yc) max(yc)]);
                         axis(obj.H.probeAx, 'equal');
                         set(obj.H.probeAx, 'XTick', [], 'YTick', []);
                         title(obj.H.probeAx, {'scroll to zoom, click to view channel,', 'right-click to disable channel'});
