@@ -26,6 +26,7 @@ classdef ksGUI < handle
     % - saving of probe layouts
     % - plotting bug: zoom out on probe view should allow all the way out
     % in x
+    % - some help/tools for working with other datafile types
     
 
     properties        
@@ -340,10 +341,7 @@ classdef ksGUI < handle
             obj.H.logBox = uicontrol(...
                 'Parent', obj.H.logPanel,...
                 'Style', 'listbox', 'Enable', 'inactive', 'String', {}, ...
-                'Tag', 'Logging Display', 'FontSize', 14);
-            
-            obj.log('Initialization success. Select a data file (upper left) to begin.');
-            
+                'Tag', 'Logging Display', 'FontSize', 14);                        
         end
         
         function initPars(obj)
@@ -370,12 +368,20 @@ classdef ksGUI < handle
                 savedSettings = load(obj.P.settingsPath);
                 if isfield(savedSettings, 'lastFile')
                     obj.H.settings.ChooseFileEdt.String = savedSettings.lastFile;
-                    obj.updateFileSettings();
+                    obj.log('Initializing with last used file.');
                     obj.restoreGUIsettings();
+                    obj.updateProbeView('new');
+                    obj.updateFileSettings();
                 end
+            else
+                obj.log('Select a data file (upper left) to begin.');
             end
             
             obj.updateProbeView('new');
+            
+            if obj.P.probeGood && obj.P.dataGood
+                obj.computeWhitening();
+            end
             
         end
         
@@ -395,12 +401,16 @@ classdef ksGUI < handle
         function updateFileSettings(obj)
             
             % check whether there's a data file and exists
-            if ~exist(obj.H.settings.ChooseFileEdt.String)
+            if ~exist(obj.H.settings.ChooseFileEdt.String, 'file')
                 obj.log('Data file does not exist.');
                 return;
             end
             
-            % **check file extension
+            % check file extension
+            [~,~,ext] = fileparts(obj.H.settings.ChooseFileEdt.String);
+            if ~strcmp(ext, '.bin') &&  ~strcmp(ext, '.dat')
+                obj.log('Warning: Data file must be raw binary. Other formats not supported.');
+            end
             
             % if data file exists and output/temp are empty, pre-fill
             if strcmp(obj.H.settings.ChooseTempdirEdt.String, '...')||...
@@ -417,38 +427,54 @@ classdef ksGUI < handle
             % if nChan is set, see whether it makes any sense
             if ~isempty(obj.H.settings.setnChanEdt.String)
                 nChan = str2num(obj.H.settings.setnChanEdt.String);
-                
-                d = dir(obj.H.settings.ChooseFileEdt.String);
-                b = d.bytes;
-                
-                bytesPerSamp = 2; % hard-coded for now, int16
-                
-                if mod(b,bytesPerSamp)==0 && mod(b/bytesPerSamp,nChan)==0
-                    % if all that looks good, make the plot
-                    obj.P.nSamp = b/bytesPerSamp/nChan;
-                    obj.P.dataGood = true;
-                    obj.P.datMMfile = [];                    
-                    obj.updateDataView()
-                    
-                    lastFile = obj.H.settings.ChooseFileEdt.String;
-                    save(obj.P.settingsPath, 'lastFile');
-                    
-                    if obj.P.probeGood
-                        set(obj.H.settings.runBtn, 'enable', 'on');
-                        set(obj.H.settings.runPreprocBtn, 'enable', 'on');
-                    end
-                else
-                    obj.log('Doesn''t look like the number of channels is correct.');
-                    
-                    % try figuring it out
-                    testNC = ceil(nChan*0.9):floor(nChan*1.1);
-                    possibleVals = testNC(mod(b/bytesPerSamp, testNC)==0);
-                    obj.log(sprintf('Consider trying: %s', num2str(possibleVals)));
-                end
+            elseif isfield(obj.P, 'chanMap')  
+                % initial guess that nChan is the number of channels in the channel
+                % map
+                nChan = numel(obj.P.chanMap.chanMap);
             else
-                obj.log('Set number of channels to see data file');
+                nChan = 32; % don't have any other guess
             end
-                    
+            
+            d = dir(obj.H.settings.ChooseFileEdt.String);
+            b = d.bytes;
+            
+            a = cast(0, 'int16'); % hard-coded for now, int16
+            q = whos('a');
+            bytesPerSamp = q.bytes;
+            
+            if ~(mod(b,bytesPerSamp)==0 && mod(b/bytesPerSamp,nChan)==0)
+                % try figuring out number of channels, since the previous
+                % guess didn't work
+                testNC = ceil(nChan*0.9):floor(nChan*1.1);
+                possibleVals = testNC(mod(b/bytesPerSamp, testNC)==0);
+                if ~isempty(possibleVals)
+                    if ~isempty(find(possibleVals>nChan,1))
+                        nChan = possibleVals(find(possibleVals>nChan,1));
+                    else
+                        nChan = possibleVals(end);
+                    end
+                    obj.log(sprintf('Guessing that number of channels is %d. If it doesn''t look right, consider trying: %s', nChan, num2str(possibleVals)));
+                else
+                    obj.log('Cannot work out a guess for number of channels in the file. Please enter number of channels to proceed.');
+                    return;
+                end
+            end
+            obj.H.settings.setnChanEdt.String = num2str(nChan);                    
+                
+            % if all that looks good, make the plot
+            obj.P.nSamp = b/bytesPerSamp/nChan;
+            obj.P.dataGood = true;
+            obj.P.datMMfile = [];
+            obj.updateDataView()
+            
+            lastFile = obj.H.settings.ChooseFileEdt.String;
+            save(obj.P.settingsPath, 'lastFile');
+            
+            if obj.P.probeGood
+                set(obj.H.settings.runBtn, 'enable', 'on');
+                set(obj.H.settings.runPreprocBtn, 'enable', 'on');
+            end            
+            
         end
         
         function advancedPopup(obj)
@@ -518,6 +544,7 @@ classdef ksGUI < handle
             try
                 obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
+                obj.P.Wrot = obj.rez.Wrot;
                 
                 set(obj.H.settings.runSpikesortBtn, 'enable', 'on');
                 
@@ -528,6 +555,15 @@ classdef ksGUI < handle
                 obj.log(sprintf('Error preprocessing! %s', ex.message));
             end
             
+        end
+        
+        function computeWhitening(obj)
+            obj.log('Computing whitening filter...')
+            obj.prepareForRun;
+            [~,Wrot] = computeWhitening(obj.ops);
+            obj.P.Wrot = Wrot;
+            obj.updateDataView;
+            obj.log('Done.')
         end
         
         function runSpikesort(obj)
@@ -569,29 +605,30 @@ classdef ksGUI < handle
             
             if obj.P.dataGood && obj.P.probeGood
                 % get currently selected time and channels
-
-                t = obj.P.currT;                
-                chList = obj.P.selChans;                
+                
+                t = obj.P.currT;
+                chList = obj.P.selChans;
                 tWin = obj.P.tWin;
-
+                
                 % show raw data traces
                 if ~isfield(obj.P, 'datMMfile') || isempty(obj.P.datMMfile)
                     filename = obj.H.settings.ChooseFileEdt.String;
                     datatype = 'int16';
-                    chInFile = str2num(obj.H.settings.setnChanEdt.String);                
+                    chInFile = str2num(obj.H.settings.setnChanEdt.String);
                     nSamp = obj.P.nSamp;
-                    mmf = memmapfile(filename, 'Format', {datatype, [chInFile nSamp], 'x'});                    
+                    mmf = memmapfile(filename, 'Format', {datatype, [chInFile nSamp], 'x'});
                     obj.P.datMMfile = mmf;
                     obj.P.datSize = [chInFile nSamp];
                 else
                     mmf = obj.P.datMMfile;
                 end
-
+                
                 Fs = str2double(obj.H.settings.setFsEdt.String);
                 samps = ceil(Fs*(t+tWin));
                 if all(samps>0 & samps<obj.P.datSize(2))
-                    dat = mmf.Data.x(obj.P.chanMap.chanMap(chList),samps(1):samps(2));                    
-                           
+                    datAll = mmf.Data.x(:,samps(1):samps(2));
+                    dat = datAll(obj.P.chanMap.chanMap(chList),:);
+                    
                     if ~isfield(obj.H, 'dataTr') || numel(obj.H.dataTr)~=numel(chList)
                         % initialize traces
                         if isfield(obj.H, 'dataTr')&&~isempty(obj.H.dataTr); delete(obj.H.dataTr); end
@@ -602,14 +639,14 @@ classdef ksGUI < handle
                             set(obj.H.dataTr(q), 'HitTest', 'off');
                         end
                         box(obj.H.dataAx, 'off');
-                        title(obj.H.dataAx, 'scroll and ctrl+scroll to move, alt/shift+scroll to scale/zoom');                        
+                        title(obj.H.dataAx, 'scroll and ctrl+scroll to move, alt/shift+scroll to scale/zoom');
                     end
                     
                     conn = obj.P.chanMap.connected(chList);
                     for q = 1:size(dat,1)
                         set(obj.H.dataTr(q), 'XData', (samps(1):samps(2))/Fs, ...
                             'YData', q+double(dat(q,:)).*obj.P.vScale);
-                        if conn(q); set(obj.H.dataTr(q), 'Color', 'k'); 
+                        if conn(q); set(obj.H.dataTr(q), 'Color', 'k');
                         else; set(obj.H.dataTr(q), 'Color', 0.8*[1 1 1]); end
                     end
                     
@@ -617,62 +654,49 @@ classdef ksGUI < handle
                     
                     yt = arrayfun(@(x)sprintf('%d (%d)', obj.P.selChans(x), obj.P.chanMap.chanMap(obj.P.selChans(x))), 1:numel(obj.P.selChans), 'uni', false);
                     set(obj.H.dataAx, 'YTick', 1:numel(obj.P.selChans), 'YTickLabel', yt);
-                end
-
-                % if the preprocessing is complete, add whitened data
-
-                if false%obj.P.preprocDone
-%                     if ~isfield(obj.P, 'ppMMfile') || isempty(obj.P.ppMMfile)
-%                         filename = obj.ops.fproc;
-%                         datatype = 'int16';
-%                         chInFile = sum(obj.P.chanMap.connected);
-%                         d = dir(filename); b = d.bytes; bytesPerSamp = 2;                     
-%                         nSamp = b/bytesPerSamp/chInFile;
-%                         mmf = memmapfile(filename, 'Format', {datatype, [nSamp chInFile], 'x'});
-%                         obj.P.ppMMfile = mmf;
-%                         obj.P.ppSize = [chInFile nSamp];
-%                     else
-%                         mmf = obj.P.ppMMfile;
-%                     end
-%                     
-%                     Fs = str2double(obj.H.settings.setFsEdt.String);
-%                     samps = ceil(Fs*(t+tWin));
-%                     if all(samps>0 & samps<obj.P.ppSize(2))
-%                         cm = obj.P.chanMap;
-%                         allProbeChans = 1:numel(cm.chanMap);
-%                         allConnChans = allProbeChans(cm.connected);
-%                         dat = zeros(numel(chList), numel(samps(1):samps(2)));
-%                         for q = 1:numel(chList)
-%                             if cm.connected(chList(q))
-%                                 thisCh = allConnChans(chList(q));
-%                                 dat(q,:) = mmf.Data.x(samps(1):samps(2), thisCh)';
-%                             end
-%                         end
-%                         
-%                         if ~isfield(obj.H, 'ppTr') || numel(obj.H.ppTr)~=numel(chList)
-%                             % initialize traces                            
-%                             for q = 1:numel(chList)
-%                                 obj.H.ppTr(q) = plot(obj.H.dataAx, 0, NaN, 'b');
-%                             end
-%                         end
-%                         
-%                         for q = 1:size(dat,1)
-%                             set(obj.H.ppTr(q), 'XData', (samps(1):samps(2))/Fs, ...
-%                                 'YData', q+double(dat(q,:)).*obj.P.vScale);
-%                         end                                                
-%                         
-%                     end
+                    
+                    
+                    % add filtered, whitened data
+                    
+                    obj.prepareForRun();
+                    datAllF = ksFilter(datAll, obj.ops);
+                    datAllF = double(gather_try(datAllF));
+                    if isfield(obj.P, 'Wrot') && ~isempty(obj.P.Wrot)
+                        Wrot = obj.P.Wrot/obj.ops.scaleproc;
+                        datAllF = datAllF*Wrot;
+                    end
+                    datAllF = datAllF'*10;
+                    cmconn = obj.P.chanMap.chanMap(obj.P.chanMap.connected);
+                    
+                    if ~isfield(obj.H, 'ppTr') || numel(obj.H.ppTr)~=numel(chList)
+                        % initialize traces
+                        for q = 1:numel(chList)
+                            obj.H.ppTr(q) = plot(obj.H.dataAx, 0, NaN, 'r');
+                        end
+                    end
+                    
+                    for q = 1:numel(chList)
+                        if obj.P.chanMap.connected(chList(q))
+                            chInd = find(cmconn==chList(q),1);
+                            set(obj.H.ppTr(q), 'XData', (samps(1):samps(2))/Fs, ...
+                                'YData', q+datAllF(chInd,:).*obj.P.vScale);                        
+                        else
+                            set(obj.H.ppTr(q), 'XData', 0, 'YData', NaN);
+                        end
+                    end
                     
                 end
                 
-                
-                % if kilosort is finished running, add residuals
-                if obj.P.ksDone
-                    
-                end
-                    
             end
+            
+            
+            % if kilosort is finished running, add residuals
+            if obj.P.ksDone
+                
+            end
+            
         end
+        
         
         
         
@@ -704,7 +728,9 @@ classdef ksGUI < handle
                             cm.connected = logical(cm.connected(:));
                             % ** check for all the right data, get a name for
                             % it, add to defaults                        
-                        end                        
+                        else
+                            return;
+                        end
                 end
                 
                 nSites = numel(cm.chanMap);
@@ -720,8 +746,8 @@ classdef ksGUI < handle
                 % TODO validate channel map
                 
                 if isfield(obj.H, 'probeSites')&&~isempty(obj.H.probeSites)
-                    fprintf(1, 'deleting\n');
                     delete(obj.H.probeSites);
+                    obj.H.probeSites = [];
                 end
                 obj.P.chanMap = cm;
                 obj.P.probeGood = true;
@@ -742,11 +768,9 @@ classdef ksGUI < handle
                     
                     if ~isfield(obj.H, 'probeSites') || isempty(obj.H.probeSites) || ...
                             numel(obj.H.probeSites)~=nSites 
-                        
                         obj.H.probeSites = [];
                         hold(obj.H.probeAx, 'on');                    
                         sq = ss*([0 0; 0 1; 1 1; 1 0]-[0.5 0.5]);
-                        fprintf(1, 'plotting\n');
                         for q = 1:nSites
                             obj.H.probeSites(q) = fill(obj.H.probeAx, ...
                                 sq(:,1)+cm.xcoords(q), ...
@@ -952,7 +976,7 @@ classdef ksGUI < handle
                 obj.rez = saveDat.rez;
                 obj.P = saveDat.P;
                 
-                obj.updateProbeView;
+                obj.updateProbeView('new');
                 obj.updateDataView;
             end
         end

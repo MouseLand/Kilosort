@@ -1,4 +1,4 @@
-ops.chanMap             = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap.mat';
+ops.chanMap             = 'C:\Users\Nick\Documents\github\Kilosort2\configFiles\neuropixPhase3A_kilosortChanMap.mat';
 % ops.chanMap = 1:ops.Nchan; % treated as linear probe if a chanMap file
 
 ops.fs                  = 30000;        % sample rate
