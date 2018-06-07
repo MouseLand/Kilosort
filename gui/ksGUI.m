@@ -13,8 +13,7 @@ classdef ksGUI < handle
     % - test that path adding and compilation work on a fresh install
     % - allow better setting of probe site shape/size
     % - up/down arrows to change number of channels displayed
-    % - *colormap data view
-    % - *apply whitening/preprocessing for channel display
+    % - *colormap data view - show whitened, residuals, zoom
     % - auto-load number of channels from meta file when possible;
     % auto-guess otherwise (number of channels on probe or next largest
     % value that works with the file size)
@@ -27,7 +26,9 @@ classdef ksGUI < handle
     % - plotting bug: zoom out on probe view should allow all the way out
     % in x
     % - some help/tools for working with other datafile types
-    
+    % - * bug when disabling/enabling channels: Wrot is the wrong size. fix
+    % by computing for all channels in channel map, and dropping
+    % unconnected ones when requested
 
     properties        
         H % struct of handles to useful parts of the gui
@@ -113,7 +114,7 @@ classdef ksGUI < handle
                 'Title', 'Message Log', 'FontSize', 18,...
                 'FontName', 'Myriad Pro');
             
-            obj.H.root.Sizes = [-1 -8 -2];
+            obj.H.root.Sizes = [-1 -12 -2];
             
             % -- Title bar
             
@@ -155,7 +156,7 @@ classdef ksGUI < handle
                 'Title', 'Data view', 'FontSize', 18,...
                 'FontName', 'Myriad Pro', 'Padding', 5);
             
-            obj.H.mainSection.Sizes = [-1 -1 -2];
+            obj.H.mainSection.Sizes = [-1 -1 -3];
             
             % --- Settings panel
             obj.H.settingsVBox = uiextras.VBox(...
@@ -357,9 +358,13 @@ classdef ksGUI < handle
             obj.P.selChans = 1:16;
             obj.P.vScale = 0.005;
             obj.P.dataGood = false;
-            obj.P.probeGood = false;
-            obj.P.preprocDone = false;
+            obj.P.probeGood = false;            
             obj.P.ksDone = false;
+            obj.P.colormapMode = false; 
+            obj.P.showRaw = true;
+            obj.P.showWhitened = false;
+            obj.P.showPrediction = false;
+            obj.P.showResidual = false;
             
             % get gui defaults/remembered settings
             mfPath = fileparts(mfilename('fullpath'));
@@ -465,6 +470,9 @@ classdef ksGUI < handle
             obj.P.nSamp = b/bytesPerSamp/nChan;
             obj.P.dataGood = true;
             obj.P.datMMfile = [];
+            if nChan>=64
+                obj.P.colormapMode = true;
+            end
             obj.updateDataView()
             
             lastFile = obj.H.settings.ChooseFileEdt.String;
@@ -544,7 +552,7 @@ classdef ksGUI < handle
             try
                 obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
-                obj.P.Wrot = obj.rez.Wrot;
+                %obj.P.Wrot = obj.rez.Wrot;
                 
                 set(obj.H.settings.runSpikesortBtn, 'enable', 'on');
                 
@@ -581,6 +589,8 @@ classdef ksGUI < handle
                 obj.log('Splits')
                 obj.rez = splitAllClusters(obj.rez);
                 
+                obj.P.ksDone = true;
+                
                 obj.log('Kilosort finished!');
                 set(obj.H.settings.runSaveBtn, 'enable', 'on');
                 obj.updateDataView();
@@ -604,13 +614,13 @@ classdef ksGUI < handle
         function updateDataView(obj)
             
             if obj.P.dataGood && obj.P.probeGood
-                % get currently selected time and channels
-                
+
+                % get currently selected time and channels                
                 t = obj.P.currT;
                 chList = obj.P.selChans;
                 tWin = obj.P.tWin;
                 
-                % show raw data traces
+                % initialize data loading if necessary
                 if ~isfield(obj.P, 'datMMfile') || isempty(obj.P.datMMfile)
                     filename = obj.H.settings.ChooseFileEdt.String;
                     datatype = 'int16';
@@ -626,78 +636,217 @@ classdef ksGUI < handle
                 Fs = str2double(obj.H.settings.setFsEdt.String);
                 samps = ceil(Fs*(t+tWin));
                 if all(samps>0 & samps<obj.P.datSize(2))
+                    
+                    % load and process data
                     datAll = mmf.Data.x(:,samps(1):samps(2));
-                    dat = datAll(obj.P.chanMap.chanMap(chList),:);
                     
-                    if ~isfield(obj.H, 'dataTr') || numel(obj.H.dataTr)~=numel(chList)
-                        % initialize traces
-                        if isfield(obj.H, 'dataTr')&&~isempty(obj.H.dataTr); delete(obj.H.dataTr); end
-                        obj.H.dataTr = [];
-                        hold(obj.H.dataAx, 'on');
-                        for q = 1:numel(chList)
-                            obj.H.dataTr(q) = plot(obj.H.dataAx, 0, NaN, 'k');
-                            set(obj.H.dataTr(q), 'HitTest', 'off');
-                        end
-                        box(obj.H.dataAx, 'off');
-                        title(obj.H.dataAx, 'scroll and ctrl+scroll to move, alt/shift+scroll to scale/zoom');
-                    end
-                    
-                    conn = obj.P.chanMap.connected(chList);
-                    for q = 1:size(dat,1)
-                        set(obj.H.dataTr(q), 'XData', (samps(1):samps(2))/Fs, ...
-                            'YData', q+double(dat(q,:)).*obj.P.vScale);
-                        if conn(q); set(obj.H.dataTr(q), 'Color', 'k');
-                        else; set(obj.H.dataTr(q), 'Color', 0.8*[1 1 1]); end
-                    end
-                    
-                    set(obj.H.dataAx, 'XLim', t+tWin);
-                    
-                    yt = arrayfun(@(x)sprintf('%d (%d)', obj.P.selChans(x), obj.P.chanMap.chanMap(obj.P.selChans(x))), 1:numel(obj.P.selChans), 'uni', false);
-                    set(obj.H.dataAx, 'YTick', 1:numel(obj.P.selChans), 'YTickLabel', yt);
-                    
-                    
-                    % add filtered, whitened data
-                    
+                    % filtered, whitened
                     obj.prepareForRun();
                     datAllF = ksFilter(datAll, obj.ops);
                     datAllF = double(gather_try(datAllF));
                     if isfield(obj.P, 'Wrot') && ~isempty(obj.P.Wrot)
-                        Wrot = obj.P.Wrot/obj.ops.scaleproc;
+                        %Wrot = obj.P.Wrot/obj.ops.scaleproc;
+                        Wrot = obj.P.Wrot;
                         datAllF = datAllF*Wrot;
                     end
-                    datAllF = datAllF'*10;
-                    cmconn = obj.P.chanMap.chanMap(obj.P.chanMap.connected);
+                    datAllF = datAllF';
                     
-                    if ~isfield(obj.H, 'ppTr') || numel(obj.H.ppTr)~=numel(chList)
-                        % initialize traces
+                    if obj.P.ksDone
+                        pd = predictData(obj.rez, samps);
+                    else
+                        pd = zeros(size(datAllF));
+                    end
+                    
+                    if ~obj.P.colormapMode % traces mode
+                        
+                        dat = datAll(obj.P.chanMap.chanMap(chList),:);
+                        
+                        cmconn = obj.P.chanMap.chanMap(obj.P.chanMap.connected);       
+                        chListW = NaN(size(chList)); % channels within the processed data
                         for q = 1:numel(chList)
-                            obj.H.ppTr(q) = plot(obj.H.dataAx, 0, NaN, 'r');
+                            if obj.P.chanMap.connected(chList(q))
+                                chListW(q) = find(cmconn==chList(q),1);
+                            end
+                        end
+                                
+                        datW = zeros(numel(chList),size(datAll,2));
+                        datP = zeros(numel(chList),size(datAll,2));                        
+                        datW(~isnan(chListW),:) = datAllF(chListW(~isnan(chListW)),:);
+                        datP(~isnan(chListW),:) = pd(chListW(~isnan(chListW)),:);
+                        datR = datW-datP;
+                        
+                        if isfield(obj.H, 'dataIm') && ~isempty(obj.H.dataIm)
+                            set(obj.H.dataIm, 'Visible', 'off');
+                        end
+                        
+                        if obj.P.showRaw
+                            if ~isfield(obj.H, 'dataTr') || numel(obj.H.dataTr)~=numel(chList)
+                                % initialize traces
+                                if isfield(obj.H, 'dataTr')&&~isempty(obj.H.dataTr); delete(obj.H.dataTr); end
+                                obj.H.dataTr = [];
+                                hold(obj.H.dataAx, 'on');
+                                for q = 1:numel(chList)
+                                    obj.H.dataTr(q) = plot(obj.H.dataAx, 0, NaN, 'k');
+                                    set(obj.H.dataTr(q), 'HitTest', 'off');
+                                end
+                                box(obj.H.dataAx, 'off');
+                                %title(obj.H.dataAx, 'scroll and ctrl+scroll to move, alt/shift+scroll to scale/zoom');
+                            end                                                
+
+                            conn = obj.P.chanMap.connected(chList);
+                            for q = 1:size(dat,1)
+                                set(obj.H.dataTr(q), 'XData', (samps(1):samps(2))/Fs, ...
+                                    'YData', q+double(dat(q,:)).*obj.P.vScale,...
+                                    'Visible', 'on');
+                                if conn(q); set(obj.H.dataTr(q), 'Color', 'k');
+                                else; set(obj.H.dataTr(q), 'Color', 0.8*[1 1 1]); end
+                            end                                                                        
+                        elseif isfield(obj.H, 'dataTr')
+                            for q = 1:numel(obj.H.dataTr)
+                                set(obj.H.dataTr(q), 'Visible', 'off');
+                            end
+                        end
+                        % add filtered, whitened data
+                        
+                        if obj.P.showWhitened
+                            if ~isfield(obj.H, 'ppTr') || numel(obj.H.ppTr)~=numel(chList)
+                                % initialize traces
+                                if isfield(obj.H, 'ppTr')&&~isempty(obj.H.ppTr); delete(obj.H.ppTr); end
+                                obj.H.ppTr = [];
+                                hold(obj.H.dataAx, 'on');
+                                for q = 1:numel(chList)
+                                    obj.H.ppTr(q) = plot(obj.H.dataAx, 0, NaN, 'Color', [0 0.6 0]);
+                                    set(obj.H.ppTr(q), 'HitTest', 'off');
+                                end
+                            end
+                            for q = 1:numel(obj.H.ppTr)
+                                set(obj.H.ppTr(q), 'Visible', 'on');
+                            end
+
+                            for q = 1:numel(chListW)  
+                                if ~isnan(chListW(q))
+                                    set(obj.H.ppTr(q), 'XData', (samps(1):samps(2))/Fs, ...
+                                        'YData', q+datW(q,:).*obj.P.vScale/15);                            
+                                end
+                            end
+                        elseif isfield(obj.H, 'ppTr')
+                            for q = 1:numel(obj.H.ppTr)
+                                set(obj.H.ppTr(q), 'Visible', 'off');
+                            end
+                        end
+                        
+                        if obj.P.showPrediction
+                            if ~isfield(obj.H, 'predTr') || numel(obj.H.predTr)~=numel(chList)
+                                % initialize traces
+                                if isfield(obj.H, 'predTr')&&~isempty(obj.H.predTr); delete(obj.H.predTr); end
+                                obj.H.predTr = [];
+                                hold(obj.H.dataAx, 'on');
+                                for q = 1:numel(chList)
+                                    obj.H.predTr(q) = plot(obj.H.dataAx, 0, NaN, 'b');
+                                    set(obj.H.predTr(q), 'HitTest', 'off');
+                                end
+                            end
+                            for q = 1:numel(obj.H.predTr)
+                                set(obj.H.predTr(q), 'Visible', 'on');
+                            end
+
+                            for q = 1:numel(chListW)  
+                                if ~isnan(chListW(q))
+                                    set(obj.H.predTr(q), 'XData', (samps(1):samps(2))/Fs, ...
+                                        'YData', q+datP(q,:).*obj.P.vScale/15);                            
+                                end
+                            end
+                        elseif isfield(obj.H, 'predTr')
+                            for q = 1:numel(obj.H.predTr)
+                                set(obj.H.predTr(q), 'Visible', 'off');
+                            end
+                        end
+                        
+                        if obj.P.showResidual
+                            if ~isfield(obj.H, 'residTr') || numel(obj.H.residTr)~=numel(chList)
+                                % initialize traces
+                                if isfield(obj.H, 'residTr')&&~isempty(obj.H.residTr); delete(obj.H.residTr); end
+                                obj.H.residTr = [];
+                                hold(obj.H.dataAx, 'on');
+                                for q = 1:numel(chList)
+                                    obj.H.residTr(q) = plot(obj.H.dataAx, 0, NaN, 'r');
+                                    set(obj.H.residTr(q), 'HitTest', 'off');
+                                end
+                            end
+                            for q = 1:numel(obj.H.residTr)
+                                set(obj.H.residTr(q), 'Visible', 'on');
+                            end
+
+                            for q = 1:numel(chListW)  
+                                if ~isnan(chListW(q))
+                                    set(obj.H.residTr(q), 'XData', (samps(1):samps(2))/Fs, ...
+                                        'YData', q+datR(q,:).*obj.P.vScale/15);                            
+                                end
+                            end
+                        elseif isfield(obj.H, 'residTr')
+                            for q = 1:numel(obj.H.residTr)
+                                set(obj.H.residTr(q), 'Visible', 'off');
+                            end
+                        end
+                            
+                        
+                        yt = arrayfun(@(x)sprintf('%d (%d)', chList(x), obj.P.chanMap.chanMap(chList(x))), 1:numel(chList), 'uni', false);
+                        set(obj.H.dataAx, 'YTick', 1:numel(chList), 'YTickLabel', yt);
+                        
+                    else % colormap mode
+                        chList = 1:numel(obj.P.chanMap.chanMap);
+                        
+                        if ~isfield(obj.H, 'dataIm') || isempty(obj.H.dataIm)
+                            obj.H.dataIm = imagesc(obj.H.dataAx, chList, ...
+                                (samps(1):samps(2))/Fs,...
+                                datAll);
+                            set(obj.H.dataIm, 'HitTest', 'off');
+                            colormap(obj.H.dataAx, colormap_blueblackred);
+                            
+                        end
+                        
+                        if isfield(obj.H, 'dataTr') && ~isempty(obj.H.dataTr)
+                            for q = 1:numel(obj.H.dataTr)
+                                set(obj.H.dataTr(q), 'Visible', 'off');
+                            end
+                        end
+                        if isfield(obj.H, 'ppTr') && ~isempty(obj.H.ppTr)
+                            for q = 1:numel(obj.H.ppTr)
+                                set(obj.H.ppTr(q), 'Visible', 'off');
+                            end
+                        end
+                        
+                        set(obj.H.dataIm, 'Visible', 'on');
+                        if obj.P.showRaw
+                            set(obj.H.dataIm, 'XData', (samps(1):samps(2))/Fs, ...
+                                'YData', chList, 'CData', datAll);                    
+                            set(obj.H.dataAx, 'CLim', [-1 1]*obj.P.vScale*15000);
+                        elseif obj.P.showWhitened
+                            set(obj.H.dataIm, 'XData', (samps(1):samps(2))/Fs, ...
+                                'YData', chList, 'CData', datAllF);                    
+                            set(obj.H.dataAx, 'CLim', [-1 1]*obj.P.vScale*225000);
+                        elseif obj.P.showPrediction
+                            set(obj.H.dataIm, 'XData', (samps(1):samps(2))/Fs, ...
+                                'YData', chList, 'CData', pd);                    
+                            set(obj.H.dataAx, 'CLim', [-1 1]*obj.P.vScale*225000);
+                        else % obj.P.showResidual
+                            set(obj.H.dataIm, 'XData', (samps(1):samps(2))/Fs, ...
+                                'YData', chList, 'CData', datAllF-pd);                    
+                            set(obj.H.dataAx, 'CLim', [-1 1]*obj.P.vScale*225000);
                         end
                     end
                     
-                    for q = 1:numel(chList)
-                        if obj.P.chanMap.connected(chList(q))
-                            chInd = find(cmconn==chList(q),1);
-                            set(obj.H.ppTr(q), 'XData', (samps(1):samps(2))/Fs, ...
-                                'YData', q+datAllF(chInd,:).*obj.P.vScale);                        
-                        else
-                            set(obj.H.ppTr(q), 'XData', 0, 'YData', NaN);
-                        end
-                    end
+                    set(obj.H.dataAx, 'XLim', t+tWin);
+                    set(obj.H.dataAx, 'YLim', [0 numel(chList)], 'YDir', 'normal');
                     
+                    set(obj.H.dataAx, 'YTickLabel', []);
                 end
                 
             end
             
             
-            % if kilosort is finished running, add residuals
-            if obj.P.ksDone
-                
-            end
             
         end
-        
-        
         
         
         function updateProbeView(obj, varargin)
@@ -803,13 +952,13 @@ classdef ksGUI < handle
                     
                     for q = 1:nSites
                         if ismember(q, obj.P.selChans) && ~conn(q)
-                            set(obj.H.probeSites(q), 'FaceColor', [1 0 1]);
+                            set(obj.H.probeSites(q), 'FaceColor', [1 1 0]);
                         elseif ismember(q, obj.P.selChans) 
-                            set(obj.H.probeSites(q), 'FaceColor', [0 0 1]);
+                            set(obj.H.probeSites(q), 'FaceColor', [0 1 0]);
                         elseif ~conn(q)
                             set(obj.H.probeSites(q), 'FaceColor', [1 0 0]);
                         else
-                            set(obj.H.probeSites(q), 'FaceColor', [0 1 0]);
+                            set(obj.H.probeSites(q), 'FaceColor', [0 0 1]);
                         end
                     end
                 end
@@ -824,6 +973,26 @@ classdef ksGUI < handle
                     m = get(obj.H.fig,'CurrentModifier');
 
                     if isempty(m)  
+                        % scroll in time
+                        maxT = obj.P.nSamp/obj.ops.fs;
+                        winSize = diff(obj.P.tWin);
+                        shiftSize = -evt.VerticalScrollCount*winSize*0.1;
+                        obj.P.currT = obj.P.currT+shiftSize;
+                        if obj.P.currT>maxT; obj.P.currT = maxT; end
+                        if obj.P.currT<0; obj.P.currT = 0; end
+                         
+                    elseif strcmp(m, 'shift')
+                        % zoom in time
+                        maxT = obj.P.nSamp/obj.ops.fs;
+                        oldWin = obj.P.tWin+obj.P.currT;
+                        newWin = ksGUI.chooseNewRange(oldWin, ...
+                            1.2^evt.VerticalScrollCount,...
+                            diff(oldWin)/2+oldWin(1), [0 maxT]);
+                        obj.P.tWin = newWin-newWin(1);
+                        obj.P.currT = newWin(1);
+                        
+                    elseif strcmp(m, 'control')
+                        % scroll in channels 
                         obj.P.currY = obj.P.currY-evt.VerticalScrollCount*...
                             min(diff(unique(obj.P.chanMap.ycoords)));
                         yc = obj.P.chanMap.ycoords;
@@ -832,24 +1001,12 @@ classdef ksGUI < handle
                         if obj.P.currY>mx; obj.P.currY = mx; end
                         if obj.P.currY<mn; obj.P.currY = mn; end
                         obj.updateProbeView();
-                         
-                    elseif strcmp(m, 'shift')
-                        maxT = obj.P.nSamp/obj.ops.fs;
-                        oldWin = obj.P.tWin+obj.P.currT;
-                        newWin = ksGUI.chooseNewRange(oldWin, ...
-                            1.2^evt.VerticalScrollCount,...
-                            diff(oldWin)/2+oldWin(1), [0 maxT]);
-                        obj.P.tWin = newWin-newWin(1);
-                        obj.P.currT = newWin(1);
-                    elseif strcmp(m, 'control')
-                        maxT = obj.P.nSamp/obj.ops.fs;
-                        winSize = diff(obj.P.tWin);
-                        shiftSize = -evt.VerticalScrollCount*winSize*0.1;
-                        obj.P.currT = obj.P.currT+shiftSize;
-                        if obj.P.currT>maxT; obj.P.currT = maxT; end
-                        if obj.P.currT<0; obj.P.currT = 0; end
+                        
+                        
                     elseif strcmp(m, 'alt')
+                        % zoom in scaling of traces
                         obj.P.vScale = obj.P.vScale*1.2^(-evt.VerticalScrollCount);
+                        
                     end
                     obj.updateDataView();
                 end
@@ -910,7 +1067,7 @@ classdef ksGUI < handle
         
         function timeClickCB(obj, ~, keydata)
             if obj.P.dataGood
-                nSamp = obj.P.datMMfile.Format{2}(2);
+                nSamp = obj.P.nSamp;
                 maxT = nSamp/obj.ops.fs;
                 
                 obj.P.currT = keydata.IntersectionPoint(1)*maxT;
@@ -927,6 +1084,45 @@ classdef ksGUI < handle
                     obj.P.nChanToPlot = obj.P.nChanToPlot+1;
                 case 'downarrow'
                     obj.P.nChanToPlot = obj.P.nChanToPlot-1;
+                case 'c'
+                    obj.P.colormapMode = ~obj.P.colormapMode;     
+                case '1'
+                    if obj.P.colormapMode 
+                        obj.P.showRaw = true; 
+                        obj.P.showWhitened = false;
+                        obj.P.showPrediction = false;
+                        obj.P.showResidual = false;
+                    else
+                        obj.P.showRaw = ~obj.P.showRaw;
+                    end
+                case '2'
+                    if obj.P.colormapMode
+                        obj.P.showRaw = false;
+                        obj.P.showWhitened = true;
+                        obj.P.showPrediction = false;
+                        obj.P.showResidual = false;
+                    else
+                        obj.P.showWhitened = ~obj.P.showWhitened;
+                    end
+                case '3'
+                    if obj.P.colormapMode
+                        obj.P.showRaw = false;
+                        obj.P.showWhitened = false;
+                        obj.P.showPrediction = true;
+                        obj.P.showResidual = false;
+                    else
+                        obj.P.showPrediction = ~obj.P.showPrediction;
+                    end
+                case '4'
+                    if obj.P.colormapMode
+                        obj.P.showRaw = false;
+                        obj.P.showWhitened = false;
+                        obj.P.showPrediction = false;
+                        obj.P.showResidual = true;
+                    else
+                        obj.P.showResidual = ~obj.P.showResidual;
+                    end
+                    
             end
             obj.updateProbeView;
             obj.updateDataView;
@@ -946,6 +1142,7 @@ classdef ksGUI < handle
             saveDat.ops = obj.ops;
             saveDat.ops.gui = [];
             saveDat.rez = obj.rez;
+            saveDat.rez.ops.gui = [];
             saveDat.P = obj.P;
             
             [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);            
@@ -985,6 +1182,7 @@ classdef ksGUI < handle
             % write a .m file script that the user can use later to run
             % directly, i.e. skipping the gui
             obj.log('Writing to script not yet implemented.');
+            obj.refocus(obj.H.settings.writeBtn);
         end
         
         function help(obj)
@@ -995,7 +1193,7 @@ classdef ksGUI < handle
                 '',...
                 '*** Troubleshooting ***', ...
                 '1. Close and restart kilosort gui.', ...
-                '2. Delete the file \myDirectory\myFilename_ksSettings.mat and restart', ...
+                '2. Delete the file \myDirectory\myFilename_ksSettings.mat and restart the gui', ...
                 '3. Create an issue at github.com/MouseLand/Kilosort2 with as much detail about the problem as possible.'};
             
             h = helpdlg(hstr, 'Kilosort help');
