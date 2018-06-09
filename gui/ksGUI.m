@@ -12,20 +12,16 @@ classdef ksGUI < handle
     % TODO: (* = before release)
     % - test that path adding and compilation work on a fresh install
     % - allow better setting of probe site shape/size
-    % - up/down arrows to change number of channels displayed
     % - auto-load number of channels from meta file when possible
     % - update time plot when scrolling in dataview
     % - show RMS noise level of channels to help selecting ones to drop?
     % - implement builder for new probe channel maps (cm, xc, yc, name,
     % site size)
-    % - advanced option setting
+    % - *advanced option setting
     % - saving of probe layouts
     % - plotting bug: zoom out on probe view should allow all the way out
     % in x
     % - some help/tools for working with other datafile types
-    % - * bug when disabling/enabling channels: Wrot is the wrong size. fix
-    % by computing for all channels in channel map, and dropping
-    % unconnected ones when requested
     % - update data view needs refactoring... 
     % - when re-loading, check whether preprocessing can be skipped 
 
