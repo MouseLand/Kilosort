@@ -177,14 +177,16 @@ classdef ksGUI < handle
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'pushbutton', ...
                 'String', 'Select working directory', ...
-                'Callback', @(s,~)obj.selectDirDlg(s));
+                'Callback', @(s,~)obj.selectDirDlg(s),...
+                'Tag', 'temp');
                         
             % choose output path
             obj.H.settings.ChooseOutputTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'pushbutton', ...
                 'String', 'Select results output directory', ...
-                'Callback', @(s,~)obj.selectDirDlg(s));
+                'Callback', @(s,~)obj.selectDirDlg(s),...
+                'Tag', 'output');
                         
             % choose probe
             obj.H.settings.setProbeTxt = uicontrol(...
@@ -417,19 +419,26 @@ classdef ksGUI < handle
             
         end
         
-%         function selectDirDlg(obj, s)
-%             s
-%             [filename, pathname] = uigetfile('', 'Pick a directory.');
-%             
-% %             if filename~=0 % 0 when cancel
-% %                 obj.H.settings.ChooseFileEdt.String = ...
-% %                     fullfile(pathname, filename);
-% %                 obj.log(sprintf('Selected file %s', obj.H.settings.ChooseFileEdt.String));
-% %                                 
-% %                 obj.updateFileSettings();
-% %             end
-%             
-%         end
+        function selectDirDlg(obj, src)
+            switch src.Tag
+                case 'output'
+                    startDir = obj.H.settings.ChooseOutputEdt.String;
+                case 'temp'
+                    startDir = obj.H.settings.ChooseTempdirEdt.String;
+            end
+            if strcmp(startDir, '...'); startDir = ''; end
+            pathname = uigetdir(startDir, 'Pick a directory.');
+            
+            if pathname~=0 % 0 when cancel
+                switch src.Tag
+                    case 'output'
+                        obj.H.settings.ChooseOutputEdt.String = pathname;
+                    case 'temp'
+                        obj.H.settings.ChooseTempdirEdt.String = pathname;
+                end
+            end
+            obj.updateFileSettings();
+        end
         
         function updateFileSettings(obj)
             
