@@ -176,13 +176,15 @@ classdef ksGUI < handle
             obj.H.settings.ChooseTempdirTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'pushbutton', ...
-                'String', 'Select working directory');
+                'String', 'Select working directory', ...
+                'Callback', @(s,~)obj.selectDirDlg(s));
                         
             % choose output path
             obj.H.settings.ChooseOutputTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'pushbutton', ...
-                'String', 'Select results output directory');
+                'String', 'Select results output directory', ...
+                'Callback', @(s,~)obj.selectDirDlg(s));
                         
             % choose probe
             obj.H.settings.setProbeTxt = uicontrol(...
@@ -323,8 +325,8 @@ classdef ksGUI < handle
                 ' [1, 2, 3, 4] Enable different data views','',...
                 ' [c] Toggle colormap vs traces mode', '',...
                 ' [up, down] Add/remove channels to be displayed', '',...
-                ' [scroll and alt/ctrl/shift+scroll] Zoom/scale/move ', '',
-                ' [click] Jump to position and time', '',
+                ' [scroll and alt/ctrl/shift+scroll] Zoom/scale/move ', '',...
+                ' [click] Jump to position and time', '',...
                 ' [right click] Disable nearest channel'}));
             
             obj.H.dataAx = axes(obj.H.dataVBox);   
@@ -366,7 +368,8 @@ classdef ksGUI < handle
             obj.P.currY = 0;
             obj.P.currX = 0;
             obj.P.nChanToPlot = 16;
-            obj.P.selChans = 1:16;
+            obj.P.nChanToPlotCM = 16;
+            obj.P.selChans = 1:16;            
             obj.P.vScale = 0.005;
             obj.P.dataGood = false;
             obj.P.probeGood = false;            
@@ -413,6 +416,20 @@ classdef ksGUI < handle
             end
             
         end
+        
+%         function selectDirDlg(obj, s)
+%             s
+%             [filename, pathname] = uigetfile('', 'Pick a directory.');
+%             
+% %             if filename~=0 % 0 when cancel
+% %                 obj.H.settings.ChooseFileEdt.String = ...
+% %                     fullfile(pathname, filename);
+% %                 obj.log(sprintf('Selected file %s', obj.H.settings.ChooseFileEdt.String));
+% %                                 
+% %                 obj.updateFileSettings();
+% %             end
+%             
+%         end
         
         function updateFileSettings(obj)
             
@@ -483,6 +500,7 @@ classdef ksGUI < handle
             obj.P.datMMfile = [];
             if nChan>=64
                 obj.P.colormapMode = true;
+                obj.P.nChanToPlotCM = nChan;
             end
             obj.updateDataView()
             
@@ -579,7 +597,16 @@ classdef ksGUI < handle
         function computeWhitening(obj)
             obj.log('Computing whitening filter...')
             obj.prepareForRun;
-            [~,Wrot] = computeWhitening(obj.ops);
+            
+            % here, use a different channel map than the actual: show all
+            % channels as connected. That way we can drop/add without
+            % recomputing everything later. 
+            ops = obj.ops;
+            ops.chanMap = obj.P.chanMap;
+            ops.chanMap.connected = true(size(ops.chanMap.connected));
+            
+            [~,Wrot] = computeWhitening(ops); % this refers to a function outside the gui
+            
             obj.P.Wrot = Wrot;
             obj.updateDataView;
             obj.log('Done.')
@@ -657,7 +684,8 @@ classdef ksGUI < handle
                     datAllF = double(gather_try(datAllF));
                     if isfield(obj.P, 'Wrot') && ~isempty(obj.P.Wrot)
                         %Wrot = obj.P.Wrot/obj.ops.scaleproc;
-                        Wrot = obj.P.Wrot;
+                        conn = obj.P.chanMap.connected;
+                        Wrot = obj.P.Wrot(conn,conn);
                         datAllF = datAllF*Wrot;
                     end
                     datAllF = datAllF';
@@ -668,25 +696,30 @@ classdef ksGUI < handle
                         pd = zeros(size(datAllF));
                     end
                     
+                    dat = datAll(obj.P.chanMap.chanMap(chList),:);
+                    
+                    connInChList = obj.P.chanMap.connected(chList);
+                    
+                    cmconn = obj.P.chanMap.chanMap(obj.P.chanMap.connected);
+                                        
+                    chListW = NaN(size(chList)); % channels within the processed data
+                    for q = 1:numel(chList)
+                        if obj.P.chanMap.connected(chList(q))
+                            chListW(q) = find(cmconn==chList(q),1);
+                        end
+                    end
+                    
+                    datW = zeros(numel(chList),size(datAll,2));
+                    datP = zeros(numel(chList),size(datAll,2));
+                    datW(~isnan(chListW),:) = datAllF(chListW(~isnan(chListW)),:);
+                    datP(~isnan(chListW),:) = pd(chListW(~isnan(chListW)),:);
+                    datR = datW-datP;
+                    
                     if ~obj.P.colormapMode % traces mode
                         
                         ttl = '';
                         
-                        dat = datAll(obj.P.chanMap.chanMap(chList),:);
                         
-                        cmconn = obj.P.chanMap.chanMap(obj.P.chanMap.connected);       
-                        chListW = NaN(size(chList)); % channels within the processed data
-                        for q = 1:numel(chList)
-                            if obj.P.chanMap.connected(chList(q))
-                                chListW(q) = find(cmconn==chList(q),1);
-                            end
-                        end
-                                
-                        datW = zeros(numel(chList),size(datAll,2));
-                        datP = zeros(numel(chList),size(datAll,2));                        
-                        datW(~isnan(chListW),:) = datAllF(chListW(~isnan(chListW)),:);
-                        datP(~isnan(chListW),:) = pd(chListW(~isnan(chListW)),:);
-                        datR = datW-datP;
                         
                         if isfield(obj.H, 'dataIm') && ~isempty(obj.H.dataIm)
                             set(obj.H.dataIm, 'Visible', 'off');
@@ -817,17 +850,18 @@ classdef ksGUI < handle
                         title(obj.H.dataAx, ttl);
                         yt = arrayfun(@(x)sprintf('%d (%d)', chList(x), obj.P.chanMap.chanMap(chList(x))), 1:numel(chList), 'uni', false);
                         set(obj.H.dataAx, 'YTick', 1:numel(chList), 'YTickLabel', yt);
-                        
+                        set(obj.H.dataAx, 'YLim', [0 numel(chList)], 'YDir', 'normal');
                     else % colormap mode
-                        chList = 1:numel(obj.P.chanMap.chanMap);
+                        %chList = 1:numel(obj.P.chanMap.chanMap);
                         
                         if ~isfield(obj.H, 'dataIm') || isempty(obj.H.dataIm)
+                            obj.H.dataIm = [];
+                            hold(obj.H.dataAx, 'on');
                             obj.H.dataIm = imagesc(obj.H.dataAx, chList, ...
                                 (samps(1):samps(2))/Fs,...
-                                datAll);
+                                datAll(obj.P.chanMap.connected,:));
                             set(obj.H.dataIm, 'HitTest', 'off');
                             colormap(obj.H.dataAx, colormap_blueblackred);
-                            
                         end
                         
                         if isfield(obj.H, 'dataTr') && ~isempty(obj.H.dataTr)
@@ -854,29 +888,30 @@ classdef ksGUI < handle
                         set(obj.H.dataIm, 'Visible', 'on');
                         if obj.P.showRaw
                             set(obj.H.dataIm, 'XData', (samps(1):samps(2))/Fs, ...
-                                'YData', chList, 'CData', datAll);                    
+                                'YData', 1:sum(connInChList), 'CData', dat(connInChList,:));                    
                             set(obj.H.dataAx, 'CLim', [-1 1]*obj.P.vScale*15000);
                             title(obj.H.dataAx, 'raw');
                         elseif obj.P.showWhitened
                             set(obj.H.dataIm, 'XData', (samps(1):samps(2))/Fs, ...
-                                'YData', chList, 'CData', datAllF);                    
+                                'YData', 1:sum(connInChList), 'CData', datW(connInChList,:));                    
                             set(obj.H.dataAx, 'CLim', [-1 1]*obj.P.vScale*225000);
                             title(obj.H.dataAx, 'filtered');
                         elseif obj.P.showPrediction
                             set(obj.H.dataIm, 'XData', (samps(1):samps(2))/Fs, ...
-                                'YData', chList, 'CData', pd);                    
+                                'YData', 1:sum(connInChList), 'CData', datP(connInChList,:));                    
                             set(obj.H.dataAx, 'CLim', [-1 1]*obj.P.vScale*225000);
                             title(obj.H.dataAx, 'prediction');
                         else % obj.P.showResidual
                             set(obj.H.dataIm, 'XData', (samps(1):samps(2))/Fs, ...
-                                'YData', chList, 'CData', datAllF-pd);                    
+                                'YData', 1:sum(connInChList), 'CData', datR(connInChList,:));                    
                             set(obj.H.dataAx, 'CLim', [-1 1]*obj.P.vScale*225000);
                             title(obj.H.dataAx, 'residual');
                         end
+                        set(obj.H.dataAx, 'YLim', [0 sum(connInChList)], 'YDir', 'normal');
                     end
                     
                     set(obj.H.dataAx, 'XLim', t+tWin);
-                    set(obj.H.dataAx, 'YLim', [0 numel(chList)], 'YDir', 'normal');
+                    
                     
                     set(obj.H.dataAx, 'YTickLabel', []);
                 end
@@ -976,7 +1011,14 @@ classdef ksGUI < handle
 
                     y = obj.P.currY;
                     x = obj.P.currX;
-                    nCh = obj.P.nChanToPlot;
+                    if obj.P.colormapMode
+                        nCh = obj.P.nChanToPlotCM;
+                        if nCh>numel(cm.chanMap)
+                            nCh = numel(cm.chanMap);
+                        end
+                    else
+                        nCh = obj.P.nChanToPlot;
+                    end
                     conn = obj.P.chanMap.connected;
 
                     dists = ((cm.xcoords-x).^2 + (cm.ycoords-y).^2).^(0.5);
@@ -1031,14 +1073,24 @@ classdef ksGUI < handle
                         obj.P.currT = newWin(1);
                         
                     elseif strcmp(m, 'control')
-                        % scroll in channels 
-                        obj.P.currY = obj.P.currY-evt.VerticalScrollCount*...
-                            min(diff(unique(obj.P.chanMap.ycoords)));
-                        yc = obj.P.chanMap.ycoords;
-                        mx = max(yc)+obj.P.chanMap.siteSize;
-                        mn = min(yc)-obj.P.chanMap.siteSize;
-                        if obj.P.currY>mx; obj.P.currY = mx; end
-                        if obj.P.currY<mn; obj.P.currY = mn; end
+                        if obj.P.colormapMode
+                            % zoom in Y when in colormap mode
+                            obj.P.nChanToPlotCM = round(obj.P.nChanToPlotCM*1.2^evt.VerticalScrollCount);
+                            if obj.P.nChanToPlotCM>numel(obj.P.chanMap.chanMap)
+                                obj.P.nChanToPlotCM=numel(obj.P.chanMap.chanMap);
+                            elseif obj.P.nChanToPlotCM<1
+                                obj.P.nChanToPlotCM=1;
+                            end
+                        else
+                            % scroll in channels when in traceview
+                            obj.P.currY = obj.P.currY-evt.VerticalScrollCount*...
+                                min(diff(unique(obj.P.chanMap.ycoords)));
+                            yc = obj.P.chanMap.ycoords;
+                            mx = max(yc)+obj.P.chanMap.siteSize;
+                            mn = min(yc)-obj.P.chanMap.siteSize;
+                            if obj.P.currY>mx; obj.P.currY = mx; end
+                            if obj.P.currY<mn; obj.P.currY = mn; end
+                        end
                         obj.updateProbeView();
                         
                         
@@ -1083,11 +1135,11 @@ classdef ksGUI < handle
             obj.updateDataView;
         end
         
-        function dataClickCB(obj, ~, keydata)
+        function dataClickCB(obj, ~, keydata)                   
             if keydata.Button==1 % left click, re-center view
                 obj.P.currT = keydata.IntersectionPoint(1)-diff(obj.P.tWin)/2;
                 
-                thisY = round(keydata.IntersectionPoint(2));  
+                thisY = round(keydata.IntersectionPoint(2)); 
                 if thisY<=0; thisY = 1; end
                 if thisY>=numel(obj.P.selChans); thisY = numel(obj.P.selChans); end
                 thisCh = obj.P.selChans(thisY);
@@ -1096,9 +1148,18 @@ classdef ksGUI < handle
             else % any other click, disconnect/reconnect the nearest channel   
                 thisY = round(keydata.IntersectionPoint(2));  
                 if thisY<=0; thisY = 1; end
-                if thisY>=numel(obj.P.selChans); thisY = numel(obj.P.selChans); end
-                thisCh = obj.P.selChans(thisY);
-                obj.P.chanMap.connected(thisCh) = ~obj.P.chanMap.connected(thisCh);                
+                if obj.P.colormapMode
+                    sc = obj.P.selChans;
+                    cm = obj.P.chanMap;
+                    sc = sc(ismember(sc, find(cm.connected)));
+                    if thisY<=0; thisY = 1; end
+                    if thisY>=numel(sc); thisY = numel(sc); end
+                    thisCh = sc(thisY);                    
+                else
+                    if thisY>=numel(obj.P.selChans); thisY = numel(obj.P.selChans); end
+                    thisCh = obj.P.selChans(thisY);                
+                end
+                obj.P.chanMap.connected(thisCh) = ~obj.P.chanMap.connected(thisCh);
             end
             obj.updateProbeView;
             obj.updateDataView;
