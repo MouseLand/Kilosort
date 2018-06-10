@@ -1,4 +1,4 @@
-function xscore = mergeAllClusters(rez)
+function xscore = mergeAllClusters2(rez)
 
 Nfilt = size(rez.W,2);
 
@@ -11,7 +11,6 @@ for ik = 1:Nfilt
    
    ipair = rez.iNeigh(:, ik);
    
-   %%
    for j = 2:length(ipair)
        i2 = ipair(j);
        
@@ -21,7 +20,7 @@ for ik = 1:Nfilt
        
        j2 = find(rez.iNeigh(:, i2)==ik);
        
-       if ~isempty(j2) && rez.simScore(ik, i2)>.5
+       if ~isempty(j2) && rez.simScore(ik, i2)>.7           
           s1 = rez.st3(:,2) ==i2;
           
           c1 = rez.cProj(s0, [1 j]);
@@ -29,11 +28,7 @@ for ik = 1:Nfilt
           
           xs = c2(:,1) - c2(:,2);
           
-          if ik==161 && i2==167
-              keyboard;
-          end
-          
-          xscore(i2, ik) = mergeScore(xs);           
+          xscore(i2, ik) = mergeScore2(xs);           
           chckd(i2, ik) = 1;
           
           if xscore(i2, ik)>0
@@ -41,7 +36,7 @@ for ik = 1:Nfilt
           end
        end
    end
-   %%
+   
    if rem(ik, 100)==1
        fprintf('Found %d merges, checked %d/%d clusters \n', nmerges, ik, Nfilt) 
    end    

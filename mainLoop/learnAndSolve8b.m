@@ -1,4 +1,4 @@
-% function rez = learnAndSolve8(rez)
+function rez = learnAndSolve8b(rez)
 
 ops = rez.ops;
 
@@ -7,6 +7,7 @@ wPCA    = extractPCfromSnippets(rez, 3);
 wPCA = gpuArray(wPCA);
 
 ops.wPCA = wPCA;
+rez.ops = ops;
 % wPCA = gpuArray(ops.wPCA(:,1:3)); 
 
 wPCA(:,1) = - wPCA(:,1) * sign(wPCA(20,1));
@@ -33,8 +34,8 @@ Nfilt 	= ops.Nfilt;
 Nrank   = 3; %ops.Nrank;
 Nchan 	= ops.Nchan;
 
-[iC, mask] = getClosestChannels(rez, sigmaMask, NchanNear);
-
+% [iC, mask] = getClosestChannels(rez, sigmaMask, NchanNear);
+[iC, mask, C2C] = getClosestChannels(rez, sigmaMask, NchanNear);
 
 isortbatches = rez.iorig(:);
 nhalf = ceil(nBatches/2);
@@ -68,6 +69,8 @@ W0 = permute(wPCA, [1 3 2]);
 iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
 
 nsp = gpuArray.zeros(0,1, 'single');
+sig = gpuArray.zeros(0,1, 'single');
+dnext = gpuArray.zeros(0,1, 'single');
 
 Params(13) = 0;
 
@@ -80,9 +83,8 @@ fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 fid = fopen(ops.fproc, 'r');
 
 ntot = 0;
-%%
-m0 = ops.minFR * ops.NT/ops.fs;
 
+m0 = ops.minFR * ops.NT/ops.fs;
 
 for ibatch = 1:niter
     %     k = irounds(ibatch);
@@ -90,7 +92,7 @@ for ibatch = 1:niter
     k = isortbatches(korder); 
     
     if ibatch>niter-nBatches && korder==nhalf
-        [W, dWU] = revertW(rez);
+        [W, dWU, sig] = revertW(rez);
         fprintf('reverted back to middle timepoint \n')
     end
     
@@ -113,6 +115,7 @@ for ibatch = 1:niter
         Nfilt = size(W,2);
         nsp(1:Nfilt) = m0;
         sig(1:Nfilt) = 5^2;
+        dnext(1:Nfilt) = 5^2;
         Params(2) = Nfilt;
     end
     
@@ -124,19 +127,19 @@ for ibatch = 1:niter
         W = W(:,isort, :);
         dWU = dWU(:,:,isort);
         nsp = nsp(isort);
+        sig = sig(isort);
+        dnext = dnext(isort);
     end
     
     % decompose dWU by svd of time and space (61 by 61)
-%     [W, U, mu] = mexSVDsmall(Params, dWU, W, iC-1, iW-1);
     [W, U, mu] = mexSVDsmall2(Params, dWU, W, iC-1, iW-1, Ka, Kb);
     
     % this needs to change
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
 
-
-    [st0, id0, x0, featW, dWU, drez, nsp0, ss0, featPC, sig] = ...
+    [st0, id0, x0, featW, dWU, drez, nsp0, ss0, featPC, sig, dnext] = ...
         mexMPnu8(Params, dataRAW, dWU, U, W, mu, iC-1, iW-1, UtU, iList-1, ...
-        wPCA, maskU, pm, sig);    
+        wPCA, maskU, pm, sig, dnext);    
     
     nsp = nsp * p1 + (1-p1) * nsp0;
     
@@ -146,7 +149,17 @@ for ibatch = 1:niter
         flag_resort   = 0;
         
         % final clean up
-        [W, U, dWU, mu, nsp, sig] = triageTemplates2(ops, W, U, dWU, mu, nsp, sig, 1);        
+        [W, U, dWU, mu, nsp, sig, dnext] = ...
+            triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext);        
+        
+        % run the algorithm locally to get splits
+%         [W, dWU, isplit] = halfwaySplits(rez, Params, W, U, mu,...
+%             dWU, sig,  fid, korder);        
+%         nsp     = nsp(isplit);
+%         sig     = sig(isplit);
+%         dnext   = dnext(isplit);
+%         mu      = mu(isplit);
+
         Nfilt = size(W,2);
         Params(2) = Nfilt; 
         
@@ -160,16 +173,16 @@ for ibatch = 1:niter
         
         % different threshold on last pass?
         Params(3) = ops.Th(end);
-
-        rez = memorizeW(rez, W, dWU, U, mu);
+        
+        rez = memorizeW(rez, W, dWU, U, mu, sig);
         fprintf('memorized middle timepoint \n')
     end
-    
     
     if ibatch<niter-nBatches %-50
         if rem(ibatch, 5)==1    
             % this drops templates
-            [W, U, dWU, mu, nsp, sig] = triageTemplates2(ops, W, U, dWU, mu, nsp, sig, 1);
+            [W, U, dWU, mu, nsp, sig, dnext] = ...
+                triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext);
         end
         Nfilt = size(W,2);
         Params(2) = Nfilt;
@@ -186,6 +199,7 @@ for ibatch = 1:niter
             nsp(Nfilt + [1:size(dWU0,3)]) = ops.minFR * NT/ops.fs;
             mu(Nfilt + [1:size(dWU0,3)])  = 10;
             sig(Nfilt + [1:size(dWU0,3)])  = 5^2;
+            dnext(Nfilt + [1:size(dWU0,3)])  = 5^2;
             
             Nfilt = min(ops.Nfilt, size(W,2));
             Params(2) = Nfilt;
@@ -195,6 +209,7 @@ for ibatch = 1:niter
             nsp = nsp(1:Nfilt);
             mu  = mu(1:Nfilt);
             sig  = sig(1:Nfilt);
+            dnext  = dnext(1:Nfilt);
         end
         
     end
@@ -220,7 +235,6 @@ for ibatch = 1:niter
     end
     
     if ibatch==niter-nBatches        
-        flag_lastpass = 1;
         
         st3 = zeros(1e7, 4);
         fW  = zeros(Nnearest, 1e7, 'single');
@@ -231,20 +245,23 @@ for ibatch = 1:niter
         fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.2f, mu: %2.2f, nst0: %d \n', ...
             toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0))
         
-       figure(2)
-       subplot(2,2,1)
-       imagesc(W(:,:,1))
-       
-       subplot(2,2,2)
-       imagesc(U(:,:,1))
-       
-       subplot(2,2,3)
-       plot(mu)
-       
-       subplot(2,2,4)
-       semilogx(1+nsp, mu, '.')
-       
-       drawnow
+%        figure(2)
+%        subplot(2,2,1)
+%        imagesc(W(:,:,1))
+%        
+%        subplot(2,2,2)
+%        imagesc(U(:,:,1))
+%        
+%        subplot(2,2,3)
+%        plot(mu)
+%        ylim([0 100])
+%        
+%        subplot(2,2,4)
+%        semilogx(1+nsp, mu, '.')
+%        ylim([0 100])
+%        xlim([0 100])
+%        
+%        drawnow
     end
 end
 
@@ -274,17 +291,12 @@ rez.iNeigh   = gather(iList);
 
 rez.ops = ops;
 
-rez.W = cat(1, zeros(nt0 - (ops.nt0-1-nt0min), Nfilt, Nrank), rez.W);
 rez.nsp = nsp;
 
 nNeighPC        = size(fWpc,1);
 rez.cProjPC     = permute(fWpc, [3 2 1]); %zeros(size(st3,1), 3, nNeighPC, 'single');
 
-[~, iNch]       = sort(abs(rez.U(:,:,1)), 1, 'descend');
+% [~, iNch]       = sort(abs(rez.U(:,:,1)), 1, 'descend');
 maskPC          = zeros(Nchan, Nfilt, 'single');
 rez.iNeighPC    = gather(iC(:, iW));
 
-
-% rez.muall = muall;
-% rez.Wall = Wall;
-% rez.Uall = Uall;

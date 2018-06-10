@@ -1,4 +1,4 @@
-function [mh, imax, h1, h2] = split_histograms(his)
+function [mh, imax, h1, h2] = split_histograms(his, imax)
 
 %% smooth the histogram
 Nbins = size(his,1);
@@ -38,15 +38,18 @@ end
 
 dharea = hmax./sum(his2,1);
 
-mh = max(dharea, [], 1);
+if nargin==1    
+    mh = max(dharea, [], 1);
+    [~, imax] = max((mh - dharea<1e-3) .* dh, [], 1);
+end
+mh = dharea(imax);
 
-[~, imax] = max((mh - dharea<1e-3) .* dh, [], 1);
-
-
-h1 = zeros(size(his));
-h2 = zeros(size(his));
-for j = 1:Nbins
-    h1(j, j<imax) = his(j, j<imax);
-    h2(j, j>=imax) = his(j, j>=imax);
+if nargout>2
+    h1 = zeros(size(his));
+    h2 = zeros(size(his));
+    for j = 1:Nbins
+        h1(j, j<imax) = his(j, j<imax);
+        h2(j, j>=imax) = his(j, j>=imax);
+    end
 end
 

@@ -1,19 +1,18 @@
-function [iC, mask] = getClosestChannels(rez, sigma, NchanClosest)
+function [iC, mask, C2C] = getClosestChannels(rez, sigma, NchanClosest)
 
 
-pds = (rez.xc(:) - rez.xc(:)').^2 + (rez.yc(:) - rez.yc(:)').^2;
+C2C = (rez.xc(:) - rez.xc(:)').^2 + (rez.yc(:) - rez.yc(:)').^2;
+Nchan = size(C2C,1);
 
-Nchan = size(pds,1);
+C2C =  sqrt(C2C);
 
-pds =  sqrt(pds);
-
-[~, isort] = sort(pds, 'ascend');
+[~, isort] = sort(C2C, 'ascend');
 
 iC= isort(1:NchanClosest, :);
 iC = sort(iC, 1);
 
 ix = iC + [0:Nchan:Nchan^2-1];
-mask = exp( - pds(ix).^2/(2*sigma^2));
+mask = exp( - C2C(ix).^2/(2*sigma^2));
 
 mask = mask ./ (1e-3 + sum(mask.^2,1)).^.5;
 

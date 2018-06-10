@@ -7,7 +7,9 @@ function [spikeTimes, clusterIDs, amplitudes, templates, templateFeatures, ...
 % available (https://github.com/kwikteam/npy-matlab)
 %
 % spikeTimes will be in samples, not seconds
-
+rez.W = gather(rez.Wphy);
+rez.U = gather(rez.U);
+rez.mu = gather(rez.mu);
 
 fs = dir(fullfile(savePath, '*.npy'));
 for i = 1:length(fs)
