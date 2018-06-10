@@ -7,7 +7,7 @@ ops.fshigh              = 150;   % frequency for high pass filtering
 
 ops.Th       = [12 10];     % threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
 
-ops.lam      = 40^2;   % weighting on the amplitude penalty (like in Kilosort1, but it has to be much larger)
+ops.lam      = 10^2;   % weighting on the amplitude penalty (like in Kilosort1, but it has to be much larger)
 
 ops.ThS      = [8 8];  % lower bound on acceptable single spike quality (annealed)
 
@@ -23,11 +23,11 @@ ops.nfullpasses = 1; % how many forward backward passes to do
 
 ops.nPCs        = 3; % how many PCs to project the spikes into
 
-ops.ccsplit = 0.99; % required isolation for splitting a cluster at the end (max = 1)
+ops.ccsplit     = 0.97; % required isolation for splitting a cluster at the end (max = 1)
 
-ops.useRAM = 0; % whether to hold data in RAM (won't check if there's enough RAM)
+ops.useRAM      = 0; % whether to hold data in RAM (won't check if there's enough RAM)
 
-ops.ThPre = 8; % threshold crossings for pre-clustering (in PCA projection space)
+ops.ThPre       = 8; % threshold crossings for pre-clustering (in PCA projection space)
 
 
 %% danger, changing these settings can lead to fatal errors
