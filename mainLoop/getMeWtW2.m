@@ -2,14 +2,16 @@ function [WtW, iList] = getMeWtW2(W, U0, Nnearest)
 
 [nt0, Nfilt, Nrank] = size(W);
 
-Params = double([1 Nfilt 0 0 0 0 0 0 0 nt0]);
 
-WtW     = gpuArray.zeros(Nfilt,Nfilt,2*nt0-1, 'single');
+WtW     = gpuArray.zeros(Nfilt,Nfilt, 'single');
+
 for i = 1:Nrank
     for j = 1:Nrank
         utu0 = U0(:,:,i)' * U0(:,:,j);
-        wtw0 =  mexWtW2(Params, W(:,:,i), W(:,:,j), utu0);
-        WtW = WtW + wtw0;
+        
+        wtw0 = W(:,:,i)' * W(:,:,j);        
+        
+        WtW = WtW + wtw0.*utu0;
     end
 end
 

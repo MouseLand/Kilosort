@@ -1,12 +1,27 @@
 function rez = splitAllClusters(rez)
 
-wPCA = rez.ops.wPCA;
+ops = rez.ops;
+wPCA = gather(ops.wPCA);
 
 ccsplit = rez.ops.ccsplit;
+
+NchanNear   = 32;
+Nnearest    = 32;
+sigmaMask   = ops.sigmaMask;
 
 ik = 0;
 Nfilt = size(rez.W,2);
 nsplits= 0;
+
+[iC, mask, C2C] = getClosestChannels(rez, sigmaMask, NchanNear);
+
+ops.nt0min = getOr(ops, 'nt0min', 20);
+
+[~, iW] = max(abs(rez.dWU(ops.nt0min, :, :)), [], 2);
+iW = squeeze(int32(iW));
+
+isplit = 1:Nfilt;
+
 while ik<Nfilt    
     if rem(ik, 100)==1
        fprintf('Found %d splits, checked %d/%d clusters \n', nsplits, ik, Nfilt) 
@@ -96,9 +111,11 @@ while ik<Nfilt
        % one cluster stays, one goes
        Nfilt = Nfilt + 1;
        
-       rez.W(:,Nfilt, :) = rez.W(:,ik, :);
-       rez.U(:,Nfilt, :) = rez.U(:,ik, :);
-       rez.mu(Nfilt)     = rez.mu(ik);
+       rez.dWU(:,iC(:, iW(ik)),Nfilt) = c2;
+       rez.dWU(:,iC(:, iW(ik)),ik)    = c1;
+       rez.W(:,Nfilt,:) = permute(wPCA, [1 3 2]);
+       iW(Nfilt) = iW(ik);
+       isplit(Nfilt) = isplit(ik);
        
        rez.st3(isp(ilow), 2)    = Nfilt;
        rez.simScore(:, Nfilt)   = rez.simScore(:, ik);
@@ -117,6 +134,30 @@ while ik<Nfilt
     
     
 end
+
+fprintf('Finished splitting. Found %d splits, checked %d/%d clusters \n', nsplits, ik, Nfilt)
+
+
+Nfilt = size(rez.W,2);
+Nrank = 3;
+Nchan = ops.Nchan;
+Params     = double([0 Nfilt 0 0 size(rez.W,1) Nnearest ...
+    Nrank 0 0 Nchan NchanNear 0 0]);
+
+% [rez.W, rez.U, rez.mu] = mexSVDsmall(Params, rez.dWU, rez.W, iC-1, iW-1);
+[Ka, Kb] = getKernels(ops, 10, 1);
+[rez.W, rez.U, rez.mu] = mexSVDsmall2(Params, rez.dWU, rez.W, iC-1, iW-1, Ka, Kb);
+
+[WtW, iList] = getMeWtW(rez.W, rez.U, Nnearest);
+rez.iList = iList;
+rez.simScore = gather(max(WtW, [], 3));
+rez.iNeigh   = gather(iList(:, 1:Nfilt));
+rez.iNeighPC    = gather(iC(:, iW(1:Nfilt)));
+
+rez.Wphy = cat(1, zeros(1+ops.nt0min, Nfilt, Nrank), rez.W);
+
+rez.isplit = isplit;
+
 
 % figure(1)
 % subplot(1,4,1)
