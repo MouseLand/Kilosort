@@ -67,7 +67,7 @@ classdef ksGUI < handle
             end
             
             % compile if necessary
-            if ~exist('mexWtW2')
+            if ~exist('mexSVDsmall2')
                 
                 fprintf(1, 'Compiled Kilosort files not found. Attempting to compile now.\n');
                 try
@@ -626,7 +626,7 @@ classdef ksGUI < handle
                 
                 % main optimization
                 obj.log('Main optimization')
-                obj.rez = learnAndSolve8(obj.rez);
+                obj.rez = learnAndSolve8b(obj.rez);
 
                 % this does splits
                 obj.log('Splits')
