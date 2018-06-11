@@ -26,7 +26,7 @@ rootH = 'H:\DATA\Spikes\temp\';
 ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
 %%
 
-for j = 1:numel(fdir)    
+for j = 3 %1:numel(fdir)    
     ops.chanMap = fullfile(pathToYourConfigFile, [chanMapList{iMap(j)} '.mat']);
     ops.NchanTOT    = NTOT(j); % total number of channels in your recording
     rootZ = fullfile(rootrootZ, fdir{j});

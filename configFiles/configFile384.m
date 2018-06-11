@@ -13,6 +13,8 @@ ops.ThS      = [8 8];  % lower bound on acceptable single spike quality (anneale
 
 ops.momentum = [20 400]; % number of samples to average over (annealed) 
 
+ops.mergeThreshold = 0; % merge when explained variance loss is below this number, as a sqrt fraction of the unit's mean (try 1/4)
+
 ops.minFR    = 1/50; % minimum spike rate (Hz)
 
 ops.sigmaMask  = 30; % spatial constant in um for computing residual variance of spike
