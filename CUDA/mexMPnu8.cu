@@ -486,38 +486,39 @@ __global__ void average_snips(const double *Params, const int *st, const int *id
   // residual variance if a spike is any good
   
   for(ind=0; ind<counter[0];ind++)
-      if (id[ind]==bid && spkscore[ind]<ThS){          
-          tidy 		= threadIdx.y;
-          if (tidx==0 && tidy==0)
-              nsp[bid]++;
-          
-          
-          // only do this if the spike is "GOOD"
-          
-          while (tidy<Nchan){
-              X = 0.0f;
-              for (k=0;k<Nrank;k++)
-                  X += W[tidx + bid* nt0 + nt0*Nfilt*k] *
-                          U[tidy + bid * Nchan + Nchan*Nfilt*k];
+      if (id[ind]==bid){
+          if (spkscore[ind]<ThS){
+              if (tidx==0 &&  threadIdx.y==0)
+                  nsp[bid]++;
               
-              xsum = dataraw[st[ind]+tidx + NT * tidy] + x[ind] * X;
-              
-              WU[tidx+tidy*nt0 + nt0*Nchan * bid] *= p[bid];
-              WU[tidx+tidy*nt0 + nt0*Nchan * bid] +=(1-p[bid]) * xsum;
-              
-              if(tidx==0 && threadIdx.y==0){
-                  d = mu[bid] - y[ind];
-                  sig[bid] = sig[bid] * p[bid] + (1-p[bid]) * d*d;
-                  dnextbest[bid] = dnextbest[bid] * p[bid] + (1-p[bid]) * z[ind];
+              tidy 		= threadIdx.y;
+
+              // only do this if the spike is "GOOD"
+              while (tidy<Nchan){
+                  X = 0.0f;
+                  for (k=0;k<Nrank;k++)
+                      X += W[tidx + bid* nt0 + nt0*Nfilt*k] *
+                              U[tidy + bid * Nchan + Nchan*Nfilt*k];
+                  
+                  xsum = dataraw[st[ind]+tidx + NT * tidy] + x[ind] * X;
+                  
+                  WU[tidx+tidy*nt0 + nt0*Nchan * bid] *= p[bid];
+                  WU[tidx+tidy*nt0 + nt0*Nchan * bid] +=(1-p[bid]) * xsum;
+                  
+                  if(tidx==0 && threadIdx.y==0){
+                      d = mu[bid] - y[ind];
+                      sig[bid] = sig[bid] * p[bid] + (1-p[bid]) * d*d;
+                      dnextbest[bid] = dnextbest[bid] * p[bid] + (1-p[bid]) * z[ind];
+                  }
+                  tidy+=blockDim.y;
               }
-              tidy+=blockDim.y;
           }
       }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void	computePCfeatures(const double *Params, const int *counter, 
-        const float *dataraw,  const int *st, const int *id, const float *x, 
+__global__ void	computePCfeatures(const double *Params, const int *counter,
+        const float *dataraw,  const int *st, const int *id, const float *x,
         const float *W, const float *U, const float *mu, const int *iW, const int *iC,
         const float *wPCA, float *featPC){
     

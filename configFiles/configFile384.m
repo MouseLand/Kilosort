@@ -1,31 +1,37 @@
 ops.chanMap             = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap.mat';
-% ops.chanMap = 1:ops.Nchan; % treated as linear probe if a chanMap file
+% ops.chanMap = 1:ops.Nchan; % treated as linear probe if no chanMap file
 
-ops.fs                  = 30000;        % sample rate
+% sample rate
+ops.fs                  = 30000;        
 
-ops.fshigh              = 150;   % frequency for high pass filtering
+% frequency for high pass filtering (150)
+ops.fshigh              = 150;   
 
-ops.Th       = [12 10];     % threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
+% threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
+ops.Th       = [12 10];     
 
-ops.lam      = 10^2;   % weighting on the amplitude penalty (like in Kilosort1, but it has to be much larger)
+% weighting on the amplitude penalty (like in Kilosort1)
+ops.lam      = 10^2;   
 
-ops.ThS      = [8 8];  % lower bound on acceptable single spike quality (annealed)
+% merge when explained variance loss is below this number, 
+% as a sqrt fraction of the unit's mean (try 1/4)
+ops.mergeThreshold = 1/4; 
 
-ops.momentum = [20 400]; % number of samples to average over (annealed) 
-
-ops.mergeThreshold = 0; % merge when explained variance loss is below this number, as a sqrt fraction of the unit's mean (try 1/4)
+% splitting a cluster at the end requires at least this much isolation 
+% for each sub-cluster (max = 1)
+ops.ccsplit     = 0.97; 
 
 ops.minFR    = 1/50; % minimum spike rate (Hz)
 
+ops.ThS      = [8 8];  % lower bound on acceptable single spike quality
+
+ops.momentum = [20 400]; % number of samples to average over (annealed) 
+
 ops.sigmaMask  = 30; % spatial constant in um for computing residual variance of spike
 
-ops.Nfilt       = 1024; % max number of clusters
-
-ops.nfullpasses = 1; % how many forward backward passes to do
+ops.Nfilt       = 1024; % max number of clusters (even temporary ones)
 
 ops.nPCs        = 3; % how many PCs to project the spikes into
-
-ops.ccsplit     = 0.97; % required isolation for splitting a cluster at the end (max = 1)
 
 ops.useRAM      = 0; % whether to hold data in RAM (won't check if there's enough RAM)
 

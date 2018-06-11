@@ -24,9 +24,11 @@ rootrootZ = 'F:\Spikes\';
 % path to whitened, filtered proc file (on a fast SSD)
 rootH = 'H:\DATA\Spikes\temp\';
 ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
-%%
 
-for j = 3 %1:numel(fdir)    
+ops.ThS = 10;
+% rez.ops.mergeThreshold = 1/4;
+
+for j = 1 %1:numel(fdir)    
     ops.chanMap = fullfile(pathToYourConfigFile, [chanMapList{iMap(j)} '.mat']);
     ops.NchanTOT    = NTOT(j); % total number of channels in your recording
     rootZ = fullfile(rootrootZ, fdir{j});
@@ -61,14 +63,15 @@ for j = 3 %1:numel(fdir)
     % this saves to Phy
     rezToPhy(rez, rootZ);
     
+    % discard features in final rez file (too slow to save)
     rez.cProj = [];
     rez.cProjPC = [];
     
-    % save final results as rez2 (rez alone is much smaller)
+    % save final results as rez2 
     fname = fullfile(rootZ, 'rez2.mat');
     save(fname, 'rez', '-v7.3');
 end
 %%
 % cd('D:\Drive\CODE\Janelia\SpikeSortingBench')
-% loadManualSorting;
+loadManualSorting;
 
