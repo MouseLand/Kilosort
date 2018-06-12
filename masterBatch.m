@@ -25,8 +25,6 @@ rootrootZ = 'F:\Spikes\';
 rootH = 'H:\DATA\Spikes\temp\';
 ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
 
-ops.ThS = 10;
-% rez.ops.mergeThreshold = 1/4;
 
 for j = 1 %1:numel(fdir)    
     ops.chanMap = fullfile(pathToYourConfigFile, [chanMapList{iMap(j)} '.mat']);
@@ -53,7 +51,7 @@ for j = 1 %1:numel(fdir)
         rez = clusterSingleBatches(rez);
         save(fname, 'rez', '-v7.3');
     end
-    
+
     % main optimization
     rez = learnAndSolve8b(rez);
 
@@ -70,8 +68,8 @@ for j = 1 %1:numel(fdir)
     % save final results as rez2 
     fname = fullfile(rootZ, 'rez2.mat');
     save(fname, 'rez', '-v7.3');
+    
+%     loadManualSorting;
 end
-%%
-% cd('D:\Drive\CODE\Janelia\SpikeSortingBench')
-loadManualSorting;
+
 

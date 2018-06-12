@@ -8,7 +8,7 @@ ops.fs                  = 30000;
 ops.fshigh              = 150;   
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
-ops.Th       = [12 10];     
+ops.Th       = [12 12];     
 
 % weighting on the amplitude penalty (like in Kilosort1)
 ops.lam      = 10^2;   

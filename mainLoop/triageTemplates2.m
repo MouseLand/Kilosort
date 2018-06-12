@@ -35,7 +35,7 @@ dnext(idrop) = [];
 
 mergeThreshold = getOr(ops, 'mergeThreshold', 0);
 
-imerge = find(sqrt(dnext(:)) < mergeThreshold);
+imerge = find(sqrt(dnext(:)) < mergeThreshold * mu);
 iW0 = iW(imerge);
 nsp0 = nsp(imerge);
 
