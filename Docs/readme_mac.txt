@@ -1,6 +1,7 @@
-***these instructions have not been tested in a long time, and Matlab appears to have simplified this process quite a bit on other platforms. 
+*** these instructions have not been tested in a long time, and Matlab appears to have simplified this process quite a bit on other platforms. 
 Try running mexGPUall right after installing everything. 
-If that fails, the rest of the instructions below might help. Particularly #7 appears required on Mac. ***
+If that fails, the rest of the instructions below might help. Particularly #7 appears required on Mac. 
+***
 
 Assuming gpu functions have been correctly compiled (see below), a "master_file.m" is available that you should copy to a local path and change for each of your experiments. 
 The logic is that the git folder might be updated, and when that happens all extraneous files in that folder will be deleted and any changes you made reverted. 
@@ -49,5 +50,11 @@ mexClustering.cu   222, 223, 224
 mexDistances.cu   149
 
 8. ran mexGPUall.m
+
+*** update 6/28/18. Version compatibility between Mac OS / CUDA Toolkit / Matlab:
+9. Because NVIDIA requires a particular toolkit for particular OS X version (CUDA Toolkit 9.2 for the current 10.13.4+), whereas Matlab links to a different, built in CUDA Toolkit (e.g., CUDA Toolkit 8.0 in Matlab2017b), you need to specify the correct linker libraries when mexcuda tries to compile. this means adding the following:
+<-L&quot;/Developer/NVIDIA/CUDAX.X/lib$quot;>, where X.X is the current CUDA Toolkit typically installed in /Developer/NVIDIA/
+to the LINKERLIBS var on line 51 of the config file in /Applications/MATLAB_R2017b.app/toolbox/distcomp/gpu/extern/src/mex/maci64/nvcc_clang++.xml
+***
 
 ...and MEX completed successfully!
