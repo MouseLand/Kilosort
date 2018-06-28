@@ -55,6 +55,9 @@ mexDistances.cu   149
 9. Because NVIDIA requires a particular toolkit for particular OS X version (CUDA Toolkit 9.2 for the current 10.13.4+), whereas Matlab links to a different, built in CUDA Toolkit (e.g., CUDA Toolkit 8.0 in Matlab2017b), you need to specify the correct linker libraries when mexcuda tries to compile. this means adding the following:
 <-L&quot;/Developer/NVIDIA/CUDAX.X/lib$quot;>, where X.X is the current CUDA Toolkit typically installed in /Developer/NVIDIA/
 to the LINKERLIBS var on line 51 of the config file in /Applications/MATLAB_R2017b.app/toolbox/distcomp/gpu/extern/src/mex/maci64/nvcc_clang++.xml
+
+when compiling this way, you will also need to copy libcublas.X.X.dylib, libcudart.X.X.dylib, and libcufft.X.X.dylib from /Developer/NVIDIA/CUDAX.X/lib/ to /Applications/MATLAB_R2017b.app/bin/maci64/
+
 ***
 
 ...and MEX completed successfully!
