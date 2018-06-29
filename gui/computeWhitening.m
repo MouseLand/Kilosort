@@ -59,7 +59,8 @@ else
 end
 
 ibatch = 1;
-while ibatch<=Nbatch    
+while ibatch<=Nbatch  
+    drawnow; pause(0.05); 
     offset = max(0, twind + 2*NchanTOT*((NT - ops.ntbuff) * (ibatch-1) - 2*ops.ntbuff));
     fseek(fid, offset, 'bof');
     buff = fread(fid, [NchanTOT NTbuff], '*int16');
@@ -83,12 +84,13 @@ CC = CC / ceil((Nbatch-1)/ops.nSkipCov);
 fclose(fid);
 
 if ops.whiteningRange<Inf
+    drawnow; pause(0.05); 
     ops.whiteningRange = min(ops.whiteningRange, Nchan);
     Wrot = whiteningLocal(gather_try(CC), yc, xc, ops.whiteningRange);
 else
-    [E, D] 	= svd(CC);
-    D       = diag(D);
-    eps 	= 1e-6;
+    [E, D] 	= svd(CC); drawnow; pause(0.05); 
+    D       = diag(D); drawnow; pause(0.05); 
+    eps 	= 1e-6; drawnow; pause(0.05); 
     Wrot 	= E * diag(1./(D + eps).^.5) * E';
 end
 Wrot    = ops.scaleproc * Wrot;

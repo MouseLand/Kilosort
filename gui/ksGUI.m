@@ -22,8 +22,14 @@ classdef ksGUI < handle
     % - plotting bug: zoom out on probe view should allow all the way out
     % in x
     % - some help/tools for working with other datafile types
-    % - update data view needs refactoring... 
+    % - update data view needs refactoring... load a bigger-than-needed
+    % segment of data, and just move around using this as possible
     % - when re-loading, check whether preprocessing can be skipped 
+    % - find way to run ks in the background so gui is still usable(?)
+    % - quick way to set working/output directory when selecting a new file
+    % - when selecting a new file, reset whitening matrix
+    % - when re-loading old file and whitening matrix already exists, use
+    % it rather than re-compute
 
     properties        
         H % struct of handles to useful parts of the gui
