@@ -32,11 +32,14 @@ dnext(idrop) = [];
 
 
 % check which templates can be absorbed into other templates
-imerge = find((sqrt(dnext(:)) < mu/4));
+
+mergeThreshold = getOr(ops, 'mergeThreshold', 0);
+
+imerge = find(sqrt(dnext(:)) < mergeThreshold * mu);
 iW0 = iW(imerge);
 nsp0 = nsp(imerge);
 
-p2p = (C2C(iW0, iW0)<60) .* (nsp0(:) > nsp0(:)'); 
+p2p = (C2C(iW0, iW0)<60) .* (nsp0(:) > nsp0(:)');
 imax = max(p2p, [], 2) < .5;
 
 idrop = false(numel(mu), 1);
@@ -49,4 +52,4 @@ mu(idrop) = [];
 nsp(idrop) = [];
 sig(idrop) = [];
 dnext(idrop) = [];
-%     uniqid(idrop) = [];
+

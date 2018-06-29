@@ -36,11 +36,9 @@ dsets = {'20141202_all_es', '20150924_1_e', '20150601_all_s',...
 
 addpath(rootZ)
 
-ops.Th  = [10 10];
-% d = load('H:\DATA\Spikes\Benchmark2015\rez.mat');
 tic
 
-for idk = [4] %:3 %1:length(dsets)
+for idk = [4 3 5] %:3 %1:length(dsets)
     fname = [dsets{idk} '.dat']; %'20141202_all_es.dat';
     
     savePath = fullfile(rootZ,  dsets{idk});
@@ -53,20 +51,16 @@ for idk = [4] %:3 %1:length(dsets)
    
     fname = fullfile(savePath, 'rez.mat');
     if exist(fname, 'file')
-        load(fname);
-%         rez.iorig = dr.rez.iorig;
-%         rez.ccb = dr.rez.ccb;
-%         rez.ccbsort = dr.rez.ccbsort;
+        dr = load(fname);
+        rez.iorig = dr.rez.iorig;
+        rez.ccb = dr.rez.ccb;
+        rez.ccbsort = dr.rez.ccbsort;
     else
         rez = clusterSingleBatches(rez);
         save(fname, 'rez', '-v7.3');
     end
-
-    rez.ops.lam = 100;
-    rez.ops.Th = [10 10];
     
-    learnAndSolve8b;
-%     rez = learnAndSolve8b(rez);        
+    rez = learnAndSolve8b(rez);        
     
     rez = splitAllClusters(rez);
     
