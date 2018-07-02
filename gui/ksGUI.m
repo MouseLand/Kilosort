@@ -534,7 +534,6 @@ classdef ksGUI < handle
         
         function runAll(obj)
             
-            obj.prepareForRun;
             obj.runPreproc;
             obj.runSpikesort;
             obj.runSaveToPhy;
