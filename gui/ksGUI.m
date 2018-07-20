@@ -30,6 +30,7 @@ classdef ksGUI < handle
     % - when selecting a new file, reset whitening matrix
     % - when re-loading old file and whitening matrix already exists, use
     % it rather than re-compute
+    % - When preproc is done, use whitening matrix
 
     properties        
         H % struct of handles to useful parts of the gui
@@ -385,8 +386,11 @@ classdef ksGUI < handle
             obj.P.showPrediction = false;
             obj.P.showResidual = false;
             
-            % get gui defaults/remembered settings
             mfPath = fileparts(mfilename('fullpath'));
+            cm = load(fullfile(mfPath, 'cmap.mat')); %grey/red
+            obj.P.colormap = cm.cm; 
+            
+            % get gui defaults/remembered settings
             obj.P.settingsPath = fullfile(mfPath, 'userSettings.mat');
             if exist(obj.P.settingsPath, 'file')
                 savedSettings = load(obj.P.settingsPath);
@@ -407,9 +411,9 @@ classdef ksGUI < handle
             
             obj.updateProbeView('new');
             
-%             if obj.P.probeGood && obj.P.dataGood
-%                 obj.computeWhitening();
-%             end
+            if obj.P.probeGood && obj.P.dataGood
+                obj.computeWhitening();
+            end
             
         end
         
@@ -875,8 +879,8 @@ classdef ksGUI < handle
                             obj.H.dataIm = imagesc(obj.H.dataAx, chList, ...
                                 (samps(1):samps(2))/Fs,...
                                 datAll(obj.P.chanMap.connected,:));
-                            set(obj.H.dataIm, 'HitTest', 'off');
-                            colormap(obj.H.dataAx, colormap_blueblackred);
+                            set(obj.H.dataIm, 'HitTest', 'off');                            
+                            colormap(obj.H.dataAx, obj.P.colormap);
                         end
                         
                         if isfield(obj.H, 'dataTr') && ~isempty(obj.H.dataTr)

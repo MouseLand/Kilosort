@@ -31,7 +31,8 @@ rez.ops.tend   = min(nTimepoints, ceil(ops.trange(2) * ops.fs));
 rez.ops.sampsToRead = rez.ops.tend-rez.ops.tstart; 
 
 NTbuff      = NT + 4*ops.ntbuff;
-Nbatch      = ceil(rez.ops.sampsToRead /(NT-ops.ntbuff));
+% Nbatch      = ceil(rez.ops.sampsToRead /(NT-ops.ntbuff));
+Nbatch = 2; % for the purposes of the gui, we only use two batches. It's not exactly the full whitening matrix, but it's close enough
 
 % by how many bytes to offset all the batches
 twind = rez.ops.tstart * NchanTOT*2;
@@ -60,7 +61,7 @@ end
 
 ibatch = 1;
 while ibatch<=Nbatch  
-    drawnow; pause(0.05); 
+    %drawnow; pause(0.05); 
     offset = max(0, twind + 2*NchanTOT*((NT - ops.ntbuff) * (ibatch-1) - 2*ops.ntbuff));
     fseek(fid, offset, 'bof');
     buff = fread(fid, [NchanTOT NTbuff], '*int16');
@@ -84,7 +85,7 @@ CC = CC / ceil((Nbatch-1)/ops.nSkipCov);
 fclose(fid);
 
 if ops.whiteningRange<Inf
-    drawnow; pause(0.05); 
+    %drawnow; pause(0.05); 
     ops.whiteningRange = min(ops.whiteningRange, Nchan);
     Wrot = whiteningLocal(gather_try(CC), yc, xc, ops.whiteningRange);
 else
