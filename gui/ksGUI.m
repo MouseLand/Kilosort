@@ -96,6 +96,7 @@ classdef ksGUI < handle
         function build(obj, f)
             % construct the GUI with appropriate panels
             obj.H.fig = f;
+            set(f, 'UserData', obj);
             
             set(f, 'KeyPressFcn', @(f,k)obj.keyboardFcn(f, k));
             
@@ -392,9 +393,13 @@ classdef ksGUI < handle
                 if isfield(savedSettings, 'lastFile')
                     obj.H.settings.ChooseFileEdt.String = savedSettings.lastFile;
                     obj.log('Initializing with last used file.');
-                    obj.restoreGUIsettings();
-                    obj.updateProbeView('new');
-                    obj.updateFileSettings();
+                    try
+                        obj.restoreGUIsettings();
+                        obj.updateProbeView('new');
+                        obj.updateFileSettings();
+                    catch
+                        obj.log('Failed to initialize last file.');
+                    end
                 end
             else
                 obj.log('Select a data file (upper left) to begin.');
@@ -402,9 +407,9 @@ classdef ksGUI < handle
             
             obj.updateProbeView('new');
             
-            if obj.P.probeGood && obj.P.dataGood
-                obj.computeWhitening();
-            end
+%             if obj.P.probeGood && obj.P.dataGood
+%                 obj.computeWhitening();
+%             end
             
         end
         
@@ -1258,7 +1263,7 @@ classdef ksGUI < handle
             [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);            
             savePath = fullfile(p, [fn '_ksSettings.mat']);
             
-            save(savePath, 'saveDat');
+            save(savePath, 'saveDat', '-v7.3');
             obj.refocus(obj.H.settings.saveBtn);
         end
         
