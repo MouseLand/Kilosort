@@ -660,6 +660,16 @@ classdef ksGUI < handle
         function runSaveToPhy(obj)
             
             % save results
+            
+            % discard features in final rez file (too slow to save)
+            rez = obj.rez;
+            rez.cProj = [];
+            rez.cProjPC = [];
+            
+            % save final results as rez2
+            fname = fullfile(obj.ops.saveDir, 'rez.mat');
+            save(fname, 'rez', '-v7.3');
+            
             try
                 rezToPhy(obj.rez, obj.ops.saveDir);
             catch ex
