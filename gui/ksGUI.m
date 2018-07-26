@@ -240,7 +240,12 @@ classdef ksGUI < handle
             obj.H.settings.setProbeEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'popupmenu', 'HorizontalAlignment', 'left', ...
-                'String', {'Neuropixels Phase3A', '[new]', 'other...'}, ...
+                'String', {...
+                'Neuropixels Phase3A', ...
+                'Neuropixels Phase3B1 (staggered)',...
+                'Neuropixels Phase3B2 (aligned)',...
+                '[new]', ...
+                'other...'}, ...
                 'Callback', @(~,~)obj.updateProbeView('reset'));
             obj.H.settings.setnChanEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
@@ -660,11 +665,12 @@ classdef ksGUI < handle
         function runSaveToPhy(obj)
             
             % save results
-            
+            obj.log(sprintf('Saving data to %s', obj.ops.saveDir));
             % discard features in final rez file (too slow to save)
             rez = obj.rez;
             rez.cProj = [];
             rez.cProjPC = [];
+            rez.ops.gui = [];
             
             % save final results as rez2
             fname = fullfile(obj.ops.saveDir, 'rez.mat');
@@ -675,7 +681,7 @@ classdef ksGUI < handle
             catch ex
                 obj.log(sprintf('Error saving data for phy! %s', ex.message));
             end            
-            
+            obj.log('Done');
         end
             
         function updateDataView(obj)
@@ -965,6 +971,10 @@ classdef ksGUI < handle
                 switch selProbe
                     case 'Neuropixels Phase3A'
                         cm = load('neuropixPhase3A_kilosortChanMap.mat');
+                    case 'Neuropixels Phase3B1 (staggered)'    
+                        cm = load('neuropixPhase3B1_kilosortChanMap.mat');
+                    case 'Neuropixels Phase3B2 (aligned)'
+                        cm = load('neuropixPhase3B2_kilosortChanMap.mat');
                     case '[new]'
                         obj.log('New probe creator not yet implemented.');
                         return;
@@ -1271,6 +1281,8 @@ classdef ksGUI < handle
             saveDat.ops = obj.ops;
             saveDat.ops.gui = [];
             saveDat.rez = obj.rez;
+            saveDat.rez.cProjPC = []; 
+            saveDat.rez.cProj = []; 
             saveDat.rez.ops.gui = [];
             saveDat.P = obj.P;
             
