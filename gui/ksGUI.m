@@ -27,10 +27,10 @@ classdef ksGUI < handle
     % - when re-loading, check whether preprocessing can be skipped 
     % - find way to run ks in the background so gui is still usable(?)
     % - quick way to set working/output directory when selecting a new file
-    % - when selecting a new file, reset whitening matrix
+    % - when selecting a new file, reset everything
     % - when re-loading old file and whitening matrix already exists, use
     % it rather than re-compute
-    % - When preproc is done, use whitening matrix
+    % - button to easily match folders to the source
 
     properties        
         H % struct of handles to useful parts of the gui
@@ -429,7 +429,9 @@ classdef ksGUI < handle
                 obj.H.settings.ChooseFileEdt.String = ...
                     fullfile(pathname, filename);
                 obj.log(sprintf('Selected file %s', obj.H.settings.ChooseFileEdt.String));
-                                
+                
+                obj.P.ksDone = false;
+                
                 obj.updateFileSettings();
             end
             
@@ -605,7 +607,14 @@ classdef ksGUI < handle
             try
                 obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
-                %obj.P.Wrot = obj.rez.Wrot;
+                
+                % use the new whitening matrix, which can sometimes be
+                % quite different than the earlier estimated one
+                rW = obj.rez.Wrot;
+                pW = obj.P.Wrot;
+                cn = obj.P.chanMap.connected;
+                pW(cn,cn) = rW;
+                obj.P.Wrot = pW;
                 
                 set(obj.H.settings.runSpikesortBtn, 'enable', 'on');
                 
@@ -854,7 +863,7 @@ classdef ksGUI < handle
                         
                         if obj.P.showResidual
                             
-                            ttl = [ttl '\color[rgb]{1 0 0}residal '];
+                            ttl = [ttl '\color[rgb]{1 0 0}residual '];
                             
                             if ~isfield(obj.H, 'residTr') || numel(obj.H.residTr)~=numel(chList)
                                 % initialize traces
