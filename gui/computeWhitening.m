@@ -60,7 +60,7 @@ else
 end
 
 ibatch = 1;
-while ibatch<=Nbatch  
+while ibatch<=5  
     %drawnow; pause(0.05); 
     offset = max(0, twind + 2*NchanTOT*((NT - ops.ntbuff) * (ibatch-1) - 2*ops.ntbuff));
     fseek(fid, offset, 'bof');
