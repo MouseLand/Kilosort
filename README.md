@@ -1,3 +1,5 @@
+Kilosort2 has been designed to take similar inputs as Kilosort and produce similar output variables, which can be loaded in the Phy GUI. Therefore, the CUDA instructions and integration with Matlab is the same. To aid in setting up a run on your own probe configuration, we have added a graphical user interface where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2 sees it correctly. The instructions below are cut and paste from the original Kilosort. 
+
 # Fast spike sorting for hundreds of channels #
 
 Implements an integrated template matching framework for detecting and clustering spikes from multi-channel electrophysiological recordings. Very fast when a GPU is available, but can also run on the CPU side. 
