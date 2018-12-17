@@ -10,13 +10,14 @@ chanMapList = {'neuropixPhase3A_kilosortChanMap', ...
 fdir = {'Loewi\posterior', 'Loewi\frontal', 'WillAllen', ...
     'Waksman\ZO', 'Waksman\K1', 'Waksman\ZNP1', ...
     'Robbins\K1', 'Robbins\K3', 'Robbins\ZNP1', ...
-    'Josh\probeA', 'Josh\probeF', 'Josh\probeD'};
-NTOT = [384 384 385 385 385 385 385 385 385 384 384 384];
-iMap = [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1];
-
+    'Josh\probeA', 'Josh\probeF', 'Josh\probeD', 'Bekesy\ZO', 'Bekesy\K1'};
+NTOT = [384 384 385 385 385 385 385 385 385 384 384 384 385 385];
+iMap = [1 1 1 1 1 1 1 1 1 1 1 1 3 2];
+%%
 % common options for every probe
 
-ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
+ops.sorting     = 2; % type of sorting, 2 is by rastermap, 1 is old
+ops.trange      = [0 1900]; % TIME RANGE IN SECONDS TO PROCESS
 
 % find the binary file in this folder
 rootrootZ = 'F:\Spikes\';
@@ -26,15 +27,17 @@ rootH = 'H:\DATA\Spikes\temp\';
 ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
 
 
-for j = 1 %1:numel(fdir)    
+for j = 14 %1:numel(fdir)    
+    fprintf('%s\n', fdir{j})
+    
     ops.chanMap = fullfile(pathToYourConfigFile, [chanMapList{iMap(j)} '.mat']);
     ops.NchanTOT    = NTOT(j); % total number of channels in your recording
     rootZ = fullfile(rootrootZ, fdir{j});
     
-    fs = [dir(fullfile(rootZ, '*.bin')) dir(fullfile(rootZ, '*.dat'))];
-    fname = fs(1).name;
-    ops.fbinary     = fullfile(rootZ,  fname);
-    ops.rootZ = rootZ;
+    fs          = [dir(fullfile(rootZ, '*.bin')) dir(fullfile(rootZ, '*.dat'))];
+    fname       = fs(1).name;
+    ops.fbinary = fullfile(rootZ,  fname);
+    ops.rootZ   = rootZ;
     
     % preprocess data to create temp_wh.dat
     rez = preprocessDataSub(ops);
@@ -56,7 +59,7 @@ for j = 1 %1:numel(fdir)
     rez = learnAndSolve8b(rez);
 
     % final splits
-    rez = splitAllClusters(rez);
+    rez = splitAllClusters(rez);    
     
     % this saves to Phy
     rezToPhy(rez, rootZ);

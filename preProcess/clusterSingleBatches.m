@@ -30,47 +30,49 @@ tic
 for ibatch = 1:nBatches        
     [uproj, call, muall, tsall] = extractPCbatch(rez, wPCA, min(nBatches-1, ibatch));  
     
-    ioff = nPCs * gpuArray(int32(call - nch - 1));
-    
-    [W, mu, Wheights] = initializeWdata(ioff, uproj, Nchan, nPCs, Nfilt);
-    
-    Params  = [1 size(uproj,1) Nfilt pm size(W,1) 0 Nnearest];
-    Params(1) = size(uproj,2);
-    
-    for i = 1:niter
-        dWU     = gpuArray.zeros(size(W), 'single');        
+    if size(uproj,2)>=Nfilt
+        ioff = nPCs * gpuArray(int32(call - nch - 1));
         
-        %  boolean variable: should we compute spike x filter
-        iW = abs(call - Wheights) < 10;
+        [W, mu, Wheights] = initializeWdata(ioff, uproj, Nchan, nPCs, Nfilt);
         
-        % get iclust and update W
-        [dWU, iclust, dx, nsp, dV] = mexClustering(Params, uproj, W, ioff, ...
-            iW, dWU, mu);
+        Params  = [1 size(uproj,1) Nfilt pm size(W,1) 0 Nnearest];
+        Params(1) = size(uproj,2);
         
-        dWU = dWU./(1e-5 + single(nsp'));
+        for i = 1:niter
+            dWU     = gpuArray.zeros(size(W), 'single');
+            
+            %  boolean variable: should we compute spike x filter
+            iW = abs(call - Wheights) < 10;
+            
+            % get iclust and update W
+            [dWU, iclust, dx, nsp, dV] = mexClustering(Params, uproj, W, ioff, ...
+                iW, dWU, mu);
+            
+            dWU = dWU./(1e-5 + single(nsp'));
+            
+            mu = sum(dWU.^2,1).^.5;
+            W = dWU./(1e-5 + mu);
+            
+            W = reshape(W, nPCs, Nchan, Nfilt);
+            nW = sq(sum(W(1, :, :).^2,1));
+            W = reshape(W, Nchan * nPCs, Nfilt);
+            
+            [~, Wheights] = max(nW,[], 1);
+            [Wheights, isort] = sort(Wheights);
+            
+            W   = W(:, isort);
+            mu  = mu(isort);
+            nsp = nsp(isort);
+        end
         
-        mu = sum(dWU.^2,1).^.5;
-        W = dWU./(1e-5 + mu);
+        Wheights = min(max(Wheights, nch+1), Nchan-nch);
+        ioffW = nPCs * double(Wheights - nch - 1);
         
-        W = reshape(W, nPCs, Nchan, Nfilt);
-        nW = sq(sum(W(1, :, :).^2,1));
-        W = reshape(W, Nchan * nPCs, Nfilt);
+        W0 = reshape(W(ioffW + [1:size(uproj,1)]' + ([1:Nfilt]-1)*size(W,1)),...
+            size(uproj,1), Nfilt);
         
-        [~, Wheights] = max(nW,[], 1);
-        [Wheights, isort] = sort(Wheights);
-        
-        W   = W(:, isort);
-        mu  = mu(isort);
-        nsp = nsp(isort);
+        W0 = W0 ./ (1e-5 + sum(W0.^2,1).^.5);
     end
-
-    Wheights = min(max(Wheights, nch+1), Nchan-nch);
-    ioffW = nPCs * double(Wheights - nch - 1);
-    
-    W0 = reshape(W(ioffW + [1:size(uproj,1)]' + ([1:Nfilt]-1)*size(W,1)),...
-        size(uproj,1), Nfilt);
-    
-    W0 = W0 ./ (1e-5 + sum(W0.^2,1).^.5);
     
     Ws(:, :, ibatch)   = W0;    
     mus(:, ibatch)     = mu;
@@ -156,8 +158,12 @@ ccb0 = ccb0 + ccb0';
 
 rez.ccb = gather(ccb0);
 
-[ccb1, iorig] = sortBatches(ccb0);
-
+if getOr(rez.ops, 'sorting', 1)==2
+    [ccb1, iorig] = sort_by_rastermap(ccb0);
+else
+    [ccb1, iorig] = sortBatches(ccb0);
+end
+    
 figure(1); 
 subplot(1,2,1)
 imagesc(ccb0, [-5 5]); drawnow

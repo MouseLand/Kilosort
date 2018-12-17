@@ -1,4 +1,4 @@
-function rez = splitAllClusters(rez)
+function [rez, X] = splitAllClusters(rez)
 
 ops = rez.ops;
 wPCA = gather(ops.wPCA);
@@ -130,9 +130,9 @@ while ik<Nfilt
        ik = ik-1;
        
        nsplits = nsplits + 1;
+       
+       X{nsplits} = x;       
     end    
-    
-    
 end
 
 fprintf('Finished splitting. Found %d splits, checked %d/%d clusters \n', nsplits, ik, Nfilt)
