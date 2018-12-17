@@ -8,6 +8,9 @@ ops.fs                  = 30000;
 % frequency for high pass filtering (150)
 ops.fshigh              = 150;   
 
+% sorting type for drift correction
+ops.sorting     = 1; % type of sorting, 2 is by rastermap, 1 is old
+
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
 ops.Th       = [12 12];     
 
