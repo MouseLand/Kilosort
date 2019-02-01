@@ -105,6 +105,99 @@ __global__ void average_snips(const double *Params, const int *ioff, const int *
       }  
 }
 
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+__global__ void average_snips_v3(const double *Params, const int *ioff, const int *id, const float *uproj, 
+        const float *cmax, float *bigArray){
+  
+
+  // jic, version to work with Nfeatures threads
+  // have made a big array of Nfeature*NfeatW*Nfilters so projections
+  // onto each Nfeature can be summed without collisions
+  // after running this, need to sum up each set of Nfeature subArrays
+  // to calculate the final NfeatW*Nfilters array
+
+  int tid, bid, ind, Nspikes, Nfeatures, NfeatW;
+  float xsum = 0.0f;   
+
+  Nspikes               = (int) Params[0];
+  Nfeatures             = (int) Params[1];
+  NfeatW                = (int) Params[4];
+
+  tid       = threadIdx.x;      //feature index
+  bid 		= blockIdx.x;       //filter index
+
+
+
+  
+
+  for(ind=0; ind<Nspikes;ind++) {
+
+      if (id[ind]==bid){
+            //uproj is Nfeatures x Nspikes
+            xsum = uproj[tid + Nfeatures * ind];
+            //add this to the Nfeature-th array of NfeatW at the offset for this spike
+            bigArray[ioff[ind] + tid + tid*NfeatW + Nfeatures*NfeatW * bid] +=  xsum; 
+      }  //end of if block for  match
+  }     //end of loop over spikes
+
+}
+
+
+
+__global__ void sum_dWU(const double *Params, const float *bigArray, float *WU) {
+
+  int tid,bid, ind, Nfilters, Nthreads, Nfeatures, Nblocks, NfeatW, nWU, nElem;
+  float sum = 0.0f; 
+  
+  Nfeatures             = (int) Params[1];
+  NfeatW                = (int) Params[4];
+  Nfilters              = (int) Params[2];
+  Nthreads              = blockDim.x;
+  Nblocks               = gridDim.x;
+
+  tid 		= threadIdx.x;
+  bid 		= blockIdx.x;
+
+
+  //WU is NfeatW x Nfilters. 
+
+  nWU = NfeatW * Nfilters;
+  nElem = Nfeatures*NfeatW; //number of elements in each subArray of bigArray
+
+  //Calculate which element we're addressing  
+  int tind = tid + bid * Nthreads;
+
+  int currFilt, currFW, currIndex;
+  while (tind < nWU){
+
+
+      //which filter and element of WU?
+      currFilt = floor((double)(tind/NfeatW));
+      currFW = tind - currFilt*NfeatW;
+
+      //Sum up the Nfeature elements of bigArray that correspond to this 
+      //filter and NfeatW 
+
+      sum = 0.0f;
+
+      for(ind=0; ind<Nfeatures; ind++) {
+          //bigArray is Nfilter arrays of Nfeature x NfeatW;
+          currIndex = currFilt*nElem + ind*NfeatW + currFW;
+          sum += bigArray[ currIndex ];
+      }         
+
+      WU[tind] += sum;
+      tind += Nblocks*Nthreads; 
+
+   }  
+
+}
+
+
+
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void count_spikes(const double *Params, const int *id, int *nsp, const float *x, float *V){
     
@@ -145,7 +238,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
 {
     /* Declare input variables*/
   double *Params, *d_Params;
-  int Nfeatures, Nspikes, Nfilters;
+  int Nfeatures, Nspikes, Nfilters, NfeatW;
+
   
   /* Initialize the MathWorks GPU API. */
   mxInitGPU();
@@ -155,6 +249,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   Nspikes               = (int) Params[0];
   Nfeatures             = (int) Params[1];
   Nfilters              = (int) Params[2];
+  NfeatW                = (int) Params[4];
+
   
   // copy Params to GPU
   cudaMalloc(&d_Params,      sizeof(double)*mxGetNumberOfElements(prhs[0]));
@@ -195,9 +291,12 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMalloc(&d_id,      Nspikes  *  sizeof(int));
   cudaMalloc(&d_x,      Nspikes  *  sizeof(float));
   cudaMalloc(&d_nsp,      Nfilters  *  sizeof(int));
-   cudaMalloc(&d_V,      Nfilters  *  sizeof(float));
+  cudaMalloc(&d_V,      Nfilters  *  sizeof(float));
    
   cudaMemset(d_nsp,      0, Nfilters *   sizeof(int));
+  //jic add Memset for d_V
+  cudaMemset(d_V, 0, Nfilters  *  sizeof(float));
+
   
   // get list of cmaxes for each combination of neuron and filter
   computeCost<<<Nfilters, 1024>>>(d_Params, d_uproj, d_mu, d_W, d_ioff, 
@@ -206,10 +305,42 @@ void mexFunction(int nlhs, mxArray *plhs[],
   // loop through cmax to find best template
   bestFilter<<<40, 256>>>(d_Params, d_iW, d_cmax, d_id, d_x);
   
-  // average all spikes for same template
-  average_snips<<<Nfilters, Nfeatures>>>(d_Params, d_ioff, d_id, d_uproj, 
-          d_cmax, d_dWU);
+  // average all spikes for same template -- ORIGINAL
+  //average_snips<<<Nfilters, Nfeatures>>>(d_Params, d_ioff, d_id, d_uproj, 
+  //        d_cmax, d_dWU);
+
+
+
+  //-------------------------------------------------
+
+  //jic for running average_snips_v3 with Nfeature threads
+
   
+
+  float *d_bigArray;
+  int bSize;
+
+  
+  bSize = Nfeatures*NfeatW*Nfilters;
+  cudaMalloc(&d_bigArray, bSize*sizeof(float) );
+  cudaMemset(d_bigArray, 0, bSize*sizeof(float) );
+
+  average_snips_v3<<<Nfilters, Nfeatures>>>(d_Params, d_ioff, d_id,  
+      d_uproj, d_cmax, d_bigArray);
+
+  //sum over bigArray. 
+  //Total number of features for imec probe = 3*384 = 1152
+  //Can't safely break this into Nfilters,NfeatW, becasue NfeatW > 1024
+  //break into an arbitrary number of blocks/threads
+
+  sum_dWU<<<128,1024>>>( d_Params, d_bigArray, d_dWU );
+
+  cudaFree(d_bigArray);
+
+  //-------------------------------------------------
+
+
+
   count_spikes<<<7, 256>>>(d_Params, d_id, d_nsp, d_x, d_V);
 
   // dWU stays a GPU array
@@ -220,7 +351,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   float *x, *V;
   
   const mwSize dimst[]      = {Nspikes,1};  
-  const mwSize dimst2[] 	= {Nspikes,Nfilters};  
+  //const mwSize dimst2[] 	= {Nspikes,Nfilters};  
   const mwSize dimst4[] 	= {Nfilters,1};  
 
   plhs[1]   = mxCreateNumericArray(2, dimst,  mxINT32_CLASS,  mxREAL);
