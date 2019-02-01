@@ -17,6 +17,12 @@
 #include <iostream>
 using namespace std;
 
+//for sorting according to timestamps
+
+#include "mexNvidia_quicksort.cu"
+
+
+
 const int  Nthreads = 1024, maxFR = 100000, NrankMax = 3, nmaxiter = 500, NchanMax = 32;
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	spaceFilter(const double *Params, const float *data, const float *U, 
@@ -463,13 +469,18 @@ __global__ void computeSpikeGoodness(const double *Params, const int *counter, c
   }
 }
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void average_snips(const double *Params, const int *st, const int *id,
+__global__ void average_snips(const double *Params, const int *st, 
+
+        const unsigned int *idx, const int *id, 
+
         const float *x, const float *y,  const int *counter, const float *dataraw, 
         const float *W, const float *U, float *WU, float *nsp, 
         const float *spkscore, const float *p, float *sig, const float *mu,
         const float *z, float *dnextbest){
     
   int nt0, tidx, tidy, bid, ind, NT, Nchan,k, Nrank, Nfilt;
+  int currInd;
+
   float xsum,  X, ThS, d; 
   
   NT        = (int) Params[0];
@@ -483,13 +494,28 @@ __global__ void average_snips(const double *Params, const int *st, const int *id
   bid 		= blockIdx.x;
   
   // we need wPCA projections in here, and then to decide based on total 
-  // residual variance if a spike is any good
   
-  for(ind=0; ind<counter[0];ind++)
-      if (id[ind]==bid){
-          if (spkscore[ind]<ThS){
-              if (tidx==0 &&  threadIdx.y==0)
+  // idx is the time sort order of the spikes; the original order is a function
+  // of when threads complete in mexGetSpikes. Compilation of the sums for WU, sig, and dnextbest
+  // in a fixed order makes the calculation deterministic.
+  
+  for(ind=0; ind<counter[0];ind++) {
+
+      currInd = idx[ind];       //get the next spike in time order
+
+      if (id[currInd]==bid){
+
+          if (spkscore[currInd]<ThS){
+
+              if (tidx==0 &&  threadIdx.y==0) {
                   nsp[bid]++;
+                  //calculation of d, sig, and dnextbest moved out of while
+                  //loop over channel, which repeats the sum NT/16 times
+                  d = mu[bid] - y[currInd];
+                  sig[bid] = sig[bid] * p[bid] + (1-p[bid]) * d*d;
+                  dnextbest[bid] = dnextbest[bid] * p[bid] + (1-p[bid]) * z[currInd];
+               }
+
               
               tidy 		= threadIdx.y;
 
@@ -500,21 +526,23 @@ __global__ void average_snips(const double *Params, const int *st, const int *id
                       X += W[tidx + bid* nt0 + nt0*Nfilt*k] *
                               U[tidy + bid * Nchan + Nchan*Nfilt*k];
                   
-                  xsum = dataraw[st[ind]+tidx + NT * tidy] + x[ind] * X;
-                  
+                  xsum = dataraw[st[currInd]+tidx + NT * tidy] + x[currInd] * X;
+
                   WU[tidx+tidy*nt0 + nt0*Nchan * bid] *= p[bid];
                   WU[tidx+tidy*nt0 + nt0*Nchan * bid] +=(1-p[bid]) * xsum;
-                  
-                  if(tidx==0 && threadIdx.y==0){
-                      d = mu[bid] - y[ind];
-                      sig[bid] = sig[bid] * p[bid] + (1-p[bid]) * d*d;
-                      dnextbest[bid] = dnextbest[bid] * p[bid] + (1-p[bid]) * z[ind];
-                  }
+                                 
                   tidy+=blockDim.y;
-              }
-          }
-      }
-}
+
+              }        //end of while loop over channels
+          }            //end of if block over spkscore > ThS
+       }               //end of if block for id == bid
+    }                  //end of for loop over spike indicies
+}                      //end of function
+
+
+
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	computePCfeatures(const double *Params, const int *counter,
@@ -784,16 +812,41 @@ void mexFunction(int nlhs, mxArray *plhs[],
      computePCfeatures<<<Nfilt, tpPC>>>(d_Params, d_counter, d_draw, d_st,
              d_id, d_x, d_W, d_U, d_mu, d_iW, d_iC, d_wPCA, d_featPC);
   
-  // update dWU here by adding back to subbed spikes.  
-  average_snips<<<Nfilt,tpS>>>(d_Params, d_st, d_id, d_x, d_y, d_counter, 
+
+  //jic addition of time sorting prior to average_snips
+  //get a set of indices for the sorted timestamp array
+  //make a copy of the timestamp array to sort, plus an array of indicies
+
+  unsigned int *d_stSort, *d_idx;
+  cudaMalloc(&d_stSort,  counter[0] * sizeof(int));
+  cudaMemset(d_stSort, 0, counter[0] *sizeof(int));
+
+  cudaMalloc(&d_idx,  counter[0] * sizeof(int));
+  cudaMemset(d_idx, 0, counter[0] *sizeof(int));
+
+
+  //copy input to output; quicksort acts on that array
+  cudaMemcpy( d_stSort, d_st, counter[0]*sizeof(int), cudaMemcpyDeviceToDevice );
+
+  //fill the idx array with integers from 0 to nitems-1
+  set_idx<<< 1, 1 >>>(d_idx, counter[0]);
+
+
+  // Launch quicksort on device
+
+  int left = 0;
+  int right = counter[0]-1;
+  cdp_simple_quicksort<<< 1, 1 >>>(d_stSort, d_idx, left, right, 0);
+
+  // update dWU here by adding back to subbed spikes.
+  // additional parameter d_idx = array of time sorted indicies  
+  average_snips<<<Nfilt,tpS>>>(d_Params, d_st, d_idx, d_id, d_x, d_y, d_counter, 
           d_draw, d_W, d_U, d_dWU, d_nsp, d_spkscore, d_p, d_sig, d_mu, d_z, d_nextbest);
 
-  
   // add back to the residuals the spikes with unexplained variance
   for(int iter=0;iter<(int) Params[3];iter++)      
       addback_spikes<<<Nfilt,tpS>>>(d_Params,  d_st, d_id, d_x, 
               d_count, d_draw, d_W, d_U, iter, d_spkscore);  
-  
    
   float *x, *feat, *spkscore, *featPC;
   int *st, *id;
@@ -849,7 +902,9 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaFree(d_featPC);
   cudaFree(d_dout);
   cudaFree(d_data);
-  
+  cudaFree(d_idx);
+  cudaFree(d_stSort);
+
   mxGPUDestroyGPUArray(p);
   mxGPUDestroyGPUArray(draw);
   mxGPUDestroyGPUArray(dorig);
