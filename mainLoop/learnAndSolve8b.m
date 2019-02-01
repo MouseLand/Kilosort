@@ -115,7 +115,7 @@ for ibatch = 1:niter
         Nfilt = size(W,2);
         nsp(1:Nfilt) = m0;
         sig(1:Nfilt) = 5^2;
-        dnext(1:Nfilt) = 5^2;
+        dnext(1:Nfilt) = 20^2; % changed from 5^2
         Params(2) = Nfilt;
     end
 
@@ -199,7 +199,7 @@ for ibatch = 1:niter
             nsp(Nfilt + [1:size(dWU0,3)]) = ops.minFR * NT/ops.fs;
             mu(Nfilt + [1:size(dWU0,3)])  = 10;
             sig(Nfilt + [1:size(dWU0,3)])  = 5^2;
-            dnext(Nfilt + [1:size(dWU0,3)])  = 5^2;
+            dnext(Nfilt + [1:size(dWU0,3)])  = 20^2; % changed from 5^2
 
             Nfilt = min(ops.Nfilt, size(W,2));
             Params(2) = Nfilt;
