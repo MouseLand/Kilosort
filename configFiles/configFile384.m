@@ -12,22 +12,22 @@ ops.fshigh              = 150;
 ops.sorting     = 1; % type of sorting, 2 is by rastermap, 1 is old
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
-ops.Th       = [12 12];     
+ops.Th       = [9 9];     
 
 % weighting on the amplitude penalty (like in Kilosort1)
 ops.lam      = 10^2;   
 
 % merge when explained variance loss is below this number, 
 % as a sqrt fraction of the unit's mean (try 1/4)
-ops.mergeThreshold = 1/4; 
+ops.mergeThreshold = 1/2; 
 
 % splitting a cluster at the end requires at least this much isolation 
 % for each sub-cluster (max = 1)
-ops.ccsplit     = 0.97; 
+ops.ccsplit     = 0.99; 
 
 ops.minFR    = 1/50; % minimum spike rate (Hz)
 
-ops.ThS      = [8 8];  % lower bound on acceptable single spike quality
+ops.ThS      = [10 8];  % lower bound on acceptable single spike quality
 
 ops.momentum = [20 400]; % number of samples to average over (annealed) 
 

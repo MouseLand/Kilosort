@@ -22,7 +22,6 @@ using namespace std;
 #include "mexNvidia_quicksort.cu"
 
 
-
 const int  Nthreads = 1024, maxFR = 100000, NrankMax = 3, nmaxiter = 500, NchanMax = 32;
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	spaceFilter(const double *Params, const float *data, const float *U, 
