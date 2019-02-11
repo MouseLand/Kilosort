@@ -1,4 +1,4 @@
-function rez = learnAndSolve8b(rez)
+% function rez = learnAndSolve8b(rez)
 
 ops = rez.ops;
 
@@ -50,7 +50,7 @@ niter   = numel(irounds);
 if irounds(niter - nBatches)~=nhalf
     error('mismatch between number of batches');
 end
-
+%%
 flag_resort      = 1;
 
 t0 = ceil(rez.ops.trange(1) * ops.fs);
@@ -137,7 +137,7 @@ for ibatch = 1:niter
     % this needs to change
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
 
-    [st0, id0, x0, featW, dWU, drez, nsp0, ss0, featPC, sig, dnext] = ...
+    [st0, id0, x0, featW, dWU, drez, nsp0, featPC, sig, dnext] = ...
         mexMPnu8(Params, dataRAW, dWU, U, W, mu, iC-1, iW-1, UtU, iList-1, ...
         wPCA, maskU, pm, sig, dnext);
 
@@ -151,14 +151,6 @@ for ibatch = 1:niter
         % final clean up
         [W, U, dWU, mu, nsp, sig, dnext] = ...
             triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext);
-
-        % run the algorithm locally to get splits
-%         [W, dWU, isplit] = halfwaySplits(rez, Params, W, U, mu,...
-%             dWU, sig,  fid, korder);
-%         nsp     = nsp(isplit);
-%         sig     = sig(isplit);
-%         dnext   = dnext(isplit);
-%         mu      = mu(isplit);
 
         Nfilt = size(W,2);
         Params(2) = Nfilt;
@@ -224,8 +216,7 @@ for ibatch = 1:niter
         irange = ntot + [1:numel(x0)];
         st3(irange,1) = double(st);
         st3(irange,2) = double(id0+1);
-        st3(irange,3) = double(x0);
-        st3(irange,4) = double(ss0(:,1));
+        st3(irange,3) = double(x0);        
 
         fW(:, irange) = gather(featW);
 
@@ -245,23 +236,23 @@ for ibatch = 1:niter
         fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.2f, mu: %2.2f, nst0: %d \n', ...
             toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0))
 
-%        figure(2)
-%        subplot(2,2,1)
-%        imagesc(W(:,:,1))
-%
-%        subplot(2,2,2)
-%        imagesc(U(:,:,1))
-%
-%        subplot(2,2,3)
-%        plot(mu)
-%        ylim([0 100])
-%
-%        subplot(2,2,4)
-%        semilogx(1+nsp, mu, '.')
-%        ylim([0 100])
-%        xlim([0 100])
-%
-%        drawnow
+       figure(2)
+       subplot(2,2,1)
+       imagesc(W(:,:,1))
+
+       subplot(2,2,2)
+       imagesc(U(:,:,1))
+
+       subplot(2,2,3)
+       plot(mu)
+       ylim([0 100])
+
+       subplot(2,2,4)
+       semilogx(1+nsp, mu, '.')
+       ylim([0 100])
+       xlim([0 100])
+
+       drawnow
     end
 end
 
