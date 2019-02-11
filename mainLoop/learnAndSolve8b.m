@@ -211,7 +211,8 @@ for ibatch = 1:niter
         if k==1
             ioffset         = 0;
         end
-        toff = nt0min + t0 -ioffset + (NT-ops.ntbuff)*(k-1);
+        toff = nt0min + t0 -ioffset + (NT-ops.ntbuff)*(k-1);        
+        
         st = toff + double(st0);
         irange = ntot + [1:numel(x0)];
         st3(irange,1) = double(st);
