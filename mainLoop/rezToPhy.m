@@ -11,6 +11,12 @@ rez.W = gather(rez.Wphy);
 rez.U = gather(rez.U);
 rez.mu = gather(rez.mu);
 
+[~, isort]   = sort(rez.st3(:,1), 'ascend');
+rez.st3      = rez.st3(isort, :);
+rez.cProj    = rez.cProj(isort, :);
+rez.cProjPC  = rez.cProjPC(isort, :, :);
+
+
 fs = dir(fullfile(savePath, '*.npy'));
 for i = 1:length(fs)
    delete(fullfile(savePath, fs(i).name)); 

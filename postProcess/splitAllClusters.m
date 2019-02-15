@@ -150,7 +150,11 @@ Params     = double([0 Nfilt 0 0 size(rez.W,1) Nnearest ...
 
 [WtW, iList] = getMeWtW(rez.W, rez.U, Nnearest);
 rez.iList = iList;
+
+isplit = rez.simScore==1;
 rez.simScore = gather(max(WtW, [], 3));
+rez.simScore(isplit) = 1;
+
 rez.iNeigh   = gather(iList(:, 1:Nfilt));
 rez.iNeighPC    = gather(iC(:, iW(1:Nfilt)));
 

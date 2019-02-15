@@ -1,5 +1,5 @@
-function [W, U, dWU, mu, nsp,sig, dnext] = ...
-    triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp,sig, dnext)
+function [W, U, dWU, mu, nsp,sig, dnext, damp, ndrop] = ...
+    triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp,sig, dnext, damp, ndrop)
 
 m0 = ops.minFR * ops.NT/ops.fs;
 idrop = nsp<m0;
@@ -11,6 +11,8 @@ mu(idrop) = [];
 nsp(idrop) = [];
 sig(idrop) = [];
 dnext(idrop) = [];
+damp(idrop, :) = [];
+ndrop(1) = .9 * ndrop(1) + .1*gather(sum(idrop));
 
 % 
 cc = getMeWtW2(W, U);
@@ -29,7 +31,8 @@ mu(idrop) = [];
 nsp(idrop) = [];
 sig(idrop) = [];
 dnext(idrop) = [];
-
+damp(idrop, :) = [];
+ndrop(2) = .9*ndrop(2) + .1*gather(sum(idrop));
 
 % check which templates can be absorbed into other templates
 
@@ -52,4 +55,6 @@ mu(idrop) = [];
 nsp(idrop) = [];
 sig(idrop) = [];
 dnext(idrop) = [];
+damp(idrop, :) = [];
+ndrop(3) = .9*ndrop(3) + .1*gather(sum(idrop));
 
