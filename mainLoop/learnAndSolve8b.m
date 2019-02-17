@@ -71,6 +71,7 @@ iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
 nsp = gpuArray.zeros(0,1, 'single');
 sig = gpuArray.zeros(0,1, 'single');
 dnext = gpuArray.zeros(0,1, 'single');
+ndrop = zeros(3,1);
 
 Params(13) = 0;
 
@@ -149,8 +150,8 @@ for ibatch = 1:niter
         flag_resort   = 0;
 
         % final clean up
-        [W, U, dWU, mu, nsp, sig, dnext] = ...
-            triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext);
+        [W, U, dWU, mu, nsp, sig, dnext, ndrop] = ...
+            triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext, ndrop);
 
         % run the algorithm locally to get splits
 %         [W, dWU, isplit] = halfwaySplits(rez, Params, W, U, mu,...
@@ -181,8 +182,8 @@ for ibatch = 1:niter
     if ibatch<niter-nBatches %-50
         if rem(ibatch, 5)==1
             % this drops templates
-            [W, U, dWU, mu, nsp, sig, dnext] = ...
-                triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext);
+            [W, U, dWU, mu, nsp, sig, dnext, ndrop] = ...
+                triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext, ndrop);
         end
         Nfilt = size(W,2);
         Params(2) = Nfilt;
@@ -242,8 +243,8 @@ for ibatch = 1:niter
     end
 
     if rem(ibatch, 100)==1
-        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.2f, mu: %2.2f, nst0: %d \n', ...
-            toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0))
+        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.2f, mu: %2.2f, nst0: %d, ndrop %2.2f, %2.2f, %2.2f \n', ...
+            toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0), ndrop)
 
 %        figure(2)
 %        subplot(2,2,1)
