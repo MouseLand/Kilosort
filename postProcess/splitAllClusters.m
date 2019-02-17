@@ -1,4 +1,4 @@
-function [rez, X] = splitAllClusters(rez)
+function [rez, X] = splitAllClusters(rez, flag)
 
 ops = rez.ops;
 wPCA = gather(ops.wPCA);
@@ -21,33 +21,49 @@ ops.nt0min = getOr(ops, 'nt0min', 20);
 iW = squeeze(int32(iW));
 
 isplit = 1:Nfilt;
+dt = 1/1000;
+nccg = 0;
 
 while ik<Nfilt    
     if rem(ik, 100)==1
-       fprintf('Found %d splits, checked %d/%d clusters \n', nsplits, ik, Nfilt) 
+       fprintf('Found %d splits, checked %d/%d clusters, nccg %d \n', nsplits, ik, Nfilt, nccg) 
     end
     ik = ik+1;
     
     isp = find(rez.st3(:,2)==ik);
-    
     nSpikes = numel(isp);
-    
-    if nSpikes<300        
-        continue;
+    if  nSpikes<300
+       continue; 
     end
     
+    ss = rez.st3(isp,1)/ops.fs;
+    
+%     [K, Q1] = ccg(ss, ss, 500, dt);    
+
+%     [K, Qi, Q00, Q01, rir] = ccg(ss, ss, 500, dt);
+%     Q1 = min(Qi/Q00);
+%     R = min(rir);
+    
+%     if Q1<.2 && R<.05
+%         continue;
+%     end
     
     clp0 = rez.cProjPC(isp, :, :);
+    clp0 = gpuArray(clp0(:,:));    
     clp = clp0 - mean(clp0,1);
     
-    clp = gpuArray(clp(:,:));    
+    
     clp = clp - my_conv2(clp, 250, 1);
     
-    [u s v] = svdecon(clp');
+    if flag
+        [u s v] = svdecon(clp');    
+        w = u(:,1);
+    else
+        w = mean(clp0, 1)'; 
+        w = w/sum(w.^2)^.5;
+    end
     
-    w = u(:,1);
-    x = gather(clp * w);
-    
+    x = gather(clp * w);    
     s1 = var(x(x>mean(x)));
     s2 = var(x(x<mean(x)));
     
@@ -94,20 +110,35 @@ while ik<Nfilt
     phigh = mean(rs(~ilow,2));
     nremove = min(mean(ilow), mean(~ilow));
 
+    
+    % did this split fix the autocorrelograms?
+%     [K, Q12] = ccg(ss(ilow), ss(~ilow), 500, dt);  
+    [K, Qi, Q00, Q01, rir] = ccg(ss(ilow), ss(~ilow), 500, dt);
+    Q12 = min(Qi/max(Q00, Q01));
+    R = min(rir);
+    
+    % if the CCG has a dip, don't do the split
+    if Q12<.2 && R<.05
+        nccg = nccg+1;
+        continue;
+    end
+    
+    c1  = wPCA * reshape(mean(clp0(ilow,:),1), 3, []);
+    c2  = wPCA * reshape(mean(clp0(~ilow,:),1), 3, []);
+    cc = corrcoef(c1, c2);
+    n1 =sqrt(sum(c1(:).^2));
+    n2 =sqrt(sum(c2(:).^2));
+    
+    r0 = 2*abs(n1 - n2)/(n1 + n2);
+    
+    
+    if cc(1,2)>.9 && r0<.2
+        continue;
+    end
+    
+    
     % when do I split 
-    if nremove > .05 && plow>ccsplit && phigh>ccsplit
-       c1  = wPCA * reshape(mean(clp0(ilow,:),1), 3, []);
-       c2  = wPCA * reshape(mean(clp0(~ilow,:),1), 3, []);
-       cc = corrcoef(c1, c2);
-       n1 =sqrt(sum(c1(:).^2));
-       n2 =sqrt(sum(c2(:).^2));
-       
-       r0 = 2*abs(n1 - n2)/(n1 + n2);
-       
-       if cc(1,2)>.9 && r0<.2
-           continue;
-       end       
-        
+    if nremove > .05 && min(plow,phigh)>ccsplit && min(sum(ilow), sum(~ilow))>300
        % one cluster stays, one goes
        Nfilt = Nfilt + 1;
        
@@ -135,7 +166,7 @@ while ik<Nfilt
     end    
 end
 
-fprintf('Finished splitting. Found %d splits, checked %d/%d clusters \n', nsplits, ik, Nfilt)
+fprintf('Finished splitting. Found %d splits, checked %d/%d clusters, nccg %d \n', nsplits, ik, Nfilt, nccg)
 
 
 Nfilt = size(rez.W,2);

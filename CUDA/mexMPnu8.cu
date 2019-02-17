@@ -415,7 +415,7 @@ __global__ void average_snips(const double *Params, const int *st,
   tidx 		= threadIdx.x;
   bid 		= blockIdx.x;
   
-  Th = 8.f;
+  Th = 12.f;
   
   // we need wPCA projections in here, and then to decide based on total
   

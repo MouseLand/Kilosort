@@ -6,13 +6,13 @@ ops.chanMap             = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilos
 ops.fs                  = 30000;        
 
 % frequency for high pass filtering (150)
-ops.fshigh              = 300;   
+ops.fshigh              = 150;   
 
 % sorting type for drift correction
 ops.sorting     = 1; % type of sorting, 2 is by rastermap, 1 is old
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
-ops.Th       = [4 4];     
+ops.Th       = [12 6];     
 
 % weighting on the amplitude penalty (like in Kilosort1)
 ops.lam      = 10^2;   

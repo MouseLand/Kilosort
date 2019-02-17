@@ -77,6 +77,7 @@ ich = ich(1:k);
 nc = histcounts(ich, .5 + [0:Nchan]);
 nc = nc/ttime;
 
+% igood = nc>.1;
 igood = nc>.1;
 % chanMap = chanMap(nc>.1);
 fprintf('found %d threshold crossings in %2.2f seconds of data \n', k, ttime)
