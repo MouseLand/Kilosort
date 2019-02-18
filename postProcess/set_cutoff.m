@@ -19,6 +19,10 @@ for j = 1:Nk
     Th = 8;    
     while Th>=4.
         st = ss(vexp>Th);
+        if isempty(st)
+            Th = Th - .5;
+            continue;
+        end
         [K, Qi, Q00, Q01, rir] = ccg(st, st, 500, dt);
         Q = min(Qi/(max(Q00, Q01)));
         R = min(rir);
