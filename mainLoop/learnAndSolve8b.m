@@ -91,6 +91,7 @@ ndrop = zeros(1,3);
 
 m0 = ops.minFR * ops.NT/ops.fs;
 
+%
 for ibatch = 1:niter    
     %     k = irounds(ibatch);
     korder = irounds(ibatch);
@@ -113,10 +114,10 @@ for ibatch = 1:niter
     dat = fread(fid, [NT ops.Nchan], '*int16');
     dataRAW = single(gpuArray(dat))/ ops.scaleproc;
 
-    if ibatch==1    
-%         keyboard;
+    
+    if ibatch==1            
         [dWU, cmap] = mexGetSpikes2(Params, dataRAW, wTEMP, iC-1);
-%         dWU = mexGetSpikesOld(Params, dataRAW, wPCA);
+%         dWU = mexGetSpikes(Params, dataRAW, wPCA);
         dWU = reshape(wPCA * (wPCA' * dWU(:,:)), size(dWU));
         
         W = W0(:,ones(1,size(dWU,3)),:);
@@ -127,7 +128,7 @@ for ibatch = 1:niter
         dnext(1:Nfilt) = 20^2; % changed from 5^2
         Params(2) = Nfilt;
     end
-
+    
     if flag_resort
         [~, iW] = max(abs(dWU(nt0min, :, :)), [], 2);
         iW = int32(squeeze(iW));
@@ -147,6 +148,7 @@ for ibatch = 1:niter
     % this needs to change
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
 
+    
     [st0, id0, x0, featW, dWU, drez, nsp0, featPC, sig, dnext, damp, vexp] = ...
         mexMPnu8(Params, dataRAW, dWU, U, W, mu, iC-1, iW-1, UtU, iList-1, ...
         wPCA, maskU, pm, sig, dnext, damp);
@@ -154,6 +156,7 @@ for ibatch = 1:niter
     damp = damp * p1 + (1-p1) * damp;
     nsp = nsp * p1 + (1-p1) * nsp0;
 
+    
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     if ibatch==niter-nBatches
@@ -191,7 +194,7 @@ for ibatch = 1:niter
         Params(2) = Nfilt;
 
         % this adds templates        
-%         dWU0 = mexGetSpikes(Params, drez, wPCA, iC-1);
+%         dWU0 = mexGetSpikes(Params, drez, wPCA);
         [dWU0,cmap] = mexGetSpikes2(Params, drez, wTEMP, iC-1);
         
         if size(dWU0,3)>0    
@@ -240,6 +243,7 @@ for ibatch = 1:niter
         st3(irange,2) = double(id0+1);
         st3(irange,3) = double(x0);        
         st3(irange,4) = double(vexp);
+        st3(irange,5) = korder;
 
         fW(:, irange) = gather(featW);
 
@@ -250,7 +254,7 @@ for ibatch = 1:niter
 
     if ibatch==niter-nBatches
 
-        st3 = zeros(1e7, 4);
+        st3 = zeros(1e7, 5);
         fW  = zeros(Nnearest, 1e7, 'single');
         fWpc = zeros(NchanNear, Nrank, 1e7, 'single');
     end

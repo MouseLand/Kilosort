@@ -19,88 +19,53 @@ using namespace std;
 
 const int  Nthreads = 1024, maxFR = 5000, NrankMax = 3;
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void  sumChannels(const double *Params, const int *Nsum, const float *data, 
-	float *datasum, const int *iC){
-    
-  int tid, tid0, i, bid, NT, Nchan, NchanNear,k,j,iChan;
-  float  Cf;
-
- 
-  NchanNear = (int) Params[10];  
-  tid 		= threadIdx.x;
-  bid 		= blockIdx.x;
-  NT 		= (int) Params[0];
-  Nchan     = (int) Params[9];
-  
-  tid0 = tid + bid * blockDim.x;
-  while (tid0<NT){
-      for (i=0; i<Nchan;i++){
-          Cf = 0.0f;
-          k = 0;
-          for(j=0; j<Nsum[5]; j++){
-              iChan = iC[j+ NchanNear * i];
-              Cf += data[tid0 + NT * iChan];
-              if (j==Nsum[k]-1){
-                  datasum[tid0 + NT * i + Nchan*NT*k] = Cf;
-                  k = k+1;
-              }
-          }
-      }
-      tid0 += blockDim.x * gridDim.x;
-  }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////
-__global__ void	Conv1D(const double *Params, const float *data, const float *W, float *conv_sig){
-    volatile __shared__ float  sW[81*NrankMax], sdata[(Nthreads+81)*NrankMax];
-    float x, y;
-    int tid, tid0, bid, i, nid, Nrank, NT, nt0, k, Nchan;
+__global__ void	Conv1D(const double *Params, const float *data, const float *W, float *conv_sig){    
+  volatile __shared__ float  sW[81*NrankMax], sdata[(Nthreads+81)*NrankMax]; 
+  float x, y;
+  int tid, tid0, bid, i, nid, Nrank, NT, nt0;
 
   tid 		= threadIdx.x;
   bid 		= blockIdx.x;
   NT      	=   (int) Params[0];
   Nrank     = (int) Params[6];
   nt0       = (int) Params[4];
-  Nchan     = (int) Params[9];
    
   if(tid<nt0*Nrank)
       sW[tid]= W[tid%nt0 + (tid/nt0) * nt0];
   __syncthreads();
   
-  for (k=0;k<6;k++){
-      tid0 = 0;
-      while (tid0<NT-Nthreads-nt0+1){
-          if (tid<nt0*NrankMax)
-              sdata[tid%nt0 + (tid/nt0)*(Nthreads+nt0)] =
-                      data[tid0 + tid%nt0+ NT*bid+ k * NT * Nchan];
-          
-          #pragma unroll 3
-          for(nid=0;nid<Nrank;nid++){
-              sdata[tid + nt0+nid*(Nthreads+nt0)] = data[nt0+tid0 + tid+ NT*bid + k * NT * Nchan];
-          }
-          __syncthreads();
-          
-          x = 0.0f;
-          for(nid=0;nid<Nrank;nid++){
-              y = 0.0f;
-              #pragma unroll 4
-              for(i=0;i<nt0;i++)
-                  y    += sW[i + nid*nt0] * sdata[i+tid + nid*(Nthreads+nt0)];
-              
-              x += y*y;
-          }
-          conv_sig[tid0  + tid + NT*bid + k * NT * Nchan]   = x;
-          
-          tid0+=Nthreads;
-          __syncthreads();
+  tid0 = 0;
+  while (tid0<NT-Nthreads-nt0+1){
+	  if (tid<nt0*NrankMax) 
+          sdata[tid%nt0 + (tid/nt0)*(Nthreads+nt0)] = 
+			data[tid0 + tid%nt0+ NT*bid];
+	  
+      #pragma unroll 3
+      for(nid=0;nid<Nrank;nid++){
+          sdata[tid + nt0+nid*(Nthreads+nt0)] = data[nt0+tid0 + tid+ NT*bid];
+	  }
+	  __syncthreads();
+      
+	  x = 0.0f;
+      for(nid=0;nid<Nrank;nid++){
+          y = 0.0f;
+		  #pragma unroll 4
+          for(i=0;i<nt0;i++)
+              y    += sW[i + nid*nt0] * sdata[i+tid + nid*(Nthreads+nt0)];
+
+           x += y*y;
       }
+      conv_sig[tid0  + tid + NT*bid]   = x;
+      
+      tid0+=Nthreads;
+      __syncthreads();
   }
 }
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void  bestFilter(const double *Params, const int *Nsum, const float *data, 
-	float *err, int *ftype, float *kall){
+__global__ void  bestFilter(const double *Params, const float *data, 
+	float *err, int *ftype){
     
-  int tid, tid0, i, bid, NT, Nchan,k, ibest = 0, kbest;
+  int tid, tid0, i, bid, NT, Nchan, ibest = 0;
   float  Cf, Cbest = 0.0f;
 
   tid 		= threadIdx.x;
@@ -110,20 +75,16 @@ __global__ void  bestFilter(const double *Params, const int *Nsum, const float *
   
   tid0 = tid + bid * blockDim.x;
   while (tid0<NT){
-      kbest = 0;
-      for (k=0;k<6;k++){
-        for (i=0; i<Nchan;i++){          
-              Cf = data[tid0 + NT*i + k*NT*Nchan] / Nsum[k];
-              if (Cf > Cbest + 1e-6){
-                  Cbest 	= Cf;
-                  ibest 	= i;
-                  kbest 	= k;
-              }
+      for (i=0; i<Nchan;i++){
+          Cf = data[tid0 + NT * i];
+          
+          if (Cf > Cbest + 1e-6){
+              Cbest 	= Cf;
+              ibest 	= i;
           }
       }
       err[tid0] 	= Cbest;
       ftype[tid0] 	= ibest;
-      kall[tid0] 	= kbest;
       
       tid0 += blockDim.x * gridDim.x;
   }
@@ -144,8 +105,7 @@ __global__ void	cleanup_spikes(const double *Params, const float *err,
   
   NT      	=   (int) Params[0];
   tid0 		= bid * blockDim.x ;
-  //Th 		= (float) Params[2];
-  Th = 8.0f;
+  Th 		= (float) Params[2];
   
   while(tid0<NT-Nthreads-lockout+1){
       if (tid<2*lockout)
@@ -279,25 +239,20 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemcpy(d_Params,Params,sizeof(double)*mxGetNumberOfElements(prhs[0]),cudaMemcpyHostToDevice);
 
    /* collect input GPU variables*/
-  mxGPUArray const  *W,  *data, *iC, *Nsum;
+  mxGPUArray const  *W,  *data;
   const float     *d_W, *d_data;
-  const int       *d_iC, *d_Nsum;
   
   data       = mxGPUCreateFromMxArray(prhs[1]);
   d_data     = (float const *)(mxGPUGetDataReadOnly(data));
   W             = mxGPUCreateFromMxArray(prhs[2]);
   d_W        	= (float const *)(mxGPUGetDataReadOnly(W));
-  iC       = mxGPUCopyFromMxArray(prhs[3]);
-  d_iC     = (int const *)(mxGPUGetDataReadOnly(iC));  
-  Nsum       = mxGPUCopyFromMxArray(prhs[4]);
-  d_Nsum     = (int const *)(mxGPUGetDataReadOnly(Nsum));
+  
   
   /* allocate new GPU variables*/  
-  float *d_err,*d_x, *d_dout, *d_WU, *d_datasum, *d_kall;
+  float *d_err,*d_x, *d_dout, *d_WU;
   int *d_st, *d_id1, *d_st1, *d_ftype,  *d_id, *d_counter;
 
-  cudaMalloc(&d_dout,   6*NT * Nchan* sizeof(float));
-  cudaMalloc(&d_datasum,6*NT * Nchan* sizeof(float));
+  cudaMalloc(&d_dout,   NT * Nchan* sizeof(float));
   cudaMalloc(&d_err,   NT * sizeof(float));
   cudaMalloc(&d_ftype, NT * sizeof(int));  
   cudaMalloc(&d_st,    maxFR * sizeof(int));
@@ -305,37 +260,31 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMalloc(&d_x,     maxFR * sizeof(float));
   cudaMalloc(&d_st1,    maxFR * sizeof(int));
   cudaMalloc(&d_id1,    maxFR * sizeof(int));
-  cudaMalloc(&d_kall,   NT * sizeof(float));
   
   
   cudaMalloc(&d_counter,   2*sizeof(int));
 
   cudaMemset(d_counter, 0, 2*sizeof(int));
-  cudaMemset(d_dout,    0, 6*NT * Nchan * sizeof(float));
-  cudaMemset(d_datasum, 0, 6*NT * Nchan * sizeof(float));
+  cudaMemset(d_dout,    0, NT * Nchan * sizeof(float));
   cudaMemset(d_err,     0, NT * sizeof(float));
   cudaMemset(d_ftype,   0, NT * sizeof(int));
   cudaMemset(d_st,      0, maxFR *   sizeof(int));
   cudaMemset(d_id,      0, maxFR *   sizeof(int));
   cudaMemset(d_x,       0, maxFR *   sizeof(float));
-  cudaMemset(d_st1,     0, maxFR *   sizeof(int));
-  cudaMemset(d_id1,     0, maxFR *   sizeof(int));
-    cudaMemset(d_kall,     0, NT * sizeof(float));
-    
+  cudaMemset(d_st1,      0, maxFR *   sizeof(int));
+  cudaMemset(d_id1,      0, maxFR *   sizeof(int));
+  
+  
+  
   int *counter;
   counter = (int*) calloc(1,sizeof(int));
   
-  cudaMemcpy(d_datasum, d_data, NT * Nchan * sizeof(float), cudaMemcpyDeviceToDevice);
-  
-  // sum the data with the nearby channels
-  sumChannels<<<NT/Nthreads,Nthreads>>>(d_Params, d_Nsum, d_data, d_datasum, d_iC);
-  
   // filter the data with the temporal templates
-  Conv1D<<<Nchan, Nthreads>>>(d_Params, d_datasum, d_W, d_dout);
+  Conv1D<<<Nchan, Nthreads>>>(d_Params, d_data, d_W, d_dout);
   
   // compute the best filter
-  bestFilter<<<NT/Nthreads,Nthreads>>>(d_Params, d_Nsum, d_dout, d_err, d_ftype, d_kall);
-
+  bestFilter<<<NT/Nthreads,Nthreads>>>(d_Params, d_dout, d_err, d_ftype);
+  
   // ignore peaks that are smaller than another nearby peak
   cleanup_spikes<<<NT/Nthreads,Nthreads>>>(d_Params,
           d_err, d_ftype, d_x, d_st, d_id, d_counter); // NT/Nthreads
@@ -355,22 +304,17 @@ void mexFunction(int nlhs, mxArray *plhs[],
   extract_snips<<<Nchan,tpS>>>(  d_Params, d_st1, d_id1, d_counter, d_data, d_WU);
   
   
-  mxGPUArray *WU1, *kall1;
-  float  *d_WU1, *d_kall1;
+  mxGPUArray *WU1;
+  float  *d_WU1;
   const mwSize dimsu[] 	= {nt0, Nchan, counter[0]};
-  const mwSize dimsv[] = {NT};
   WU1 		= mxGPUCreateGPUArray(3, dimsu, mxSINGLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);  
   d_WU1 		= (float *)(mxGPUGetData(WU1));
-  kall1 		= mxGPUCreateGPUArray(1, dimsv, mxSINGLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);  
-  d_kall1 		= (float *)(mxGPUGetData(kall1));
   
   if (counter[0]>0)
       cudaMemcpy(d_WU1, d_WU, nt0*Nchan*counter[0]*sizeof(float), cudaMemcpyDeviceToDevice);
-        cudaMemcpy(d_kall1, d_kall, NT*sizeof(float), cudaMemcpyDeviceToDevice);
   
   // dWU stays a GPU array
   plhs[0] 	= mxGPUCreateMxArrayOnGPU(WU1);
-  plhs[1] 	= mxGPUCreateMxArrayOnGPU(kall1);
 
   
   cudaFree(d_ftype);
@@ -384,11 +328,9 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaFree(d_Params);
   
   cudaFree(d_dout);
-  cudaFree(d_datasum);
   cudaFree(d_WU);
   
   mxGPUDestroyGPUArray(W);
-  mxGPUDestroyGPUArray(iC);
   mxGPUDestroyGPUArray(data);
   mxGPUDestroyGPUArray(WU1);
 }

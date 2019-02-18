@@ -402,9 +402,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaFree(d_kk);
   cudaFree(d_id1);
   cudaFree(d_counter);
-  cudaFree(d_Params);
-  
-  //cudaFree(d_dout);
+  cudaFree(d_Params); 
   cudaFree(d_dfilt);
   cudaFree(d_WU);
   

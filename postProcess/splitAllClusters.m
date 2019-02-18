@@ -118,7 +118,7 @@ while ik<Nfilt
     R = min(rir);
     
     % if the CCG has a dip, don't do the split
-    if Q12<.2 && R<.05
+    if Q12<.25 && R<.05
         nccg = nccg+1;
         continue;
     end

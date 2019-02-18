@@ -6,7 +6,7 @@ dt = 1/1000;
 Nk = max(rez.st3(:,2));
 
 % sort by firing rate first
-nspk = zeros(Nk, 1);
+rez.good = zeros(Nk, 1);
 for j = 1:Nk
     ix = find(rez.st3(:,2)==j);        
     ss = rez.st3(ix,1)/ops.fs;
@@ -16,16 +16,16 @@ for j = 1:Nk
     
     vexp = rez.st3(ix,4);
     
-    Th = 8;
-    
+    Th = 8;    
     while Th>=4.
         st = ss(vexp>Th);
         [K, Qi, Q00, Q01, rir] = ccg(st, st, 500, dt);
         Q = min(Qi/(max(Q00, Q01)));
         R = min(rir);
-        if Q>.25 || R>.05           
+        if Q>.25 || R>.05                
            break; 
         else
+            rez.good(j) = 1;
             Th = Th - .5;
         end        
     end
@@ -35,7 +35,7 @@ for j = 1:Nk
     rez.st3(ix(vexp<=Th), 2) = 0;
     
     if rem(j,100)==1
-       fprintf('%d \n', j) 
+%        fprintf('%d \n', j) 
     end
 end
 % eliminate spikes with id = 0

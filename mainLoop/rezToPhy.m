@@ -11,6 +11,10 @@ rez.W = gather(rez.Wphy);
 rez.U = gather(rez.U);
 rez.mu = gather(rez.mu);
 
+if size(rez.st3,2)>4
+    rez.st3 = rez.st3(:,1:4);
+end
+
 [~, isort]   = sort(rez.st3(:,1), 'ascend');
 rez.st3      = rez.st3(isort, :);
 rez.cProj    = rez.cProj(isort, :);

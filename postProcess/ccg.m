@@ -54,6 +54,7 @@ Q01 = max(Q01, sum(K(irange3)) / (numel(irange3)*tbin* numel(st1) * numel(st2)/T
 
 % disp(R00)
 
+a = K(nbins+1);
 K(nbins+1) = 0;
 for i = 1:10
     irange = [nbins+1-i:nbins+1+i];
@@ -70,6 +71,6 @@ for i = 1:10
     
 end
 
-
+K(nbins+1) = a;
 Qin = Qi/Q00;
 Qin1 = Qi/Q01;
