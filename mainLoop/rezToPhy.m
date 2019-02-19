@@ -11,6 +11,20 @@ rez.W = gather(rez.Wphy);
 rez.U = gather(rez.U);
 rez.mu = gather(rez.mu);
 
+if size(rez.st3,2)>4
+    rez.st3 = rez.st3(:,1:4);
+end
+
+[~, isort]   = sort(rez.st3(:,1), 'ascend');
+rez.st3      = rez.st3(isort, :);
+rez.cProj    = rez.cProj(isort, :);
+rez.cProjPC  = rez.cProjPC(isort, :, :);
+
+% ix = rez.st3(:,4)>12;
+% rez.st3 = rez.st3(ix, :);
+% rez.cProj = rez.cProj(ix, :);
+% rez.cProjPC = rez.cProjPC(ix, :,:);
+
 fs = dir(fullfile(savePath, '*.npy'));
 for i = 1:length(fs)
    delete(fullfile(savePath, fs(i).name)); 

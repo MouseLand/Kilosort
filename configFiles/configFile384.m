@@ -12,7 +12,7 @@ ops.fshigh              = 150;
 ops.sorting     = 1; % type of sorting, 2 is by rastermap, 1 is old
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 8])
-ops.Th       = [12 12];     
+ops.Th       = [10 4];     
 
 % weighting on the amplitude penalty (like in Kilosort1)
 ops.lam      = 10^2;   
@@ -23,7 +23,7 @@ ops.mergeThreshold = 1/4;
 
 % splitting a cluster at the end requires at least this much isolation 
 % for each sub-cluster (max = 1)
-ops.ccsplit     = 0.97; 
+ops.ccsplit     = 0.9; 
 
 ops.minFR    = 1/50; % minimum spike rate (Hz)
 
@@ -43,9 +43,9 @@ ops.ThPre       = 8; % threshold crossings for pre-clustering (in PCA projection
 
 
 %% danger, changing these settings can lead to fatal errors
-ops.GPU                 = 1; % whether to run this code on an Nvidia GPU (much faster, mexGPUall first)
+ops.GPU                 = 1; % has to be 1, no CPU version yet, sorry
 
-ops.nSkipCov            = 5; % compute whitening matrix from every N-th batch (1)
+ops.nSkipCov            = 25; % compute whitening matrix from every N-th batch (1)
 
 ops.ntbuff              = 64;    % samples of symmetrical buffer for whitening and spike detection
 
