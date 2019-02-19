@@ -34,6 +34,7 @@ for j = 1:Nk
         s2 = rez.st3(rez.st3(:,2)==ix(k), 1)/ops.fs;
         [K, Qi, Q00, Q01, rir] = ccg(s1, s2, 500, dt);
         Q = min(Qi/(max(Q00, Q01)));
+%         Q = min(Qi/Q01);
         R = min(rir);
         
         if flag
