@@ -1,7 +1,7 @@
 % mexGPUall. For these to complete succesfully, you need to configure the
 % Matlab GPU library first (see README files for platform-specific
 % information)
-    mexcuda -largeArrayDims mexGetSpikes.cu
+    mexcuda -largeArrayDims mexGetSpikes2.cu
     mexcuda -largeArrayDims -dynamic mexMPnu8.cu
 
     mexcuda -largeArrayDims mexSVDsmall2.cu
