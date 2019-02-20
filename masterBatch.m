@@ -59,7 +59,16 @@ for j = 1 %1:numel(fdir)
     rez = learnAndSolve8b(rez);
 
     % final splits
-    rez = splitAllClusters(rez);
+    rez = find_merges(rez, 1);
+    
+    % final splits by SVD
+    rez = splitAllClusters(rez, 1);
+    
+    % final splits by amplitudes
+    rez = splitAllClusters(rez, 0);
+    
+    % decide on cutoff
+    rez = set_cutoff(rez);
 
     % this saves to Phy
     rezToPhy(rez, rootZ);

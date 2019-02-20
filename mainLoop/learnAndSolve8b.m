@@ -1,4 +1,4 @@
-function rez = learnAndSolve8b(rez)
+% function rez = learnAndSolve8b(rez)
 
 ops = rez.ops;
 
@@ -52,7 +52,8 @@ niter   = numel(irounds);
 if irounds(niter - nBatches)~=nhalf
     error('mismatch between number of batches');
 end
-%
+%%
+flag_final = 0;
 flag_resort      = 1;
 
 t0 = ceil(rez.ops.trange(1) * ops.fs);
@@ -91,8 +92,8 @@ ndrop = zeros(1,3);
 
 m0 = ops.minFR * ops.NT/ops.fs;
 
-%
-for ibatch = 1:niter    
+%%
+for ibatch = ibatch:niter    
     %     k = irounds(ibatch);
     korder = irounds(ibatch);
     k = isortbatches(korder);
@@ -155,13 +156,16 @@ for ibatch = 1:niter
 
     damp = damp * p1 + (1-p1) * damp;
     nsp = nsp * p1 + (1-p1) * nsp0;
+    
+    
 
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     if ibatch==niter-nBatches
         flag_resort   = 0;
-
+        flag_final = 1;
+        
         % final clean up
         [W, U, dWU, mu, nsp, sig, dnext,damp, ndrop] = ...
             triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext, damp, ndrop);
@@ -252,8 +256,7 @@ for ibatch = 1:niter
         ntot = ntot + numel(x0);
     end
 
-    if ibatch==niter-nBatches
-
+    if ibatch==niter-nBatches        
         st3 = zeros(1e7, 5);
         fW  = zeros(Nnearest, 1e7, 'single');
         fWpc = zeros(NchanNear, Nrank, 1e7, 'single');
@@ -263,6 +266,8 @@ for ibatch = 1:niter
         fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.2f, mu: %2.2f, nst0: %d, drop: %2.2f, %2.2f, %2.2f \n', ...
             toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0), ndrop)
 
+        keyboard;
+        
        figure(2)
        subplot(2,2,1)
        imagesc(W(:,:,1))
