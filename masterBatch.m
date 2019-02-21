@@ -80,6 +80,20 @@ for j = 1 %1:numel(fdir)
     % save final results as rez2
     fname = fullfile(rootZ, 'rez2.mat');
     save(fname, 'rez', '-v7.3');
+    
+    
+    
+    sum(rez.good>0)
+    fileID = fopen(fullfile(rootZ2, 'cluster_group.tsv'),'w');
+    fprintf(fileID, 'cluster_id%sgroup', char(9));
+    fprintf(fileID, char([13 10]));
+    for k = 1:length(rez.good)
+        if rez.good(k)
+            fprintf(fileID, '%d%sgood', k-1, char(9));
+            fprintf(fileID, char([13 10]));
+        end
+    end
+    fclose(fileID);
 
 %     loadManualSorting;
 end
