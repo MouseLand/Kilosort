@@ -20,7 +20,7 @@ inclTemps = uint32(rez.st3(inclSpikes,2));
 amplitudes = rez.st3(inclSpikes,3);
 
 for s = 1:sum(inclSpikes)
-    ibatch = ceil(st(s)/NT); % this determines what batch the spike falls in
+    ibatch = ceil(st(s)/rez.ops.NT); % this determines what batch the spike falls in
     ampi = rez.muA(inclTemps(s), ibatch);
     
     % this is the reconstruction of the temporal part

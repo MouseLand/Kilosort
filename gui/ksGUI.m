@@ -31,6 +31,7 @@ classdef ksGUI < handle
     % - when re-loading old file and whitening matrix already exists, use
     % it rather than re-compute
     % - button to easily match folders to the source
+    % - why doesn't computeWhitening run on initial load?
 
     properties        
         H % struct of handles to useful parts of the gui
@@ -147,7 +148,7 @@ classdef ksGUI < handle
                 'Parent', obj.H.setRunVBox, ...
                 'Title', 'Run', 'FontSize', 18,...
                 'FontName', 'Myriad Pro');
-            obj.H.setRunVBox.Sizes = [-2 -1];
+            obj.H.setRunVBox.Sizes = [-4 -1];
             
             obj.H.probePanel = uiextras.Panel(...
                 'Parent', obj.H.mainSection, ...
@@ -210,11 +211,34 @@ classdef ksGUI < handle
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
                 'String', 'Sampling frequency (Hz)');
                         
-            % choose max number of clusters
-            obj.H.settings.setNfiltTxt = uicontrol(...
+            % choose threshold
+            obj.H.settings.setThTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'Number of templates');
+                'String', 'Threshold');
+            
+            % good channels
+            obj.H.settings.setMinfrTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'Min. firing rate per chan (0=include all chans)');
+            
+            % lambda
+            obj.H.settings.setLambdaTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'Lambda');
+            
+            % ccsplit
+            obj.H.settings.setCcsplitTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'CC Split');
+            
+            obj.H.settings.setTrangeTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'Time range (s)');
             
             % advanced options
             obj.H.settings.setAdvancedTxt = uicontrol(...
@@ -255,13 +279,31 @@ classdef ksGUI < handle
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '30000', 'Callback', @(~,~)obj.updateFileSettings());            
-            obj.H.settings.setNfiltEdt = uicontrol(...
+            obj.H.settings.setThEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
+            obj.H.settings.setMinfrEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
+            obj.H.settings.setLambdaEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
+            obj.H.settings.setCcsplitEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
+            obj.H.settings.setTrangeEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '');
             
+            
+            
             set( obj.H.settingsGrid, ...
-                'ColumnSizes', [-1 -1], 'RowSizes', -1*ones(1,8) );%
+                'ColumnSizes', [-1 -1], 'RowSizes', -1*ones(1,12) );%
             
             obj.H.runVBox = uiextras.VBox(...
                 'Parent', obj.H.runPanel,...
@@ -304,20 +346,21 @@ classdef ksGUI < handle
                 'Callback', @(~,~)obj.runSaveToPhy());
             
             % button for write script
-            obj.H.settings.writeBtn = uicontrol(...
-                'Parent', obj.H.runVBox,...
-                'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
-                'String', 'Write this run to script', ...
-                'Callback', @(~,~)obj.writeScript());
+%             obj.H.settings.writeBtn = uicontrol(...
+%                 'Parent', obj.H.runVBox,...
+%                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
+%                 'String', 'Write this run to script', ...
+%                 'Callback', @(~,~)obj.writeScript());
             
             % button for save defaults
-            obj.H.settings.saveBtn = uicontrol(...
-                'Parent', obj.H.runVBox,...
-                'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
-                'String', 'Save state', ...
-                'Callback', @(~,~)obj.saveGUIsettings());
+%             obj.H.settings.saveBtn = uicontrol(...
+%                 'Parent', obj.H.runVBox,...
+%                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
+%                 'String', 'Save state', ...
+%                 'Callback', @(~,~)obj.saveGUIsettings());
             
-            obj.H.runVBox.Sizes = [-3 -1 -1];
+            %obj.H.runVBox.Sizes = [-3 -1 -1];
+            obj.H.runVBox.Sizes = [-1];
             
             % -- Probe view
             obj.H.probeAx = axes(obj.H.probePanel);
@@ -537,14 +580,18 @@ classdef ksGUI < handle
             if obj.P.probeGood
                 set(obj.H.settings.runBtn, 'enable', 'on');
                 set(obj.H.settings.runPreprocBtn, 'enable', 'on');
-            end            
+            end      
+            
+            obj.refocus(obj.H.settings.ChooseFileTxt);
             
         end
         
         function advancedPopup(obj)
             
             % bring up popup window to set other ops
-            obj.log('setting advanced options not yet implemented.');
+            helpdlg({'To set advanced options, do this in the command window:','',...
+                '>> ks = get(gcf, ''UserData'');',...
+                '>> ks.ops.myOption = myValue;'})
             
         end
         
@@ -585,16 +632,53 @@ classdef ksGUI < handle
             chanMap.ycoords = obj.P.chanMap.ycoords(conn); 
             obj.ops.chanMap = chanMap;
             
-            obj.ops.Nfilt = str2double(obj.H.settings.setNfiltEdt.String);
+            % sanitize options set in the gui
+            
+            %obj.ops.Nfilt = str2double(obj.H.settings.setNfiltEdt.String);
             if isempty(obj.ops.Nfilt)||isnan(obj.ops.Nfilt)
                 obj.ops.Nfilt = numel(obj.ops.chanMap.chanMap)*2.5;
             end
             if mod(obj.ops.Nfilt,32)~=0
                 obj.ops.Nfilt = ceil(obj.ops.Nfilt/32)*32;
             end
-            obj.H.settings.setNfiltEdt.String = num2str(obj.ops.Nfilt);
+            %obj.H.settings.setNfiltEdt.String = num2str(obj.ops.Nfilt);
             
             obj.ops.NchanTOT = str2double(obj.H.settings.setnChanEdt.String);
+            
+            obj.ops.minfr_goodchannels = str2double(obj.H.settings.setMinfrEdt.String);
+            if isempty(obj.ops.minfr_goodchannels)||isnan(obj.ops.minfr_goodchannels)
+                obj.ops.minfr_goodchannels = 0.1;
+            end
+            if obj.ops.minfr_goodchannels==0
+                obj.ops.throw_out_channels = false;
+            else
+                obj.ops.throw_out_channels = true;
+            end
+            obj.H.settings.setMinfrEdt.String = num2str(obj.ops.minfr_goodchannels);
+                        
+            obj.ops.Th = str2num(obj.H.settings.setThEdt.String);
+            if isempty(obj.ops.Th)||any(isnan(obj.ops.Th))
+                obj.ops.Th = [10 4];
+            end
+            obj.H.settings.setThEdt.String = num2str(obj.ops.Th);
+            
+            obj.ops.lam = str2num(obj.H.settings.setLambdaEdt.String);
+            if isempty(obj.ops.lam)||isnan(obj.ops.lam)
+                obj.ops.lam = 100;
+            end
+            obj.H.settings.setLambdaEdt.String = num2str(obj.ops.lam);
+            
+            obj.ops.ccsplit = str2double(obj.H.settings.setCcsplitEdt.String);
+            if isempty(obj.ops.ccsplit)||isnan(obj.ops.ccsplit)
+                obj.ops.ccsplit = 0.9;
+            end
+            obj.H.settings.setCcsplitEdt.String = num2str(obj.ops.ccsplit);
+            
+            obj.ops.trange = str2num(obj.H.settings.setTrangeEdt.String);
+            if isempty(obj.ops.trange)||any(isnan(obj.ops.trange))
+                obj.ops.trange = [0 Inf];
+            end
+            obj.H.settings.setTrangeEdt.String = num2str(obj.ops.trange);
             
         end
         
@@ -608,10 +692,21 @@ classdef ksGUI < handle
                 obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
                 
+                % update connected channels
+                igood = obj.rez.ops.igood;
+                previousGood = find(obj.P.chanMap.connected);
+                newGood = previousGood(igood);
+                obj.P.chanMap.connected = false(size(obj.P.chanMap.connected));
+                obj.P.chanMap.connected(newGood) = true;
+                
                 % use the new whitening matrix, which can sometimes be
                 % quite different than the earlier estimated one
                 rW = obj.rez.Wrot;
-                pW = obj.P.Wrot;
+                if isfield(obj.P, 'Wrot')                    
+                    pW = obj.P.Wrot;                    
+                else
+                    pW = zeros(numel(obj.P.chanMap.connected));
+                end
                 cn = obj.P.chanMap.connected;
                 pW(cn,cn) = rW;
                 obj.P.Wrot = pW;
@@ -623,6 +718,7 @@ classdef ksGUI < handle
                 obj.log('Done preprocessing.'); 
             catch ex
                 obj.log(sprintf('Error preprocessing! %s', ex.message));
+                keyboard
             end
             
         end
@@ -679,6 +775,7 @@ classdef ksGUI < handle
                 obj.updateDataView();
             catch ex
                 obj.log(sprintf('Error running kilosort! %s', ex.message));
+                keyboard
             end   
                         
         end
@@ -1297,7 +1394,10 @@ classdef ksGUI < handle
             saveDat.settings.setProbeEdt.Value = obj.H.settings.setProbeEdt.Value;
             saveDat.settings.setnChanEdt.String = obj.H.settings.setnChanEdt.String;
             saveDat.settings.setFsEdt.String = obj.H.settings.setFsEdt.String;
-            saveDat.settings.setNfiltEdt.String = obj.H.settings.setNfiltEdt.String;
+            saveDat.settings.setThEdt.String = obj.H.settings.setThEdt.String;
+            saveDat.settings.setLambdaEdt.String = obj.H.settings.setLambdaEdt.String;
+            saveDat.settings.setCcsplitEdt.String = obj.H.settings.setCcsplitEdt.String;
+            saveDat.settings.setMinfrEdt.String = obj.H.settings.setMinfrEdt.String;
             
             saveDat.ops = obj.ops;
             saveDat.ops.gui = [];
@@ -1311,7 +1411,7 @@ classdef ksGUI < handle
             savePath = fullfile(p, [fn '_ksSettings.mat']);
             
             save(savePath, 'saveDat', '-v7.3');
-            obj.refocus(obj.H.settings.saveBtn);
+            %obj.refocus(obj.H.settings.saveBtn);
         end
         
         function restoreGUIsettings(obj)
