@@ -329,7 +329,7 @@ rez.cProjPC     = permute(fWpc, [3 2 1]); %zeros(size(st3,1), 3, nNeighPC, 'sing
 % maskPC          = zeros(Nchan, Nfilt, 'single');
 rez.iNeighPC    = gather(iC(:, iW));
 
-
+%%
 nKeep = 20; % how many PCs to keep
 rez.W_a = zeros(nt0 * Nrank, nKeep, Nfilt, 'single');
 rez.W_b = zeros(nBatches, nKeep, Nfilt, 'single');
@@ -339,14 +339,14 @@ for j = 1:Nfilt
     WA = reshape(rez.WA(:, j, :, :), [], nBatches);
     WA = gpuArray(WA);
     [A, B, C] = svdecon(WA);
-    rez.W_a(:,:,j) = gather(reshape(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep), nt0, Nrank, nKeep));
+    rez.W_a(:,:,j) = gather(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep));
     rez.W_b(:,:,j) = gather(C(:, 1:nKeep));
     
     UA = reshape(rez.UA(:, j, :, :), [], nBatches);
     UA = gpuArray(UA);
     [A, B, C] = svdecon(UA);
-    rez.U_a(:,:,j) = gather(reshape(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep), Nchan, Nrank, nKeep));
-    rez.U_b(:,:,:,j) = gather(C(:, 1:nKeep));
+    rez.U_a(:,:,j) = gather(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep));
+    rez.U_b(:,:,j) = gather(C(:, 1:nKeep));
 end
 
 fprintf('Finished compressing time-varying templates \n')
