@@ -20,11 +20,19 @@ inclTemps = uint32(rez.st3(inclSpikes,2));
 amplitudes = rez.st3(inclSpikes,3);
 
 for s = 1:sum(inclSpikes)
+    ibatch = ceil(st(s)/NT);
+    Wi = rez.W_a(:, :, inclTemps(s)) * rez.W_b(ibatch, :, inclTemps(s))';
+    Ui = rez.U_a(:, :, inclTemps(s)) * rez.U_b(ibatch, :, inclTemps(s))';
+    ampi = rez.muA(inclTemps(s), ibatch);
+    
+    Wi = reshape(Wi, rez.ops.nt0, []);
+    Ui = reshape(Ui, rez.ops.Nchan, []);
     
     theseSamps = st(s)+(1:buff)-19-samps(1)+buff*2;
-    predData(:,theseSamps) = predData(:,theseSamps) + ...
-        squeeze(U(:,inclTemps(s),:)) * squeeze(W(:,inclTemps(s),:))' * amplitudes(s);
+    %     predData(:,theseSamps) = predData(:,theseSamps) + ...
+    %         squeeze(U(:,inclTemps(s),:)) * squeeze(W(:,inclTemps(s),:))' * amplitudes(s);
     
+    predData(:,theseSamps) = predData(:,theseSamps) + Ui * Wi' * ampi;
 end
 
 predData = predData(:,buff*2+1:end-buff*2).*rez.ops.scaleproc;
