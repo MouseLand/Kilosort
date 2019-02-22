@@ -58,7 +58,7 @@ classdef ksGUI < handle
             
             % check that required functions are present
             if ~exist('uiextras.HBox')
-                error('ksGUI:init:uix', 'You must have the "uiextras" toolbox to use this GUI. Choose Environment->Get Add-ons and search for "GUI Layout Toolbox" by David Sampson.\n')
+                error('ksGUI:init:uix', 'You must have the "uiextras" toolbox to use this GUI. Choose Home->Add-Ons->Get Add-ons and search for "GUI Layout Toolbox" by David Sampson. You may have to search for the author''s name to find the right one for some reason. If you cannot find it, go here to download: https://www.mathworks.com/matlabcentral/fileexchange/47982-gui-layout-toolbox\n')
             end
             
             % add paths
@@ -655,11 +655,23 @@ classdef ksGUI < handle
                 % main optimization
                 obj.log('Main optimization')
                 obj.rez = learnAndSolve8b(obj.rez);
-
-                % this does splits
-                obj.log('Splits')
-                obj.rez = splitAllClusters(obj.rez);
                 
+                % final splits
+                obj.log('Splits and merges part 1/3...')
+                obj.rez = find_merges(obj.rez, 1);
+                
+                % final splits by SVD
+                obj.log('Splits and merges part 2/3...')
+                obj.rez = splitAllClusters(obj.rez, 1);
+                
+                % final splits by amplitudes
+                obj.log('Splits and merges part 3/3...')
+                obj.rez = splitAllClusters(obj.rez, 0);
+                
+                % decide on cutoff
+                obj.log('Last step...')
+                obj.rez = set_cutoff(obj.rez);
+                                                                
                 obj.P.ksDone = true;
                 
                 obj.log('Kilosort finished!');

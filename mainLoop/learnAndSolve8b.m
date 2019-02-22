@@ -1,4 +1,4 @@
-% function rez = learnAndSolve8b(rez)
+function rez = learnAndSolve8b(rez)
 
 ops = rez.ops;
 
