@@ -339,14 +339,14 @@ for j = 1:Nfilt
     WA = reshape(rez.WA(:, j, :, :), [], nBatches);
     WA = gpuArray(WA);
     [A, B, C] = svdecon(WA);
-    rez.W_a(:,:,j) = reshape(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep), nt0, Nrank, nKeep);
-    rez.W_b(:,:,j) = C(:, 1:nKeep);
+    rez.W_a(:,:,j) = gather(reshape(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep), nt0, Nrank, nKeep));
+    rez.W_b(:,:,j) = gather(C(:, 1:nKeep));
     
     UA = reshape(rez.UA(:, j, :, :), [], nBatches);
     UA = gpuArray(UA);
     [A, B, C] = svdecon(UA);
-    rez.U_a(:,:,j) = reshape(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep), Nchan, Nrank, nKeep);
-    rez.U_b(:,:,:,j) = C(:, 1:nKeep);
+    rez.U_a(:,:,j) = gather(reshape(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep), Nchan, Nrank, nKeep));
+    rez.U_b(:,:,:,j) = gather(C(:, 1:nKeep));
 end
 
 fprintf('Finished compressing time-varying templates \n')
