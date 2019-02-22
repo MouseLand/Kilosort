@@ -10,14 +10,12 @@ classdef ksGUI < handle
     % GUI by N. Steinmetz
     %
     % TODO: (* = before release)
-    % - test that path adding and compilation work on a fresh install
     % - allow better setting of probe site shape/size
     % - auto-load number of channels from meta file when possible
     % - update time plot when scrolling in dataview
     % - show RMS noise level of channels to help selecting ones to drop?
     % - implement builder for new probe channel maps (cm, xc, yc, name,
     % site size)
-    % - *advanced option setting
     % - saving of probe layouts
     % - plotting bug: zoom out on probe view should allow all the way out
     % in x
@@ -28,9 +26,6 @@ classdef ksGUI < handle
     % - find way to run ks in the background so gui is still usable(?)
     % - quick way to set working/output directory when selecting a new file
     % - when selecting a new file, reset everything
-    % - when re-loading old file and whitening matrix already exists, use
-    % it rather than re-compute
-    % - button to easily match folders to the source
     % - why doesn't computeWhitening run on initial load?
 
     properties        
@@ -85,12 +80,12 @@ classdef ksGUI < handle
                     fprintf(1, 'Success!\n');
                     cd(oldDir);
                 catch ex
-                    fprintf(1, 'Compilation failed. Check installation instructions at https://github.com/cortex-lab/Kilosort\n');
+                    fprintf(1, 'Compilation failed. Check installation instructions at https://github.com/MouseLand/Kilosort2\n');
                     rethrow(ex);
                 end
             end
             
-                     
+            obj.P.allChanMaps = loadChanMaps();         
                         
         end
         
@@ -134,7 +129,13 @@ classdef ksGUI < handle
                 'String', 'Help', 'FontSize', 24,...
                 'Callback', @(~,~)obj.help);
             
-            obj.H.titleHBox.Sizes = [-5 -1];
+            obj.H.resetButton = uicontrol(...
+                'Parent', obj.H.titleHBox,...
+                'Style', 'pushbutton', ...
+                'String', 'Reset GUI', 'FontSize', 24,...
+                'Callback', @(~,~)obj.reset);
+            
+            obj.H.titleHBox.Sizes = [-5 -1 -1];
             
             % -- Main section
             obj.H.setRunVBox = uiextras.VBox(...
@@ -260,16 +261,13 @@ classdef ksGUI < handle
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '...', 'Callback', @(~,~)obj.updateFileSettings());
             
-            % TODO: get list of probes
+            probeNames = {obj.P.allChanMaps.name};
+            probeNames{end+1} = '[new]'; 
+            probeNames{end+1} = 'other...'; 
             obj.H.settings.setProbeEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'popupmenu', 'HorizontalAlignment', 'left', ...
-                'String', {...
-                'Neuropixels Phase3A', ...
-                'Neuropixels Phase3B1 (staggered)',...
-                'Neuropixels Phase3B2 (aligned)',...
-                '[new]', ...
-                'other...'}, ...
+                'String', probeNames, ...
                 'Callback', @(~,~)obj.updateProbeView('reset'));
             obj.H.settings.setnChanEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
@@ -449,8 +447,9 @@ classdef ksGUI < handle
                         obj.restoreGUIsettings();
                         obj.updateProbeView('new');
                         obj.updateFileSettings();
-                    catch
+                    catch ex
                         obj.log('Failed to initialize last file.');
+                        keyboard
                     end
                 end
             else
@@ -1087,30 +1086,69 @@ classdef ksGUI < handle
 
                 cm = [];
                 switch selProbe
-                    case 'Neuropixels Phase3A'
-                        cm = load('neuropixPhase3A_kilosortChanMap.mat');
-                    case 'Neuropixels Phase3B1 (staggered)'    
-                        cm = load('neuropixPhase3B1_kilosortChanMap.mat');
-                    case 'Neuropixels Phase3B2 (aligned)'
-                        cm = load('neuropixPhase3B2_kilosortChanMap.mat');
                     case '[new]'
-                        obj.log('New probe creator not yet implemented.');
-                        return;
+                        %obj.log('New probe creator not yet implemented.');
+                        answer = inputdlg({'Name for new channel map:', ...
+                            'X-coordinates of each site (can use matlab expressions):',...
+                            'Y-coordinates of each site:',...
+                            'Shank index (''kcoords'') for each site (blank for single shank):',...
+                            'Channel map (the list of rows in the data file for each site):',...
+                            'List of disconnected/bad site numbers (blank for none):'});
+                        if isempty(answer)
+                            return;
+                        else
+                            cm.name = answer{1};
+                            cm.xcoords = str2num(answer{2});
+                            cm.ycoords = str2num(answer{3});
+                            if ~isempty(answer{4})
+                                cm.kcoords = str2num(answer{4});
+                            end
+                            cm.chanMap = str2num(answer{5});
+                            if ~isempty(answer{6})
+                                q = str2num(answer{6});
+                                if numel(q) == numel(cm.chanMap)
+                                    cm.connected = q;
+                                else
+                                    cm.connected = true(size(cm.chanMap));
+                                    cm.connected(q) = false;
+                                end
+                            end
+                            cm = createValidChanMap(cm);
+                            if ~isempty(cm)
+                                answer = questdlg('Save this channel map for later?');
+                                if strcmp(answer, 'Yes')
+                                    saveNewChanMap(cm, obj);
+                                end
+                            else
+                                obj.log('Channel map invalid. Must have chanMap, xcoords, and ycoords of same length');
+                            end
+                        end
                     case 'other...'
                         [filename, pathname] = uigetfile('*.mat', 'Pick a channel map file.');
 
                         if filename~=0 % 0 when cancel
                             %obj.log('choosing a different channel map not yet implemented.');
-                            cm = load(fullfile(pathname, filename)); 
-                            cm.chanMap = cm.chanMap(:);
-                            cm.xcoords = cm.xcoords(:);
-                            cm.ycoords = cm.ycoords(:);
-                            cm.connected = logical(cm.connected(:));
-                            % ** check for all the right data, get a name for
-                            % it, add to defaults                        
+                            cm = load(fullfile(pathname, filename));
+                            cm = createValidChanMap(cm, filename);
+                            if ~isempty(cm)
+                                obj.P.allChanMaps(end+1) = cm;
+                                currProbeList = obj.H.settings.setProbeEdt.String;
+                                newProbeList = [{cm.name} currProbeList];
+                                obj.H.settings.setProbeEdt.String = newProbeList;
+                                answer = questdlg('Save this channel map for later?');
+                                if strcmp(answer, 'Yes')
+                                    saveNewChanMap(cm, obj);
+                                end
+                            else
+                                obj.log('Channel map invalid. Must have chanMap, xcoords, and ycoords of same length');
+                                return;
+                            end
                         else
                             return;
                         end
+                    otherwise
+                        probeNames = {obj.P.allChanMaps.name};
+                        cm = obj.P.allChanMaps(strcmp(probeNames, selProbe));                        
                 end
                 
                 nSites = numel(cm.chanMap);
@@ -1429,7 +1467,10 @@ classdef ksGUI < handle
                 obj.H.settings.setProbeEdt.Value = saveDat.settings.setProbeEdt.Value;
                 obj.H.settings.setnChanEdt.String = saveDat.settings.setnChanEdt.String;
                 obj.H.settings.setFsEdt.String = saveDat.settings.setFsEdt.String;
-                obj.H.settings.setNfiltEdt.String = saveDat.settings.setNfiltEdt.String;
+                obj.H.settings.setThEdt.String = saveDat.settings.setThEdt.String;
+                obj.H.settings.setLambdaEdt.String = saveDat.settings.setLambdaEdt.String;
+                obj.H.settings.setCcsplitEdt.String = saveDat.settings.setCcsplitEdt.String;
+                obj.H.settings.setMinfrEdt.String = saveDat.settings.setMinfrEdt.String;
                 
                 obj.ops = saveDat.ops;
                 obj.rez = saveDat.rez;
@@ -1462,8 +1503,25 @@ classdef ksGUI < handle
             
         end
         
+        function reset(obj)
+             % full reset: delete userSettings.mat and the settings file
+             % for current file. re-launch. 
+             
+             delete(obj.P.settingsPath);
+                
+             [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);
+             savePath = fullfile(p, [fn '_ksSettings.mat']);
+             delete(savePath);
+             
+             obj.P.skipSave = true;
+             kilosort;
+             
+        end
+        
         function cleanup(obj)
-            obj.saveGUIsettings();
+            if ~isfield(obj.P, 'skipSave')
+                obj.saveGUIsettings();
+            end
             fclose('all');
         end
         
