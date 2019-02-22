@@ -12,8 +12,9 @@ if strcmp(cm.name, 'unknown')
     end
 end
 if ~isempty(newName)
+    newName = genvarname(newName);
     ksRoot = fileparts(fileparts(mfilename('fullpath')));
-    newFn = [answer{1} '_kilosortChanMap.mat'];
+    newFn = [newName '_kilosortChanMap.mat'];
     save(fullfile(ksRoot, 'configFiles', newFn), '-struct', 'cm');
     obj.log(['Saved new channel map: ' fullfile(ksRoot, 'configFiles', newFn)]);
 else

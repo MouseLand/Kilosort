@@ -1115,12 +1115,18 @@ classdef ksGUI < handle
                             end
                             cm = createValidChanMap(cm);
                             if ~isempty(cm)
+                                obj.P.allChanMaps(end+1) = cm;
+                                currProbeList = obj.H.settings.setProbeEdt.String;
+                                newProbeList = [{cm.name} currProbeList];
+                                obj.H.settings.setProbeEdt.String = newProbeList;
+                                
                                 answer = questdlg('Save this channel map for later?');
                                 if strcmp(answer, 'Yes')
                                     saveNewChanMap(cm, obj);
                                 end
                             else
                                 obj.log('Channel map invalid. Must have chanMap, xcoords, and ycoords of same length');
+                                return;
                             end
                         end
                     case 'other...'
@@ -1135,6 +1141,7 @@ classdef ksGUI < handle
                                 currProbeList = obj.H.settings.setProbeEdt.String;
                                 newProbeList = [{cm.name} currProbeList];
                                 obj.H.settings.setProbeEdt.String = newProbeList;
+                                
                                 answer = questdlg('Save this channel map for later?');
                                 if strcmp(answer, 'Yes')
                                     saveNewChanMap(cm, obj);
