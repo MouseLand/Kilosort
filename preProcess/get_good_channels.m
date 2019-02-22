@@ -20,7 +20,7 @@ ibatch = 1;
 ich = gpuArray.zeros(5e4,1, 'int16');
 k = 0;
 ttime = 0;
-while ibatch<=100    
+while ibatch<=Nbatch
     offset = twind + 2*NchanTOT*NT* (ibatch-1);
     fseek(fid, offset, 'bof');
     buff = fread(fid, [NchanTOT NT], '*int16');
@@ -66,9 +66,8 @@ while ibatch<=100
     
     k = k + numel(xj);
     
-    ibatch = ibatch +1;
-    ttime = ttime + size(datr,1)/ops.fs;
-    
+    ibatch = ibatch + ceil(Nbatch/100);
+    ttime = ttime + size(datr,1)/ops.fs;    
 end
 fclose(fid);
 
@@ -78,7 +77,7 @@ nc = histcounts(ich, .5 + [0:Nchan]);
 nc = nc/ttime;
 
 % igood = nc>.1;
-igood = nc>.1;
+igood = nc>getOr(ops, 'minfr_goodchannels', .1);
 % chanMap = chanMap(nc>.1);
 fprintf('found %d threshold crossings in %2.2f seconds of data \n', k, ttime)
 fprintf('found %d bad channels \n', sum(~igood))

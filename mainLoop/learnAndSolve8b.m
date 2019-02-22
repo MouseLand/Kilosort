@@ -92,8 +92,7 @@ ndrop = zeros(1,3);
 
 m0 = ops.minFR * ops.NT/ops.fs;
 
-%%
-for ibatch = ibatch:niter    
+for ibatch = 1:niter    
     %     k = irounds(ibatch);
     korder = irounds(ibatch);
     k = isortbatches(korder);
@@ -227,7 +226,11 @@ for ibatch = ibatch:niter
 
     end
 
-    if ibatch>niter-nBatches
+    if ibatch>niter-nBatches        
+        rez.WA(:,:,:,k) = gather(W);
+        rez.UA(:,:,:,k) = gather(U);
+        rez.muA(:,k) = gather(mu);
+        
         ioffset         = ops.ntbuff;
         if k==1
             ioffset         = 0;
@@ -258,6 +261,10 @@ for ibatch = ibatch:niter
 
     if ibatch==niter-nBatches        
         st3 = zeros(1e7, 5);
+        rez.WA = zeros(nt0, Nfilt, Nrank,nBatches,  'single');
+        rez.UA = zeros(Nchan, Nfilt, Nrank,nBatches,  'single');
+        rez.muA = zeros(Nfilt, nBatches,  'single');
+        
         fW  = zeros(Nnearest, 1e7, 'single');
         fWpc = zeros(NchanNear, Nrank, 1e7, 'single');
     end
@@ -266,7 +273,7 @@ for ibatch = ibatch:niter
         fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.2f, mu: %2.2f, nst0: %d, drop: %2.2f, %2.2f, %2.2f \n', ...
             toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0), ndrop)
 
-        keyboard;
+%         keyboard;
         
        figure(2)
        subplot(2,2,1)
@@ -321,3 +328,29 @@ rez.cProjPC     = permute(fWpc, [3 2 1]); %zeros(size(st3,1), 3, nNeighPC, 'sing
 % [~, iNch]       = sort(abs(rez.U(:,:,1)), 1, 'descend');
 % maskPC          = zeros(Nchan, Nfilt, 'single');
 rez.iNeighPC    = gather(iC(:, iW));
+
+
+nKeep = 20; % how many PCs to keep
+rez.W_a = zeros(nt0 * Nrank, nKeep, Nfilt, 'single');
+rez.W_b = zeros(nBatches, nKeep, Nfilt, 'single');
+rez.U_a = zeros(Nchan* Nrank, nKeep, Nfilt, 'single');
+rez.U_b = zeros(nBatches, nKeep, Nfilt, 'single');
+for j = 1:Nfilt    
+    WA = reshape(rez.WA(:, j, :, :), [], nBatches);
+    WA = gpuArray(WA);
+    [A, B, C] = svdecon(WA);
+    rez.W_a(:,:,j) = reshape(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep), nt0, Nrank, nKeep);
+    rez.W_b(:,:,j) = C(:, 1:nKeep);
+    
+    UA = reshape(rez.UA(:, j, :, :), [], nBatches);
+    UA = gpuArray(UA);
+    [A, B, C] = svdecon(UA);
+    rez.U_a(:,:,j) = reshape(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep), Nchan, Nrank, nKeep);
+    rez.U_b(:,:,:,j) = C(:, 1:nKeep);
+end
+
+fprintf('Finished compressing time-varying templates \n')
+%%
+
+
+
