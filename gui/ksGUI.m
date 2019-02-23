@@ -456,11 +456,9 @@ classdef ksGUI < handle
                 obj.log('Select a data file (upper left) to begin.');
             end
             
-            obj.updateProbeView('new');
+%             obj.updateProbeView('new');
             
-            if obj.P.probeGood && obj.P.dataGood
-                obj.computeWhitening();
-            end
+            
             
         end
         
@@ -530,9 +528,41 @@ classdef ksGUI < handle
                 obj.H.settings.ChooseOutputEdt.String = pathname;
             end
             
+            nChan = obj.checkNChan();                    
+                
+            if ~isempty(nChan)
+                % if all that looks good, make the plot
+            
+                obj.P.dataGood = true;
+                obj.P.datMMfile = [];
+                if nChan>=64
+                    obj.P.colormapMode = true;
+                    obj.P.nChanToPlotCM = nChan;
+                end
+                obj.updateDataView()
+
+                lastFile = obj.H.settings.ChooseFileEdt.String;
+                save(obj.P.settingsPath, 'lastFile');
+
+                if obj.P.probeGood
+                    set(obj.H.settings.runBtn, 'enable', 'on');
+                    set(obj.H.settings.runPreprocBtn, 'enable', 'on');
+                end      
+            end
+            obj.refocus(obj.H.settings.ChooseFileTxt);
+            
+        end
+        
+        function nChan = checkNChan(obj)
+            origNChan = 0;
             % if nChan is set, see whether it makes any sense
             if ~isempty(obj.H.settings.setnChanEdt.String)
                 nChan = str2num(obj.H.settings.setnChanEdt.String);
+                origNChan = nChan;
+                if isfield(obj.P, 'chanMap') && sum(obj.P.chanMap.connected)>nChan
+                    nChan = numel(obj.P.chanMap.chanMap); % need more channels
+                end
+                    
             elseif isfield(obj.P, 'chanMap')  
                 % initial guess that nChan is the number of channels in the channel
                 % map
@@ -541,52 +571,46 @@ classdef ksGUI < handle
                 nChan = 32; % don't have any other guess
             end
             
-            d = dir(obj.H.settings.ChooseFileEdt.String);
-            b = d.bytes;
-            
-            a = cast(0, 'int16'); % hard-coded for now, int16
-            q = whos('a');
-            bytesPerSamp = q.bytes;
-            
-            if ~(mod(b,bytesPerSamp)==0 && mod(b/bytesPerSamp,nChan)==0)
-                % try figuring out number of channels, since the previous
-                % guess didn't work
-                testNC = ceil(nChan*0.9):floor(nChan*1.1);
-                possibleVals = testNC(mod(b/bytesPerSamp, testNC)==0);
-                if ~isempty(possibleVals)
-                    if ~isempty(find(possibleVals>nChan,1))
-                        nChan = possibleVals(find(possibleVals>nChan,1));
+            if ~isempty(obj.H.settings.ChooseFileEdt.String) && ...
+                    ~strcmp(obj.H.settings.ChooseFileEdt.String, '...')
+                d = dir(obj.H.settings.ChooseFileEdt.String);
+                b = d.bytes;
+
+                a = cast(0, 'int16'); % hard-coded for now, int16
+                q = whos('a');
+                bytesPerSamp = q.bytes;
+
+                if ~(mod(b,bytesPerSamp)==0 && mod(b/bytesPerSamp,nChan)==0)
+                    % try figuring out number of channels, since the previous
+                    % guess didn't work
+                    testNC = ceil(nChan*0.9):floor(nChan*1.1);
+                    possibleVals = testNC(mod(b/bytesPerSamp, testNC)==0);
+                    if ~isempty(possibleVals)
+                        if ~isempty(find(possibleVals>nChan,1))
+                            nChan = possibleVals(find(possibleVals>nChan,1));
+                        else
+                            nChan = possibleVals(end);
+                        end
+                        obj.log(sprintf('Guessing that number of channels is %d. If it doesn''t look right, consider trying: %s', nChan, num2str(possibleVals)));
                     else
-                        nChan = possibleVals(end);
+                        obj.log('Cannot work out a guess for number of channels in the file. Please enter number of channels to proceed.');
+                        nChan = [];
+                        return;
                     end
-                    obj.log(sprintf('Guessing that number of channels is %d. If it doesn''t look right, consider trying: %s', nChan, num2str(possibleVals)));
-                else
-                    obj.log('Cannot work out a guess for number of channels in the file. Please enter number of channels to proceed.');
-                    return;
+                end
+                obj.H.settings.setnChanEdt.String = num2str(nChan);
+                obj.P.nSamp = b/bytesPerSamp/nChan;
+                
+                
+            end
+            
+            if nChan~=origNChan
+                obj.P.datMMfile = [];
+                if nChan>=64
+                    obj.P.colormapMode = true;
+                    obj.P.nChanToPlotCM = nChan;
                 end
             end
-            obj.H.settings.setnChanEdt.String = num2str(nChan);                    
-                
-            % if all that looks good, make the plot
-            obj.P.nSamp = b/bytesPerSamp/nChan;
-            obj.P.dataGood = true;
-            obj.P.datMMfile = [];
-            if nChan>=64
-                obj.P.colormapMode = true;
-                obj.P.nChanToPlotCM = nChan;
-            end
-            obj.updateDataView()
-            
-            lastFile = obj.H.settings.ChooseFileEdt.String;
-            save(obj.P.settingsPath, 'lastFile');
-            
-            if obj.P.probeGood
-                set(obj.H.settings.runBtn, 'enable', 'on');
-                set(obj.H.settings.runPreprocBtn, 'enable', 'on');
-            end      
-            
-            obj.refocus(obj.H.settings.ChooseFileTxt);
-            
         end
         
         function advancedPopup(obj)
@@ -778,7 +802,6 @@ classdef ksGUI < handle
                 obj.updateDataView();
             catch ex
                 obj.log(sprintf('Error running kilosort! %s', ex.message));
-                keyboard
             end   
                         
         end
@@ -1160,8 +1183,7 @@ classdef ksGUI < handle
                     otherwise
                         probeNames = {obj.P.allChanMaps.name};
                         cm = obj.P.allChanMaps(strcmp(probeNames, selProbe));
-                end
-                obj.updateFileSettings();
+                end               
                 
                 nSites = numel(cm.chanMap);
                 ux = unique(cm.xcoords); uy = unique(cm.ycoords);
@@ -1172,17 +1194,20 @@ classdef ksGUI < handle
                     ss = min(diff(uy));
                 end
                 cm.siteSize = ss;
-                
-                % TODO validate channel map
-                
+                               
                 if isfield(obj.H, 'probeSites')&&~isempty(obj.H.probeSites)
                     delete(obj.H.probeSites);
                     obj.H.probeSites = [];
                 end
+                
                 obj.P.chanMap = cm;
                 obj.P.probeGood = true;
                 
+                nChan = checkNChan(obj);
+                
                 if obj.P.dataGood
+                    obj.computeWhitening()
+
                     set(obj.H.settings.runBtn, 'enable', 'on');
                     set(obj.H.settings.runPreprocBtn, 'enable', 'on');
                 end
@@ -1249,6 +1274,7 @@ classdef ksGUI < handle
                             set(obj.H.probeSites(q), 'FaceColor', [0 0 1]);
                         end
                     end
+                    
                 end
             end
         end
