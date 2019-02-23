@@ -11,6 +11,8 @@ Nrank = 3;
 wPCA = gpuArray(wPCA(:, 1:Nrank));
 wTEMP = gpuArray(wTEMP);
 
+wPCAd = double(wPCA);
+
 ops.wPCA = gather(wPCA);
 ops.wTEMP = gather(wTEMP);
 rez.ops = ops;
@@ -52,7 +54,7 @@ niter   = numel(irounds);
 if irounds(niter - nBatches)~=nhalf
     error('mismatch between number of batches');
 end
-%%
+%
 flag_final = 0;
 flag_resort      = 1;
 
@@ -64,18 +66,18 @@ ThSi = ops.ThS(1);
 
 pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter-nBatches));
 
-Nsum = 7;
+Nsum = 7; % how many channels to extend out the waveform in mexgetspikes
 Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
-    Nrank ops.lam pmi(1) Nchan NchanNear ThSi(1) 1 Nsum NrankPC]);
+    Nrank ops.lam pmi(1) Nchan NchanNear ThSi(1) 1 Nsum NrankPC ops.Th(1)]);
 
-W0 = permute(wPCA, [1 3 2]);
+W0 = permute(double(wPCA), [1 3 2]);
 
 iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
 
-nsp = gpuArray.zeros(0,1, 'single');
-sig = gpuArray.zeros(0,1, 'single');
-dnext = gpuArray.zeros(0,1, 'single');
-damp = gpuArray.zeros(0,100, 'single');
+nsp = gpuArray.zeros(0,1, 'double');
+sig = gpuArray.zeros(0,1, 'double');
+dnext = gpuArray.zeros(0,1, 'double');
+damp = gpuArray.zeros(0,100, 'double');
 
 Params(13) = 0;
 
@@ -92,7 +94,8 @@ ndrop = zeros(1,3);
 
 m0 = ops.minFR * ops.NT/ops.fs;
 
-for ibatch = 1:niter    
+for ibatch = 1:niter
+    
     %     k = irounds(ibatch);
     korder = irounds(ibatch);
     k = isortbatches(korder);
@@ -104,7 +107,7 @@ for ibatch = 1:niter
 
     if ibatch<=niter-nBatches
         Params(9) = pmi(ibatch);
-        pm = pmi(ibatch) * gpuArray.ones(1, Nfilt, 'single');
+        pm = pmi(ibatch) * gpuArray.ones(1, Nfilt, 'double');
     end
 
     % dat load \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -116,9 +119,11 @@ for ibatch = 1:niter
 
     
     if ibatch==1            
-        [dWU, cmap] = mexGetSpikes2(Params, dataRAW, wTEMP, iC-1);
+        [dWU, cmap] = mexGetSpikes2(Params, dataRAW, wTEMP, iC-1);        
 %         dWU = mexGetSpikes(Params, dataRAW, wPCA);
-        dWU = reshape(wPCA * (wPCA' * dWU(:,:)), size(dWU));
+        dWU = double(dWU);
+        dWU = reshape(wPCAd * (wPCAd' * dWU(:,:)), size(dWU));
+        
         
         W = W0(:,ones(1,size(dWU,3)),:);
         Nfilt = size(W,2);
@@ -143,24 +148,23 @@ for ibatch = 1:niter
     end
 
     % decompose dWU by svd of time and space (61 by 61)
-    [W, U, mu] = mexSVDsmall2(Params, dWU, W, iC-1, iW-1, Ka, Kb);
-
+    [W, U, mu] = mexSVDsmall2(Params, dWU, W, iC-1, iW-1, double(Ka), double(Kb));
+  
     % this needs to change
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
-
-    
+   
     [st0, id0, x0, featW, dWU, drez, nsp0, featPC, sig, dnext, damp, vexp] = ...
-        mexMPnu8(Params, dataRAW, dWU, U, W, mu, iC-1, iW-1, UtU, iList-1, ...
+        mexMPnu8(Params, dataRAW, dWU, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
         wPCA, maskU, pm, sig, dnext, damp);
-
-    damp = damp * p1 + (1-p1) * damp;
-    nsp = nsp * p1 + (1-p1) * nsp0;
-    
-    
-
+  
+    if ibatch>51
+%         fprintf('%d, %d, %2.8f, %2.8f, %2.8f, %2.8f \n', ibatch, numel(st0), mean(dWU(:)), mean(W(:)), mean(U(:)), mean(mu(:)))
+    end
+    damp = damp * p1;
+    nsp = nsp * p1 + (1-p1) * double(nsp0);
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-
+    
     if ibatch==niter-nBatches
         flag_resort   = 0;
         flag_final = 1;
@@ -172,7 +176,7 @@ for ibatch = 1:niter
         Nfilt = size(W,2);
         Params(2) = Nfilt;
 
-        [WtW, iList] = getMeWtW(W, U, Nnearest);
+        [WtW, iList] = getMeWtW(single(W), single(U), Nnearest);
 
         [~, iW] = max(abs(dWU(nt0min, :, :)), [], 2);
         iW = int32(squeeze(iW));
@@ -201,7 +205,8 @@ for ibatch = 1:niter
         [dWU0,cmap] = mexGetSpikes2(Params, drez, wTEMP, iC-1);
         
         if size(dWU0,3)>0    
-            dWU0 = reshape(wPCA * (wPCA' * dWU0(:,:)), size(dWU0));
+            dWU0 = double(dWU0);
+            dWU0 = reshape(wPCAd * (wPCAd' * dWU0(:,:)), size(dWU0));            
             dWU = cat(3, dWU, dWU0);
 
             W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:);
@@ -270,7 +275,7 @@ for ibatch = 1:niter
     end
 
     if rem(ibatch, 100)==1
-        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.2f, mu: %2.2f, nst0: %d, drop: %2.2f, %2.2f, %2.2f \n', ...
+        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, nst0: %d, drop: %2.4f, %2.4f, %2.4f \n', ...
             toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0), ndrop)
 
 %         keyboard;
@@ -299,6 +304,7 @@ end
 fclose(fid);
 
 toc
+
 
 st3 = st3(1:ntot, :);
 fW = fW(:, 1:ntot);
@@ -330,7 +336,7 @@ rez.cProjPC     = permute(fWpc, [3 2 1]); %zeros(size(st3,1), 3, nNeighPC, 'sing
 % maskPC          = zeros(Nchan, Nfilt, 'single');
 rez.iNeighPC    = gather(iC(:, iW));
 
-%%
+
 nKeep = 20; % how many PCs to keep
 rez.W_a = zeros(nt0 * Nrank, nKeep, Nfilt, 'single');
 rez.W_b = zeros(nBatches, nKeep, Nfilt, 'single');

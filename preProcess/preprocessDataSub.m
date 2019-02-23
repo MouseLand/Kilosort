@@ -15,7 +15,7 @@ ops.twind = ops.tstart * NchanTOT*2;
 Nbatch      = ceil(ops.sampsToRead /(NT-ops.ntbuff));
 ops.Nbatch = Nbatch;
 
-if getOr(ops, 'throw_out_channels', 1)
+if getOr(ops, 'minfr_goodchannels', .1)>0
     [chanMap, xc, yc, kcoords, NchanTOTdefault] = loadChanMap(ops.chanMap);
 end
 ops.NchanTOT = getOr(ops, 'NchanTOT', NchanTOTdefault);

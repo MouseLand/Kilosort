@@ -16,8 +16,8 @@ for j = 1:Nk
     
     vexp = rez.st3(ix,4);
     
-    Th = 8;    
-    while Th>=4.
+    Th = ops.Th(1);    
+    while Th>=ops.Th(2)
         st = ss(vexp>Th);
         if isempty(st)
             Th = Th - .5;

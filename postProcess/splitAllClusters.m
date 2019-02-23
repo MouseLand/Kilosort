@@ -179,7 +179,7 @@ Params     = double([0 Nfilt 0 0 size(rez.W,1) Nnearest ...
 [Ka, Kb] = getKernels(ops, 10, 1);
 [rez.W, rez.U, rez.mu] = mexSVDsmall2(Params, rez.dWU, rez.W, iC-1, iW-1, Ka, Kb);
 
-[WtW, iList] = getMeWtW(rez.W, rez.U, Nnearest);
+[WtW, iList] = getMeWtW(single(rez.W), single(rez.U), Nnearest);
 rez.iList = iList;
 
 isplit = rez.simScore==1;

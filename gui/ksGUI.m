@@ -449,7 +449,7 @@ classdef ksGUI < handle
                         obj.updateFileSettings();
                     catch ex
                         obj.log('Failed to initialize last file.');
-                        keyboard
+%                         keyboard
                     end
                 end
             else
@@ -779,21 +779,23 @@ classdef ksGUI < handle
                 obj.log('Main optimization')
                 obj.rez = learnAndSolve8b(obj.rez);
                 
-                % final splits
-                obj.log('Splits and merges part 1/3...')
-                obj.rez = find_merges(obj.rez, 1);
-                
-                % final splits by SVD
-                obj.log('Splits and merges part 2/3...')
-                obj.rez = splitAllClusters(obj.rez, 1);
-                
-                % final splits by amplitudes
-                obj.log('Splits and merges part 3/3...')
-                obj.rez = splitAllClusters(obj.rez, 0);
-                
-                % decide on cutoff
-                obj.log('Last step...')
-                obj.rez = set_cutoff(obj.rez);
+                % final splits and merges
+                if 1
+                    obj.log('Merges...')
+                    obj.rez = find_merges(obj.rez, 1);
+                    
+                    % final splits by SVD
+                    obj.log('Splits part 1/2...')
+                    obj.rez = splitAllClusters(obj.rez, 1);
+                    
+                    % final splits by amplitudes
+                    obj.log('Splits part 2/2...')
+                    obj.rez = splitAllClusters(obj.rez, 0);
+                    
+                    % decide on cutoff
+                    obj.log('Last step. Setting cutoff...')
+                    obj.rez = set_cutoff(obj.rez);
+                end
                                                                 
                 obj.P.ksDone = true;
                 

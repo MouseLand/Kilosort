@@ -8,7 +8,10 @@ for j = 1:size(CC,1)
     
     [E, D]      = svd(CC(ilocal, ilocal));
     D           = diag(D);
-    eps         = 1e-6;
-    wrot0       = E * diag(1./(D + eps).^.5) * E';
+%     eps 	= mean(D); %1e-6;
+    eps 	= 1e-6;
+    f  = mean((D+eps) ./ (D+1e-6)).^.5;
+%     fprintf('%2.2f ', f)
+    wrot0       = E * diag(f./(D + eps).^.5) * E';
     Wrot(ilocal, j)  = wrot0(:,1);
 end

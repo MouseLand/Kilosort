@@ -84,7 +84,10 @@ if ops.whiteningRange<Inf
 else
     [E, D] 	= svd(CC);
     D       = diag(D);
+%     eps 	= mean(D); %1e-6;
     eps 	= 1e-6;
-    Wrot 	= E * diag(1./(D + eps).^.5) * E';
+    f  = mean((D+eps) ./ (D+1e-6));
+%     fprintf('%2.2f ', f)
+    Wrot 	= E * diag(f./(D + eps).^.5) * E';
 end
 Wrot    = ops.scaleproc * Wrot;

@@ -188,7 +188,7 @@ __global__ void	timeFilterUpdate(const double *Params, const float *data, const 
 }
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void  bestFilter(const double *Params, const float *data, 
-	const float *mu, const float *sig, float *err, float *eloss, int *ftype){
+	const float *mu, const double *sig, float *err, float *eloss, int *ftype){
   int tid, tid0, i, bid, NT, Nfilt, ibest = 0, nt0;
   float  Cf, Cbest, lam, b, a, Cnextbest;
 
@@ -230,7 +230,7 @@ __global__ void  bestFilter(const double *Params, const float *data,
 // THIS UPDATE DOES NOT UPDATE ELOSS?
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void  bestFilterUpdate(const double *Params, const float *data, 
-	const float *mu, const float *sig, float *err, float *eloss, int *ftype, const int *st, const int *id, const int *counter){
+	const float *mu, const double *sig, float *err, float *eloss, int *ftype, const int *st, const int *id, const int *counter){
   int tid,  ind, i,t, NT, Nfilt, ibest = 0, nt0;
   float  Cf, Cbest, lam, b, a, Cnextbest;
 
@@ -271,7 +271,7 @@ __global__ void  bestFilterUpdate(const double *Params, const float *data,
 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	cleanup_spikes(const double *Params, const float *data, 
-        const float *mu, const float *sig, const float *err, const float *eloss, const int *ftype, int *st, 
+        const float *mu, const double *sig, const float *err, const float *eloss, const int *ftype, int *st, 
         int *id, float *x, float *y,  float *z, int *counter){
     
   int lockout, indx, tid, bid, NT, tid0,  j, id0, t0;
@@ -463,9 +463,9 @@ __global__ void computeSpikeGoodness(const double *Params, const int *counter, c
 __global__ void average_snips(const double *Params, const int *st, 
         const unsigned int *idx, const int *id, 
         const float *x, const float *y,  const int *counter, const float *dataraw, 
-        const float *W, const float *U, float *WU, float *nsp, 
-        const float *p, float *sig, const float *mu,
-        const float *z, float *dnextbest, float *damp){
+        const float *W, const float *U, double *WU, float *nsp, 
+        const double *p, double *sig, const float *mu,
+        const float *z, double *dnextbest, double *damp){
     
   int nt0, tidx, tidy, bid, ind, NT, Nchan,k, Nrank, Nfilt;
   int currInd, ibin;  
@@ -480,7 +480,8 @@ __global__ void average_snips(const double *Params, const int *st,
   tidx 		= threadIdx.x;
   bid 		= blockIdx.x;
   
-  Th = 12.f;
+  //Th = 10.f;
+  Th 		= (float) Params[15];
   
   // we need wPCA projections in here, and then to decide based on total
   
@@ -504,7 +505,7 @@ __global__ void average_snips(const double *Params, const int *st,
                   //calculation of d, sig, and dnextbest moved out of while
                   //loop over channel, which repeats the sum NT/16 times
                   d = mu[bid] - y[currInd];
-                  if ((int) Params[14] != 2)
+                  if ((int) Params[12] != 2)
                       sig[bid] = sig[bid] * p[bid] + (1-p[bid]) * d*d;
                   dnextbest[bid] = dnextbest[bid] * p[bid] + (1-p[bid]) * z[currInd];
               }
@@ -519,7 +520,7 @@ __global__ void average_snips(const double *Params, const int *st,
                   xsum = dataraw[st[currInd]+tidx + NT * tidy] + y[currInd] * X;
                   
                   WU[tidx+tidy*nt0 + nt0*Nchan * bid] *= p[bid];
-                  WU[tidx+tidy*nt0 + nt0*Nchan * bid] +=(1-p[bid]) * xsum;
+                  WU[tidx+tidy*nt0 + nt0*Nchan * bid] +=(1-p[bid]) * ((double) xsum);
                   
                   tidy+=blockDim.y;
                   
@@ -657,11 +658,13 @@ void mexFunction(int nlhs, mxArray *plhs[],
    /* collect input GPU variables*/
   mxGPUArray const  *W, *iList,  *U, *iC, *iW, *mu, *UtU, *wPCA, *p, *mask;
   mxGPUArray *dWU, *draw, *nsp, *sig, *nextbest, *damp;
-  const float  *d_p,   *d_W, *d_U,  *d_mu, *d_mask, *d_wPCA;
+  const float   *d_W, *d_U,  *d_mu, *d_mask, *d_wPCA;
   const int *d_iList, *d_iC, *d_iW;
-  float *d_draw, *d_dWU, *d_nsp, *d_sig;
+  float *d_draw, *d_nsp;
+  double *d_dWU, *d_sig, *d_nextbest, *d_damp;
+  const double *d_p;
   const bool *d_UtU;
-  float *d_spkscore, *d_err, *d_x, *d_y, *d_z, *d_dout, *d_feat,*d_nextbest, *d_damp, *d_data,  *d_featPC, *d_eloss;
+  float *d_spkscore, *d_err, *d_x, *d_y, *d_z, *d_dout, *d_feat, *d_data,  *d_featPC, *d_eloss;
   int *d_st,  *d_ftype,  *d_id, *d_counter, *d_count;
 
   
@@ -682,7 +685,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   wPCA             = mxGPUCreateFromMxArray(prhs[10]);
   d_wPCA        	= (float const *)(mxGPUGetDataReadOnly(wPCA));
   p              = mxGPUCreateFromMxArray(prhs[12]);
-  d_p        	= (float const *)(mxGPUGetDataReadOnly(p));
+  d_p        	= (double const *)(mxGPUGetDataReadOnly(p));
   mask             = mxGPUCreateFromMxArray(prhs[11]);
   d_mask        	= (float const *)(mxGPUGetDataReadOnly(mask));
   
@@ -690,13 +693,13 @@ void mexFunction(int nlhs, mxArray *plhs[],
   draw       = mxGPUCopyFromMxArray(prhs[1]);
   d_draw     = (float *)(mxGPUGetData(draw));
   dWU       = mxGPUCopyFromMxArray(prhs[2]);
-  d_dWU     = (float *)(mxGPUGetData(dWU));
+  d_dWU     = (double *)(mxGPUGetData(dWU));
   sig              = mxGPUCopyFromMxArray(prhs[13]);
-  d_sig        	= (float *)(mxGPUGetData(sig));
+  d_sig        	= (double *)(mxGPUGetData(sig));
   nextbest              = mxGPUCopyFromMxArray(prhs[14]);
-  d_nextbest        	= (float *)(mxGPUGetData(nextbest));
+  d_nextbest        	= (double *)(mxGPUGetData(nextbest));
   damp              = mxGPUCopyFromMxArray(prhs[15]);
-  d_damp        	= (float *)(mxGPUGetData(damp));
+  d_damp        	= (double *)(mxGPUGetData(damp));
   
   const mwSize dimsNsp[] 	= {Nfilt,1};
   nsp 		= mxGPUCreateGPUArray(2, dimsNsp, mxSINGLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);

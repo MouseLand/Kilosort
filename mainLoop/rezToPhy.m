@@ -7,9 +7,9 @@ function [spikeTimes, clusterIDs, amplitudes, templates, templateFeatures, ...
 % available (https://github.com/kwikteam/npy-matlab)
 %
 % spikeTimes will be in samples, not seconds
-rez.W = gather(rez.Wphy);
-rez.U = gather(rez.U);
-rez.mu = gather(rez.mu);
+rez.W = gather(single(rez.Wphy));
+rez.U = gather(single(rez.U));
+rez.mu = gather(single(rez.mu));
 
 if size(rez.st3,2)>4
     rez.st3 = rez.st3(:,1:4);

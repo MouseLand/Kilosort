@@ -20,8 +20,8 @@ using namespace std;
 const int  Nthreads = 1024,  NrankMax = 3, nt0max = 61, NchanMax = 512, tmax = 19;
 
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void blankdWU(const double *Params, const float *dWU,  
-        const int *iC, const int *iW, float *dWUblank){
+__global__ void blankdWU(const double *Params, const double *dWU,  
+        const int *iC, const int *iW, double *dWUblank){
     
   int nt0, tidx, tidy, bid, Nchan, NchanNear, iChan;
   
@@ -43,10 +43,10 @@ __global__ void blankdWU(const double *Params, const float *dWU,
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void getwtw(const double *Params, const float *dWU, float *wtw){
+__global__ void getwtw(const double *Params, const double *dWU, double *wtw){
     
   int nt0, tidx, tidy, bid, Nchan,k;
-  float x; 
+  double x; 
   
   nt0       = (int) Params[4];
   Nchan     = (int) Params[9];
@@ -67,10 +67,10 @@ __global__ void getwtw(const double *Params, const float *dWU, float *wtw){
   }
 }
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void getU(const double *Params, const float *dWU, float *W, float *U){
+__global__ void getU(const double *Params, const double *dWU, double *W, double *U){
     
   int Nfilt, nt0, tidx, tidy, bid, Nchan,k;
-  float x; 
+  double x; 
   
   
   nt0       = (int) Params[4];
@@ -91,11 +91,11 @@ __global__ void getU(const double *Params, const float *dWU, float *W, float *U)
   }
 }
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void getW(const double *Params, float *wtw, float *W){
+__global__ void getW(const double *Params, double *wtw, double *W){
     
   int Nfilt, nt0, tid, bid, i, t, Nrank,k;
-  float x, x0, xmax; 
-  volatile __shared__ float sW[nt0max*NrankMax], swtw[nt0max*nt0max], xN[1];
+  double x, x0, xmax; 
+  volatile __shared__ double sW[nt0max*NrankMax], swtw[nt0max*nt0max], xN[1];
   
   nt0       = (int) Params[4];
    Nrank       = (int) Params[6];
@@ -155,13 +155,13 @@ __global__ void getW(const double *Params, float *wtw, float *W){
 
 }
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void reNormalize(const double *Params, const float *A, const float *B, 
-        float *W, float *U, float *mu){
+__global__ void reNormalize(const double *Params, const double *A, const double *B, 
+        double *W, double *U, double *mu){
     
     int Nfilt, nt0, tid, bid, Nchan,k, Nrank, imax, t, ishift;
-    float x, xmax, xshift, sgnmax;
+    double x, xmax, xshift, sgnmax;
     
-    volatile __shared__ float sW[NrankMax*nt0max], sU[NchanMax*NrankMax], sS[NrankMax+1], 
+    volatile __shared__ double sW[NrankMax*nt0max], sU[NchanMax*NrankMax], sS[NrankMax+1], 
             sWup[nt0max*10];
     
     nt0       = (int) Params[4];
@@ -297,41 +297,41 @@ void mexFunction(int nlhs, mxArray *plhs[],
    /* collect input GPU variables*/
   mxGPUArray const *dWU, *iW, *iC, *A, *B;
   mxGPUArray  *W, *U, *mu;
-  const float *d_dWU,*d_A, *d_B;
-  float *d_W, *d_U, *d_mu;
+  const double *d_dWU,*d_A, *d_B;
+  double *d_W, *d_U, *d_mu;
   const int *d_iW, *d_iC;
 
   dWU       = mxGPUCreateFromMxArray(prhs[1]);
-  d_dWU     = (float const *)(mxGPUGetDataReadOnly(dWU));
+  d_dWU     = (double const *)(mxGPUGetDataReadOnly(dWU));
   iC       = mxGPUCopyFromMxArray(prhs[3]);
   d_iC     = (int const *)(mxGPUGetDataReadOnly(iC));  
   iW       = mxGPUCopyFromMxArray(prhs[4]);
   d_iW     = (int const *)(mxGPUGetDataReadOnly(iW));
   
   A       = mxGPUCreateFromMxArray(prhs[5]);
-  d_A     = (float const *)(mxGPUGetDataReadOnly(A));
+  d_A     = (double const *)(mxGPUGetDataReadOnly(A));
   B       = mxGPUCreateFromMxArray(prhs[6]);
-  d_B     = (float const *)(mxGPUGetDataReadOnly(B));  
+  d_B     = (double const *)(mxGPUGetDataReadOnly(B));  
   
   const mwSize dimsU[] 	= {Nchan,Nfilt, Nrank}, dimsMu[] 	= {Nfilt, 1}; 
-  U  = mxGPUCreateGPUArray(3,  dimsU, mxSINGLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
-  mu = mxGPUCreateGPUArray(1, dimsMu, mxSINGLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+  U  = mxGPUCreateGPUArray(3,  dimsU, mxDOUBLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+  mu = mxGPUCreateGPUArray(1, dimsMu, mxDOUBLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
   
   
    // W,U,mu are not a constant , so the data has to be "copied" over
   W       = mxGPUCopyFromMxArray(prhs[2]);
-  d_W     = (float *)(mxGPUGetData(W));
+  d_W     = (double *)(mxGPUGetData(W));
 //   U       = mxGPUCopyFromMxArray(prhs[3]);
-  d_U     = (float *)(mxGPUGetData(U));
+  d_U     = (double *)(mxGPUGetData(U));
 //   mu       = mxGPUCopyFromMxArray(prhs[4]);
-  d_mu     = (float *)(mxGPUGetData(mu));
+  d_mu     = (double *)(mxGPUGetData(mu));
   
   
-  float *d_wtw, *d_dWUb;
-  cudaMalloc(&d_wtw,   nt0*nt0 * Nfilt* sizeof(float));
-  cudaMemset(d_wtw,    0, nt0*nt0 * Nfilt* sizeof(float));
-  cudaMalloc(&d_dWUb,   nt0*Nchan * Nfilt* sizeof(float));
-  cudaMemset(d_dWUb,    0, nt0*Nchan * Nfilt* sizeof(float));
+  double *d_wtw, *d_dWUb;
+  cudaMalloc(&d_wtw,   nt0*nt0 * Nfilt* sizeof(double));
+  cudaMemset(d_wtw,    0, nt0*nt0 * Nfilt* sizeof(double));
+  cudaMalloc(&d_dWUb,   nt0*Nchan * Nfilt* sizeof(double));
+  cudaMemset(d_dWUb,    0, nt0*Nchan * Nfilt* sizeof(double));
   
   dim3 tpS(nt0, Nthreads/nt0), tpK(Nrank, Nthreads/Nrank);
   
