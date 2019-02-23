@@ -503,10 +503,14 @@ classdef ksGUI < handle
         function updateFileSettings(obj)
             
             % check whether there's a data file and exists
-            if ~exist(obj.H.settings.ChooseFileEdt.String, 'file')
+            if strcmp(obj.H.settings.ChooseFileEdt.String, '...')
+                return;
+            end
+            if ~exist(obj.H.settings.ChooseFileEdt.String, 'file')                     
                 obj.log('Data file does not exist.');
                 return;
             end
+            
             
             % check file extension
             [~,~,ext] = fileparts(obj.H.settings.ChooseFileEdt.String);
@@ -1131,7 +1135,7 @@ classdef ksGUI < handle
                         end
                     case 'other...'
                         [filename, pathname] = uigetfile('*.mat', 'Pick a channel map file.');
-
+                        
                         if filename~=0 % 0 when cancel
                             %obj.log('choosing a different channel map not yet implemented.');
                             cm = load(fullfile(pathname, filename));
@@ -1155,8 +1159,9 @@ classdef ksGUI < handle
                         end
                     otherwise
                         probeNames = {obj.P.allChanMaps.name};
-                        cm = obj.P.allChanMaps(strcmp(probeNames, selProbe));                        
+                        cm = obj.P.allChanMaps(strcmp(probeNames, selProbe));
                 end
+                obj.updateFileSettings();
                 
                 nSites = numel(cm.chanMap);
                 ux = unique(cm.xcoords); uy = unique(cm.ycoords);
@@ -1452,10 +1457,12 @@ classdef ksGUI < handle
             saveDat.rez.ops.gui = [];
             saveDat.P = obj.P;
             
-            [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);            
-            savePath = fullfile(p, [fn '_ksSettings.mat']);
+            if ~strcmp(obj.H.settings.ChooseFileEdt.String, '...')
+                [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);            
+                savePath = fullfile(p, [fn '_ksSettings.mat']);
+                save(savePath, 'saveDat', '-v7.3');
+            end            
             
-            save(savePath, 'saveDat', '-v7.3');
             %obj.refocus(obj.H.settings.saveBtn);
         end
         
@@ -1514,11 +1521,15 @@ classdef ksGUI < handle
              % full reset: delete userSettings.mat and the settings file
              % for current file. re-launch. 
              
-             delete(obj.P.settingsPath);
+             if exist(obj.P.settingsPath)
+                delete(obj.P.settingsPath);
+             end
                 
              [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);
              savePath = fullfile(p, [fn '_ksSettings.mat']);
-             delete(savePath);
+             if exist(savePath)
+                delete(savePath);
+             end
              
              obj.P.skipSave = true;
              kilosort;
