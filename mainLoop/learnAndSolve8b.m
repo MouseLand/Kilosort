@@ -312,6 +312,7 @@ ntot
 % st3 = st3(isort, :);
 
 rez.st3 = st3;
+rez.st2 = st3;
 
 rez.simScore = gather(max(WtW, [], 3));
 
