@@ -10,14 +10,12 @@ classdef ksGUI < handle
     % GUI by N. Steinmetz
     %
     % TODO: (* = before release)
-    % - test that path adding and compilation work on a fresh install
     % - allow better setting of probe site shape/size
     % - auto-load number of channels from meta file when possible
     % - update time plot when scrolling in dataview
     % - show RMS noise level of channels to help selecting ones to drop?
     % - implement builder for new probe channel maps (cm, xc, yc, name,
     % site size)
-    % - *advanced option setting
     % - saving of probe layouts
     % - plotting bug: zoom out on probe view should allow all the way out
     % in x
@@ -28,9 +26,7 @@ classdef ksGUI < handle
     % - find way to run ks in the background so gui is still usable(?)
     % - quick way to set working/output directory when selecting a new file
     % - when selecting a new file, reset everything
-    % - when re-loading old file and whitening matrix already exists, use
-    % it rather than re-compute
-    % - button to easily match folders to the source
+    % - why doesn't computeWhitening run on initial load?
 
     properties        
         H % struct of handles to useful parts of the gui
@@ -84,12 +80,12 @@ classdef ksGUI < handle
                     fprintf(1, 'Success!\n');
                     cd(oldDir);
                 catch ex
-                    fprintf(1, 'Compilation failed. Check installation instructions at https://github.com/cortex-lab/Kilosort\n');
+                    fprintf(1, 'Compilation failed. Check installation instructions at https://github.com/MouseLand/Kilosort2\n');
                     rethrow(ex);
                 end
             end
             
-                     
+            obj.P.allChanMaps = loadChanMaps();         
                         
         end
         
@@ -133,7 +129,13 @@ classdef ksGUI < handle
                 'String', 'Help', 'FontSize', 24,...
                 'Callback', @(~,~)obj.help);
             
-            obj.H.titleHBox.Sizes = [-5 -1];
+            obj.H.resetButton = uicontrol(...
+                'Parent', obj.H.titleHBox,...
+                'Style', 'pushbutton', ...
+                'String', 'Reset GUI', 'FontSize', 24,...
+                'Callback', @(~,~)obj.reset);
+            
+            obj.H.titleHBox.Sizes = [-5 -1 -1];
             
             % -- Main section
             obj.H.setRunVBox = uiextras.VBox(...
@@ -147,7 +149,7 @@ classdef ksGUI < handle
                 'Parent', obj.H.setRunVBox, ...
                 'Title', 'Run', 'FontSize', 18,...
                 'FontName', 'Myriad Pro');
-            obj.H.setRunVBox.Sizes = [-2 -1];
+            obj.H.setRunVBox.Sizes = [-4 -1];
             
             obj.H.probePanel = uiextras.Panel(...
                 'Parent', obj.H.mainSection, ...
@@ -210,11 +212,34 @@ classdef ksGUI < handle
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
                 'String', 'Sampling frequency (Hz)');
                         
-            % choose max number of clusters
-            obj.H.settings.setNfiltTxt = uicontrol(...
+            % choose threshold
+            obj.H.settings.setThTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'Number of templates');
+                'String', 'Threshold');
+            
+            % good channels
+            obj.H.settings.setMinfrTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'Min. firing rate per chan (0=include all chans)');
+            
+            % lambda
+            obj.H.settings.setLambdaTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'Lambda');
+            
+            % ccsplit
+            obj.H.settings.setCcsplitTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'CC Split');
+            
+            obj.H.settings.setTrangeTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'Time range (s)');
             
             % advanced options
             obj.H.settings.setAdvancedTxt = uicontrol(...
@@ -236,16 +261,13 @@ classdef ksGUI < handle
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '...', 'Callback', @(~,~)obj.updateFileSettings());
             
-            % TODO: get list of probes
+            probeNames = {obj.P.allChanMaps.name};
+            probeNames{end+1} = '[new]'; 
+            probeNames{end+1} = 'other...'; 
             obj.H.settings.setProbeEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'popupmenu', 'HorizontalAlignment', 'left', ...
-                'String', {...
-                'Neuropixels Phase3A', ...
-                'Neuropixels Phase3B1 (staggered)',...
-                'Neuropixels Phase3B2 (aligned)',...
-                '[new]', ...
-                'other...'}, ...
+                'String', probeNames, ...
                 'Callback', @(~,~)obj.updateProbeView('reset'));
             obj.H.settings.setnChanEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
@@ -255,13 +277,31 @@ classdef ksGUI < handle
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '30000', 'Callback', @(~,~)obj.updateFileSettings());            
-            obj.H.settings.setNfiltEdt = uicontrol(...
+            obj.H.settings.setThEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
+            obj.H.settings.setMinfrEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
+            obj.H.settings.setLambdaEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
+            obj.H.settings.setCcsplitEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
+            obj.H.settings.setTrangeEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '');
             
+            
+            
             set( obj.H.settingsGrid, ...
-                'ColumnSizes', [-1 -1], 'RowSizes', -1*ones(1,8) );%
+                'ColumnSizes', [-1 -1], 'RowSizes', -1*ones(1,12) );%
             
             obj.H.runVBox = uiextras.VBox(...
                 'Parent', obj.H.runPanel,...
@@ -304,20 +344,21 @@ classdef ksGUI < handle
                 'Callback', @(~,~)obj.runSaveToPhy());
             
             % button for write script
-            obj.H.settings.writeBtn = uicontrol(...
-                'Parent', obj.H.runVBox,...
-                'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
-                'String', 'Write this run to script', ...
-                'Callback', @(~,~)obj.writeScript());
+%             obj.H.settings.writeBtn = uicontrol(...
+%                 'Parent', obj.H.runVBox,...
+%                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
+%                 'String', 'Write this run to script', ...
+%                 'Callback', @(~,~)obj.writeScript());
             
             % button for save defaults
-            obj.H.settings.saveBtn = uicontrol(...
-                'Parent', obj.H.runVBox,...
-                'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
-                'String', 'Save state', ...
-                'Callback', @(~,~)obj.saveGUIsettings());
+%             obj.H.settings.saveBtn = uicontrol(...
+%                 'Parent', obj.H.runVBox,...
+%                 'Style', 'pushbutton', 'HorizontalAlignment', 'left', ...
+%                 'String', 'Save state', ...
+%                 'Callback', @(~,~)obj.saveGUIsettings());
             
-            obj.H.runVBox.Sizes = [-3 -1 -1];
+            %obj.H.runVBox.Sizes = [-3 -1 -1];
+            obj.H.runVBox.Sizes = [-1];
             
             % -- Probe view
             obj.H.probeAx = axes(obj.H.probePanel);
@@ -406,19 +447,18 @@ classdef ksGUI < handle
                         obj.restoreGUIsettings();
                         obj.updateProbeView('new');
                         obj.updateFileSettings();
-                    catch
+                    catch ex
                         obj.log('Failed to initialize last file.');
+                        keyboard
                     end
                 end
             else
                 obj.log('Select a data file (upper left) to begin.');
             end
             
-            obj.updateProbeView('new');
+%             obj.updateProbeView('new');
             
-            if obj.P.probeGood && obj.P.dataGood
-                obj.computeWhitening();
-            end
+            
             
         end
         
@@ -461,10 +501,14 @@ classdef ksGUI < handle
         function updateFileSettings(obj)
             
             % check whether there's a data file and exists
-            if ~exist(obj.H.settings.ChooseFileEdt.String, 'file')
+            if strcmp(obj.H.settings.ChooseFileEdt.String, '...')
+                return;
+            end
+            if ~exist(obj.H.settings.ChooseFileEdt.String, 'file')                     
                 obj.log('Data file does not exist.');
                 return;
             end
+            
             
             % check file extension
             [~,~,ext] = fileparts(obj.H.settings.ChooseFileEdt.String);
@@ -484,9 +528,41 @@ classdef ksGUI < handle
                 obj.H.settings.ChooseOutputEdt.String = pathname;
             end
             
+            nChan = obj.checkNChan();                    
+                
+            if ~isempty(nChan)
+                % if all that looks good, make the plot
+            
+                obj.P.dataGood = true;
+                obj.P.datMMfile = [];
+                if nChan>=64
+                    obj.P.colormapMode = true;
+                    obj.P.nChanToPlotCM = nChan;
+                end
+                obj.updateDataView()
+
+                lastFile = obj.H.settings.ChooseFileEdt.String;
+                save(obj.P.settingsPath, 'lastFile');
+
+                if obj.P.probeGood
+                    set(obj.H.settings.runBtn, 'enable', 'on');
+                    set(obj.H.settings.runPreprocBtn, 'enable', 'on');
+                end      
+            end
+            obj.refocus(obj.H.settings.ChooseFileTxt);
+            
+        end
+        
+        function nChan = checkNChan(obj)
+            origNChan = 0;
             % if nChan is set, see whether it makes any sense
             if ~isempty(obj.H.settings.setnChanEdt.String)
                 nChan = str2num(obj.H.settings.setnChanEdt.String);
+                origNChan = nChan;
+                if isfield(obj.P, 'chanMap') && sum(obj.P.chanMap.connected)>nChan
+                    nChan = numel(obj.P.chanMap.chanMap); % need more channels
+                end
+                    
             elseif isfield(obj.P, 'chanMap')  
                 % initial guess that nChan is the number of channels in the channel
                 % map
@@ -495,56 +571,54 @@ classdef ksGUI < handle
                 nChan = 32; % don't have any other guess
             end
             
-            d = dir(obj.H.settings.ChooseFileEdt.String);
-            b = d.bytes;
-            
-            a = cast(0, 'int16'); % hard-coded for now, int16
-            q = whos('a');
-            bytesPerSamp = q.bytes;
-            
-            if ~(mod(b,bytesPerSamp)==0 && mod(b/bytesPerSamp,nChan)==0)
-                % try figuring out number of channels, since the previous
-                % guess didn't work
-                testNC = ceil(nChan*0.9):floor(nChan*1.1);
-                possibleVals = testNC(mod(b/bytesPerSamp, testNC)==0);
-                if ~isempty(possibleVals)
-                    if ~isempty(find(possibleVals>nChan,1))
-                        nChan = possibleVals(find(possibleVals>nChan,1));
+            if ~isempty(obj.H.settings.ChooseFileEdt.String) && ...
+                    ~strcmp(obj.H.settings.ChooseFileEdt.String, '...')
+                d = dir(obj.H.settings.ChooseFileEdt.String);
+                b = d.bytes;
+
+                a = cast(0, 'int16'); % hard-coded for now, int16
+                q = whos('a');
+                bytesPerSamp = q.bytes;
+
+                if ~(mod(b,bytesPerSamp)==0 && mod(b/bytesPerSamp,nChan)==0)
+                    % try figuring out number of channels, since the previous
+                    % guess didn't work
+                    testNC = ceil(nChan*0.9):floor(nChan*1.1);
+                    possibleVals = testNC(mod(b/bytesPerSamp, testNC)==0);
+                    if ~isempty(possibleVals)
+                        if ~isempty(find(possibleVals>nChan,1))
+                            nChan = possibleVals(find(possibleVals>nChan,1));
+                        else
+                            nChan = possibleVals(end);
+                        end
+                        obj.log(sprintf('Guessing that number of channels is %d. If it doesn''t look right, consider trying: %s', nChan, num2str(possibleVals)));
                     else
-                        nChan = possibleVals(end);
+                        obj.log('Cannot work out a guess for number of channels in the file. Please enter number of channels to proceed.');
+                        nChan = [];
+                        return;
                     end
-                    obj.log(sprintf('Guessing that number of channels is %d. If it doesn''t look right, consider trying: %s', nChan, num2str(possibleVals)));
-                else
-                    obj.log('Cannot work out a guess for number of channels in the file. Please enter number of channels to proceed.');
-                    return;
+                end
+                obj.H.settings.setnChanEdt.String = num2str(nChan);
+                obj.P.nSamp = b/bytesPerSamp/nChan;
+                
+                
+            end
+            
+            if nChan~=origNChan
+                obj.P.datMMfile = [];
+                if nChan>=64
+                    obj.P.colormapMode = true;
+                    obj.P.nChanToPlotCM = nChan;
                 end
             end
-            obj.H.settings.setnChanEdt.String = num2str(nChan);                    
-                
-            % if all that looks good, make the plot
-            obj.P.nSamp = b/bytesPerSamp/nChan;
-            obj.P.dataGood = true;
-            obj.P.datMMfile = [];
-            if nChan>=64
-                obj.P.colormapMode = true;
-                obj.P.nChanToPlotCM = nChan;
-            end
-            obj.updateDataView()
-            
-            lastFile = obj.H.settings.ChooseFileEdt.String;
-            save(obj.P.settingsPath, 'lastFile');
-            
-            if obj.P.probeGood
-                set(obj.H.settings.runBtn, 'enable', 'on');
-                set(obj.H.settings.runPreprocBtn, 'enable', 'on');
-            end            
-            
         end
         
         function advancedPopup(obj)
             
             % bring up popup window to set other ops
-            obj.log('setting advanced options not yet implemented.');
+            helpdlg({'To set advanced options, do this in the command window:','',...
+                '>> ks = get(gcf, ''UserData'');',...
+                '>> ks.ops.myOption = myValue;'})
             
         end
         
@@ -585,16 +659,53 @@ classdef ksGUI < handle
             chanMap.ycoords = obj.P.chanMap.ycoords(conn); 
             obj.ops.chanMap = chanMap;
             
-            obj.ops.Nfilt = str2double(obj.H.settings.setNfiltEdt.String);
+            % sanitize options set in the gui
+            
+            %obj.ops.Nfilt = str2double(obj.H.settings.setNfiltEdt.String);
             if isempty(obj.ops.Nfilt)||isnan(obj.ops.Nfilt)
                 obj.ops.Nfilt = numel(obj.ops.chanMap.chanMap)*2.5;
             end
             if mod(obj.ops.Nfilt,32)~=0
                 obj.ops.Nfilt = ceil(obj.ops.Nfilt/32)*32;
             end
-            obj.H.settings.setNfiltEdt.String = num2str(obj.ops.Nfilt);
+            %obj.H.settings.setNfiltEdt.String = num2str(obj.ops.Nfilt);
             
             obj.ops.NchanTOT = str2double(obj.H.settings.setnChanEdt.String);
+            
+            obj.ops.minfr_goodchannels = str2double(obj.H.settings.setMinfrEdt.String);
+            if isempty(obj.ops.minfr_goodchannels)||isnan(obj.ops.minfr_goodchannels)
+                obj.ops.minfr_goodchannels = 0.1;
+            end
+            if obj.ops.minfr_goodchannels==0
+                obj.ops.throw_out_channels = false;
+            else
+                obj.ops.throw_out_channels = true;
+            end
+            obj.H.settings.setMinfrEdt.String = num2str(obj.ops.minfr_goodchannels);
+                        
+            obj.ops.Th = str2num(obj.H.settings.setThEdt.String);
+            if isempty(obj.ops.Th)||any(isnan(obj.ops.Th))
+                obj.ops.Th = [10 4];
+            end
+            obj.H.settings.setThEdt.String = num2str(obj.ops.Th);
+            
+            obj.ops.lam = str2num(obj.H.settings.setLambdaEdt.String);
+            if isempty(obj.ops.lam)||isnan(obj.ops.lam)
+                obj.ops.lam = 100;
+            end
+            obj.H.settings.setLambdaEdt.String = num2str(obj.ops.lam);
+            
+            obj.ops.ccsplit = str2double(obj.H.settings.setCcsplitEdt.String);
+            if isempty(obj.ops.ccsplit)||isnan(obj.ops.ccsplit)
+                obj.ops.ccsplit = 0.9;
+            end
+            obj.H.settings.setCcsplitEdt.String = num2str(obj.ops.ccsplit);
+            
+            obj.ops.trange = str2num(obj.H.settings.setTrangeEdt.String);
+            if isempty(obj.ops.trange)||any(isnan(obj.ops.trange))
+                obj.ops.trange = [0 Inf];
+            end
+            obj.H.settings.setTrangeEdt.String = num2str(obj.ops.trange);
             
         end
         
@@ -608,10 +719,21 @@ classdef ksGUI < handle
                 obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
                 
+                % update connected channels
+                igood = obj.rez.ops.igood;
+                previousGood = find(obj.P.chanMap.connected);
+                newGood = previousGood(igood);
+                obj.P.chanMap.connected = false(size(obj.P.chanMap.connected));
+                obj.P.chanMap.connected(newGood) = true;
+                
                 % use the new whitening matrix, which can sometimes be
                 % quite different than the earlier estimated one
                 rW = obj.rez.Wrot;
-                pW = obj.P.Wrot;
+                if isfield(obj.P, 'Wrot')                    
+                    pW = obj.P.Wrot;                    
+                else
+                    pW = zeros(numel(obj.P.chanMap.connected));
+                end
                 cn = obj.P.chanMap.connected;
                 pW(cn,cn) = rW;
                 obj.P.Wrot = pW;
@@ -623,6 +745,7 @@ classdef ksGUI < handle
                 obj.log('Done preprocessing.'); 
             catch ex
                 obj.log(sprintf('Error preprocessing! %s', ex.message));
+                keyboard
             end
             
         end
@@ -990,31 +1113,77 @@ classdef ksGUI < handle
 
                 cm = [];
                 switch selProbe
-                    case 'Neuropixels Phase3A'
-                        cm = load('neuropixPhase3A_kilosortChanMap.mat');
-                    case 'Neuropixels Phase3B1 (staggered)'    
-                        cm = load('neuropixPhase3B1_kilosortChanMap.mat');
-                    case 'Neuropixels Phase3B2 (aligned)'
-                        cm = load('neuropixPhase3B2_kilosortChanMap.mat');
                     case '[new]'
-                        obj.log('New probe creator not yet implemented.');
-                        return;
+                        %obj.log('New probe creator not yet implemented.');
+                        answer = inputdlg({'Name for new channel map:', ...
+                            'X-coordinates of each site (can use matlab expressions):',...
+                            'Y-coordinates of each site:',...
+                            'Shank index (''kcoords'') for each site (blank for single shank):',...
+                            'Channel map (the list of rows in the data file for each site):',...
+                            'List of disconnected/bad site numbers (blank for none):'});
+                        if isempty(answer)
+                            return;
+                        else
+                            cm.name = answer{1};
+                            cm.xcoords = str2num(answer{2});
+                            cm.ycoords = str2num(answer{3});
+                            if ~isempty(answer{4})
+                                cm.kcoords = str2num(answer{4});
+                            end
+                            cm.chanMap = str2num(answer{5});
+                            if ~isempty(answer{6})
+                                q = str2num(answer{6});
+                                if numel(q) == numel(cm.chanMap)
+                                    cm.connected = q;
+                                else
+                                    cm.connected = true(size(cm.chanMap));
+                                    cm.connected(q) = false;
+                                end
+                            end
+                            cm = createValidChanMap(cm);
+                            if ~isempty(cm)
+                                obj.P.allChanMaps(end+1) = cm;
+                                currProbeList = obj.H.settings.setProbeEdt.String;
+                                newProbeList = [{cm.name} currProbeList];
+                                obj.H.settings.setProbeEdt.String = newProbeList;
+                                
+                                answer = questdlg('Save this channel map for later?');
+                                if strcmp(answer, 'Yes')
+                                    saveNewChanMap(cm, obj);
+                                end
+                            else
+                                obj.log('Channel map invalid. Must have chanMap, xcoords, and ycoords of same length');
+                                return;
+                            end
+                        end
                     case 'other...'
                         [filename, pathname] = uigetfile('*.mat', 'Pick a channel map file.');
-
+                        
                         if filename~=0 % 0 when cancel
                             %obj.log('choosing a different channel map not yet implemented.');
-                            cm = load(fullfile(pathname, filename)); 
-                            cm.chanMap = cm.chanMap(:);
-                            cm.xcoords = cm.xcoords(:);
-                            cm.ycoords = cm.ycoords(:);
-                            cm.connected = logical(cm.connected(:));
-                            % ** check for all the right data, get a name for
-                            % it, add to defaults                        
+                            cm = load(fullfile(pathname, filename));
+                            cm = createValidChanMap(cm, filename);
+                            if ~isempty(cm)
+                                obj.P.allChanMaps(end+1) = cm;
+                                currProbeList = obj.H.settings.setProbeEdt.String;
+                                newProbeList = [{cm.name} currProbeList];
+                                obj.H.settings.setProbeEdt.String = newProbeList;
+                                
+                                answer = questdlg('Save this channel map for later?');
+                                if strcmp(answer, 'Yes')
+                                    saveNewChanMap(cm, obj);
+                                end
+                            else
+                                obj.log('Channel map invalid. Must have chanMap, xcoords, and ycoords of same length');
+                                return;
+                            end
                         else
                             return;
                         end
-                end
+                    otherwise
+                        probeNames = {obj.P.allChanMaps.name};
+                        cm = obj.P.allChanMaps(strcmp(probeNames, selProbe));
+                end               
                 
                 nSites = numel(cm.chanMap);
                 ux = unique(cm.xcoords); uy = unique(cm.ycoords);
@@ -1025,17 +1194,20 @@ classdef ksGUI < handle
                     ss = min(diff(uy));
                 end
                 cm.siteSize = ss;
-                
-                % TODO validate channel map
-                
+                               
                 if isfield(obj.H, 'probeSites')&&~isempty(obj.H.probeSites)
                     delete(obj.H.probeSites);
                     obj.H.probeSites = [];
                 end
+                
                 obj.P.chanMap = cm;
                 obj.P.probeGood = true;
                 
+                nChan = checkNChan(obj);
+                
                 if obj.P.dataGood
+                    obj.computeWhitening()
+
                     set(obj.H.settings.runBtn, 'enable', 'on');
                     set(obj.H.settings.runPreprocBtn, 'enable', 'on');
                 end
@@ -1102,6 +1274,7 @@ classdef ksGUI < handle
                             set(obj.H.probeSites(q), 'FaceColor', [0 0 1]);
                         end
                     end
+                    
                 end
             end
         end
@@ -1297,7 +1470,10 @@ classdef ksGUI < handle
             saveDat.settings.setProbeEdt.Value = obj.H.settings.setProbeEdt.Value;
             saveDat.settings.setnChanEdt.String = obj.H.settings.setnChanEdt.String;
             saveDat.settings.setFsEdt.String = obj.H.settings.setFsEdt.String;
-            saveDat.settings.setNfiltEdt.String = obj.H.settings.setNfiltEdt.String;
+            saveDat.settings.setThEdt.String = obj.H.settings.setThEdt.String;
+            saveDat.settings.setLambdaEdt.String = obj.H.settings.setLambdaEdt.String;
+            saveDat.settings.setCcsplitEdt.String = obj.H.settings.setCcsplitEdt.String;
+            saveDat.settings.setMinfrEdt.String = obj.H.settings.setMinfrEdt.String;
             
             saveDat.ops = obj.ops;
             saveDat.ops.gui = [];
@@ -1307,11 +1483,13 @@ classdef ksGUI < handle
             saveDat.rez.ops.gui = [];
             saveDat.P = obj.P;
             
-            [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);            
-            savePath = fullfile(p, [fn '_ksSettings.mat']);
+            if ~strcmp(obj.H.settings.ChooseFileEdt.String, '...')
+                [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);            
+                savePath = fullfile(p, [fn '_ksSettings.mat']);
+                save(savePath, 'saveDat', '-v7.3');
+            end            
             
-            save(savePath, 'saveDat', '-v7.3');
-            obj.refocus(obj.H.settings.saveBtn);
+            %obj.refocus(obj.H.settings.saveBtn);
         end
         
         function restoreGUIsettings(obj)
@@ -1329,7 +1507,10 @@ classdef ksGUI < handle
                 obj.H.settings.setProbeEdt.Value = saveDat.settings.setProbeEdt.Value;
                 obj.H.settings.setnChanEdt.String = saveDat.settings.setnChanEdt.String;
                 obj.H.settings.setFsEdt.String = saveDat.settings.setFsEdt.String;
-                obj.H.settings.setNfiltEdt.String = saveDat.settings.setNfiltEdt.String;
+                obj.H.settings.setThEdt.String = saveDat.settings.setThEdt.String;
+                obj.H.settings.setLambdaEdt.String = saveDat.settings.setLambdaEdt.String;
+                obj.H.settings.setCcsplitEdt.String = saveDat.settings.setCcsplitEdt.String;
+                obj.H.settings.setMinfrEdt.String = saveDat.settings.setMinfrEdt.String;
                 
                 obj.ops = saveDat.ops;
                 obj.rez = saveDat.rez;
@@ -1362,8 +1543,29 @@ classdef ksGUI < handle
             
         end
         
+        function reset(obj)
+             % full reset: delete userSettings.mat and the settings file
+             % for current file. re-launch. 
+             
+             if exist(obj.P.settingsPath)
+                delete(obj.P.settingsPath);
+             end
+                
+             [p,fn] = fileparts(obj.H.settings.ChooseFileEdt.String);
+             savePath = fullfile(p, [fn '_ksSettings.mat']);
+             if exist(savePath)
+                delete(savePath);
+             end
+             
+             obj.P.skipSave = true;
+             kilosort;
+             
+        end
+        
         function cleanup(obj)
-            obj.saveGUIsettings();
+            if ~isfield(obj.P, 'skipSave')
+                obj.saveGUIsettings();
+            end
             fclose('all');
         end
         

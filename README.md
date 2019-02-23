@@ -1,4 +1,4 @@
-Kilosort2 has been designed to take similar inputs as Kilosort and produce similar output variables, which can be loaded in the Phy GUI. Therefore, the CUDA instructions and integration with Matlab is the same. To aid in setting up a run on your own probe configuration, we have added a graphical user interface where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2 sees it correctly. The instructions below are cut and paste from the original Kilosort. 
+Kilosort2 has been designed to take similar inputs as Kilosort and produce similar output variables, which can be loaded in the Phy GUI. Therefore, the CUDA instructions and integration with Matlab is the same. To aid in setting up a run on your own probe configuration, we have added a [graphical user interface](https://github.com/MouseLand/Kilosort2/wiki) where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2 sees it correctly.  
 
 # Fast spike sorting for hundreds of channels #
 
@@ -39,12 +39,23 @@ You can verify that the code has been installed correctly by running master_eMou
 
 ### General instructions for running Kilosort ###
 
+#### Option 1: Using scripts (classic method)
+
 1. Make a copy of master_file_example_MOVEME.m and \configFiles\StandardConfig_MOVEME.m and put them in the directory with your data. 
 2. Generate a channel map file for your probe using \configFiles\createChannelMap.m as a starting point. 
 3. Edit the config file with desired parameters. You should at least set the file paths (ops.fbinary, ops.fproc (this file will not exist yet - kilosort will create it), and ops.root), the sampling frequency (ops.fs), the number of channels in the file (ops.NchanTOT), the number of channels to be included in the sorting (ops.Nchan), the number of templates you want kilosort to produce (ops.Nfilt), and the location of your channel map file (ops.chanMap). 
 4. Edit master_file so that the paths at the top (lines 3-4) point to your local copies of those github repositories, and so that the configuration file is correctly specified (lines 6-7). 
 
 To understand the parameters that can be adjusted in Kilosort, please refer to the example configuration files. The description of each parameter is inline with its assigned (default) setting, which you can change. 
+
+#### Option 2: Using the GUI
+
+Navigate to the kilosort directory and run 'kilosort':
+```
+>> cd \my\kilosort2\directory\
+>> kilosort
+```
+See the [GUI documentation](https://github.com/MouseLand/Kilosort2/wiki) for more details. 
 
 ### Integration with Phy GUI ###
 Kilosort provides a results file called "rez", where the first column of rez.st are the spike times and the second column are the cluster identities. However, the best way to use this software is together with [Phy](https://github.com/kwikteam/phy), which provides a manual clustering interface for refining the results of the algorithm. 
