@@ -15,22 +15,25 @@ ops.twind = ops.tstart * NchanTOT*2;
 Nbatch      = ceil(ops.sampsToRead /(NT-ops.ntbuff));
 ops.Nbatch = Nbatch;
 
-if getOr(ops, 'minfr_goodchannels', .1)>0
-    [chanMap, xc, yc, kcoords, NchanTOTdefault] = loadChanMap(ops.chanMap);
-end
+[chanMap, xc, yc, kcoords, NchanTOTdefault] = loadChanMap(ops.chanMap);
 ops.NchanTOT = getOr(ops, 'NchanTOT', NchanTOTdefault);
 
-% determine bad channels
-fprintf('Time %3.0fs. Determining good channels.. \n', toc);
+if getOr(ops, 'minfr_goodchannels', .1)>0
+    
+    % determine bad channels
+    fprintf('Time %3.0fs. Determining good channels.. \n', toc);
 
-igood = get_good_channels(ops, chanMap);
-xc = xc(igood);
-yc = yc(igood);
-kcoords = kcoords(igood);
-chanMap = chanMap(igood);
-
+    igood = get_good_channels(ops, chanMap);
+    xc = xc(igood);
+    yc = yc(igood);
+    kcoords = kcoords(igood);
+    chanMap = chanMap(igood);
+        
+    ops.igood = igood;
+else
+    ops.igood = true(size(chanMap));
+end
 ops.Nchan = numel(chanMap);
-ops.igood = igood;
 
 rez.ops         = ops;
 rez.xc = xc;
