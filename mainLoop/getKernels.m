@@ -24,8 +24,8 @@ B = reshape(B, nup, nt0, nt0);
 A = squeeze(B(:, nt0max, :));
 B = permute(B, [2 3 1]);
 
-Ka = gpuArray(single(A));
-Kb = gpuArray(single(B));
+Ka = gpuArray(double(A));
+Kb = gpuArray(double(B));
 
 % A = ;
 

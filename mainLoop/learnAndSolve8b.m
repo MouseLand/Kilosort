@@ -148,7 +148,7 @@ for ibatch = 1:niter
     end
 
     % decompose dWU by svd of time and space (61 by 61)
-    [W, U, mu] = mexSVDsmall2(Params, dWU, W, iC-1, iW-1, double(Ka), double(Kb));
+    [W, U, mu] = mexSVDsmall2(Params, dWU, W, iC-1, iW-1, Ka, Kb);
   
     % this needs to change
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
