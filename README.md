@@ -1,4 +1,4 @@
-# Kilosort2: automated spike sorting with drift tracking and template matching on GPUs#
+# Kilosort2: automated spike sorting with drift tracking and template matching on GPUs #
 
 Welcome to Kilosort2, a Matlab package for spike sorting electrophysiological data of up to thousands of channels. To aid in setting up a Kilosort2 run on your own probe configuration, we have developed a [graphical user interface](https://github.com/MouseLand/Kilosort2/wiki) where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2 sees it correctly. Like Kilosort1, the final output of Kilosort2 can be visualized in the [Phy GUI](https://github.com/kwikteam/phy), which must be installed separately (we recommend the development version).
 
@@ -29,6 +29,55 @@ See the [GUI documentation](https://github.com/MouseLand/Kilosort2/wiki) for mor
 
 To understand the parameters that can be adjusted in Kilosort2, please refer to the example configuration files. The description of each parameter is inline with its assigned (default) setting, which you can change. The main parameters which will produce noticeable changes are ops.Th, ops.ccsplit and ops.lambda.
 
+### Integration with Phy GUI ###
+Kilosort2 provides a results file called "rez", where the first column of rez.st are the spike times and the second column are the cluster identities. It also provides a field rez.good which is 1 if the algorithm classified that cluster as a good single unit. To visualize the results of Kilosort2, you can use [Phy](https://github.com/kwikteam/phy), which also provides a manual clustering interface for refining the results of the algorithm. Unlike Kilosort1, Kilosort2 will automatically set the "good" units in Phy based on a <20% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
+
+Because Phy is written in Python, you also need to install [npy-matlab](https://github.com/kwikteam/npy-matlab), to provide read/write functions from Matlab to Python.
+
+Detailed instructions for interpreting results are provided [here](https://github.com/kwikteam/phy-contrib/blob/master/docs/template-gui.md). This documentation was developed for Kilosort1, so things will look a little different with Kilosort2.
+
+### Matlab output structures ###
+
+Kilosort is best used in conjunction with Phy. The .npy and .csv output files can then be loaded back into Matlab, following these general instructions: https://github.com/kwikteam/phy-contrib/blob/master/docs/template-gui.md. For a full example, see the tutorial with Neuropixels results data available here: http://data.cortexlab.net/singlePhase3/ and here: http://data.cortexlab.net/dualPhase3/.
+
+However, in some situations you might need to use the Matlab results structures. Here is an explanation of these variables, available inside the struct called "rez"
+
+xc, yc: x and y coordinates of each channel on the probe, in the order of channels provided in the channel map (default is linear, 1:1:nChannels).
+
+connected: whether a channel in the original binary dat is "connected", or "active". Inactive channels are ignored.
+
+Wrot: cross-channel whitening matrix. Wrot * high_pass_filtered_data = post_data, where post_data is the postprocessed data on which the Kilosort algorithm is applied.
+
+WrotInv: is the matrix inverse of Wrot. WrotInv * post_data = high_pass_filtered_data
+
+ops: keeps all the configuration settings provided by the user, and cumulative information added throghout the Kilosort steps
+
+ccb: dissimilarity matrix between each batch and every other batch
+
+ccbsort: ccb reordered by the drift estimation algorithm
+
+st: first column is the spike time in samples, second column is the spike template, third column is the extracted amplitude, and fifth column is the post auto-merge cluster (if you run the auto-merger).
+
+mu: mean amplitude for each template
+
+U: low-rank components of the spatial masks for each template
+
+W: low-rank components of the temporal masks for each template
+
+dWU: average of a subset of spikes corresponding to each template. The low-rank decomposition of this matrix results in W and U.
+
+Wraw: the spike template, un-whitened by the operation Wraw(:,:,n) = Wrotinv' * (U(:,n,:) * W(:,n,:)'), for each template n.
+
+simScore: correlation between all pairs of templates.
+
+cProj: projections of each detected spike onto the principal components of the channels corresponding to the spike's assigned template. The channel order for each template is available in iNeigh.
+
+iNeigh: for each template, the channels with largest amplitudes are indexed in order (default 12). This indexing is used to sort coefficients in cProj. Notice this is a fundamentally sparse scheme: only the top channels for each template are stored.
+
+cProjPC: projections of each detected spike onto the top templates most similar to the spike's assigned template. The nearest-template order for each template is available in iNeighPC.
+
+iNeighPC: for each template, the other templates with largest similarity are indexed in order (default 12). This indexing is used to sort coefficients in cProjPC. Notice this is a fundamentally sparse scheme: only the top closest template for each template are stored.
+
 ### How Kilosort2 works ###
 
 The pipeline in Kilosort2 is divided into four steps, which we explain separately.
@@ -37,7 +86,7 @@ The pipeline in Kilosort2 is divided into four steps, which we explain separatel
 
 First we determine which channels contain significant numbers of negative threshold crossings (default 0.1Hz). In our experience, channels with very few threshold crossings are not useful and can only confuse the sorting. We high-pass filter the data (default 150Hz), and "whiten" the channels. Whitening is the process of removing the correlations between a channel and its neighboring channels by subtracting a weighted sum of the neighbors. This increases the discriminability of spikes that are localized on the probe and thus sortable into single units, as contrasted with faraway spikes that are seen over a large number of channels and are typically not sortable.
 
-#### 2) Drift determination and batch reordering. ####
+#### 2) Drift calculation and batch reordering. ####
 
 Kilosort2 tracks waveforms as they change as a function of time, or as a function of drift. Because changes as a function of time are mostly due to probe drift, it is advantageous to "re-order time" so that Kilosort2 can traverse the data approximately in the order of vertical probe location. The preprocessed data is already broken up into small batches (default is 2s). The goal of this step is to determine the dissimilarity matrix between all batches, and re-order the batches so that the dissimilarity matrix becomes more diagonal, or at least the dissimilarities along the diagonal are smallest. To achieve this, spikes are extracted via threshold crossings from each batch, and then clustered via scaled k-means. To compare two batches, we compute the average minimum distance from each cluster in one batch to the clusters in the other batch, then symmetrize this matrix and z-score it.
 
@@ -63,50 +112,29 @@ Splits (1/2 and 2/2): two sets of splits are performed by default to account for
 
 Threshold detection: finally, we found that some neurons at the noise floor can benefit from adaptive setting of the threshold for each neuron. We start this procedure with ops.Th(1), and independently for each neuron lower the threshold in 0.5 decrements, as long as the number of refractory violations in the autocorrelogram does not increase beyond the acceptable quality threshold (of 20% estimated contamination). For this step to work well, ops.Th(2) used in the final pass should be relatively small, so that all potential spikes are collected.
 
-### Integration with Phy GUI ###
-Kilosort2 provides a results file called "rez", where the first column of rez.st are the spike times and the second column are the cluster identities. It also provides a field rez.good which is 1 if the algorithm classified that cluster as a good single unit. To visualize the results of Kilosort2, you can use [Phy](https://github.com/kwikteam/phy), which also provides a manual clustering interface for refining the results of the algorithm. Unlike Kilosort1, Kilosort2 will automatically set the "good" units in Phy based on a <20% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
 
-Because Phy is written in Python, you also need to install [npy-matlab](https://github.com/kwikteam/npy-matlab), to provide read/write functions from Matlab to Python.
+### Release history ###
 
-Detailed instructions for interpreting results are provided [here](https://github.com/kwikteam/phy-contrib/blob/master/docs/template-gui.md). This documentation was developed for Kilosort1, so things will look a little different with Kilosort2.
+v0.3 (February 2019): first public release, includes more automation
+1. Removed a number of optimization steps that were judged ineffective. The spike amplitude variance is no longer empirically calculated, and is instead fixed and incorporated into the ops.lam parameter the way it is in Kilosort1. One of the two types of merging during the optimization was removed, because it was never used.
+2. Default ops.lam value changed to 10, due to the above. The ops.lam parameter is now equivalent to the corresponding parameter in Kilosort1.
+3. Several of the variables that accumulate during optimization (dWU, W, nsp) were switched from singles to doubles to lower the run-to-run variability. Some variability still exists, which we believe is due to numerical errors from using single variables on the GPU. This is unavoidable, since most GPUs have much faster processing of single-typed data, but should have minimal impact on the final results.  
+4. A new merging step was added at the end of the optimization. It is similar to the merges during optimization, in that waveforms that are correlated get merged. Unlike the main optimization, no restriction is put on the amplitudes of the waveforms to be merged, so that a unit with high amplitude variability can be consolidated. However, this step also requires that the cross-correlogram (CCG) have a very clear refractory period.  
+5. A bug was fixed in the splitting step, where the spikes were not re-ordered according to drift before high-pass filtering. This resulted in much less effective splits.
+6. As a consequence of 5, the ccsplit threshold can now be lowered significantly before false positives are found. The default changes to 0.9.
+7. A veto step was added to the splits: if a split would result in a refractory CCG, it is not performed.
+8. Units with clean auto-correlograms (few refractory violations) are labelled as good, in rez.good, and in Phy. The default threshold is 20% estimated contamination.
+9. A step was added before data preprocessing where bad channels (no spikes) are detected and removed.
+10. The Kilosort GUI was updated. The data views now use the actual time-varying templates used by Kilosort2. The adjustable parameters were restricted to Th, ccsplit and lam. The GUI now allows the creation of new probe geometries. A wiki was added to guide the GUI user.
+11. A new batch re-ordering algorithm was added (rastermap), to be tried if the default fails in some noticeable way.
 
-### Matlab output structures ###
+v0.2 (June 2018): first fully functional version, which fuses drift tracking with template matching.
+1. Used in original Stringer, Pachitariu et al, 2018b preprint.
+2. Ongoing testing by collaborators.
 
-Kilosort is best used in conjunction with Phy. The .npy and .csv output files can then be loaded back into Matlab, following these general instructions: https://github.com/kwikteam/phy-contrib/blob/master/docs/template-gui.md. For a full example, see the tutorial with Neuropixels results data available here: http://data.cortexlab.net/singlePhase3/ and here: http://data.cortexlab.net/dualPhase3/.
-
-However, in some situations you might need to use the Matlab results structures. Here is an explanation of these variables, available inside the struct called "rez"
-
-xc, yc: x and y coordinates of each channel on the probe, in the order of channels provided in the channel map (default is linear, 1:1:nChannels).
-
-connected: whether a channel in the original binary dat is "connected", or "active". Inactive channels are ignored.
-
-Wrot: cross-channel whitening matrix. Wrot * high_pass_filtered_data = post_data, where post_data is the postprocessed data on which the Kilosort algorithm is applied.
-
-WrotInv: is the matrix inverse of Wrot. WrotInv * post_data = high_pass_filtered_data
-
-ops: keeps all the configuration settings provided by the user, and cumulative information added throghout the Kilosort steps.
-
-st: first column is the spike time in samples, second column is the spike template, third column is the extracted amplitude, and fifth column is the post auto-merge cluster (if you run the auto-merger).
-
-mu: mean amplitude for each template
-
-U: low-rank components of the spatial masks for each template
-
-W: low-rank components of the temporal masks for each template
-
-dWU: average of a subset of spikes corresponding to each template. The low-rank decomposition of this matrix results in W and U.
-
-Wraw: the spike template, un-whitened by the operation Wraw(:,:,n) = Wrotinv' * (U(:,n,:) * W(:,n,:)'), for each template n.
-
-simScore: correlation between all pairs of templates.
-
-cProj: projections of each detected spike onto the principal components of the channels corresponding to the spike's assigned template. The channel order for each template is available in iNeigh.
-
-iNeigh: for each template, the channels with largest amplitudes are indexed in order (default 12). This indexing is used to sort coefficients in cProj. Notice this is a fundamentally sparse scheme: only the top channels for each template are stored.
-
-cProjPC: projections of each detected spike onto the top templates most similar to the spike's assigned template. The nearest-template order for each template is available in iNeighPC.
-
-iNeighPC: for each template, the other templates with largest similarity are indexed in order (default 12). This indexing is used to sort coefficients in cProjPC. Notice this is a fundamentally sparse scheme: only the top closest template for each template are stored.
+v0.1 (April 2018): initial batch re-ordering algorithm and drift correction.
+1. This original version did not contain template matching, and the spikes were instead detected by threshold crossing.
+2. Used in original Stringer, Pachitariu et al, 2018a preprint.
 
 
 ### Questions ###
