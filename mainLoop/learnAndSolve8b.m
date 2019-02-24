@@ -1,4 +1,4 @@
-function rez = learnAndSolve8b(rez)
+% function rez = learnAndSolve8b(rez)
 
 ops = rez.ops;
 
@@ -16,7 +16,7 @@ wPCAd = double(wPCA);
 ops.wPCA = gather(wPCA);
 ops.wTEMP = gather(wTEMP);
 rez.ops = ops;
-
+%%
 rng('default'); rng(1);
 
 NchanNear   = 32;
@@ -107,7 +107,7 @@ for ibatch = 1:niter
 
     if ibatch<=niter-nBatches
         Params(9) = pmi(ibatch);
-        pm = pmi(ibatch) * gpuArray.ones(1, Nfilt, 'double');
+        pm = pmi(ibatch) * gpuArray.ones(Nfilt, 1, 'double');
     end
 
     % dat load \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -128,7 +128,7 @@ for ibatch = 1:niter
         W = W0(:,ones(1,size(dWU,3)),:);
         Nfilt = size(W,2);
         nsp(1:Nfilt) = m0;
-        sig(1:Nfilt) = 5^2;
+        sig(1:Nfilt) = 10;
         damp(1:Nfilt,:) = 0;
         dnext(1:Nfilt) = 20^2; % changed from 5^2
         Params(2) = Nfilt;
@@ -153,15 +153,25 @@ for ibatch = 1:niter
     % this needs to change
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
    
-    [st0, id0, x0, featW, dWU, drez, nsp0, featPC, sig, dnext, damp, vexp] = ...
-        mexMPnu8(Params, dataRAW, dWU, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
+    
+    damp = damp * p1;
+    
+    [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, sig0, dnext, damp, vexp] = ...
+        mexMPnu8b(Params, dataRAW, dWU, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
         wPCA, maskU, pm, sig, dnext, damp);
   
     if ibatch>51
 %         fprintf('%d, %d, %2.8f, %2.8f, %2.8f, %2.8f \n', ibatch, numel(st0), mean(dWU(:)), mean(W(:)), mean(U(:)), mean(mu(:)))
     end
-    damp = damp * p1;
+    
+    fexp = exp(double(nsp0).*log(pm(1:Nfilt)));
+    fexpr = reshape(fexp, 1,1,[]);
     nsp = nsp * p1 + (1-p1) * double(nsp0);
+    dWU = dWU .* fexpr + (1-fexpr) .* (dWU0./reshape(max(1, double(nsp0)), 1,1, []));
+    if 0 %Params(13) ~=2
+        sig = sig .* fexp + (1-fexp) .* sig0./max(1, double(nsp0));
+    end
+    
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     
@@ -213,7 +223,7 @@ for ibatch = 1:niter
 
             nsp(Nfilt + [1:size(dWU0,3)]) = ops.minFR * NT/ops.fs;
             mu(Nfilt + [1:size(dWU0,3)])  = 10;
-            sig(Nfilt + [1:size(dWU0,3)])  = 5^2;
+            sig(Nfilt + [1:size(dWU0,3)])  = 10;
             dnext(Nfilt + [1:size(dWU0,3)])  = 20^2; % changed from 5^2
             damp(Nfilt + [1:size(dWU0,3)], :)  = 0; % changed from 5^2
 
@@ -299,7 +309,6 @@ for ibatch = 1:niter
        drawnow
     end
 end
-
 
 fclose(fid);
 

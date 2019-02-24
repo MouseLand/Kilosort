@@ -5,7 +5,21 @@ function [spikeTimes, clusterIDs, amplitudes, templates, templateFeatures, ...
 % save in the appropriate format for the phy GUI to run on. If you provide
 % a savePath it should be a folder, and you will need to have npy-matlab
 % available (https://github.com/kwikteam/npy-matlab)
-%
+
+
+% save a list of "good" clusters for Phy
+fileID = fopen(fullfile(savePath, 'cluster_group.tsv'),'w');
+fprintf(fileID, 'cluster_id%sgroup', char(9));
+fprintf(fileID, char([13 10]));
+for j = 1:length(rez.good)
+    if rez.good(j)
+        fprintf(fileID, '%d%sgood', j-1, char(9));
+        fprintf(fileID, char([13 10]));
+    end
+end
+fclose(fileID);
+
+
 % spikeTimes will be in samples, not seconds
 rez.W = gather(single(rez.Wphy));
 rez.U = gather(single(rez.U));
