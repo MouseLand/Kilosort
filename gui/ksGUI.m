@@ -223,24 +223,23 @@ classdef ksGUI < handle
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
                 'String', 'Min. firing rate per chan (0=include all chans)');
             
-            % lambda
-%             obj.H.settings.setLambdaTxt = uicontrol(...
-%                 'Parent', obj.H.settingsGrid,...
-%                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-%                 'String', 'Lambda');
-            
-            % ccsplit
-            obj.H.settings.setCcsplitTxt = uicontrol(...
-                'Parent', obj.H.settingsGrid,...
-                'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'CC Split');            
-            
             % choose threshold
             obj.H.settings.setThTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
                 'String', 'Threshold');
 
+            %                         lambda
+            obj.H.settings.setLambdaTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'Lambda');
+            
+            % ccsplit
+            obj.H.settings.setCcsplitTxt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'text', 'HorizontalAlignment', 'right', ...
+                'String', 'CC Split');            
             
             % advanced options
             obj.H.settings.setAdvancedTxt = uicontrol(...
@@ -286,24 +285,22 @@ classdef ksGUI < handle
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '');
-            %             obj.H.settings.setLambdaEdt = uicontrol(...
-            %                 'Parent', obj.H.settingsGrid,...
-            %                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
-            %                 'String', '');
-            obj.H.settings.setCcsplitEdt = uicontrol(...
-                'Parent', obj.H.settingsGrid,...
-                'Style', 'edit', 'HorizontalAlignment', 'left', ...
-                'String', '');
             obj.H.settings.setThEdt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'edit', 'HorizontalAlignment', 'left', ...
                 'String', '');
-
-            
+            obj.H.settings.setLambdaEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
+            obj.H.settings.setCcsplitEdt = uicontrol(...
+                'Parent', obj.H.settingsGrid,...
+                'Style', 'edit', 'HorizontalAlignment', 'left', ...
+                'String', '');
             
             
             set( obj.H.settingsGrid, ...
-                'ColumnSizes', [-1 -1], 'RowSizes', -1*ones(1,11) );% 12?
+                'ColumnSizes', [-1 -1], 'RowSizes', -1*ones(1,12) );% 12?
             
             obj.H.runVBox = uiextras.VBox(...
                 'Parent', obj.H.runPanel,...
@@ -691,11 +688,11 @@ classdef ksGUI < handle
             end
             obj.H.settings.setThEdt.String = num2str(obj.ops.Th);
             
-%             obj.ops.lam = str2num(obj.H.settings.setLambdaEdt.String);
+            obj.ops.lam = str2num(obj.H.settings.setLambdaEdt.String);
             if isempty(obj.ops.lam)||isnan(obj.ops.lam)
-                obj.ops.lam = 100;
+                obj.ops.lam = 10;
             end
-%             obj.H.settings.setLambdaEdt.String = num2str(obj.ops.lam);
+            obj.H.settings.setLambdaEdt.String = num2str(obj.ops.lam);
             
             obj.ops.ccsplit = str2double(obj.H.settings.setCcsplitEdt.String);
             if isempty(obj.ops.ccsplit)||isnan(obj.ops.ccsplit)
@@ -810,8 +807,7 @@ classdef ksGUI < handle
                         
         end
         
-        function runSaveToPhy(obj)
-            
+        function runSaveToPhy(obj)            
             % save results
             obj.log(sprintf('Saving data to %s', obj.ops.saveDir));
             % discard features in final rez file (too slow to save)
@@ -826,18 +822,6 @@ classdef ksGUI < handle
             
             try
                 rezToPhy(obj.rez, obj.ops.saveDir);
-                
-                fileID = fopen(fullfile(obj.ops.saveDir, 'cluster_group.tsv'),'w');
-                fprintf(fileID, 'cluster_id%sgroup', char(9));
-                fprintf(fileID, char([13 10]));
-                for j = 1:length(obj.rez.good)
-                    if obj.rez.good(j)
-                        fprintf(fileID, '%d%sgood', j-1, char(9));
-                        fprintf(fileID, char([13 10]));
-                    end
-                end
-                fclose(fileID);
-
             catch ex
                 obj.log(sprintf('Error saving data for phy! %s', ex.message));
             end            
@@ -1487,7 +1471,7 @@ classdef ksGUI < handle
             saveDat.settings.setnChanEdt.String = obj.H.settings.setnChanEdt.String;
             saveDat.settings.setFsEdt.String = obj.H.settings.setFsEdt.String;
             saveDat.settings.setThEdt.String = obj.H.settings.setThEdt.String;
-%             saveDat.settings.setLambdaEdt.String = obj.H.settings.setLambdaEdt.String;
+            saveDat.settings.setLambdaEdt.String = obj.H.settings.setLambdaEdt.String;
             saveDat.settings.setCcsplitEdt.String = obj.H.settings.setCcsplitEdt.String;
             saveDat.settings.setMinfrEdt.String = obj.H.settings.setMinfrEdt.String;
             
@@ -1524,7 +1508,7 @@ classdef ksGUI < handle
                 obj.H.settings.setnChanEdt.String = saveDat.settings.setnChanEdt.String;
                 obj.H.settings.setFsEdt.String = saveDat.settings.setFsEdt.String;
                 obj.H.settings.setThEdt.String = saveDat.settings.setThEdt.String;
-%                 obj.H.settings.setLambdaEdt.String = saveDat.settings.setLambdaEdt.String;
+                obj.H.settings.setLambdaEdt.String = saveDat.settings.setLambdaEdt.String;
                 obj.H.settings.setCcsplitEdt.String = saveDat.settings.setCcsplitEdt.String;
                 obj.H.settings.setMinfrEdt.String = saveDat.settings.setMinfrEdt.String;
                 

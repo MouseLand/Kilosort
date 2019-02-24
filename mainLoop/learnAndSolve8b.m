@@ -1,4 +1,4 @@
-% function rez = learnAndSolve8b(rez)
+function rez = learnAndSolve8b(rez)
 
 ops = rez.ops;
 
@@ -127,10 +127,7 @@ for ibatch = 1:niter
         
         W = W0(:,ones(1,size(dWU,3)),:);
         Nfilt = size(W,2);
-        nsp(1:Nfilt) = m0;
-        sig(1:Nfilt) = 10;
-        damp(1:Nfilt,:) = 0;
-        dnext(1:Nfilt) = 20^2; % changed from 5^2
+        nsp(1:Nfilt) = m0;        
         Params(2) = Nfilt;
     end
     
@@ -141,10 +138,7 @@ for ibatch = 1:niter
         [iW, isort] = sort(iW);
         W = W(:,isort, :);
         dWU = dWU(:,:,isort);
-        nsp = nsp(isort);
-        sig = sig(isort);
-        dnext = dnext(isort);
-        damp = damp(isort,:);
+        nsp = nsp(isort);        
     end
 
     % decompose dWU by svd of time and space (61 by 61)
@@ -154,11 +148,9 @@ for ibatch = 1:niter
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan);
    
     
-    damp = damp * p1;
-    
-    [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, sig0, dnext, damp, vexp] = ...
-        mexMPnu8b(Params, dataRAW, dWU, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
-        wPCA, maskU, pm, sig, dnext, damp);
+    [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp] = ...
+        mexMPnu8b(Params, dataRAW, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
+        wPCA);
   
     if ibatch>51
 %         fprintf('%d, %d, %2.8f, %2.8f, %2.8f, %2.8f \n', ibatch, numel(st0), mean(dWU(:)), mean(W(:)), mean(U(:)), mean(mu(:)))
@@ -168,10 +160,6 @@ for ibatch = 1:niter
     fexpr = reshape(fexp, 1,1,[]);
     nsp = nsp * p1 + (1-p1) * double(nsp0);
     dWU = dWU .* fexpr + (1-fexpr) .* (dWU0./reshape(max(1, double(nsp0)), 1,1, []));
-    if 0 %Params(13) ~=2
-        sig = sig .* fexp + (1-fexp) .* sig0./max(1, double(nsp0));
-    end
-    
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     
@@ -180,8 +168,8 @@ for ibatch = 1:niter
         flag_final = 1;
         
         % final clean up
-        [W, U, dWU, mu, nsp, sig, dnext,damp, ndrop] = ...
-            triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext, damp, ndrop);
+        [W, U, dWU, mu, nsp, ndrop] = ...
+            triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, ndrop);
 
         Nfilt = size(W,2);
         Params(2) = Nfilt;
@@ -204,8 +192,8 @@ for ibatch = 1:niter
     if ibatch<niter-nBatches %-50
         if rem(ibatch, 5)==1
             % this drops templates
-            [W, U, dWU, mu, nsp, sig, dnext, damp, ndrop] = ...
-                triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, sig, dnext, damp, ndrop);
+            [W, U, dWU, mu, nsp, ndrop] = ...
+                triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, ndrop);
         end
         Nfilt = size(W,2);
         Params(2) = Nfilt;
@@ -222,10 +210,7 @@ for ibatch = 1:niter
             W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:);
 
             nsp(Nfilt + [1:size(dWU0,3)]) = ops.minFR * NT/ops.fs;
-            mu(Nfilt + [1:size(dWU0,3)])  = 10;
-            sig(Nfilt + [1:size(dWU0,3)])  = 10;
-            dnext(Nfilt + [1:size(dWU0,3)])  = 20^2; % changed from 5^2
-            damp(Nfilt + [1:size(dWU0,3)], :)  = 0; % changed from 5^2
+            mu(Nfilt + [1:size(dWU0,3)])  = 10;            
 
             Nfilt = min(ops.Nfilt, size(W,2));
             Params(2) = Nfilt;
@@ -233,10 +218,7 @@ for ibatch = 1:niter
             W   = W(:, 1:Nfilt, :);
             dWU = dWU(:, :, 1:Nfilt);
             nsp = nsp(1:Nfilt);
-            mu  = mu(1:Nfilt);
-            sig  = sig(1:Nfilt);
-            dnext  = dnext(1:Nfilt);
-            damp = damp(1:Nfilt, :);
+            mu  = mu(1:Nfilt);            
         end
 
     end

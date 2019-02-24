@@ -16,7 +16,7 @@ ops.sorting     = 1; % type of sorting, 2 is by rastermap, 1 is old
 ops.Th       = [10 4];     
 
 % weighting on the amplitude penalty (like in Kilosort1)
-ops.lam      = 10^2;   
+ops.lam      = 10;   
 
 % merge when explained variance loss is below this number, 
 % as a sqrt fraction of the unit's mean (try 1/4)
