@@ -31,11 +31,11 @@ See the [GUI documentation](https://github.com/MouseLand/Kilosort2/wiki) for mor
 
 If you are unhappy with the quality of the automated sorting, try changing one of the main parameters:
 
-`ops.Th`, default [10 4]. Thresholds on assigning spikes based on the template projections used during the optimization (Th(1)) or during the final pass (Th(2)). Typically, Th(1) is high enough that it only picks sortable clusters, while Th(2) is low enough that it can pick all of the spikes of the sortable cluster. It doesn't matter if the final pass also collects noise: an additional per neuron threshold is set afterwards.
+`ops.Th = [10 4]` (default). Thresholds on spike detection used during the optimization (Th(1)) or during the final pass (Th(2)). These thresholds are applied to the template projections, not to the voltage. Typically, Th(1) is high enough that the algorithm only picks up sortable units, while Th(2) is low enough that it can pick all of the spikes of these units. It doesn't matter if the final pass also collects noise: an additional per neuron threshold is set afterwards, and a splitting step ensures clusters with multiple units get split.
 
-`ops.splitAUC`, default 0.9. Threshold on the area under the curve (AUC) criterion for performing a split in the final step. If the AUC of the split is higher than this, that split is considered valid. If the cross-correlation of the split units does not contain a big dip at time 0, the split goes through.
+`ops.splitAUC = 0.9` (default). Threshold on the area under the curve (AUC) criterion for performing a split in the final step. If the AUC of the split is higher than this, that split is considered valid. If the cross-correlation of the split units does not contain a big dip at time 0, the split goes through.
 
-`ops.lambda`, default 10.  The individual spike amplitudes are biased towards the mean of the cluster by this factor. 50 is a lot, 0 is none.
+`ops.lambda = 10` (default).  The individual spike amplitudes are biased towards the mean of the cluster by this factor. 50 is a lot, 0 is no bias.
 
 A list of all the adjustable parameters is in the example configuration file.
 
