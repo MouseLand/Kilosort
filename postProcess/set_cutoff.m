@@ -17,6 +17,8 @@ for j = 1:Nk
     vexp = rez.st3(ix,4);
     
     Th = ops.Th(1);    
+    
+    fcontamination = 0.2;
     while Th>=ops.Th(2)
         st = ss(vexp>Th);
         if isempty(st)
@@ -26,9 +28,12 @@ for j = 1:Nk
         [K, Qi, Q00, Q01, rir] = ccg(st, st, 500, dt);
         Q = min(Qi/(max(Q00, Q01)));
         R = min(rir);
-        if Q>.25 || R>.05                
+        if Q>fcontamination || R>.05                
            break; 
         else
+            if Th==ops.Th(2) && Q<.05
+                fcontamination = min(.05, max(.01, Q*2));
+            end
             rez.good(j) = 1;
             Th = Th - .5;
         end        
