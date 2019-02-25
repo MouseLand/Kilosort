@@ -148,9 +148,9 @@ v0.1 (April 2018): initial batch re-ordering algorithm and drift correction.
 
 ### Credits ###
 
-Kilosort2, by Marius Pachitariu
-GUI, by Nick Steinmetz
-eMouse simulation with drift, by Jennifer Colonell
+Kilosort2, by Marius Pachitariu 
+GUI, by Nick Steinmetz 
+eMouse simulation with drift, by Jennifer Colonell 
 
 ### Questions ###
 
