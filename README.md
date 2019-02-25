@@ -146,6 +146,11 @@ v0.1 (April 2018): initial batch re-ordering algorithm and drift correction.
 1. This original version did not contain template matching, and the spikes were instead detected by threshold crossing.
 2. Used in original Stringer, Pachitariu et al, 2018a preprint.
 
+### Credits ###
+
+Kilosort2, by Marius Pachitariu
+GUI, by Nick Steinmetz
+eMouse simulation with drift, by Jennifer Colonell
 
 ### Questions ###
 
