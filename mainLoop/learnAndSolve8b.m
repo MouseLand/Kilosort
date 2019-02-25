@@ -16,7 +16,7 @@ wPCAd = double(wPCA);
 ops.wPCA = gather(wPCA);
 ops.wTEMP = gather(wTEMP);
 rez.ops = ops;
-%%
+
 rng('default'); rng(1);
 
 NchanNear   = 32;
@@ -25,10 +25,10 @@ Nnearest    = 32;
 sigmaMask  = ops.sigmaMask;
 
 
-ops.spkTh = -6;
+ops.spkTh = -6; % why am I overwriting this here?
 
 nt0 = ops.nt0;
-nt0min  = ceil(20 * nt0/61);
+nt0min  = ceil(20 * nt0/61); % someone had trouble with this?
 rez.ops.nt0min  = nt0min;
 
 nBatches  = rez.temp.Nbatch;
@@ -62,22 +62,18 @@ t0 = ceil(rez.ops.trange(1) * ops.fs);
 
 nInnerIter  = 60;
 
-ThSi = ops.ThS(1);
 
 pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter-nBatches));
 
 Nsum = 7; % how many channels to extend out the waveform in mexgetspikes
 Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
-    Nrank ops.lam pmi(1) Nchan NchanNear ThSi(1) 1 Nsum NrankPC ops.Th(1)]);
+    Nrank ops.lam pmi(1) Nchan NchanNear 0 1 Nsum NrankPC ops.Th(1)]);
 
 W0 = permute(double(wPCA), [1 3 2]);
 
 iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
 
 nsp = gpuArray.zeros(0,1, 'double');
-sig = gpuArray.zeros(0,1, 'double');
-dnext = gpuArray.zeros(0,1, 'double');
-damp = gpuArray.zeros(0,100, 'double');
 
 Params(13) = 0;
 
@@ -90,7 +86,7 @@ fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 fid = fopen(ops.fproc, 'r');
 
 ntot = 0;
-ndrop = zeros(1,3);
+ndrop = zeros(1,2);
 
 m0 = ops.minFR * ops.NT/ops.fs;
 
@@ -101,7 +97,7 @@ for ibatch = 1:niter
     k = isortbatches(korder);
 
     if ibatch>niter-nBatches && korder==nhalf
-        [W, dWU, sig] = revertW(rez);
+        [W, dWU] = revertW(rez);
         fprintf('reverted back to middle timepoint \n')
     end
 
@@ -149,17 +145,13 @@ for ibatch = 1:niter
    
     
     [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp] = ...
-        mexMPnu8b(Params, dataRAW, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
+        mexMPnu8(Params, dataRAW, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
         wPCA);
-  
-    if ibatch>51
-%         fprintf('%d, %d, %2.8f, %2.8f, %2.8f, %2.8f \n', ibatch, numel(st0), mean(dWU(:)), mean(W(:)), mean(U(:)), mean(mu(:)))
-    end
-    
+   
     fexp = exp(double(nsp0).*log(pm(1:Nfilt)));
-    fexpr = reshape(fexp, 1,1,[]);
+    fexp = reshape(fexp, 1,1,[]);
     nsp = nsp * p1 + (1-p1) * double(nsp0);
-    dWU = dWU .* fexpr + (1-fexpr) .* (dWU0./reshape(max(1, double(nsp0)), 1,1, []));
+    dWU = dWU .* fexp + (1-fexp) .* (dWU0./reshape(max(1, double(nsp0)), 1,1, []));
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     
@@ -185,7 +177,7 @@ for ibatch = 1:niter
         % different threshold on last pass?
         Params(3) = ops.Th(end);
 
-        rez = memorizeW(rez, W, dWU, U, mu, sig);
+        rez = memorizeW(rez, W, dWU, U, mu);
         fprintf('memorized middle timepoint \n')
     end
 
@@ -267,7 +259,7 @@ for ibatch = 1:niter
     end
 
     if rem(ibatch, 100)==1
-        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, nst0: %d, drop: %2.4f, %2.4f, %2.4f \n', ...
+        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, nst0: %d, merges: %2.4f, %2.4f \n', ...
             toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0), ndrop)
 
 %         keyboard;
