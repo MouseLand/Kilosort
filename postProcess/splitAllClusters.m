@@ -173,7 +173,7 @@ Nfilt = size(rez.W,2);
 Nrank = 3;
 Nchan = ops.Nchan;
 Params     = double([0 Nfilt 0 0 size(rez.W,1) Nnearest ...
-    Nrank 0 0 Nchan NchanNear 0 0]);
+    Nrank 0 0 Nchan NchanNear ops.nt0min 0]);
 
 % [rez.W, rez.U, rez.mu] = mexSVDsmall(Params, rez.dWU, rez.W, iC-1, iW-1);
 [Ka, Kb] = getKernels(ops, 10, 1);
