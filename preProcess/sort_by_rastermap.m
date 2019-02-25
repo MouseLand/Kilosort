@@ -7,7 +7,7 @@ cc = cc + diag(mean(cc,1));
 ccsort = zscore(cc, [], 1);
 [u, s, v] = svdecon(ccsort);
 [~, isort] = sort(u(:,1));
-X = u(:, 1:200) * s(1:200, 1:200);
+X = u(:, 1:min(200, size(cc,1))) * s(1:min(200, size(cc,1)), 1:min(200, size(cc,1)));
 
 
 SALL = dctbasis(nC,1);

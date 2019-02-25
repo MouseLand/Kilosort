@@ -1,6 +1,7 @@
 function [rez, DATA] = preprocessDataSub(ops)
 tic;
 ops.nt0 	= getOr(ops, {'nt0'}, 61);
+ops.nt0min  = getOr(ops, 'nt0min', ceil(20 * ops.nt0/61));
 
 NT       = ops.NT ;
 NchanTOT = ops.NchanTOT;

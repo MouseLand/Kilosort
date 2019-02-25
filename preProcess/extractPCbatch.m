@@ -47,7 +47,7 @@ col = col(isort);
 mu  = mu(isort);
 
 % get clips from upsampled data
-clips  = get_SpikeSample(dataRAW, row, col, dc, 1);
+clips  = get_SpikeSample(dataRAW, row, col, ops, dc, 1);
 
 % compute center of mass of each spike and add to height estimate
 uS = reshape(wPCA' * clips(:, :), nPC , numel(dc), []);

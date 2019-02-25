@@ -10,11 +10,10 @@ NT  	= ops.NT;
 batchstart = 0:NT:NT*Nbatch;
 
 % extract the PCA projections
-CC = zeros(61);
 fid = fopen(ops.fproc, 'r');
 
 k = 0;
-dd = gpuArray.zeros(61, 5e4, 'single');
+dd = gpuArray.zeros(ops.nt0, 5e4, 'single');
 for ibatch = 1:100:Nbatch
     offset = 2 * ops.Nchan*batchstart(ibatch);
     fseek(fid, offset, 'bof');
@@ -33,7 +32,7 @@ for ibatch = 1:100:Nbatch
     % find isolated spikes
     [row, col, mu] = isolated_peaks_new(dataRAW, ops);
     
-    clips = get_SpikeSample(dataRAW, row, col, 0);
+    clips = get_SpikeSample(dataRAW, row, col, ops, 0);
     
     c = sq(clips(:, :));
         
@@ -67,4 +66,4 @@ end
 CC = dd * dd';
 [U Sv V] = svdecon(CC);
 wPCA = U(:, 1:nPCs);
-wPCA(:,1) = - wPCA(:,1) * sign(wPCA(21,1));
+wPCA(:,1) = - wPCA(:,1) * sign(wPCA(ops.nt0min,1));

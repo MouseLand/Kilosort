@@ -17,7 +17,7 @@
 #include <iostream>
 using namespace std;
 
-const int  Nthreads = 1024,  NrankMax = 3, nt0max = 61, NchanMax = 512, tmax = 19;
+const int  Nthreads = 1024,  NrankMax = 3, nt0max = 71, NchanMax = 512;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void blankdWU(const double *Params, const double *dWU,  
@@ -93,13 +93,15 @@ __global__ void getU(const double *Params, const double *dWU, double *W, double 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void getW(const double *Params, double *wtw, double *W){
     
-  int Nfilt, nt0, tid, bid, i, t, Nrank,k;
+  int Nfilt, nt0, tid, bid, i, t, Nrank,k, tmax;
   double x, x0, xmax; 
   volatile __shared__ double sW[nt0max*NrankMax], swtw[nt0max*nt0max], xN[1];
   
   nt0       = (int) Params[4];
    Nrank       = (int) Params[6];
   Nfilt    	=   (int) Params[1];
+  tmax = (int) Params[11];
+  
   tid 		= threadIdx.x;
   bid 		= blockIdx.x;
   
@@ -158,7 +160,7 @@ __global__ void getW(const double *Params, double *wtw, double *W){
 __global__ void reNormalize(const double *Params, const double *A, const double *B, 
         double *W, double *U, double *mu){
     
-    int Nfilt, nt0, tid, bid, Nchan,k, Nrank, imax, t, ishift;
+    int Nfilt, nt0, tid, bid, Nchan,k, Nrank, imax, t, ishift, tmax;
     double x, xmax, xshift, sgnmax;
     
     volatile __shared__ double sW[NrankMax*nt0max], sU[NchanMax*NrankMax], sS[NrankMax+1], 
@@ -168,6 +170,7 @@ __global__ void reNormalize(const double *Params, const double *A, const double 
     Nchan     = (int) Params[9];
     Nfilt     = (int) Params[1];    
     Nrank     = (int) Params[6];
+    tmax = (int) Params[11];
     bid 	  = blockIdx.x;
     
     tid 		= threadIdx.x;

@@ -10,7 +10,7 @@ NT  	= ops.NT;
 batchstart = 0:NT:NT*Nbatch;
 
 % extract the PCA projections
-CC = zeros(61);
+CC = zeros(ops.nt0);
 fid = fopen(ops.fproc, 'r');
 
 for ibatch = 1:100:Nbatch
@@ -31,7 +31,7 @@ for ibatch = 1:100:Nbatch
     % find isolated spikes
     [row, col, mu] = isolated_peaks_new(dataRAW, ops);
     
-    clips = get_SpikeSample(dataRAW, row, col, 0);
+    clips = get_SpikeSample(dataRAW, row, col, ops, 0);
     
     c = sq(clips(:, :));
     CC = CC + gather(c * c')/1e3;

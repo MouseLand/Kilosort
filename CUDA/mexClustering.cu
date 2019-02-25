@@ -130,9 +130,6 @@ __global__ void average_snips_v3(const double *Params, const int *ioff, const in
   bid 		= blockIdx.x;       //filter index
 
 
-
-  
-
   for(ind=0; ind<Nspikes;ind++) {
 
       if (id[ind]==bid){

@@ -28,8 +28,7 @@ sigmaMask  = ops.sigmaMask;
 ops.spkTh = -6; % why am I overwriting this here?
 
 nt0 = ops.nt0;
-nt0min  = ceil(20 * nt0/61); % someone had trouble with this?
-rez.ops.nt0min  = nt0min;
+nt0min  = rez.ops.nt0min; 
 
 nBatches  = rez.temp.Nbatch;
 NT  	= ops.NT;
@@ -67,7 +66,7 @@ pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter-nBatches));
 
 Nsum = 7; % how many channels to extend out the waveform in mexgetspikes
 Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
-    Nrank ops.lam pmi(1) Nchan NchanNear 0 1 Nsum NrankPC ops.Th(1)]);
+    Nrank ops.lam pmi(1) Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1)]);
 
 W0 = permute(double(wPCA), [1 3 2]);
 
