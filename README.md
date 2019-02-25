@@ -40,7 +40,7 @@ If you are unhappy with the quality of the automated sorting, try changing one o
 A list of all the adjustable parameters is in the example configuration file.
 
 ### Integration with Phy GUI ###
-Kilosort2 provides a results file called "rez", where the first column of rez.st are the spike times and the second column are the cluster identities. It also provides a field rez.good which is 1 if the algorithm classified that cluster as a good single unit. To visualize the results of Kilosort2, you can use [Phy](https://github.com/kwikteam/phy), which also provides a manual clustering interface for refining the results of the algorithm. Unlike Kilosort1, Kilosort2 will automatically set the "good" units in Phy based on a <20% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
+Kilosort2 provides a results file called "rez", where the first column of rez.st are the spike times and the second column are the cluster identities. It also provides a field rez.good which is 1 if the algorithm classified that cluster as a good single unit. To visualize the results of Kilosort2, you can use [Phy](https://github.com/kwikteam/phy), which also provides a manual clustering interface for refining the results of the algorithm. Kilosort2 automatically sets the "good" units in Phy based on a <20% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
 
 Because Phy is written in Python, you also need to install [npy-matlab](https://github.com/kwikteam/npy-matlab), to provide read/write functions from Matlab to Python.
 
