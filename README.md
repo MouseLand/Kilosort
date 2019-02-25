@@ -1,6 +1,6 @@
 # Kilosort2: automated spike sorting with drift tracking and template matching on GPUs #
 
-Welcome to Kilosort2, a Matlab package for spike sorting electrophysiological data of up to thousands of channels. To aid in setting up a Kilosort2 run on your own probe configuration, we have developed a [graphical user interface](https://github.com/MouseLand/Kilosort2/wiki) where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2 sees it correctly. The final output of Kilosort2 can be visualized in the [Phy GUI](https://github.com/kwikteam/phy), which must be installed separately (we recommend the development version).
+Welcome to Kilosort2, a Matlab package for spike sorting electrophysiological data of up to 1024 channels. To aid in setting up a Kilosort2 run on your own probe configuration, we have developed a [graphical user interface](https://github.com/MouseLand/Kilosort2/wiki) where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2 sees it correctly. The final output of Kilosort2 can be visualized in the [Phy GUI](https://github.com/kwikteam/phy), which must be installed separately (we recommend the development version).
 
 Required toolboxes: parallel computing toolbox, signal processing toolbox.
 
