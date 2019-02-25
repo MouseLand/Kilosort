@@ -19,6 +19,7 @@ for j = 1:Nk
     Th = ops.Th(1);    
     
     fcontamination = 0.2;
+    rez.est_contam_rate(j) = 1;
     while Th>=ops.Th(2)
         st = ss(vexp>Th);
         if isempty(st)
@@ -31,10 +32,11 @@ for j = 1:Nk
         if Q>fcontamination || R>.05                
            break; 
         else
-            if Th==ops.Th(2) && Q<.05
+            if Th==ops.Th(1) && Q<.05
                 fcontamination = min(.05, max(.01, Q*2));
             end
             rez.good(j) = 1;
+            rez.est_contam_rate(j) = Q;
             Th = Th - .5;
         end        
     end
