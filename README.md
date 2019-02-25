@@ -46,6 +46,11 @@ Because Phy is written in Python, you also need to install [npy-matlab](https://
 
 Detailed instructions for interpreting results are provided [here](https://github.com/kwikteam/phy-contrib/blob/master/docs/template-gui.md). That documentation was developed for Kilosort1, so things will look a little different with Kilosort2.
 
+### Credits ###
+
+Kilosort2 by Marius Pachitariu  
+GUI by Nick Steinmetz  
+eMouse simulation by Jennifer Colonell  
 
 ### Questions ###
 

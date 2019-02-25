@@ -33,7 +33,9 @@ if getOr(ops, 'minfr_goodchannels', .1)>0
 else
     ops.igood = true(size(chanMap));
 end
+
 ops.Nchan = numel(chanMap);
+ops.Nfilt = getOr(ops, 'nfilt_factor', 4) * ops.Nchan;
 
 rez.ops         = ops;
 rez.xc = xc;

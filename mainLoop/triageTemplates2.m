@@ -14,7 +14,9 @@ ndrop(1) = .9 * ndrop(1) + .1*gather(sum(idrop));
 % 
 cc = getMeWtW2(W, U);
 cc = cc -diag(diag(cc));
-sd = sqrt(10);
+
+sd = sqrt(10); % this is hard-coded here
+
 r0 = 2*(sd(:) + sd(:)') ./ abs(mu(:) - mu(:)');
 rdir = (nsp(:) - nsp(:)')<0;
 ipair = (cc>0.9 & r0>1 & rdir);

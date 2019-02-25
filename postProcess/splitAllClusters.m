@@ -3,7 +3,7 @@ function [rez, X] = splitAllClusters(rez, flag)
 ops = rez.ops;
 wPCA = gather(ops.wPCA);
 
-ccsplit = rez.ops.ccsplit;
+ccsplit = rez.ops.AUCsplit;
 
 NchanNear   = 32;
 Nnearest    = 32;

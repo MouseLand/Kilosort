@@ -239,7 +239,7 @@ classdef ksGUI < handle
             obj.H.settings.setCcsplitTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'CC Split');            
+                'String', 'AUC for splits');            
             
             % advanced options
             obj.H.settings.setAdvancedTxt = uicontrol(...
@@ -659,6 +659,7 @@ classdef ksGUI < handle
             obj.ops.chanMap = chanMap;
             
             % sanitize options set in the gui
+            obj.ops.Nfilt = numel(obj.ops.chanMap.chanMap) * 4;
             
             %obj.ops.Nfilt = str2double(obj.H.settings.setNfiltEdt.String);
             if isempty(obj.ops.Nfilt)||isnan(obj.ops.Nfilt)
@@ -694,11 +695,11 @@ classdef ksGUI < handle
             end
             obj.H.settings.setLambdaEdt.String = num2str(obj.ops.lam);
             
-            obj.ops.ccsplit = str2double(obj.H.settings.setCcsplitEdt.String);
-            if isempty(obj.ops.ccsplit)||isnan(obj.ops.ccsplit)
-                obj.ops.ccsplit = 0.9;
+            obj.ops.AUCsplit = str2double(obj.H.settings.setCcsplitEdt.String);
+            if isempty(obj.ops.AUCsplit)||isnan(obj.ops.AUCsplit)
+                obj.ops.AUCsplit = 0.9;
             end
-            obj.H.settings.setCcsplitEdt.String = num2str(obj.ops.ccsplit);
+            obj.H.settings.setCcsplitEdt.String = num2str(obj.ops.AUCsplit);
             
             obj.ops.trange = str2num(obj.H.settings.setTrangeEdt.String);
             if isempty(obj.ops.trange)||any(isnan(obj.ops.trange))
