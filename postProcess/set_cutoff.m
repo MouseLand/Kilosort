@@ -18,7 +18,7 @@ for j = 1:Nk
     
     Th = ops.Th(1);    
     
-    fcontamination = 0.2;
+    fcontamination = 0.1;
     rez.est_contam_rate(j) = 1;
     while Th>=ops.Th(2)
         st = ss(vexp>Th);
