@@ -20,62 +20,70 @@ using namespace std;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void computeCost(const double *Params, const float *uproj, const float *mu, const float *W, 
-        const int *ioff, const bool *iW, float *cmax){
+        const bool *match, const int *iC, const int *call, float *cmax){
     
-  int tid, bid, Nspikes, Nfeatures, NfeatW, Nthreads, k;
+  int NrankPC,j, NchanNear, tid, bid, Nspikes, Nthreads, k, my_chan, this_chan, Nchan;
   float xsum = 0.0f, Ci, lam; 
   
   Nspikes               = (int) Params[0];
-  Nfeatures             = (int) Params[1];
-  NfeatW                = (int) Params[4];
+  NrankPC             = (int) Params[1];  
   Nthreads              = blockDim.x;
   lam                   = (float) Params[5];
+  NchanNear             = (int) Params[6];
+  Nchan                 = (int) Params[7];
     
   tid 		= threadIdx.x;
   bid 		= blockIdx.x;
   
   while(tid<Nspikes){
-      if (iW[tid + bid*Nspikes]){
+      my_chan = call[tid];
+      if (match[my_chan + bid * Nchan]){
           xsum = 0.0f;
-          for (k=0;k<Nfeatures;k++)
-              xsum += uproj[k + Nfeatures * tid] * W[k + ioff[tid] +  NfeatW * bid];
-          
+          for (k=0;k<NchanNear;k++)
+              for(j=0;j<NrankPC;j++){
+                  this_chan = iC[k + my_chan * NchanNear];
+                    xsum += uproj[j + NrankPC * k + NrankPC*NchanNear * tid] * 
+                            W[j + NrankPC * this_chan +  NrankPC*Nchan * bid];                    
+              }          
           Ci = max(0.0f, xsum) + lam/mu[bid];
           
           cmax[tid + bid*Nspikes] = Ci * Ci / (1.0f + lam/(mu[bid] * mu[bid])) - lam;          
       }
       tid+= Nthreads;
-  }
-  
+  }  
 }
 
 
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void bestFilter(const double *Params, const bool *iW, const float *cmax, int *id, float *cx){
+__global__ void bestFilter(const double *Params,  const bool *match, 
+        const int *iC, const int *call, const float *cmax, int *id, float *cx){
     
-  int tid,tind,bid, ind, Nspikes, Nfilters, Nthreads, Nblocks;
+  int Nchan, tid,tind,bid, ind, Nspikes, Nfilters, Nthreads, Nblocks, my_chan;
   float max_running = 0.0f; 
   
   Nspikes               = (int) Params[0];
   Nfilters              = (int) Params[2];
   Nthreads              = blockDim.x;
   Nblocks               = gridDim.x;
+  Nchan                = (int) Params[7];
 
   tid 		= threadIdx.x;
   bid 		= blockIdx.x;
   
   tind = tid + bid * Nthreads;
   
-  while (tind<Nspikes){
+  while (tind<Nspikes){      
       max_running = 0.0f;
       id[tind] = 0;
+      my_chan = call[tind];
       
-      for(ind=0; ind<Nfilters; ind++)
-          if (iW[tind + ind*Nspikes])
+      for(ind=0; ind<Nfilters; ind++)          
+          if (match[my_chan + ind * Nchan])
               if (cmax[tind + ind*Nspikes] > max_running){
                   id[tind] = ind;
                   max_running = cmax[tind + ind*Nspikes];
               }
+      
               
       cx[tind] = max_running; 
       
@@ -83,27 +91,29 @@ __global__ void bestFilter(const double *Params, const bool *iW, const float *cm
   }  
 }
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void average_snips(const double *Params, const int *ioff, const int *id, const float *uproj, 
-        const float *cmax, float *WU){
+__global__ void average_snips(const double *Params, const int *iC, const int *call, 
+        const int *id, const float *uproj, const float *cmax, float *WU){
     
-  int tid, bid, ind, Nspikes, Nfeatures, NfeatW;
+  int my_chan, this_chan, tidx, tidy, bid, ind, Nspikes, NrankPC, NchanNear, Nchan;
   float xsum = 0.0f; 
   
   Nspikes               = (int) Params[0];
-  Nfeatures             = (int) Params[1];
-  NfeatW                = (int) Params[4];
- 
-  tid 		= threadIdx.x;
+  NrankPC             = (int) Params[1];  
+  Nchan                = (int) Params[7];
+  NchanNear             = (int) Params[6];
+    
+  tidx 		= threadIdx.x;
+  tidy 		= threadIdx.y;
   bid 		= blockIdx.x;
   
   for(ind=0; ind<Nspikes;ind++)
-      if (id[ind]==bid){
-          
-          xsum = uproj[tid + Nfeatures * ind];
-          WU[tid + ioff[ind] + NfeatW * bid] +=  xsum;
-          
+      if (id[ind]==bid){          
+          my_chan = call[ind];          
+          this_chan = iC[tidy + NchanNear * my_chan];
+          xsum = uproj[tidx + NrankPC*tidy +  NrankPC*NchanNear * ind];
+          WU[tidx + NrankPC*this_chan + NrankPC*Nchan * bid] +=  xsum;          
       }  
-}
+   }
 
 
 
@@ -129,6 +139,9 @@ __global__ void average_snips_v3(const double *Params, const int *ioff, const in
   tid       = threadIdx.x;      //feature index
   bid 		= blockIdx.x;       //filter index
 
+
+
+  
 
   for(ind=0; ind<Nspikes;ind++) {
 
@@ -235,7 +248,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
 {
     /* Declare input variables*/
   double *Params, *d_Params;
-  int Nfeatures, Nspikes, Nfilters, NfeatW;
+  int Nchan, NrankPC, Nspikes, Nfilters, NchanNear;
 
   
   /* Initialize the MathWorks GPU API. */
@@ -243,41 +256,42 @@ void mexFunction(int nlhs, mxArray *plhs[],
 
   /* read Params and copy to GPU */
   Params                = (double*) mxGetData(prhs[0]);
-  Nspikes               = (int) Params[0];
-  Nfeatures             = (int) Params[1];
-  Nfilters              = (int) Params[2];
-  NfeatW                = (int) Params[4];
-
+  Nspikes               = (int) Params[0];  
+  Nfilters              = (int) Params[2];  
+  NrankPC             = (int) Params[1];  
+  NchanNear             = (int) Params[6];
+  Nchan                 = (int) Params[7];
   
   // copy Params to GPU
   cudaMalloc(&d_Params,      sizeof(double)*mxGetNumberOfElements(prhs[0]));
   cudaMemcpy(d_Params,Params,sizeof(double)*mxGetNumberOfElements(prhs[0]),cudaMemcpyHostToDevice);
   
   /* collect input GPU variables*/
-  mxGPUArray const  *W, *uproj, *ioff, *iW, *mu;
+  mxGPUArray const  *W, *uproj, *call, *iMatch, *mu, *iC;
   const float *d_W, *d_uproj, *d_mu;
-  const int *d_ioff;
-  const bool *d_iW;
+  const int *d_call, *d_iC;  
   float *d_dWU;
+  const bool *d_iMatch;
     
   // these come as const GPU Arrays, just transfer them over
   uproj         = mxGPUCreateFromMxArray(prhs[1]);
   W             = mxGPUCreateFromMxArray(prhs[2]);
-  ioff          = mxGPUCreateFromMxArray(prhs[3]);  
-  iW            = mxGPUCreateFromMxArray(prhs[4]);
-  mu            = mxGPUCreateFromMxArray(prhs[6]);
+  mu            = mxGPUCreateFromMxArray(prhs[3]);  
+  call          = mxGPUCreateFromMxArray(prhs[4]);  
+  iMatch         = mxGPUCreateFromMxArray(prhs[5]);
+  iC            = mxGPUCreateFromMxArray(prhs[6]);  
 
   d_uproj       = (float const *)(mxGPUGetDataReadOnly(uproj));
   d_W        	= (float const *)(mxGPUGetDataReadOnly(W));
-  d_ioff        = (int const *)  (mxGPUGetDataReadOnly(ioff));
-    // this has a one for filter - spike combinations to be considered
-  d_iW          = (bool const *)  (mxGPUGetDataReadOnly(iW));
   d_mu          = (float const *)  (mxGPUGetDataReadOnly(mu));
+  d_call        = (int const *)  (mxGPUGetDataReadOnly(call));
+  d_iC          = (int const *)  (mxGPUGetDataReadOnly(iC));    
+  d_iMatch      = (bool const *)  (mxGPUGetDataReadOnly(iMatch));  
 
-  // dWU is not a constant , so the data has to be "copied" over
   mxGPUArray *dWU;
-  dWU       = mxGPUCopyFromMxArray(prhs[5]);
-  d_dWU     = (float *)(mxGPUGetData(dWU));  
+  const mwSize ddWU[] 	= {NrankPC * Nchan, Nfilters};
+  dWU 		= mxGPUCreateGPUArray(2, ddWU, mxSINGLE_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
+  d_dWU 		= (float *)(mxGPUGetData(dWU));
   
   /* Define new GPU variables*/
   float *d_cmax,  *d_x, *d_V;
@@ -288,54 +302,41 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMalloc(&d_id,      Nspikes  *  sizeof(int));
   cudaMalloc(&d_x,      Nspikes  *  sizeof(float));
   cudaMalloc(&d_nsp,      Nfilters  *  sizeof(int));
-  cudaMalloc(&d_V,      Nfilters  *  sizeof(float));
-   
+     
   cudaMemset(d_nsp,      0, Nfilters *   sizeof(int));
+  cudaMemset(d_dWU, 0, NrankPC*NchanNear*Nfilters  *  sizeof(float));
+  
   //jic add Memset for d_V
+  cudaMalloc(&d_V,      Nfilters  *  sizeof(float));
   cudaMemset(d_V, 0, Nfilters  *  sizeof(float));
-
+  
   
   // get list of cmaxes for each combination of neuron and filter
-  computeCost<<<Nfilters, 1024>>>(d_Params, d_uproj, d_mu, d_W, d_ioff, 
-          d_iW, d_cmax);
+  computeCost<<<Nfilters, 1024>>>(d_Params, d_uproj, d_mu, d_W, 
+          d_iMatch,d_iC, d_call, d_cmax);
 
   // loop through cmax to find best template
-  bestFilter<<<40, 256>>>(d_Params, d_iW, d_cmax, d_id, d_x);
+  bestFilter<<<40, 256>>>(d_Params, d_iMatch, d_iC, d_call, d_cmax, d_id, d_x);
   
   // average all spikes for same template -- ORIGINAL
-  //average_snips<<<Nfilters, Nfeatures>>>(d_Params, d_ioff, d_id, d_uproj, 
-  //        d_cmax, d_dWU);
+  dim3 thNN(NrankPC, NchanNear);
+  average_snips<<<Nfilters, thNN>>>(d_Params, d_iC, d_call, d_id, d_uproj, d_cmax, d_dWU);
 
 
 
   //-------------------------------------------------
-
-  //jic for running average_snips_v3 with Nfeature threads
-
-  
-
-  float *d_bigArray;
-  int bSize;
-
-  
-  bSize = Nfeatures*NfeatW*Nfilters;
-  cudaMalloc(&d_bigArray, bSize*sizeof(float) );
-  cudaMemset(d_bigArray, 0, bSize*sizeof(float) );
-
-  average_snips_v3<<<Nfilters, Nfeatures>>>(d_Params, d_ioff, d_id,  
-      d_uproj, d_cmax, d_bigArray);
-
-  //sum over bigArray. 
-  //Total number of features for imec probe = 3*384 = 1152
-  //Can't safely break this into Nfilters,NfeatW, becasue NfeatW > 1024
-  //break into an arbitrary number of blocks/threads
-
-  sum_dWU<<<128,1024>>>( d_Params, d_bigArray, d_dWU );
-
-  cudaFree(d_bigArray);
-
-  //-------------------------------------------------
-
+  //jic for running average_snips_v3 with Nfeature threads  
+//   float *d_bigArray;
+//   int bSize;
+//   bSize = Nfeatures*NfeatW*Nfilters;
+//   cudaMalloc(&d_bigArray, bSize*sizeof(float) );
+//   cudaMemset(d_bigArray, 0, bSize*sizeof(float) );
+// 
+//   average_snips_v3<<<Nfilters, Nfeatures>>>(d_Params, d_ioff, d_id,  
+//       d_uproj, d_cmax, d_bigArray);
+//   sum_dWU<<<128,1024>>>( d_Params, d_bigArray, d_dWU );
+//   cudaFree(d_bigArray);
+//-------------------------------------------------
 
 
   count_spikes<<<7, 256>>>(d_Params, d_id, d_nsp, d_x, d_V);
@@ -348,13 +349,13 @@ void mexFunction(int nlhs, mxArray *plhs[],
   float *x, *V;
   
   const mwSize dimst[]      = {Nspikes,1};  
-  //const mwSize dimst2[] 	= {Nspikes,Nfilters};  
+  const mwSize dimst2[] 	= {Nspikes,Nfilters};  
   const mwSize dimst4[] 	= {Nfilters,1};  
 
   plhs[1]   = mxCreateNumericArray(2, dimst,  mxINT32_CLASS,  mxREAL);
   plhs[2]   = mxCreateNumericArray(2, dimst, mxSINGLE_CLASS, mxREAL);  
   plhs[3]   = mxCreateNumericArray(2, dimst4, mxINT32_CLASS,  mxREAL);  
-  plhs[4]   = mxCreateNumericArray(2, dimst4, mxSINGLE_CLASS, mxREAL);  
+  plhs[4]   = mxCreateNumericArray(2, dimst2, mxSINGLE_CLASS, mxREAL);  
 
   id        = (int*) mxGetData(plhs[1]);  
   x        = (float*) mxGetData(plhs[2]);  
@@ -364,7 +365,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemcpy(id,   d_id,  Nspikes * sizeof(int),   cudaMemcpyDeviceToHost);
   cudaMemcpy(x, d_x,Nspikes * sizeof(float),  cudaMemcpyDeviceToHost);
   cudaMemcpy(nsp,  d_nsp, Nfilters * sizeof(int),   cudaMemcpyDeviceToHost);
-  cudaMemcpy(V, d_V, Nfilters * sizeof(float),  cudaMemcpyDeviceToHost);
+  cudaMemcpy(V, d_cmax, Nspikes * Nfilters  * sizeof(float),  cudaMemcpyDeviceToHost);
   
   //we are done, clear everything from the GPU
   cudaFree(d_Params);
@@ -379,8 +380,9 @@ void mexFunction(int nlhs, mxArray *plhs[],
   mxGPUDestroyGPUArray(uproj);
   mxGPUDestroyGPUArray(dWU);  
   mxGPUDestroyGPUArray(W);    
-  mxGPUDestroyGPUArray(ioff);  
-  mxGPUDestroyGPUArray(iW);  
+  mxGPUDestroyGPUArray(iC);  
+  mxGPUDestroyGPUArray(iMatch);  
+  mxGPUDestroyGPUArray(call);  
   mxGPUDestroyGPUArray(mu);  
 
   

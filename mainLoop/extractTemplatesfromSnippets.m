@@ -62,8 +62,8 @@ for i = 1:10
    wTEMP = wTEMP ./ sum(wTEMP.^2,1).^.5;
 end
 
+dd = double(gather(dd));
+[U Sv V] = svdecon(dd);
 
-CC = dd * dd';
-[U Sv V] = svdecon(CC);
-wPCA = U(:, 1:nPCs);
+wPCA = gpuArray(single(U(:, 1:nPCs)));
 wPCA(:,1) = - wPCA(:,1) * sign(wPCA(ops.nt0min,1));

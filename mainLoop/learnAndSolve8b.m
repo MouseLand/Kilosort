@@ -4,9 +4,12 @@ ops = rez.ops;
 
 NrankPC = 6;  
 Nrank = 3;
+rng('default'); rng(1);
+
 [wTEMP, wPCA]    = extractTemplatesfromSnippets(rez, NrankPC);
 % wPCA    = extractPCfromSnippets(rez, Nrank);
 % wPCA(:,1) = - wPCA(:,1) * sign(wPCA(20,1));
+
 
 wPCA = gpuArray(wPCA(:, 1:Nrank));
 wTEMP = gpuArray(wTEMP);
@@ -16,8 +19,6 @@ wPCAd = double(wPCA);
 ops.wPCA = gather(wPCA);
 ops.wTEMP = gather(wTEMP);
 rez.ops = ops;
-
-rng('default'); rng(1);
 
 NchanNear   = 32;
 Nnearest    = 32;

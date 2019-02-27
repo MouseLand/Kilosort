@@ -1,13 +1,15 @@
-function [uS, col, mu, row] = extractPCbatch(rez, wPCA, ibatch)
+function [uS, idchan] = extractPCbatch(rez, wPCA, ibatch, iC)
+
+wPCA = gpuArray(single(wPCA(:, 1:3)));
+% wPCA = gpuArray(single(rez.ops.wPCA(:, 1:3)));
 
 ops = rez.ops;
 nPC = size(wPCA,2);
 
 % indices of channels relative to center
-nCH = 8;
-dc = [-nCH:nCH];
-% dc = -12:15;
-%%
+NchanNear = size(iC,1);
+sigmaMask  = ops.sigmaMask;
+
 Nbatch      = rez.temp.Nbatch;
 
 NT  	= ops.NT;
@@ -18,6 +20,7 @@ fid = fopen(ops.fproc, 'r');
 offset = 2 * ops.Nchan*batchstart(ibatch);
 fseek(fid, offset, 'bof');
 dat = fread(fid, [NT ops.Nchan], '*int16');
+fclose(fid);
 
 % move data to GPU and scale it
 if ops.GPU
@@ -28,32 +31,13 @@ end
 dataRAW = single(dataRAW);
 dataRAW = dataRAW / ops.scaleproc;
 
-% find isolated spikes
-wPCA = gpuArray(wPCA);
+nt0min = rez.ops.nt0min;
+spkTh = ops.ThPre;
+[nt0, NrankPC] = size(wPCA);
+[NT, Nchan] = size(dataRAW);
 
-[nt0 Nrank] = size(wPCA);
-[NT Nchan] = size(dataRAW);
+Params = [NT Nchan NchanNear nt0 nt0min spkTh NrankPC];
 
-Params = [NT Nchan nt0 3];
+[uS, idchan] = mexThSpkPC(Params, dataRAW, wPCA, iC-1);
 
-dProc = mexFilterPCs(Params, dataRAW, wPCA(:, 1:3));
-dProc = sqrt(max(0, dProc));
-
-[row, col, mu] = isolated_peaks_PC(dProc, ops);
-
-[~, isort] = sort(row);
-row = row(isort);
-col = col(isort);
-mu  = mu(isort);
-
-% get clips from upsampled data
-clips  = get_SpikeSample(dataRAW, row, col, ops, dc, 1);
-
-% compute center of mass of each spike and add to height estimate
-uS = reshape(wPCA' * clips(:, :), nPC , numel(dc), []);
-%     uS = permute(uS, [2 1 3]);
-uS = reshape(uS, nPC*numel(dc), []);
-
-fclose(fid);
-
-
+idchan = idchan + 1;

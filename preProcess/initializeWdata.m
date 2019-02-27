@@ -1,20 +1,22 @@
-function [W, mu, Wheights] = initializeWdata(ioff, uprojDAT, nCHmax, nPCs, Nfilt)
+function [W, mu, Wheights, irand] = initializeWdata(call, uprojDAT, Nchan, nPCs, Nfilt, iC)
 
-[nFeat nS]       = size(uprojDAT); % number of spikes
+irand = ceil(rand(Nfilt,1) * size(uprojDAT,2));
+% irand = 1:Nfilt;
 
-W = gpuArray.zeros(nCHmax*nPCs, Nfilt, 'single');
-for j = 1:size(W,2)
-   W(double(ioff(j)) + [1:nFeat], j) = uprojDAT(:, j);
+W = gpuArray.zeros(nPCs, Nchan, Nfilt, 'single');
+
+for t = 1:Nfilt
+    ich = iC(:, call(irand(t)));
+    W(:, ich, t) = reshape(uprojDAT(:, irand(t)), nPCs, []);
 end
+W = reshape(W, [], Nfilt);
+W = W + .001 * gpuArray.randn(size(W), 'single');
 
 mu = sum(W.^2,1).^.5;
 W = W./(1e-5 + mu);
 
-W = reshape(W, nPCs, nCHmax, Nfilt);
+W = reshape(W, nPCs, Nchan, Nfilt);
 nW = sq(sum(W(1, :, :).^2,1));
-W = reshape(W, nPCs* nCHmax, Nfilt);
+W = reshape(W, nPCs* Nchan, Nfilt);
 
 [~, Wheights] = max(nW,[], 1);
-[Wheights, isort] = sort(Wheights);
-
-W = W(:, isort);
