@@ -1,4 +1,4 @@
-function rez = clusterSingleBatches2(rez)
+function rez = clusterSingleBatches(rez)
 rng('default'); rng(1);
 
 ops = rez.ops;
@@ -146,10 +146,10 @@ rez.ccb = gather(ccb0);
 if getOr(rez.ops, 'sorting', 1)==2
     [ccb1, iorig] = sort_by_rastermap(ccb0);
 else
-    [ccb1, iorig] = sortBatches(ccb0);
+    [ccb1, iorig] = sortBatches2(ccb0);
 end
-    
-figure(1); 
+
+figure(1);
 subplot(1,2,1)
 imagesc(ccb0, [-5 5]); drawnow
 xlabel('batches')

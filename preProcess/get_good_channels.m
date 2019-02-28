@@ -78,7 +78,7 @@ nc = nc/ttime;
 
 % igood = nc>.1;
 igood = nc>=getOr(ops, 'minfr_goodchannels', .1);
-% igood([1:200 220:end]) = 0;
+% igood([1:200 210:end]) = 0;
 
 % chanMap = chanMap(nc>.1);
 fprintf('found %d threshold crossings in %2.2f seconds of data \n', k, ttime)
