@@ -9,7 +9,7 @@ C2C =  sqrt(C2C);
 [~, isort] = sort(C2C, 'ascend');
 
 iC= isort(1:NchanClosest, :);
-iC = sort(iC, 1);
+% iC = sort(iC, 1);
 
 ix = iC + [0:Nchan:Nchan^2-1];
 mask = exp( - C2C(ix).^2/(2*sigma^2));

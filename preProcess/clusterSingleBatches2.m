@@ -1,4 +1,5 @@
-% function rez = clusterSingleBatches2(rez)
+function rez = clusterSingleBatches2(rez)
+rng('default'); rng(1);
 
 ops = rez.ops;
 
@@ -8,6 +9,8 @@ Nfilt = ceil(rez.ops.Nchan/2);
 
 % extract PC projections here
 tic
+
+
 
 wPCA    = extractPCfromSnippets(rez, nPCs);
 fprintf('Obtained 7 PC waveforms in %2.2f seconds \n', toc)
@@ -26,8 +29,7 @@ NchanNear = min(Nchan, 2*8+1);
 Ws = gpuArray.zeros(nPCs , NchanNear, Nfilt, nBatches, 'single');
 mus = gpuArray.zeros(Nfilt, nBatches, 'single');
 ns = gpuArray.zeros(Nfilt, nBatches, 'single');
-ioffWs = gpuArray.zeros(Nfilt, nBatches, 'int32');
-Whs = gpuArray.zeros(Nfilt, nBatches, 'single');
+Whs = gpuArray.zeros(Nfilt, nBatches, 'int32');
 
 i0 = 0;
 
@@ -36,12 +38,15 @@ NrankPC = 3;
 iC = getClosestChannels(rez, ops.sigmaMask, NchanNear);
 
 tic
-for ibatch = 1:nBatches        
+for ibatch = 1:nBatches            
+    [uproj, call] = extractPCbatch2(rez, wPCA, min(nBatches-1, ibatch), iC);  
     
-    [uproj, call] = extractPCbatch(rez, wPCA, min(nBatches-1, ibatch), iC);  
+    if sum(isnan(uproj(:)))>0 %sum(mus(:,ibatch)<.1)>30
+        break;
+    end
     
     if size(uproj,2)>Nfilt
-        [W, mu, Wheights, irand] = initializeWdata(call, uproj, Nchan, nPCs, Nfilt, iC);
+        [W, mu, Wheights, irand] = initializeWdata2(call, uproj, Nchan, nPCs, Nfilt, iC);
         
         Params  = [size(uproj,2) NrankPC Nfilt 0 size(W,1) 0 NchanNear Nchan];        
         
@@ -52,7 +57,7 @@ for ibatch = 1:nBatches
             iMatch = sq(min(abs(single(iC) - Wheights), [], 1))<.1;
 
             % get iclust and update W
-            [dWU, iclust, dx, nsp, dV] = mexClustering(Params, uproj, W, mu, ...
+            [dWU, iclust, dx, nsp, dV] = mexClustering2(Params, uproj, W, mu, ...
                 call-1, iMatch, iC-1);
             
             dWU = dWU./(1e-5 + single(nsp'));
@@ -72,22 +77,23 @@ for ibatch = 1:nBatches
         for t = 1:Nfilt
             W0(:, :, t) = W(:, iC(:, Wheights(t)), t);
         end        
-        W0 = W0 ./ (1e-5 + sum(W0.^2,1).^.5);
+        W0 = W0 ./ (1e-5 + sum(sum(W0.^2,1),2).^.5);
     end
     
     Ws(:, :, :, ibatch)   = W0;    
     mus(:, ibatch)     = mu;
     ns(:, ibatch)      = nsp;        
-    Whs(:, ibatch)     = Wheights;
+    Whs(:, ibatch)     = int32(Wheights);
     
     i0 = i0 + Nfilt;
     
-    if rem(ibatch, 100)==1
+    
+    if rem(ibatch, 500)==1
         fprintf('time %2.2f, pre clustered %d / %d batches \n', toc, ibatch, nBatches)
     end
 end
 
-%%
+
 tic
 ns = reshape(ns, Nfilt, []);
 
@@ -98,8 +104,8 @@ ccb = gpuArray.zeros(nBatches, 'single');
 d1 = gpuArray.zeros(nBatches, 'single');
 
 % [ncoefs, Nfilt, nBatches] = size(Ws);
-for ibatch = 1 %1:nBatches 
-    Wh0 = Whs(:, ibatch);    
+for ibatch = 1:nBatches 
+    Wh0 = single(Whs(:, ibatch));    
     W0  = Ws(:, :, ibatch);    
     mu = mus(:, ibatch);
     
@@ -113,9 +119,9 @@ for ibatch = 1 %1:nBatches
     imin = ones(1, nBatches);
     cct = Inf * gpuArray.ones(1, nBatches, 'single');    
     
-    %----------------------------------%
-    keyboard;
-    [iclust, ds] = mexDistances(Params, Ws, W, iMatch, iC-1, Whs-1, mus, mu);
+    %----------------------------------%    
+    [iclust, ds] = mexDistances2(Params, Ws, W, iMatch, iC-1, Whs-1, mus, mu);
+    
     ds = reshape(ds, Nfilt, []);
     ds = max(0, ds);    
     cct0 = mean(sqrt(ds) .* ns, 1)./mean(ns,1);    

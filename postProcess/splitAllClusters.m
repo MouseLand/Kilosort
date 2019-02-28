@@ -5,8 +5,8 @@ wPCA = gather(ops.wPCA);
 
 ccsplit = rez.ops.AUCsplit;
 
-NchanNear   = 32;
-Nnearest    = 32;
+NchanNear   = min(ops.Nchan, 32);
+Nnearest    = min(ops.Nchan, 32);
 sigmaMask   = ops.sigmaMask;
 
 ik = 0;

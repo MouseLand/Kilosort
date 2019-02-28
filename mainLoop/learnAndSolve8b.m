@@ -20,8 +20,8 @@ ops.wPCA = gather(wPCA);
 ops.wTEMP = gather(wTEMP);
 rez.ops = ops;
 
-NchanNear   = 32;
-Nnearest    = 32;
+NchanNear   = min(ops.Nchan, 32);
+Nnearest    = min(ops.Nchan, 32);
 
 sigmaMask  = ops.sigmaMask;
 

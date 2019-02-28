@@ -38,7 +38,7 @@ for ibatch = 1:nBatches
         Params  = [1 size(uproj,1) Nfilt pm size(W,1) 0 Nnearest];
         Params(1) = size(uproj,2);
         
-        for i = 1:niter
+        for i = 1%:niter
             dWU     = gpuArray.zeros(size(W), 'single');
             
             %  boolean variable: should we compute spike x filter
@@ -164,7 +164,7 @@ else
     [ccb1, iorig] = sortBatches(ccb0);
 end
     
-figure(1); 
+figure; 
 subplot(1,2,1)
 imagesc(ccb0, [-5 5]); drawnow
 xlabel('batches')

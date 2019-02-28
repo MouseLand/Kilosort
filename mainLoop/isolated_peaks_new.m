@@ -16,8 +16,8 @@ peaks = peaks .* (sum_peaks<1.2) .* S1;
 peaks([1:nt0 end-nt0:end], :) = 0;
 
 % exclude edge channels 
-noff = 8;
-peaks(:, [1:noff end-noff+ [1:noff]]) = 0;
+% noff = 8;
+% peaks(:, [1:noff end-noff+ [1:noff]]) = 0;
 
 [row, col, mu] = find(peaks);
 
