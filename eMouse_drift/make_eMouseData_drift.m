@@ -8,7 +8,7 @@ function make_eMouseData_drift(fpath, KS2path, chanMapName, useGPU, useParPool)
 norm_amp  = 20; % if 0, use amplitudes of input waveforms; if > 0, set all amplitudes to norm_amp*rms_noise
 mu_mean   = 0.75; % mean of mean spike amplitudes. Incoming waveforms are in uV; make <1 to make sorting harder
 rms_noise = 12; % rms noise in uV. Will be added to the spike signal. 15-20 uV an OK estimate from real data
-t_record  = 300; % duration in seconds of simulation. longer is better (and slower!) (1000)
+t_record  = 1200; % duration in seconds of simulation. longer is better (and slower!) (1000)
 fr_bounds = [1 10]; % min and max of firing rates ([1 10])
 tsmooth   = 0.5; % gaussian smooth the noise with sig = this many samples (increase to make it harder) (0.5)
 chsmooth  = 0.5; % smooth the noise across channels too, with this sig (increase to make it harder) (0.5)

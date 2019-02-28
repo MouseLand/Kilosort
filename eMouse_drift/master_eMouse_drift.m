@@ -1,5 +1,5 @@
 useGPU = 1; % do you have a GPU? Kilosorting 1000sec of 32chan simulated data takes 55 seconds on gtx 1080 + M2 SSD.
-useParPool = 1; % use parpool; will speed up simulation if local cluater has > 6 cores.
+useParPool = 1; % use parpool; will speed up simulation if local cluater has > 10 cores.
 makeNewData = 1; % set this to 0 to just resort a previously created data set
 sortData = 1;
 runBenchmark = 1; %set to 1 to compare sorted data to ground truth for the simulation
@@ -14,7 +14,11 @@ KS2path = 'C:\Users\labadmin\Documents\Kilosort2-determ\Kilosort2\';
 addpath(genpath('C:\Users\labadmin\Documents\Kilosort2-determ\Kilosort2')); % path to kilosort2 folder
 addpath('C:\Users\labadmin\Documents\kilosort\npy-matlab-master\');
 
-pathToYourConfigFile = 'C:\Users\labadmin\Documents\emouse_drift\eMouse\'; % path to config file
+% path to whitened, filtered proc file (on a fast SSD)
+rootH = 'C:\Users\labadmin\Documents\kilosort_datatemp';
+
+% path to config file; if running the default config, no need to change.
+pathToYourConfigFile = [KS2path,'eMouse_drift\']; % path to config file
 
 % Create the channel map for this simulation; default is a small 64 site
 % probe with imec 3A geometry.
@@ -47,8 +51,7 @@ if( sortData )
         ops.NchanTOT    = NchanTOT; % total number of channels in your recording
         ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
 
-        % path to whitened, filtered proc file (on a fast SSD)
-        rootH = 'C:\Users\labadmin\Documents\kilosort_datatemp';
+
         ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
 
         % find the binary file in this folder
