@@ -2,6 +2,7 @@
 % Matlab GPU library first (see README files for platform-specific
 % information)
 
+    mexcuda -largeArrayDims mexThSpkPC.cu
     mexcuda -largeArrayDims mexGetSpikes2.cu
     mexcuda -largeArrayDims mexMPnu8.cu
 
