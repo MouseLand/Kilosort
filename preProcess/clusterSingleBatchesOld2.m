@@ -1,4 +1,4 @@
-function rez = clusterSingleBatches(rez)
+function rez = clusterSingleBatchesOld2(rez)
 
 nPCs    = getOr(rez.ops, 'nPCs', 3);
 % Nfilt   = rez.ops.Nfilt;

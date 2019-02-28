@@ -1,4 +1,4 @@
-function rez = clusterSingleBatches(rez)
+% function rez = clusterSingleBatches(rez)
 rng('default'); rng(1);
 
 ops = rez.ops;
@@ -149,7 +149,7 @@ else
     [ccb1, iorig] = sortBatches2(ccb0);
 end
 
-figure(1);
+figure;
 subplot(1,2,1)
 imagesc(ccb0, [-5 5]); drawnow
 xlabel('batches')
