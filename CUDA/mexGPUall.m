@@ -8,8 +8,8 @@
     mexcuda -largeArrayDims mexSVDsmall2.cu
     mexcuda -largeArrayDims mexWtW2.cu
     mexcuda -largeArrayDims mexFilterPCs.cu
-    mexcuda -largeArrayDims mexClustering.cu
-    mexcuda -largeArrayDims mexDistances.cu
+    mexcuda -largeArrayDims mexClustering2.cu
+    mexcuda -largeArrayDims mexDistances2.cu
 
 
 %    mex -largeArrayDims mexMPmuFEAT.cu
