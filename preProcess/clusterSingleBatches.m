@@ -1,4 +1,4 @@
-% function rez = clusterSingleBatches(rez)
+function rez = clusterSingleBatches(rez)
 rng('default'); rng(1);
 
 ops = rez.ops;
