@@ -1,13 +1,14 @@
 function make_eMouseData_drift(fpath, KS2path, chanMapName, useGPU, useParPool)
-% this script makes binary file of simulated eMouse recording
+% this script makes a binary file of simulated eMouse recording
 % Based on Marius Pachitariu's original eMouse simulator for Kilosort 1
 % Adds the ability to simulate simple drift of the tissue relative to the
 % probe sites.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % you can play with the parameters just below here to achieve a signal more similar to your own data!!! 
+norm_amp  = 20; % if 0, use amplitudes of input waveforms; if > 0, set all amplitudes to norm_amp*rms_noise
 mu_mean   = 0.75; % mean of mean spike amplitudes. Incoming waveforms are in uV; make <1 to make sorting harder
 rms_noise = 12; % rms noise in uV. Will be added to the spike signal. 15-20 uV an OK estimate from real data
-t_record  = 1200; % duration in seconds of simulation. longer is better (and slower!) (1000)
+t_record  = 300; % duration in seconds of simulation. longer is better (and slower!) (1000)
 fr_bounds = [1 10]; % min and max of firing rates ([1 10])
 tsmooth   = 0.5; % gaussian smooth the noise with sig = this many samples (increase to make it harder) (0.5)
 chsmooth  = 0.5; % smooth the noise across channels too, with this sig (increase to make it harder) (0.5)
@@ -48,9 +49,9 @@ useDefault = 1;     %use waveforms from eMouse folder in KS2
 if useDefault
     %get waveforms from eMouse folder in KS2
     filePath{1} = [KS2path,'\eMouse_drift\','kampff_St_unit_waves_allNeg_2X'];
-    fileCopies(1) = 1;
+    fileCopies(1) = 2;
     filePath{2} = [KS2path,'\eMouse_drift\','121817_single_unit_waves_allNeg.mat'];
-    fileCopies(2) = 1;
+    fileCopies(2) = 2;
 else
     %fill in paths to waveform files 
     filePath = {};
@@ -146,13 +147,21 @@ for fileIndex = 1:nFile
     if uType(NN+1) == 0
         scaleIntensity = mu_mean*(1 + (rand(nUnit,1) - 0.5));
     end
-    if uType(NN+1) == 1
+    if uType(NN+1) == 1     %these are already small, so don't make them smaller.
         scaleIntensity = (1 + (rand(nUnit,1)-0.5));
     end
 
-    %scaleIntensity = mu_mean*ones(NN,1);
-    for i = 1:nUnit
-        uData.uColl(i).waves = uData.uColl(i).waves*scaleIntensity(i);
+   if (norm_amp > 0)
+        %get min and max intensity, and normalize to norm_amp X the rms noise
+        targAmp = rms_noise*norm_amp;
+        for i = 1:nUnit          
+            maxAmp = max(max(uData.uColl(i).waves)) - min(min(uData.uColl(i).waves));
+            uData.uColl(i).waves = uData.uColl(i).waves*(targAmp/maxAmp);
+        end
+    else
+        for i = 1:nUnit
+            uData.uColl(i).waves = uData.uColl(i).waves*scaleIntensity(i);
+        end
     end
   
     %for these units, create an intepolant which will be used to

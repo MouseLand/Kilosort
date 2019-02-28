@@ -1,8 +1,8 @@
 useGPU = 1; % do you have a GPU? Kilosorting 1000sec of 32chan simulated data takes 55 seconds on gtx 1080 + M2 SSD.
 useParPool = 1; % use parpool; will speed up simulation if local cluater has > 6 cores.
-makeNewData = 0; % set this to 0 to just resort a previously created data set
+makeNewData = 1; % set this to 0 to just resort a previously created data set
 sortData = 1;
-runBenchmark = 1;
+runBenchmark = 1; %set to 1 to compare sorted data to ground truth for the simulation
 
 fpath    = 'D:\drift_simulations\test\'; % where on disk do you want the simulation? ideally an SSD...
 if ~exist(fpath, 'dir'); mkdir(fpath); end
