@@ -1,6 +1,7 @@
 function [row, col, mu] = isolated_peaks_new(S1, ops)
-loc_range = ops.loc_range;
-long_range = ops.long_range; 
+
+loc_range = getOr(ops, 'loc_range', [5 4]);
+long_range = getOr(ops, 'long_range', [30 6]);
 Th = ops.spkTh;
 nt0 = ops.nt0;
 

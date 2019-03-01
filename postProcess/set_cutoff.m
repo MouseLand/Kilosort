@@ -53,6 +53,9 @@ for j = 1:Nk
 end
 % eliminate spikes with id = 0
 
+% we sometimes get NaNs, why?
+rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
+
 ix = rez.st3(:,2)==0;
 rez.st3(ix, :) = [];
 if ~isempty(rez.cProj)
