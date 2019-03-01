@@ -53,7 +53,7 @@ rez = set_cutoff(rez);
 fprintf('found %d good units \n', sum(rez.good>0))
 
 % write to Phy
-fprintf('Saving results to Phy')
+fprintf('Saving results to Phy  \n')
 rezToPhy(rez, rootZ);
 
 %% if you want to save the results to a Matlab file... 
@@ -63,7 +63,7 @@ rez.cProj = [];
 rez.cProjPC = [];
 
 % save final results as rez2
-fprintf('Saving final results in rez2')
+fprintf('Saving final results in rez2  \n')
 fname = fullfile(rootZ, 'rez2.mat');
 save(fname, 'rez', '-v7.3');
 
