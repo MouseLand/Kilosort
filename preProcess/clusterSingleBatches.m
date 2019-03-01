@@ -10,8 +10,6 @@ Nfilt = ceil(rez.ops.Nchan/2);
 % extract PC projections here
 tic
 
-
-
 wPCA    = extractPCfromSnippets(rez, nPCs);
 fprintf('Obtained 7 PC waveforms in %2.2f seconds \n', toc)
 
@@ -36,6 +34,8 @@ i0 = 0;
 NrankPC = 3;
 
 iC = getClosestChannels(rez, ops.sigmaMask, NchanNear);
+
+% initialize W0, mu, nsp, just in case the first batch is empty
 
 tic
 for ibatch = 1:nBatches            
@@ -79,14 +79,16 @@ for ibatch = 1:nBatches
         end        
         W0 = W0 ./ (1e-5 + sum(sum(W0.^2,1),2).^.5);
     end
-    
-    Ws(:, :, :, ibatch)   = W0;    
-    mus(:, ibatch)     = mu;
-    ns(:, ibatch)      = nsp;        
-    Whs(:, ibatch)     = int32(Wheights);
-    
-    i0 = i0 + Nfilt;
-    
+
+    if exist('W0', 'var')
+        Ws(:, :, :, ibatch)   = W0;
+        mus(:, ibatch)     = mu;
+        ns(:, ibatch)      = nsp;
+        Whs(:, ibatch)     = int32(Wheights);
+    else
+        warning('data batch #%d only had %d spikes \n', ibatch, size(uproj,2))
+    end    
+    i0 = i0 + Nfilt;    
     
     if rem(ibatch, 500)==1
         fprintf('time %2.2f, pre clustered %d / %d batches \n', toc, ibatch, nBatches)
