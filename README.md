@@ -19,7 +19,7 @@ Navigate to the kilosort directory and run 'kilosort':
 >> cd \my\kilosort2\directory\
 >> kilosort
 ```
-See the [GUI documentation](https://github.com/MouseLand/Kilosort2/wiki/Kilosort2-GUI) for more details.
+See the [GUI documentation](https://github.com/MouseLand/Kilosort2/wiki/1.-The-GUI) for more details.
 
 #### Option 2: Using scripts (classic method)
 
