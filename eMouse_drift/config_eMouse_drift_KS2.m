@@ -1,6 +1,3 @@
-ops.chanMap             = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilosortChanMap.mat';
-% ops.chanMap = 1:ops.Nchan; % treated as linear probe if no chanMap file
-
 % sample rate
 ops.fs = 30000;  
 
@@ -18,9 +15,6 @@ ops.lam = 10;
 
 % splitting a cluster at the end requires at least this much isolation for each sub-cluster (max = 1)
 ops.AUCsplit = 0.9; 
-
-% type of batch resorting, 2 is by rastermap, 1 is standard
-ops.sorting = 1; 
 
 % minimum spike rate (Hz), if a cluster falls below this for too long it gets removed
 ops.minFR = 1/50; 

@@ -1,99 +1,66 @@
-addpath(genpath('D:/GitHub/KiloSort2')) % path to kilosort folder
-addpath('D:/GitHub\npy-matlab')
+addpath(genpath('D:\GitHub\KiloSort2')) % path to kilosort folder
+addpath('D:\GitHub\npy-matlab')
 
-pathToYourConfigFile = 'D:/GitHub/KiloSort2/configFiles'; % take from Github folder and put it somewhere else (together with the master_file)
+pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github folder and put it somewhere else (together with the master_file)
 run(fullfile(pathToYourConfigFile, 'configFile384.m'))
-
-chanMapList = {'neuropixPhase3A_kilosortChanMap', ...
-    'neuropixPhase3B1_kilosortChanMap', 'neuropixPhase3B2_kilosortChanMap'};
-
-fdir = {'Loewi\posterior', 'Loewi\frontal', 'WillAllen', ...
-    'Waksman/ZO', 'Waksman/K1', 'Waksman/ZNP1', ...
-    'Robbins/K1', 'Robbins/K3', 'Robbins/ZNP1', ...
-    'Josh\probeA', 'Josh\probeF', 'Josh\probeD', 'Bekesy/ZO', 'Bekesy/K1'};
-NTOT = [384 384 385 385 385 385 385 385 385 384 384 384 385 385];
-iMap = [1 1 1 1 1 1 1 1 1 1 1 1 3 2];
-%%
-% common options for every probe
-
-ops.sorting     = 2; % type of sorting, 2 is by rastermap, 1 is old
-ops.trange      = [0 1900]; % TIME RANGE IN SECONDS TO PROCESS
-
-% find the binary file in this folder
-rootrootZ = 'F:/Spikes\';
-
-% path to whitened, filtered proc file (on a fast SSD)
-rootH = 'H:\DATA\Spikes\temp\';
+rootH = 'H:\';
 ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
+ops.chanMap = fullfile(pathToYourConfigFile, 'neuropixPhase3A_kilosortChanMap.mat');
 
+ops.sorting     = 1; % type of sorting, 2 is by rastermap, 1 is old
+ops.trange = [0 Inf]; % 3633, 2411
+ops.NchanTOT    = 385; % total number of channels in your recording
 
-for j = 1 %1:numel(fdir)
-    fprintf('%s\n', fdir{j})
+% the binary file is in this folder
+rootZ = 'G:\drift_simulations\test';
 
-    ops.chanMap = fullfile(pathToYourConfigFile, [chanMapList{iMap(j)} '.mat']);
-    ops.NchanTOT    = NTOT(j); % total number of channels in your recording
-    rootZ = fullfile(rootrootZ, fdir{j});
+%%
+fprintf('Looking for data inside %s \n', rootZ)
 
-    fs          = [dir(fullfile(rootZ, '*.bin')) dir(fullfile(rootZ, '*.dat'))];
-    fname       = fs(1).name;
-    ops.fbinary = fullfile(rootZ,  fname);
-    ops.rootZ   = rootZ;
-
-    % preprocess data to create temp_wh.dat
-    rez = preprocessDataSub(ops);
-
-    % pre-clustering to re-order batches by depth
-    fname = fullfile(rootZ, 'rez.mat');
-    if exist(fname, 'file')
-        % just load the file if we already did this
-        dr = load(fname);
-        rez.iorig = dr.rez.iorig;
-        rez.ccb = dr.rez.ccb;
-        rez.ccbsort = dr.rez.ccbsort;
-    else
-        rez = clusterSingleBatches(rez);
-        save(fname, 'rez', '-v7.3');
-    end
-
-    % main optimization
-    rez = learnAndSolve8b(rez);
-
-    % final splits
-    rez = find_merges(rez, 1);
-    
-    % final splits by SVD
-    rez = splitAllClusters(rez, 1);
-    
-    % final splits by amplitudes
-    rez = splitAllClusters(rez, 0);
-    
-    % decide on cutoff
-    rez = set_cutoff(rez);
-
-    % this saves to Phy
-    rezToPhy(rez, rootZ);
-
-    % discard features in final rez file (too slow to save)
-    rez.cProj = [];
-    rez.cProjPC = [];
-
-    % save final results as rez2
-    fname = fullfile(rootZ, 'rez2.mat');
-    save(fname, 'rez', '-v7.3');
-    
-    
-    
-    sum(rez.good>0)
-    fileID = fopen(fullfile(rootZ2, 'cluster_group.tsv'),'w');
-    fprintf(fileID, 'cluster_id%sgroup', char(9));
-    fprintf(fileID, char([13 10]));
-    for k = 1:length(rez.good)
-        if rez.good(k)
-            fprintf(fileID, '%d%sgood', k-1, char(9));
-            fprintf(fileID, char([13 10]));
-        end
-    end
-    fclose(fileID);
-
-%     loadManualSorting;
+% is there a channel map file in this folder?
+fs = dir(fullfile(rootZ, 'chan*.mat'));
+if ~isempty(fs)
+    ops.chanMap = fullfile(rootZ, fs(1).name);
 end
+
+% find the binary file
+fs          = [dir(fullfile(rootZ, '*.bin')) dir(fullfile(rootZ, '*.dat'))];
+ops.fbinary = fullfile(rootZ, fs(1).name);
+
+% preprocess data to create temp_wh.dat
+rez = preprocessDataSub(ops);
+
+% time-reordering as a function of drift
+rez = clusterSingleBatches(rez);
+save(fullfile(rootZ, 'rez.mat'), 'rez', '-v7.3');
+
+% main tracking and template matching algorithm
+rez = learnAndSolve8b(rez);
+
+% final merges
+rez = find_merges(rez, 1);
+
+% final splits by SVD
+rez = splitAllClusters(rez, 1);
+
+% final splits by amplitudes
+rez = splitAllClusters(rez, 0);
+
+% decide on cutoff
+rez = set_cutoff(rez);
+
+fprintf('found %d good units \n', sum(rez.good>0))
+
+% write to Phy
+fprintf('Saving results to Phy')
+rezToPhy(rez, rootZ);
+
+% discard features in final rez file (too slow to save)
+rez.cProj = [];
+rez.cProjPC = [];
+
+% save final results as rez2
+fprintf('Saving final results in rez2')
+fname = fullfile(rootZ2, 'rez2.mat');
+save(fname, 'rez', '-v7.3');
+

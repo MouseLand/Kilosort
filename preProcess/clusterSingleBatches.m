@@ -143,11 +143,8 @@ ccb0 = ccb0 + ccb0';
 
 rez.ccb = gather(ccb0);
 
-if getOr(rez.ops, 'sorting', 1)==2
-    [ccb1, iorig] = sort_by_rastermap(ccb0);
-else
-    [ccb1, iorig] = sortBatches2(ccb0);
-end
+% sort by new manifold algorithm
+[ccb1, iorig] = sortBatches2(ccb0);
 
 figure;
 subplot(1,2,1)

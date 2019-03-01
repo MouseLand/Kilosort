@@ -19,9 +19,6 @@ ops.lam = 10;
 % splitting a cluster at the end requires at least this much isolation for each sub-cluster (max = 1)
 ops.AUCsplit = 0.9; 
 
-% type of batch resorting, 2 is by rastermap, 1 is standard
-ops.sorting = 1; 
-
 % minimum spike rate (Hz), if a cluster falls below this for too long it gets removed
 ops.minFR = 1/50; 
 
