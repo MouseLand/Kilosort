@@ -1032,7 +1032,7 @@ classdef ksGUI < handle
                         title(obj.H.dataAx, ttl);
                         yt = arrayfun(@(x)sprintf('%d (%d)', chList(x), obj.P.chanMap.chanMap(chList(x))), 1:numel(chList), 'uni', false);
                         set(obj.H.dataAx, 'YTick', 1:numel(chList), 'YTickLabel', yt);
-                        set(obj.H.dataAx, 'YLim', [0 numel(chList)], 'YDir', 'normal');
+                        set(obj.H.dataAx, 'YLim', [0 numel(chList)+1], 'YDir', 'normal');
                     else % colormap mode
                         %chList = 1:numel(obj.P.chanMap.chanMap);
                         
@@ -1418,8 +1418,14 @@ classdef ksGUI < handle
             switch k.Key
                 case 'uparrow'
                     obj.P.nChanToPlot = obj.P.nChanToPlot+1;
+                    if obj.P.nChanToPlot > obj.ops.NchanTOT
+                        obj.P.nChanToPlot = obj.ops.NchanTOT;
+                    end
                 case 'downarrow'
                     obj.P.nChanToPlot = obj.P.nChanToPlot-1;
+                    if obj.P.nChanToPlot == 0
+                        obj.P.nChanToPlot = 1;
+                    end
                 case 'c'
                     obj.P.colormapMode = ~obj.P.colormapMode;     
                 case '1'
