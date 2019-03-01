@@ -1,6 +1,6 @@
 function make_eMouseData_drift(fpath, KS2path, chanMapName, useGPU, useParPool)
 % this script makes a binary file of simulated eMouse recording
-% Based on Marius Pachitariu's original eMouse simulator for Kilosort 1
+% written by Jennifer Colonell, based on Marius Pachitariu's original eMouse simulator for Kilosort 1
 % Adds the ability to simulate simple drift of the tissue relative to the
 % probe sites.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -438,75 +438,75 @@ while t_all<t_record
     
     dat(:, find(connected==0)) = 0; % these are the reference and dig channels
     
-    % now we add spikes on non-dead channels. 
-    ibatch = (spk_times >= t_all*fs) & (spk_times < t_all*fs+NT-buff); 
+    % now we add spikes on non-dead channels.
+    ibatch = (spk_times >= t_all*fs) & (spk_times < t_all*fs+NT-buff);
     ts = spk_times(ibatch) - t_all*fs;
     ids = clu(ibatch);
     am = amps(ibatch);
     tRange = int64(1:nt);
-tic
-
-if (useParPool) 
-%     %first run a parfor loop for the time consuming calculation of the
-%     %interpolated waves
+    tic
     
-    currWavArray = zeros(length(ts),Nchan,nt,'double'); %actual array much shorter
-    currSiteArray = zeros(length(ts),Nchan,'uint16'); %record indices of the sites in currWavArray;
-    currNsiteArray = zeros(length(ts),'uint16'); %record number of sites 
-
-    parfor i = 1:length(ts)
-        cc = ids(i); %current cluster index
-        currT = t_all + double(ts(i))/fs;
-        currYPos = calcYPos_v2( currT, p_uY.Value(cc), drift );
-        [currWav, uSites] = ...
-             intWav( p_uF.Value{cc}, p_uX.Value(cc), currYPos, p_uR.Value(cc), p_xcoords.Value, p_ycoords.Value, p_connected.Value, nt );
-        nSite = length(uSites);
-        currWavArray(i,:,:) = padarray(currWav * am(i),[(Nchan-nSite),0],0,'post');
-        currSiteArray(i, :) = padarray(uSites,(Nchan-nSite),0,'post')';
-        currNsiteArray(i) = nSite;
+    if (useParPool)
+        %     %first run a parfor loop for the time consuming calculation of the
+        %     %interpolated waves
+        
+        currWavArray = zeros(length(ts),Nchan,nt,'double'); %actual array much shorter
+        currSiteArray = zeros(length(ts),Nchan,'uint16'); %record indices of the sites in currWavArray;
+        currNsiteArray = zeros(length(ts),'uint16'); %record number of sites
+        
+        parfor i = 1:length(ts)
+            cc = ids(i); %current cluster index
+            currT = t_all + double(ts(i))/fs;
+            currYPos = calcYPos_v2( currT, p_uY.Value(cc), drift );
+            [currWav, uSites] = ...
+                intWav( p_uF.Value{cc}, p_uX.Value(cc), currYPos, p_uR.Value(cc), p_xcoords.Value, p_ycoords.Value, p_connected.Value, nt );
+            nSite = length(uSites);
+            currWavArray(i,:,:) = padarray(currWav * am(i),[(Nchan-nSite),0],0,'post');
+            currSiteArray(i, :) = padarray(uSites,(Nchan-nSite),0,'post')';
+            currNsiteArray(i) = nSite;
+        end
+        
     end
     
-end
-   
     for i = 1:length(ts)
-       %for a given time, need to calcuate the wave that correspond to
-       %the current position of the probe.
-       allspks = allspks + 1;
-       currT = t_all + double(ts(i))/fs;
-       cc = ids(i); %current cluster index
-       
-       %get current position of this unit
-       currYPos = calcYPos_v2( currT, uY(cc), drift );
-       
-       %currYdrift = calcYPos( currT, ycoords );
-       yDriftRec(allspks,1) = currT;
-       yDriftRec(allspks,2) = currYPos;
-       yDriftRec(allspks,3) = cc; %record the unit label in the drift record
-
-    
-      if (useParPool)
-          %get the waves for this unit from the big precalculated array 
-          uSites = squeeze(currSiteArray(i,1:currNsiteArray(i)));
-          tempWav = squeeze(currWavArray(i,1:currNsiteArray(i),:));
-          dat(ts(i) + tRange, uSites) = dat(ts(i) + tRange, uSites) + tempWav';
-      else
-          %calculate the interpolants now
-          [tempWav, uSites] = ...
-            intWav( uF{cc}, uX(cc), currYPos, uR(cc), xcoords, ycoords, connected, nt );
-    
+        %for a given time, need to calcuate the wave that correspond to
+        %the current position of the probe.
+        allspks = allspks + 1;
+        currT = t_all + double(ts(i))/fs;
+        cc = ids(i); %current cluster index
+        
+        %get current position of this unit
+        currYPos = calcYPos_v2( currT, uY(cc), drift );
+        
+        %currYdrift = calcYPos( currT, ycoords );
+        yDriftRec(allspks,1) = currT;
+        yDriftRec(allspks,2) = currYPos;
+        yDriftRec(allspks,3) = cc; %record the unit label in the drift record
+        
+        
+        if (useParPool)
+            %get the waves for this unit from the big precalculated array
+            uSites = squeeze(currSiteArray(i,1:currNsiteArray(i)));
+            tempWav = squeeze(currWavArray(i,1:currNsiteArray(i),:));
+            dat(ts(i) + tRange, uSites) = dat(ts(i) + tRange, uSites) + tempWav';
+        else
+            %calculate the interpolants now
+            [tempWav, uSites] = ...
+                intWav( uF{cc}, uX(cc), currYPos, uR(cc), xcoords, ycoords, connected, nt );
+            
             dat(ts(i) + tRange, uSites) = dat(ts(i) + tRange, uSites) +...
                 am(i) * tempWav(:,:)';
-      end
-
-       cM = find(uSites == monSite(cc));       
-       %if drift has moved the monitor site outside the footprint of the
-       %unit, the recorded amplitudes just stay = 0;
-       
-       if ( cM )
+        end
+        
+        cM = find(uSites == monSite(cc));
+        %if drift has moved the monitor site outside the footprint of the
+        %unit, the recorded amplitudes just stay = 0;
+        
+        if ( cM )
             yDriftRec(allspks,4) = max(tempWav(cM,:)) - min(tempWav(cM,:));
             yDriftRec(allspks,5) = max(dat(ts(i) + tRange,monSite(cc))) - min(dat(ts(i) + tRange,monSite(cc)));
-       end
-       
+        end
+        
     end
     
     dat_old    =  dat;
