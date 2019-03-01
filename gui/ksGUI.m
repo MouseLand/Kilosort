@@ -623,6 +623,8 @@ classdef ksGUI < handle
         
         function runAll(obj)
             
+            obj.P.ksDone = false;
+            
             obj.runPreproc;
             obj.runSpikesort;
             obj.runSaveToPhy;
@@ -1145,9 +1147,9 @@ classdef ksGUI < handle
                             if ~isempty(cm)
                                 obj.P.allChanMaps(end+1) = cm;
                                 currProbeList = obj.H.settings.setProbeEdt.String;
-                                newProbeList = [{cm.name} currProbeList];
+                                newProbeList = [{cm.name}; currProbeList];
                                 obj.H.settings.setProbeEdt.String = newProbeList;
-                                
+                                obj.H.settings.setProbeEdt.Value = 1;
                                 answer = questdlg('Save this channel map for later?');
                                 if strcmp(answer, 'Yes')
                                     saveNewChanMap(cm, obj);
@@ -1167,9 +1169,9 @@ classdef ksGUI < handle
                             if ~isempty(cm)
                                 obj.P.allChanMaps(end+1) = cm;
                                 currProbeList = obj.H.settings.setProbeEdt.String;
-                                newProbeList = [{cm.name} currProbeList];
+                                newProbeList = [{cm.name}; currProbeList];
                                 obj.H.settings.setProbeEdt.String = newProbeList;
-                                
+                                obj.H.settings.setProbeEdt.Value = 1;
                                 answer = questdlg('Save this channel map for later?');
                                 if strcmp(answer, 'Yes')
                                     saveNewChanMap(cm, obj);
@@ -1531,13 +1533,11 @@ classdef ksGUI < handle
         
         function help(obj)
             
-            hstr = {'Welcome to Kilosort!',...
-                '',...
-                'See below for troubleshooting and tips.',...
+            hstr = {'Welcome to Kilosort!',...                
                 '',...
                 '*** Troubleshooting ***', ...
-                '1. Close and restart kilosort gui.', ...
-                '2. Delete the file \myDirectory\myFilename_ksSettings.mat and restart the gui', ...
+                '1. Click ''reset'' to try to clear any GUI problems or weird errors. Also try restarting matlab.', ...                
+                '2. Visit github.com/MouseLand/Kilosort2 to see more troubleshooting tips.',...
                 '3. Create an issue at github.com/MouseLand/Kilosort2 with as much detail about the problem as possible.'};
             
             h = helpdlg(hstr, 'Kilosort help');
