@@ -7,6 +7,7 @@ For more information about how to run the simulator, go to the [eMouse wiki page
 Built by Jennifer Colonell. 
 
 [1] Ultra dense survey http://www.kampff-lab.org/ultra-dense-survey/
+
 [2] S. Chen, J.P. Neto, M. Pachitariu, A. R. Kampff, N. A. Steinmetz, ‘On the shape and extent of extracellular action potential waveforms across the rodent brain’. SfN 2018. 
 
 
