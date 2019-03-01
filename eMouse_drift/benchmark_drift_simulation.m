@@ -1,4 +1,4 @@
-function benchmark_simulation(rez, GTfilepath, simRecfilepath)
+function benchmark_drift_simulation(rez, GTfilepath, simRecfilepath)
 
 load(GTfilepath)
 

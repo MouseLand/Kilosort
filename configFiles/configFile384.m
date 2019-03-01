@@ -34,8 +34,10 @@ ops.sigmaMask = 30;
 % threshold crossings for pre-clustering (in PCA projection space)
 ops.ThPre = 8; 
 %% danger, changing these settings can lead to fatal errors
-ops.GPU                 = 1; % has to be 1, no CPU version yet, sorry
+% options for determining PCs
+ops.spkTh           = -6;      % spike threshold in standard deviations (-6)
 
+ops.GPU                 = 1; % has to be 1, no CPU version yet, sorry
 % ops.Nfilt               = 1024; % max number of clusters
 ops.nfilt_factor        = 4; % max number of clusters per good channel (even temporary ones)
 ops.ntbuff              = 64;    % samples of symmetrical buffer for whitening and spike detection
@@ -46,10 +48,4 @@ ops.scaleproc           = 200;   % int16 scaling of whitened data
 ops.nPCs                = 3; % how many PCs to project the spikes into
 ops.useRAM              = 0; % not yet available
 
-% options for determining PCs
-ops.spkTh           = -6;      % spike threshold in standard deviations (-6)
-ops.loc_range       = [5  4];  % ranges to detect peaks; plus/minus in time and channel ([3 1])
-ops.long_range      = [30  6]; % ranges to detect isolated peaks ([30 6])
-ops.maskMaxChannels = 5;       % how many channels to mask up/down ([5])
-ops.criterionNoiseChannels = 0.2; % fraction of "noise" templates allowed to span all channel groups (see createChannelMapFile for more info). 
 %%
