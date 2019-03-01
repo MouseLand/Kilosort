@@ -11,8 +11,6 @@
     mexcuda -largeArrayDims mexFilterPCs.cu
     mexcuda -largeArrayDims mexClustering2.cu
     mexcuda -largeArrayDims mexDistances2.cu
-    
-    mexcuda -largeArrayDims mexThSpkPC.cu
 
 
 %    mex -largeArrayDims mexMPmuFEAT.cu
