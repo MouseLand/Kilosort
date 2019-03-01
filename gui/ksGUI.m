@@ -1418,8 +1418,8 @@ classdef ksGUI < handle
             switch k.Key
                 case 'uparrow'
                     obj.P.nChanToPlot = obj.P.nChanToPlot+1;
-                    if obj.P.nChanToPlot > obj.ops.NchanTOT
-                        obj.P.nChanToPlot = obj.ops.NchanTOT;
+                    if obj.P.nChanToPlot > numel(obj.P.chanMap.chanMap)
+                        obj.P.nChanToPlot = numel(obj.P.chanMap.chanMap);
                     end
                 case 'downarrow'
                     obj.P.nChanToPlot = obj.P.nChanToPlot-1;
