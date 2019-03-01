@@ -7,17 +7,7 @@ function [spikeTimes, clusterIDs, amplitudes, templates, templateFeatures, ...
 % available (https://github.com/kwikteam/npy-matlab)
 
 
-% save a list of "good" clusters for Phy
-fileID = fopen(fullfile(savePath, 'cluster_group.tsv'),'w');
-fprintf(fileID, 'cluster_id%sgroup', char(9));
-fprintf(fileID, char([13 10]));
-for j = 1:length(rez.good)
-    if rez.good(j)
-        fprintf(fileID, '%d%sgood', j-1, char(9));
-        fprintf(fileID, char([13 10]));
-    end
-end
-fclose(fileID);
+
 
 
 % spikeTimes will be in samples, not seconds
@@ -80,6 +70,35 @@ templateFeatureInds = uint32(rez.iNeigh);
 pcFeatures = rez.cProjPC;
 pcFeatureInds = uint32(rez.iNeighPC);
 
+whiteningMatrix = rez.Wrot/rez.ops.scaleproc;
+whiteningMatrixInv = whiteningMatrix^-1;
+
+% here we compute the amplitude of every template...
+
+% unwhiten all the templates
+tempsUnW = zeros(size(templates));
+for t = 1:size(templates,1)
+    tempsUnW(t,:,:) = squeeze(templates(t,:,:))*whiteningMatrixInv;
+end
+
+% The amplitude on each channel is the positive peak minus the negative
+tempChanAmps = squeeze(max(tempsUnW,[],2))-squeeze(min(tempsUnW,[],2));
+
+% The template amplitude is the amplitude of its largest channel 
+tempAmpsUnscaled = max(tempChanAmps,[],2);
+
+% assign all spikes the amplitude of their template multiplied by their
+% scaling amplitudes
+spikeAmps = tempAmpsUnscaled(spikeTemplates).*amplitudes;
+
+% take the average of all spike amps to get actual template amps (since
+% tempScalingAmps are equal mean for all templates)
+ta = clusterAverage(spikeTemplates, spikeAmps);
+tids = unique(spikeTemplates);
+tempAmps(tids) = ta; % because ta only has entries for templates that had at least one spike
+gain = getOr(rez.ops, 'gain', 1);
+tempAmps = gain*tempAmps'; % for consistency, make first dimension template number
+
 if ~isempty(savePath)
     
     writeNPY(spikeTimes, fullfile(savePath, 'spike_times.npy'));
@@ -103,8 +122,7 @@ if ~isempty(savePath)
     writeNPY(pcFeatures, fullfile(savePath, 'pc_features.npy'));
     writeNPY(pcFeatureInds'-1, fullfile(savePath, 'pc_feature_ind.npy'));% -1 for zero indexing
     
-    whiteningMatrix = rez.Wrot/200;
-    whiteningMatrixInv = whiteningMatrix^-1;
+    
     writeNPY(whiteningMatrix, fullfile(savePath, 'whitening_mat.npy'));
     writeNPY(whiteningMatrixInv, fullfile(savePath, 'whitening_mat_inv.npy'));
     
@@ -113,6 +131,39 @@ if ~isempty(savePath)
         writeNPY(similarTemplates, fullfile(savePath, 'similar_templates.npy'));
     end
     
+    % save a list of "good" clusters for Phy
+    fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
+    fprintf(fileID, 'cluster_id%sKSLabel', char(9));
+    fprintf(fileID, char([13 10]));
+    
+    fileIDCP = fopen(fullfile(savePath, 'cluster_ContamPct.tsv'),'w');
+    fprintf(fileIDCP, 'cluster_id%sContamPct', char(9));
+    fprintf(fileIDCP, char([13 10]));
+    
+    fileIDA = fopen(fullfile(savePath, 'cluster_Amplitude.tsv'),'w');
+    fprintf(fileIDA, 'cluster_id%sAmplitude', char(9));
+    fprintf(fileIDA, char([13 10]));
+    
+    rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
+    for j = 1:length(rez.good)
+        if rez.good(j)
+            fprintf(fileID, '%d%sgood', j-1, char(9));             
+        else
+            fprintf(fileID, '%d%smua', j-1, char(9));
+        end
+        fprintf(fileID, char([13 10]));           
+        
+        fprintf(fileIDCP, '%d%s%.1f', j-1, char(9), rez.est_contam_rate(j)*100);
+        fprintf(fileIDCP, char([13 10]));
+        
+        fprintf(fileIDA, '%d%s%.1f', j-1, char(9), tempAmps(j));
+        fprintf(fileIDA, char([13 10]));
+        
+    end
+    fclose(fileID);
+    fclose(fileIDCP);
+    fclose(fileIDA);
+
      %make params file
     if ~exist(fullfile(savePath,'params.py'),'file')
         fid = fopen(fullfile(savePath,'params.py'), 'w');
