@@ -36,6 +36,7 @@ NrankPC = 3;
 iC = getClosestChannels(rez, ops.sigmaMask, NchanNear);
 
 % initialize W0, mu, nsp, just in case the first batch is empty
+Whs = gpuArray.ones(Nfilt, nBatches, 'int32');
 
 tic
 for ibatch = 1:nBatches            
