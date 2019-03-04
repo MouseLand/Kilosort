@@ -3,6 +3,11 @@ rng('default'); rng(1);
 
 ops = rez.ops;
 
+if getOr(ops, 'reorder', 0)==0
+    rez.iorig = 1:rez.temp.Nbatch;
+    return;
+end
+    
 nPCs    = getOr(rez.ops, 'nPCs', 3);
 % Nfilt   = rez.ops.Nfilt;
 Nfilt = ceil(rez.ops.Nchan/2);

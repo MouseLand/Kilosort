@@ -33,6 +33,7 @@ ops.ThPre = 8;
 %% danger, changing these settings can lead to fatal errors
 % options for determining PCs
 ops.spkTh           = -6;      % spike threshold in standard deviations (-6)
+ops.reorder         = 1;       % whether to reorder batches for drift correction. 
 
 ops.GPU                 = 1; % has to be 1, no CPU version yet, sorry
 % ops.Nfilt               = 1024; % max number of clusters
