@@ -14,7 +14,7 @@ Required toolboxes: parallel computing toolbox, signal processing toolbox.
 
 You must run and complete successfully "mexGPUall" in the CUDA folder. This requires mexcuda support, which comes with the parallel computing toolbox. To set up mexcuda compilation, install the exact version of the CUDA toolkit compatible with your Matlab version (see [here](https://www.mathworks.com/help/distcomp/gpu-support-by-release.html)). On Windows, you must also install a CPU compiler, for example the freely available [Visual Studio Community 2013](https://www.visualstudio.com/vs/older-downloads/). Note that the most recent editions of Visual Studio are usually not compatible with CUDA. If you had previously used a different CPU compiler in Matlab, you must switch to the CUDA-compatible compiler using mex -setup C++. For more about mexcuda installation, see these [instructions](http://uk.mathworks.com/help/distcomp/mexcuda.html).
 
-### General instructions for running Kilosort ###
+### General instructions for running Kilosort2 ###
 
 #### Option 1: Using the GUI
 
