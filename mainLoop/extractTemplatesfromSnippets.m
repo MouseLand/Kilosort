@@ -2,6 +2,7 @@ function [wTEMP, wPCA] = extractTemplatesfromSnippets(rez, nPCs)
 
 ops = rez.ops;
 
+nskip = getOr(ops, 'nskip', 25);
 % Nchan 	= ops.Nchan;
 
 Nbatch      = rez.temp.Nbatch;
@@ -14,7 +15,7 @@ fid = fopen(ops.fproc, 'r');
 
 k = 0;
 dd = gpuArray.zeros(ops.nt0, 5e4, 'single');
-for ibatch = 1:100:Nbatch
+for ibatch = 1:nskip:Nbatch
     offset = 2 * ops.Nchan*batchstart(ibatch);
     fseek(fid, offset, 'bof');
     dat = fread(fid, [NT ops.Nchan], '*int16');
