@@ -22,8 +22,8 @@ rez.ycoords = yc;
 rez.ops.chanMap = chanMap;
 rez.ops.kcoords = kcoords; 
 
-d = dir(ops.fbinary);
-nTimepoints = floor(d.bytes/NchanTOT/2);
+bytes = get_file_size(ops.fbinary);
+nTimepoints = floor(bytes/NchanTOT/2);
 
 rez.ops.tstart = ceil(ops.trange(1) * ops.fs); 
 rez.ops.tend   = min(nTimepoints, ceil(ops.trange(2) * ops.fs)); 
