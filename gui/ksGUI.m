@@ -572,8 +572,7 @@ classdef ksGUI < handle
             
             if ~isempty(obj.H.settings.ChooseFileEdt.String) && ...
                     ~strcmp(obj.H.settings.ChooseFileEdt.String, '...')
-                d = dir(obj.H.settings.ChooseFileEdt.String);
-                b = d.bytes;
+                b = get_file_size(obj.H.settings.ChooseFileEdt.String);
 
                 a = cast(0, 'int16'); % hard-coded for now, int16
                 q = whos('a');

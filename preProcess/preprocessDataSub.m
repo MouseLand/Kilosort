@@ -6,11 +6,11 @@ ops.nt0min  = getOr(ops, 'nt0min', ceil(20 * ops.nt0/61));
 NT       = ops.NT ;
 NchanTOT = ops.NchanTOT;
 
-d = dir(ops.fbinary);
-nTimepoints = floor(d.bytes/NchanTOT/2);
-ops.tstart = ceil(ops.trange(1) * ops.fs); 
-ops.tend   = min(nTimepoints, ceil(ops.trange(2) * ops.fs)); 
-ops.sampsToRead = ops.tend-ops.tstart; 
+bytes = get_file_size(ops.fbinary);
+nTimepoints = floor(bytes/NchanTOT/2);
+ops.tstart = ceil(ops.trange(1) * ops.fs);
+ops.tend   = min(nTimepoints, ceil(ops.trange(2) * ops.fs));
+ops.sampsToRead = ops.tend-ops.tstart;
 ops.twind = ops.tstart * NchanTOT*2;
 
 Nbatch      = ceil(ops.sampsToRead /(NT-ops.ntbuff));
