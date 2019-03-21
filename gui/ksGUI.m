@@ -683,6 +683,11 @@ classdef ksGUI < handle
                 obj.ops.throw_out_channels = true;
             end
             obj.H.settings.setMinfrEdt.String = num2str(obj.ops.minfr_goodchannels);
+
+            obj.ops.fs = str2num(obj.H.settings.setFsEdt.String);
+            if isempty(obj.ops.fs)||isnan(obj.ops.fs)
+                obj.ops.fs = 30000;
+            end
                         
             obj.ops.Th = str2num(obj.H.settings.setThEdt.String);
             if isempty(obj.ops.Th)||any(isnan(obj.ops.Th))
