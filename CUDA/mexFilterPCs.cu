@@ -75,15 +75,15 @@ void mexFunction(int nlhs, mxArray *plhs[],
 
   /* Declare input variables*/
   double *Params, *d_Params;
-  int NT, Nchan;
+  unsigned int NT, Nchan;
 
   
   /* read Params and copy to GPU */
   // NT, Nchan, nt0, Nrank
   
   Params  	= (double*) mxGetData(prhs[0]);
-  NT		= (int) Params[0];
-  Nchan     = (int) Params[1];
+  NT		= (unsigned int) Params[0];
+  Nchan     = (unsigned int) Params[1];
         
   cudaMalloc(&d_Params,      sizeof(double)*mxGetNumberOfElements(prhs[0]));
   cudaMemcpy(d_Params,Params,sizeof(double)*mxGetNumberOfElements(prhs[0]),cudaMemcpyHostToDevice);

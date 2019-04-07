@@ -276,7 +276,7 @@ __global__ void	cleanup_spikes(const double *Params, const float *data,
   int lockout, indx, tid, bid, NT, tid0,  j, id0, t0;
   volatile __shared__ float sdata[Nthreads+2*81+1];
   bool flag=0;
-  float err0, Th, lam;
+  float err0, Th;
   
   lockout   = (int) Params[4] - 1;
   tid 		= threadIdx.x;
@@ -285,7 +285,7 @@ __global__ void	cleanup_spikes(const double *Params, const float *data,
   NT      	=   (int) Params[0];
   tid0 		= bid * blockDim.x ;
   Th 		= (float) Params[2];
-  lam 	    = (float) Params[7];
+  //lam 	    = (float) Params[7];
   
   while(tid0<NT-Nthreads-lockout+1){
       if (tid<2*lockout)
@@ -558,18 +558,18 @@ void mexFunction(int nlhs, mxArray *plhs[],
 
   /* Declare input variables*/
   double *Params, *d_Params;
-  int nt0, Nchan, NT, Nfilt, Nnearest, Nrank, NchanU;
+  unsigned int nt0, Nchan, NT, Nfilt, Nnearest, Nrank, NchanU;
 
   
   /* read Params and copy to GPU */
   Params  	= (double*) mxGetData(prhs[0]);
-  NT		= (int) Params[0];
-  Nfilt     = (int) Params[1];
-  nt0       = (int) Params[4];
-  Nnearest  = (int) Params[5];
-  Nrank     = (int) Params[6];
-  NchanU    = (int) Params[10];  
-  Nchan     = (int) Params[9];
+  NT		= (unsigned int) Params[0];
+  Nfilt     = (unsigned int) Params[1];
+  nt0       = (unsigned int) Params[4];
+  Nnearest  = (unsigned int) Params[5];
+  Nrank     = (unsigned int) Params[6];
+  NchanU    = (unsigned int) Params[10];  
+  Nchan     = (unsigned int) Params[9];
   
   cudaMalloc(&d_Params,      sizeof(double)*mxGetNumberOfElements(prhs[0]));
   cudaMemcpy(d_Params,Params,sizeof(double)*mxGetNumberOfElements(prhs[0]),cudaMemcpyHostToDevice);
@@ -727,7 +727,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   
   float *x, *feat, *featPC, *vexp;
   int *st, *id;
-  int minSize;
+  unsigned int minSize;
   if (counter[0]<maxFR)  minSize = counter[0];
   else                   minSize = maxFR;
   const mwSize dimst[] 	= {minSize,1}; 

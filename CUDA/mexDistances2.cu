@@ -101,7 +101,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
 {
     /* Declare input variables*/
   double *Params, *d_Params;
-  int  Nspikes, Nfilters;
+  unsigned int  Nspikes, Nfilters;
   
   /* Initialize the MathWorks GPU API. */
   mxInitGPU();
