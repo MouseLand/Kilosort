@@ -246,9 +246,9 @@ __global__ void extract_snips(const double *Params, const int *st, const int *id
 __global__ void extract_snips2(const double *Params, const float *err, const int *st, const int *id,
         const int *counter, const int *kk, const int *iC, const float *W, float *WU){
     
-  int nt0, tidx, tidy, bid, ind, icl, NT, Nchan, Nmax, Nsum, NchanNear;
+  int nt0, tidx, tidy, bid, ind, icl, Nchan, Nmax, Nsum, NchanNear;
   
-  NT        = (int) Params[0];
+  //NT        = (int) Params[0];
   nt0       = (int) Params[4];
   Nchan     = (int) Params[9];
   Nsum      = (int) Params[13];
@@ -285,15 +285,15 @@ void mexFunction(int nlhs, mxArray *plhs[],
 
   /* Declare input variables*/
   double *Params, *d_Params;
-  int nt0, NT, Nchan, Nnearest, Nrank;
+  unsigned int nt0, NT, Nchan, Nnearest, Nrank;
   
   /* read Params and copy to GPU */
   Params  	= (double*) mxGetData(prhs[0]);
-  NT		= (int) Params[0];
-  Nchan     = (int) Params[9];
-  nt0       = (int) Params[4];
-  Nnearest  = (int) Params[5];
-  Nrank     = (int) Params[14];
+  NT		= (unsigned int) Params[0];
+  Nchan     = (unsigned int) Params[9];
+  nt0       = (unsigned int) Params[4];
+  Nnearest  = (unsigned int) Params[5];
+  Nrank     = (unsigned int) Params[14];
   
   dim3 tpB(8, 2*nt0-1), tpF(16, Nnearest), tpS(nt0, 16);
         
@@ -347,8 +347,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemset(d_st1,     0, maxFR *   sizeof(int));
   cudaMemset(d_id1,     0, maxFR *   sizeof(int));
     
-  int *counter;
-  counter = (int*) calloc(1,sizeof(int));
+  unsigned int *counter;
+  counter = (unsigned int*) calloc(1,sizeof(unsigned int));
   
   // filter the data with the temporal templates
   Conv1D<<<Nchan, Nthreads>>>(d_Params, d_data, d_W, d_dfilt);

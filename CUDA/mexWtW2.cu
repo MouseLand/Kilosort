@@ -83,15 +83,15 @@ void mexFunction(int nlhs, mxArray *plhs[],
 {
     /* Declare input variables*/
   double *Params, *d_Params;
-  int nt0, Nfilt;
+  unsigned int nt0, Nfilt;
 
   /* Initialize the MathWorks GPU API. */
   mxInitGPU();
 
   /* read Params and copy to GPU */
   Params  	= (double*) mxGetData(prhs[0]);
-  Nfilt		= (int) Params[1];
-  nt0       = (int) Params[9];
+  Nfilt		= (unsigned int) Params[1];
+  nt0       = (unsigned int) Params[9];
   
   cudaMalloc(&d_Params,      sizeof(double)*mxGetNumberOfElements(prhs[0]));
   cudaMemcpy(d_Params,Params,sizeof(double)*mxGetNumberOfElements(prhs[0]),cudaMemcpyHostToDevice);
