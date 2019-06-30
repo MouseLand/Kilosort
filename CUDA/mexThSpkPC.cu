@@ -203,14 +203,14 @@ void mexFunction(int nlhs, mxArray *plhs[],
 
   /* Declare input variables*/
   double *Params, *d_Params;
-  int NT, Nchan, NchanNear, NrankPC;
+  unsigned int NT, Nchan, NchanNear, NrankPC;
   
   /* read Params and copy to GPU */
   Params  	= (double*) mxGetData(prhs[0]);
-  NT 		= (int) Params[0];
-  Nchan     = (int) Params[1];  
-  NchanNear = (int) Params[2];      
-  NrankPC     = (int) Params[6];
+  NT 		= (unsigned int) Params[0];
+  Nchan     = (unsigned int) Params[1];  
+  NchanNear = (unsigned int) Params[2];      
+  NrankPC     = (unsigned int) Params[6];
         
   cudaMalloc(&d_Params,      sizeof(double)*mxGetNumberOfElements(prhs[0]));
   cudaMemcpy(d_Params,Params,sizeof(double)*mxGetNumberOfElements(prhs[0]),cudaMemcpyHostToDevice);
@@ -261,7 +261,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemcpy(counter,     d_counter, sizeof(int), cudaMemcpyDeviceToHost);
   
   // move d_x to the CPU
-  int minSize=1;
+  unsigned int minSize=1;
   minSize = min(maxFR, counter[0]);
 
   const mwSize ddF[] 	= {NrankPC * NchanNear, minSize};

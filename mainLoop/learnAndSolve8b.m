@@ -1,6 +1,7 @@
 function rez = learnAndSolve8b(rez)
 
 ops = rez.ops;
+ops.fig = getOr(ops, 'fig', 1);
 
 NrankPC = 6;  
 Nrank = 3;
@@ -264,23 +265,41 @@ for ibatch = 1:niter
 
 %         keyboard;
         
-       figure(2)
-       subplot(2,2,1)
-       imagesc(W(:,:,1))
+        if ibatch==1
+            figHand = figure;
+        else
+            figure(figHand);
+        end
+       
+       if ops.fig
+           subplot(2,2,1)
+           imagesc(W(:,:,1))
+           title('Temporal Components')
+           xlabel('Unit number'); 
+           ylabel('Time (samples)'); 
 
-       subplot(2,2,2)
-       imagesc(U(:,:,1))
+           subplot(2,2,2)
+           imagesc(U(:,:,1))
+           title('Spatial Components')
+           xlabel('Unit number'); 
+           ylabel('Channel number'); 
 
-       subplot(2,2,3)
-       plot(mu)
-       ylim([0 100])
+           subplot(2,2,3)
+           plot(mu)
+           ylim([0 100])
+           title('Unit Amplitudes')
+           xlabel('Unit number'); 
+           ylabel('Amplitude (arb. units)');
 
-       subplot(2,2,4)
-       semilogx(1+nsp, mu, '.')
-       ylim([0 100])
-       xlim([0 100])
-
-       drawnow
+           subplot(2,2,4)
+           semilogx(1+nsp, mu, '.')
+           ylim([0 100])
+           xlim([0 100])
+           title('Amplitude vs. Spike Count')
+           xlabel('Spike Count'); 
+           ylabel('Amplitude (arb. units)');        
+           drawnow
+        end
     end
 end
 
