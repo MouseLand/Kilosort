@@ -12,7 +12,7 @@ To aid in setting up a Kilosort2 run on your own probe configuration, we have de
 
 Required toolboxes: parallel computing toolbox, signal processing toolbox, MATLAB >=R2016b
 
-You must run and complete successfully `mexGPUall.m` in the CUDA folder. This requires mexcuda support, which comes with the parallel computing toolbox. To set up mexcuda compilation, install the exact version of the CUDA toolkit compatible with your MATLAB version (see [here](https://www.mathworks.com/help/distcomp/gpu-support-by-release.html)). On Windows, you must also install a CPU compiler, for example the freely available [Visual Studio Community 2013](https://www.visualstudio.com/vs/older-downloads/). Note that the most recent editions of Visual Studio are usually not compatible with CUDA. If you had previously used a different CPU compiler in MATLAB, you must switch to the CUDA-compatible compiler using `mex -setup C++`. For more about mexcuda installation, see these [instructions](http://uk.mathworks.com/help/distcomp/mexcuda.html).
+You must run and complete successfully `mexGPUall.m` in the `CUDA` folder. This requires mexcuda support, which comes with the parallel computing toolbox. To set up mexcuda compilation, install the exact version of the CUDA toolkit compatible with your MATLAB version (see [here](https://www.mathworks.com/help/distcomp/gpu-support-by-release.html)). On Windows, you must also install a CPU compiler, for example the freely available [Visual Studio Community 2013](https://www.visualstudio.com/vs/older-downloads/). Note that the most recent editions of Visual Studio are usually not compatible with CUDA. If you had previously used a different CPU compiler in MATLAB, you must switch to the CUDA-compatible compiler using `mex -setup C++`. For more about mexcuda installation, see these [instructions](http://uk.mathworks.com/help/distcomp/mexcuda.html).
 
 ### General instructions for running Kilosort2 ###
 
@@ -29,7 +29,7 @@ See the [GUI documentation](https://github.com/MouseLand/Kilosort2/wiki/1.-The-G
 
 1. Make a copy of `master_kilosort.m` and `\configFiles\StandardConfig_MOVEME.m` and put them in a different directory. These files will contain your own settings, and you don't want them to be overwritten when you update Kilosort2.  
 2. Generate a channel map file for your probe using `\configFiles\createChannelMap.m` as a starting point.
-3. Edit the config file with desired parameters. You should at least set the file paths (`ops.fbinary`, `ops.fproc` (this file will not exist yet - kilosort will create it), and `ops.root`), the sampling frequency (`ops.fs`), the number of channels in the file (`ops.NchanTOT`) and the location of your channel map file (`ops.chanMap`).
+3. Edit the config file with desired parameters. You should at least set the file paths (`ops.fbinary`, `ops.fproc` (this file will not exist yet - `kilosort` will create it), and `ops.root`), the sampling frequency (`ops.fs`), the number of channels in the file (`ops.NchanTOT`) and the location of your channel map file (`ops.chanMap`).
 4. Edit `master_kilosort.m` so that the paths at the top ([lines 3–4](https://github.com/MouseLand/Kilosort2/blob/master/master_kilosort.m#L3-L4)) point to your local copies of those GitHub repositories, and so that the configuration file is correctly specified ([lines 6–7](https://github.com/MouseLand/Kilosort2/blob/2fba667359dbddbb0e52e67fa848f197e44cf5ef/master_kilosort.m#L6-L7)).
 
 ### Parameters ###
