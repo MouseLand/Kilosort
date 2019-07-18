@@ -1,42 +1,43 @@
-function benchmark_drift_simulation(rez, GTfilepath, simRecfilepath, sortType, bAutoMerge)
+function benchmark_drift_simulation_jrc(GTfilepath, simRecfilepath)
 
-%for testing outside a script. comment out for normal calling!
-% load('D:\drift_simulations\74U_norm_64site_20um_600sec_20min\rezFinal.mat');
-% GTfilepath = 'D:\drift_simulations\74U_norm_64site_20um_600sec_20min\eMouseGroundTruth.mat';
-% simRecfilepath = 'D:\drift_simulations\74U_norm_64site_20um_600sec_20min\eMouseSimRecord.mat';
-% sortType = 2;
-% bAutoMerge = 0;
+%load in the files (might make this callable later...)
+% resPath = 'D:\drift_simulations\74U_norm_64site_no_drift\jrc_qq5_bp_r01\sim_binary.imec.ap_res.mat';
+% GTfilepath = 'D:\drift_simulations\74U_norm_64site_no_drift\eMouseGroundTruth.mat';
+% simRecfilepath = 'D:\drift_simulations\74U_norm_64site_no_drift\eMouseSimRecord.mat';
+% 
+% jrc_res = load(resPath);
+load(GTfilepath);           %loads in gtClu, gtRes
+
+%Read in spike times from jrc output res.spikeTimes
+%Read in spike cluster labels from jrc output res.hClust.spikeClusters
+
+testClu = jrc_res.hClust.spikeClusters;
+testRes = jrc_res.spikeTimes;
 
 
-load(GTfilepath);
+%JRClust keeps spikes from deleted clusters, with cluster label = -1
+%JRClust also keeps unassigned spikes, with label = 0
+%Remove all of those
 
-if bAutoMerge
-    testClu = 1 + rez.st3(:,5) ;
-else
-    testClu = rez.st3(:,2) ;
-end
+badSpikes = jrc_res.hClust.spikeClusters < 1; %logical array = 1 for spikes w/ cluster label < 1
 
-testRes = rez.st3(:,1);
-
-[testRes, tOrder] = sort(testRes);
-testClu = testClu(tOrder);
-
-%get cluster position footprint for each
-[cluPos, unitSize] = getFootPrintRez(rez);
+testClu(badSpikes) = [];
+testRes(badSpikes) = [];
 
 [allScores, allFPrates, allMissRates, allMerges, unDetected, overDetected, gtCluIDs] = ...
     compareClustering2_drift(gtClu, gtRes, testClu, testRes, []);
 
-%
-
-
+for i = 1:numel(unDetected)
+    fprintf('%.3f\n',unDetected(i));
+end
+    
 clid = unique(gtClu);
 clear gtimes
 for k = 1:length(clid)
     gtimes{k} = double(gtRes(gtClu==clid(k)));
 end
 
-%% figure and output results
+%%
 autoMiss = (cellfun(@(x) x(1), allMissRates));
 autoFP = (cellfun(@(x) x(1), allFPrates));
 bestMiss = (cellfun(@(x) x(end), allMissRates));
@@ -46,7 +47,6 @@ autoScore = ones(1,numel(bestMiss));
 autoScore = autoScore - autoMiss -autoFP;
 bestScore = ones(1,numel(bestMiss));
 bestScore = bestScore - bestMiss - bestFP;
-
 figure
 
 plot(sort(cellfun(@(x) x(1), allFPrates)), '-*b', 'Linewidth', 2)
@@ -55,7 +55,6 @@ plot(sort(cellfun(@(x) x(1), allMissRates)), '-*r', 'Linewidth', 2)
 plot(sort(cellfun(@(x) x(end), allFPrates)), 'b', 'Linewidth', 2)
 plot(sort(cellfun(@(x) x(end), allMissRates)), 'r', 'Linewidth', 2)
 plot(sort(unDetected), 'g', 'Linewidth', 2);
-%plot(sort(overDetected), '-g', 'Linewidth', 2);
 ylim([0 1])
 box off
 
@@ -66,37 +65,29 @@ fprintf('%d / %d good cells, score > %.2f (post-merge) \n', sum(bestScore > thGo
 
 nMerges = cellfun(@(x) numel(x)-1, allMerges);
 fprintf('Mean merges per good cell %2.2f \n', mean(nMerges(bestScore > thGood)))
-
 % disp(cellfun(@(x) x(end), allScores))
 
 xlabel('ground truth cluster')
 ylabel('fractional error')
 
-legend('false positives (initial)', 'miss rates (initial)', 'false positives (best)', 'miss rates (best)', 'undetected')
+legend('false positives (initial)', 'miss rates (initial)', 'false positives (best)', 'miss rates (best)','undetected');
 legend boxoff
-set(gca, 'Fontsize', 15)
+set(gca, 'Fontsize', 20)
 set(gcf, 'Color', 'w')
 
-if bAutoMerge
-    titleStr = sprintf('Kilosort%d with Automerge', sortType);
-else
-    titleStr = sprintf('Kilosort%d Results', sortType);
-end
-title(titleStr)
+title('JRC results vs. GT');
+
+
 
 hold off;
-
-%Calculate results vs. known unit properties
-
+%%
 
 
 %sort these in order of the GT label
-[~, sortLabelInd] = sort(gtCluIDs);
+[sortLabel, sortLabelInd] = sort(gtCluIDs);
 
 bestMiss = bestMiss(sortLabelInd);
 bestFP = bestFP(sortLabelInd);
-
-
 
 %read in amplitude data for the clusters
 %contains yDriftRec nGTSpike x 4 array with
@@ -118,23 +109,31 @@ nSpike = zeros(1,NN);
 for i = 1:NN
     ind = find(yDriftRec(:,3) == i);
     nSpike(i) = numel(ind);
-    meanAmp(i) = mean(yDriftRec(ind,4));
+    meanAmp(i) = mean(yDriftRec(ind,4)); 
     meanPos(i) = mean(yDriftRec(ind,2));
 end
 
 fprintf('GTlabel\tnSpike\tmeanAmp\tmeanPos\tundetected\tbestMiss\tbestFP\tbestScore\tautoMiss\tautoFP\tautoScore\tnMerges\tphy labels\n');
 nMerges = zeros(1,NN);
 for i = 1:NN
-    nMerges(i) = length(allMerges{i})-1;
+    nMerges(i) = length(allMerges{i});
     fprintf('%d\t%d\t%.3f\t%.3f\t%.3f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%d\t', ...
     i, nSpike(i), meanAmp(i), ...
     meanPos(i), unDetected(i), bestMiss(i), bestFP(i),bestScore(i), autoMiss(i),...
     autoFP(i), autoScore(i), nMerges(i));
-    for j = 1:length(allMerges{i})-1
-        fprintf( '%d,', allMerges{i}(j)-1 );
+    for j = 1:length(allMerges{i})
+        fprintf( '%d,', allMerges{i}(j) );
     end
-    fprintf('%d\n',allMerges{i}(length(allMerges{i}))-1);       
+    fprintf('\n');
+        
 end
+
+%sort meanAmp to plot missed/FP in order of amplitude
+%[sortAmp, sortInd] = sort(meanAmp);
+%miss_fp = (vertcat( bestMiss, bestFP ))'
+%sort bestMiss and bestFP
+%miss_fp = (vertcat( bestMiss(sortInd), bestFP(sortInd), meanAmp(sortInd)
+%))';
 
 
 end
