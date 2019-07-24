@@ -29,14 +29,14 @@ See the [GUI documentation](https://github.com/MouseLand/Kilosort2/wiki/1.-The-G
 
 1. Make a copy of `master_kilosort.m` and `\configFiles\StandardConfig_MOVEME.m` and put them in a different directory. These files will contain your own settings, and you don't want them to be overwritten when you update Kilosort2.  
 2. Generate a channel map file for your probe using `\configFiles\createChannelMap.m` as a starting point.
-3. Edit the config file with desired parameters. You should at least set the file paths (`ops.fbinary`, `ops.fproc` (this file will not exist yet - `kilosort` will create it), and `ops.root`), the sampling frequency (`ops.fs`), the number of channels in the file (`ops.NchanTOT`) and the location of your channel map file (`ops.chanMap`).
+3. Edit the config file with desired parameters. You should at least set the file paths `ops.fbinary`, `ops.root` and `ops.fproc` (this file will not exist yet - `kilosort` will create it), the sampling frequency `ops.fs`, the number of channels in the file `ops.NchanTOT` and the location of your channel map file `ops.chanMap`.
 4. Edit `master_kilosort.m` so that the paths at the top ([lines 3–4](https://github.com/MouseLand/Kilosort2/blob/master/master_kilosort.m#L3-L4)) point to your local copies of those GitHub repositories, and so that the configuration file is correctly specified ([lines 6–7](https://github.com/MouseLand/Kilosort2/blob/2fba667359dbddbb0e52e67fa848f197e44cf5ef/master_kilosort.m#L6-L7)).
 
 ### Parameters ###
 
 If you are unhappy with the quality of the automated sorting, try changing one of the main parameters:
 
-`ops.Th = [10 4]` (default). Thresholds on spike detection used during the optimization (`Th(1)`) or during the final pass (`Th(2)`). These thresholds are applied to the template projections, not to the voltage. Typically, `Th(1)` is high enough that the algorithm only picks up sortable units, while `Th(2)` is low enough that it can pick all of the spikes of these units. It doesn't matter if the final pass also collects noise: an additional per neuron threshold is set afterwards, and a splitting step ensures clusters with multiple units get split.
+`ops.Th = [10 4]` (default). Thresholds on spike detection used during the optimization `Th(1)` or during the final pass `Th(2)`. These thresholds are applied to the template projections, not to the voltage. Typically, `Th(1)` is high enough that the algorithm only picks up sortable units, while `Th(2)` is low enough that it can pick all of the spikes of these units. It doesn't matter if the final pass also collects noise: an additional per neuron threshold is set afterwards, and a splitting step ensures clusters with multiple units get split.
 
 `ops.AUCsplit = 0.9` (default). Threshold on the area under the curve (AUC) criterion for performing a split in the final step. If the AUC of the split is higher than this, that split is considered good. However, a good split only goes through if, additionally, the cross-correlogram of the split units does not contain a big dip at time 0.
 
