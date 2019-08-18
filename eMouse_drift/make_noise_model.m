@@ -1,12 +1,12 @@
 function make_noise_model
-
+%% Input params about your paths and data
 %start by building a rez structure -- will be used to call the whitening
 %and filtering functions in KS2
 
-%these need to match the current location of KS2
+%these need to match the current location of KS2 and npy
 
-addpath(genpath('C:\Users\labadmin\Documents\Kilosort2-determ\KiloSort2')) % path to kilosort folder
-addpath('C:\Users\labadmin\Documents\kilosort\npy-matlab-master')
+addpath(genpath('D:\KS2\Kilosort2-master')) % path to kilosort folder
+addpath('D:\KS2\npy-matlab-master\')
 
 % params normally read in from a config file. These need to match the model
 % data set from which the noise will be extracted.
@@ -16,17 +16,22 @@ ops.fs = 30000;
 ops.bitPerUV = 0.42667;
 
 % chanMap for your input data set. Make sure it includes reference channels
-ops.chanMap = 'D:\MP_examples\chanMap_3A.mat';
+% where they occur in the data
+ops.chanMap = 'D:\SC026_080819_g0_Imec2\SC026_noise_model\neuropixPhase3B1_kilosortChanMap.mat';
 [~,chanMapName,~] = fileparts(ops.chanMap);
 
 %path to your data file; results will also be written to this folder
-rootZ = 'D:\MP_examples\';
+rootZ = 'D:\SC026_080819_g0_Imec2\SC026_noise_model\';
 %name of the binary file
-dataName = 'Waksman_2017-06-10_ZO_g0_t0_CAR_2000_2600.exported.imec.ap.bin';
+dataName = 'SC026_080819_g0_tcat.imec2.ap.bin';
 
-
+%directory for temporary whitened data filt
+rootH = 'D:\KS2\kilosort_datatemp\';
 ops.trange = [0 inf]; % time range to use when extracting the whitening matrix
 ops.NchanTOT    = 385; % total number of channels in your recording, including digital
+%Time to sample in sec, need to sample at least enough to freq down to the high pass limit
+clipDur = 0.25; 
+%%
 
 % frequency for high pass filtering (150)
 ops.fshigh = 150;  
@@ -40,8 +45,6 @@ ops.whiteningRange      = 32; % number of channels to use for whitening each cha
 ops.nSkipCov            = 25; % compute whitening matrix from every N-th batch
 ops.scaleproc           = 100;   % int16 scaling of whitened data
 
-%directory for temporary whitened data filt
-rootH = 'C:\Users\labadmin\Documents\kilosort_datatemp\';
 
 ops.fproc       = fullfile(rootH, 'temp_wh.imec.ap.bin'); % proc file on a fast SSD
 
@@ -54,12 +57,12 @@ ops.trange = [0 60]; % time range to use when extracting the whitening matrix
 
 %calculate fft for each channel in the whitened data (stored in ops.fproc)
 tic;
-[fftSamp, nT_fft] = sampFFT( rez );
+[fftSamp, nT_fft] = sampFFT( rez, clipDur );
 fprintf( 'time to calc fft: %f\n', toc );
-%use the fft to generate noise for each channel for a time period noiseT
+%use the fft to generate noise for each channel for a time period 
 %Can only make batches of nT points at a time
 
-    noiseT = 2.2;
+    noiseT = 2.2;           %in seconds, chosen for ~66000 points
     noiseSamp = noiseT*rez.ops.fs;
     nChan = numel(rez.ops.chanMap);
     eNoise = zeros( noiseSamp, nChan, 'single' );
@@ -81,36 +84,20 @@ fprintf( 'time to calc fft: %f\n', toc );
             eNoise(tStart:tEnd,j) = tempNoise(1:lastWind);             
     end
     
-    selectChan = [10,11,12,13,14];
-    tR = [1:1000]; %just looking at 1000 samples for okayness
-    h = figure(1);
-    for k = 1:numel(selectChan)  
-        currNoise = eNoise(tR,selectChan(k));
-        plot( tR, currNoise + k*500 );
-        hold on;
-    end   
-    hold off
-    
+    selectChan = [10,11,12,13,14];  
         
-    tR = [4200:5200]; %just looking at 1000 samples for okayness
-    h = figure(2);
+    tR = [4200:5200]; %just looking at 1000 samples
+    h = figure(1);  
     for k = 1:numel(selectChan)  
         currNoise = eNoise(tR,selectChan(k));
         plot( tR, currNoise + k*500 );
         hold on;
-    end   
+    end  
+    title("1000 samples of generated noise, before unwhitening");
     hold off
+
     
-    tR = [noiseSamp - 1000: noiseSamp]; %just looking at 1000 samples for okayness
-    h = figure(3);
-    for k = 1:numel(selectChan)  
-        currNoise = eNoise(tR,selectChan(k));
-        plot( tR, currNoise + k*500 );
-        hold on;
-    end   
-    hold off
-    
-    %unwhiten this small array
+    %unwhiten this noise array
     eNoise_unwh = eNoise/rez.Wrot;
     
     %to get the final noise array, map to an array including all channels
@@ -118,36 +105,15 @@ fprintf( 'time to calc fft: %f\n', toc );
     eNoise_final = zeros(noiseSamp, nAllChan, 'single');
     eNoise_final(:,rez.ops.chanMap) = eNoise_unwh;
     
-    %new selectChan
-    
-    selectChan = [10,11,12,13,14,37];
- 
-    tR = [1:1000]; %just looking at 1000 samples for okayness
-    h = figure(4);
+
+    tR = [4200:5200]; %plot 1000 samples post unwhitening
+    h = figure(2);  
     for k = 1:numel(selectChan)  
         currNoise = eNoise_final(tR,selectChan(k));
         plot( tR, currNoise + k*50 );
         hold on;
     end   
-    hold off
-    
-        
-    tR = [4200:5200]; %just looking at 1000 samples for okayness
-    h = figure(5);
-    for k = 1:numel(selectChan)  
-        currNoise = eNoise_final(tR,selectChan(k));
-        plot( tR, currNoise + k*50 );
-        hold on;
-    end   
-    hold off
-    
-    tR = [noiseSamp - 1000: noiseSamp]; %just looking at 1000 samples for okayness
-    h = figure(6);
-    for k = 1:numel(selectChan)  
-        currNoise = eNoise_final(tR,selectChan(k));
-        plot( tR, currNoise + k*50 );
-        hold on;
-    end   
+    title('1000 samples of generated noise, after unwhitening');
     hold off
 
     nm.chanMapName = chanMapName;
@@ -299,6 +265,7 @@ for ibatch = 1:Nbatch
     
     datr = datr(ioffset + (1:NT),:);
     
+    %apply whitening
     datr    = datr * Wrot;
     
     if ops.useRAM
@@ -322,7 +289,7 @@ fclose(fid);
 end
 
 
-function [fftSamp, nT] = sampFFT( rez )
+function [fftSamp, nT] = sampFFT( rez, clipDur )
 
     ops = rez.ops;
     
@@ -333,8 +300,8 @@ function [fftSamp, nT] = sampFFT( rez )
     nChansInFile = numel(ops.chanMap);  % channels in whitenened data, excludes ref chans in original 
     d = dir(ops.fproc); 
     nSamps = d.bytes/2/nChansInFile;
-    tSkip = 0.5; % skip first tSkip seconds
-    clipDur = 0.5; %in sec, need to sample at least enough to freq down to the high pass limit
+    tSkip = 1.0; % skip first tSkip seconds
+    
     sampStart = round(ops.fs*tSkip); 
     nClipSamps = round(ops.fs*clipDur);
     mmf = memmapfile(datFile, 'Format', {'int16', [nChansInFile nSamps], 'x'});

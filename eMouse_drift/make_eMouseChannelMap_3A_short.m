@@ -1,6 +1,7 @@
-function [chanMapName] = make_eMouseChannelMap_3A_short(fpath,NchanTOT)
+function [chanMapName] = make_eMouseChannelMap_3B_short(fpath,NchanTOT)
 % create a channel Map file for simulated data on a section of 
-% an imec 3A probe (eMouse)
+% an imec 3B probe to use with eMouse
+% essentially identical to the 3A version
 
 % total number of channels = 385 (in real 3A, 384 channels + digital) 
 chanMap = (1:NchanTOT)';

@@ -1,12 +1,11 @@
-function benchmark_drift_simulation(rez, GTfilepath, simRecfilepath, sortType, bAutoMerge)
+function benchmark_drift_simulation(rez, GTfilepath, simRecfilepath, sortType, bAutoMerge, varargin)
 
 %for testing outside a script. comment out for normal calling!
-% load('D:\drift_simulations\74U_norm_64site_20um_600sec_20min\rezFinal.mat');
-% GTfilepath = 'D:\drift_simulations\74U_norm_64site_20um_600sec_20min\eMouseGroundTruth.mat';
-% simRecfilepath = 'D:\drift_simulations\74U_norm_64site_20um_600sec_20min\eMouseSimRecord.mat';
+% load('D:\drift_simulations\74U_norm_64site_20um_600sec_20min\ks2_master_060919\rezFinal.mat');
+% GTfilepath = 'D:\drift_simulations\74U_norm_64site_20um_600sec_20min\ks2_master_060919\eMouseGroundTruth.mat';
+% simRecfilepath = 'D:\drift_simulations\74U_norm_64site_20um_600sec_20min\ks2_master_060919\eMouseSimRecord.mat';
 % sortType = 2;
 % bAutoMerge = 0;
-
 
 load(GTfilepath);
 
@@ -14,6 +13,15 @@ if bAutoMerge
     testClu = 1 + rez.st3(:,5) ;
 else
     testClu = rez.st3(:,2) ;
+end
+
+bOutFile = 0;
+%fprintf( 'length of vargin: %d\n', numel(varargin));
+if( numel(varargin) == 1)
+    %path for output file
+    bOutFile = 1;
+    fprintf( 'output filename: %s\n', varargin{1} );
+    out_fid = fopen( varargin{1}, 'w' );
 end
 
 testRes = rez.st3(:,1);
@@ -122,19 +130,36 @@ for i = 1:NN
     meanPos(i) = mean(yDriftRec(ind,2));
 end
 
-fprintf('GTlabel\tnSpike\tmeanAmp\tmeanPos\tundetected\tbestMiss\tbestFP\tbestScore\tautoMiss\tautoFP\tautoScore\tnMerges\tphy labels\n');
+if( bOutFile )
+    fprintf(out_fid, 'GTlabel\tnSpike\tmeanAmp\tmeanPos\tundetected\tbestMiss\tbestFP\tbestScore\tautoMiss\tautoFP\tautoScore\tnMerges\tphy labels\n');
+else
+    fprintf('GTlabel\tnSpike\tmeanAmp\tmeanPos\tundetected\tbestMiss\tbestFP\tbestScore\tautoMiss\tautoFP\tautoScore\tnMerges\tphy labels\n');
+end
+
 nMerges = zeros(1,NN);
 for i = 1:NN
     nMerges(i) = length(allMerges{i})-1;
-    fprintf('%d\t%d\t%.3f\t%.3f\t%.3f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%d\t', ...
-    i, nSpike(i), meanAmp(i), ...
-    meanPos(i), unDetected(i), bestMiss(i), bestFP(i),bestScore(i), autoMiss(i),...
-    autoFP(i), autoScore(i), nMerges(i));
-    for j = 1:length(allMerges{i})-1
-        fprintf( '%d,', allMerges{i}(j)-1 );
+    if( bOutFile)
+        fprintf(out_fid, '%d\t%d\t%.3f\t%.3f\t%.3f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%d\t', ...
+        i, nSpike(i), meanAmp(i), ...
+        meanPos(i), unDetected(i), bestMiss(i), bestFP(i),bestScore(i), autoMiss(i),...
+        autoFP(i), autoScore(i), nMerges(i));
+        for j = 1:length(allMerges{i})-1
+            fprintf( out_fid, '%d,', allMerges{i}(j)-1 );
+        end
+        fprintf(out_fid,'%d\n',allMerges{i}(length(allMerges{i}))-1);   
+    else
+        fprintf('%d\t%d\t%.3f\t%.3f\t%.3f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%d\t', ...
+        i, nSpike(i), meanAmp(i), ...
+        meanPos(i), unDetected(i), bestMiss(i), bestFP(i),bestScore(i), autoMiss(i),...
+        autoFP(i), autoScore(i), nMerges(i));
+        for j = 1:length(allMerges{i})-1
+            fprintf( '%d,', allMerges{i}(j)-1 );
+        end
+        fprintf('%d\n',allMerges{i}(length(allMerges{i}))-1); 
     end
-    fprintf('%d\n',allMerges{i}(length(allMerges{i}))-1);       
 end
 
+fclose(out_fid);
 
 end
