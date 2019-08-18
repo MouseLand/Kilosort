@@ -1,21 +1,21 @@
-useGPU = 1; % do you have a GPU? Kilosorting 1000sec of 32chan simulated data takes 55 seconds on gtx 1080 + M2 SSD.
-useParPool = 1; % use parpool; will speed up simulation if local cluater has > 10 cores.
-makeNewData = 0; % set this to 0 to just resort a previously created data set
-sortData = 0;
+useGPU = 1; % eMouse can run w/out GPU, but KS2 cannot.
+useParPool = 0; % with current version, always faster wihtout parPool
+makeNewData = 1; % set this to 0 to just resort a previously created data set
+sortData = 1;
 runBenchmark = 1; %set to 1 to compare sorted data to ground truth for the simulation
 
-fpath    = 'D:\drift_simulations\test\'; % where on disk do you want the simulation? ideally an SSD...
+fpath    = 'D:\test_new_sim\SC_noise\'; % where on disk do you want the simulation? ideally an SSD...
 if ~exist(fpath, 'dir'); mkdir(fpath); end
 
 %KS2 path -- also has the waveforms for the simulation
-KS2path = 'C:\Users\labadmin\Documents\Kilosort2-determ\Kilosort2\';
+KS2path = 'Z:\workstation_backup\full_080119\Documents\KS2_current\';
 
 % add paths to the matlab path
-addpath(genpath('C:\Users\labadmin\Documents\Kilosort2-determ\Kilosort2')); % path to kilosort2 folder
-addpath('C:\Users\labadmin\Documents\kilosort\npy-matlab-master\');
+addpath(genpath('Z:\workstation_backup\full_080119\Documents\KS2_current\')); % path to kilosort2 folder
+addpath(genpath('D:\KS2\npy-matlab-master\'));
 
 % path to whitened, filtered proc file (on a fast SSD)
-rootH = 'C:\Users\labadmin\Documents\kilosort_datatemp';
+rootH = 'D:\KS2\kilosort_datatemp\';
 
 % path to config file; if running the default config, no need to change.
 pathToYourConfigFile = [KS2path,'eMouse_drift\']; % path to config file
@@ -23,7 +23,7 @@ pathToYourConfigFile = [KS2path,'eMouse_drift\']; % path to config file
 % Create the channel map for this simulation; default is a small 64 site
 % probe with imec 3A geometry.
 NchanTOT = 64;
-chanMapName = make_eMouseChannelMap_3A_short(fpath, NchanTOT);
+chanMapName = make_eMouseChannelMap_3B_short(fpath, NchanTOT);
 ops.chanMap             = fullfile(fpath, chanMapName);
 
 % Run the configuration file, it builds the structure of options (ops)
@@ -115,5 +115,5 @@ end
 if runBenchmark
  load(fullfile(fpath, 'rezFinal.mat'));
  benchmark_drift_simulation(rez, fullfile(fpath, 'eMouseGroundTruth.mat'),...
-     fullfile(fpath,'eMouseSimRecord.mat'),2,0);
+     fullfile(fpath,'eMouseSimRecord.mat'),2,0, fullfile(fpath, 'output_cluster_metrics.txt'));
 end
