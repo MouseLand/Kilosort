@@ -1,4 +1,4 @@
-function [WtW, iList] = getMeWtW2(W, U0, Nnearest)
+function [WtW, iList] = getMeWtW(W, U0, Nnearest)
 
 [nt0, Nfilt, Nrank] = size(W);
 
