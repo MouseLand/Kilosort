@@ -113,7 +113,7 @@ for ibatch = 1:Nbatch
     
     % CAR, common average referencing by median
     if getOr(ops, 'CAR', 1)
-        datr = datr - median(datr, 2);
+        dataRAW = dataRAW - median(dataRAW, 2);
     end
     
     datr = filter(b1, a1, dataRAW);
