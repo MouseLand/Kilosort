@@ -66,7 +66,7 @@ nInnerIter  = 60;
 
 pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter-nBatches));
 
-Nsum = 7; % how many channels to extend out the waveform in mexgetspikes
+Nsum = min(Nchan,7); % how many channels to extend out the waveform in mexgetspikes
 Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
     Nrank ops.lam pmi(1) Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1)]);
 
@@ -148,7 +148,16 @@ for ibatch = 1:niter
     [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp] = ...
         mexMPnu8(Params, dataRAW, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
         wPCA);
-   
+    
+    % Sometimes nsp can get transposed (think thi sahs to do with it being
+    % a single element in one iteration, to which elements are added
+    % nsp, nsp0, and pm must all be row vectors (Nfilt x 1), so force nsp
+    % to be a row vector.
+    [nsprow, nspcol] = size(nsp);
+    if nsprow<nspcol
+        nsp = nsp';
+    end
+    
     fexp = exp(double(nsp0).*log(pm(1:Nfilt)));
     fexp = reshape(fexp, 1,1,[]);
     nsp = nsp * p1 + (1-p1) * double(nsp0);
@@ -258,8 +267,8 @@ for ibatch = 1:niter
         fW  = zeros(Nnearest, 1e7, 'single');
         fWpc = zeros(NchanNear, Nrank, 1e7, 'single');
     end
-
-    if rem(ibatch, 100)==1
+    
+    if (rem(ibatch, 100)==1)
         fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, nst0: %d, merges: %2.4f, %2.4f \n', ...
             toc, ibatch, niter, Nfilt, sum(nsp), median(gather(mu)), numel(st0), ndrop)
 
@@ -339,7 +348,7 @@ rez.cProjPC     = permute(fWpc, [3 2 1]); %zeros(size(st3,1), 3, nNeighPC, 'sing
 rez.iNeighPC    = gather(iC(:, iW));
 
 
-nKeep = 20; % how many PCs to keep
+nKeep = min(Nchan*3,20); % how many PCs to keep
 rez.W_a = zeros(nt0 * Nrank, nKeep, Nfilt, 'single');
 rez.W_b = zeros(nBatches, nKeep, Nfilt, 'single');
 rez.U_a = zeros(Nchan* Nrank, nKeep, Nfilt, 'single');

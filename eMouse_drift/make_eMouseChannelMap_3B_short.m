@@ -7,12 +7,12 @@ function [chanMapName] = make_eMouseChannelMap_3B_short(fpath,NchanTOT)
 chanMap = (1:NchanTOT)';
 
 % channels to ignore in analysis and when adding data
-% in real 3A data, include the reference channels and the digital channel
+% in real 3B data, include the reference channels and the digital channel
 % replicate the refChans that are within range of the short probe to
 % preserve the geometry for channel to channel correlation in noise
 % generation
 
-allRef = [37, 76, 113, 152, 189, 228, 265, 304, 341, 380];
+allRef = [192];
 refChan = allRef( find(allRef < max(NchanTOT)) );
 
 
@@ -39,7 +39,8 @@ ycoords(2:2:NchanTOT) = 20*(1:halfChan);
 % the algorithm discard noisy templates shared across groups. In
 % this case, we set kcoords to indicate which group the channel belongs to.
 % In our case all channels are on the same shank in a single group so we
-% assign them all to group 1. 
+% assign them all to group 1.
+% Note that kcoords is not yet implemented in KS2 (08/15/2019)
 
 kcoords = ones(NchanTOT,1);
 
@@ -52,6 +53,6 @@ kcoords = ones(NchanTOT,1);
 % would be good to also save the sampling frequency here
 fs = 30000; 
 
-chanMapName = sprintf('chanMap_3A_%dsites.mat', NchanTOT);
+chanMapName = sprintf('chanMap_3B_%dsites.mat', NchanTOT);
 
 save(fullfile(fpath, chanMapName), 'chanMap', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs', 'NchanTOT' )
