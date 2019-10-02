@@ -1,14 +1,20 @@
-function [chanMapName] = make_eMouseChannelMap_3A_short(fpath,NchanTOT)
+function [chanMapName] = make_eMouseChannelMap_3B_short(fpath,NchanTOT)
 % create a channel Map file for simulated data on a section of 
-% an imec 3A probe (eMouse)
+% an imec 3B probe to use with eMouse
+% essentially identical to the 3A version
 
 % total number of channels = 385 (in real 3A, 384 channels + digital) 
 chanMap = (1:NchanTOT)';
 
-% channels to ignore in analysis 
+% channels to ignore in analysis and when adding data
 % in real 3A data, include the reference channels and the digital channel
+% replicate the refChans that are within range of the short probe to
+% preserve the geometry for channel to channel correlation in noise
+% generation
 
-refChan = [];
+allRef = [37, 76, 113, 152, 189, 228, 265, 304, 341, 380];
+refChan = allRef( find(allRef < max(NchanTOT)) );
+
 
 connected = true(NchanTOT,1);
 connected(refChan) = 0;
@@ -48,4 +54,4 @@ fs = 30000;
 
 chanMapName = sprintf('chanMap_3A_%dsites.mat', NchanTOT);
 
-save(fullfile(fpath, chanMapName), 'chanMap', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs')
+save(fullfile(fpath, chanMapName), 'chanMap', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs', 'NchanTOT' )
