@@ -1,7 +1,9 @@
 function [Ka, Kb] = getKernels(ops, nup, sig)
-% this function makes upsampling kernels for the temporal components
+% this function makes upsampling kernels for the temporal components.
 % those are used for interpolating the biggest negative peak,
 % and aligning the template to that peak with sub-sample resolution
+% needs nup, the interpolation factor (default = 10)
+% also needs sig, the interpolation smoothness (default = 1)
 
 nt0min = getOr(ops, 'nt0min', 20);
 nt0    = getOr(ops, 'nt0',    61);

@@ -128,6 +128,14 @@ if ~isempty(savePath)
     end
 
     % save a list of "good" clusters for Phy
+%     fileID = fopen(fullfile(savePath, 'channel_names.tsv'), 'w');
+%     fprintf(fileID, 'cluster_id%sKSLabel', char(9));
+%     for j = 1:Nchan
+%         fprintf(fileID, '%d%s%d', j-1,char(9),chanMap0ind(j));
+%         fprintf(fileID, char([13 10]));
+%     end
+%     fclose(fileID);
+
     fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
     fprintf(fileID, 'cluster_id%sKSLabel', char(9));
     fprintf(fileID, char([13 10]));

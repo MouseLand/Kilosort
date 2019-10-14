@@ -1,5 +1,6 @@
 function [K, Qi, Q00, Q01, Ri] = ccg(st1, st2, nbins, tbin)
-% this function efficiently computes the crosscorrelogram between two sets of spikes
+% this function efficiently computes the crosscorrelogram between two sets
+% of spikes (st1, st2), with tbin length each, timelags =  plus/minus nbins
 % and then estimates how refractory the cross-correlogram is, which can be used
 % during merge decisions.
 

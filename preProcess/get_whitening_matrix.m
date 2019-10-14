@@ -1,4 +1,6 @@
 function Wrot = get_whitening_matrix(rez)
+% based on a subset of the data, compute a channel whitening matrix
+% this requires temporal filtering first (gpufilter)
 
 ops = rez.ops;
 Nbatch = ops.Nbatch;
@@ -37,7 +39,7 @@ while ibatch<=Nbatch
         buff(:, nsampcurr+1:NTbuff) = repmat(buff(:,nsampcurr), 1, NTbuff-nsampcurr);
     end
 
-    datr    = gpufilter(buff, ops); % apply filters and median subtraction
+    datr    = gpufilter(buff, ops, rez.ops.chanMap); % apply filters and median subtraction
 
     CC        = CC + (datr' * datr)/NT; % sample covariance
 

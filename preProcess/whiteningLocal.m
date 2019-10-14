@@ -1,6 +1,8 @@
 function Wrot = whiteningLocal(CC, yc, xc, nRange)
 % function to perform local whitening of channels
-
+% CC is a matrix of Nchan by Nchan correlations
+% yc and xc are vector of Y and X positions of each channel
+% nRange is the number of nearest channels to consider
 Wrot = zeros(size(CC,1), size(CC,1));
 for j = 1:size(CC,1)
     ds          = (xc - xc(j)).^2 + (yc - yc(j)).^2;

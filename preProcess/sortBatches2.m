@@ -1,5 +1,6 @@
 function [ccb1, isort] = sortBatches2(ccb0)
-% takes as input a matrix of nBatches by nBatches containing dissimilarities
+% takes as input a matrix of nBatches by nBatches containing
+% dissimilarities.
 % outputs a matrix of sorted batches, and the sorting order, such that
 % ccb1 = ccb0(isort, isort)
 

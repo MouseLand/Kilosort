@@ -1,5 +1,7 @@
 function [row, col, mu] = isolated_peaks_new(S1, ops)
-
+% takes a matrix of timepoints by channels S1
+% outputs threshold crossings that are relatively isolated from other peaks
+% outputs row, column and magnitude of the threshold crossing
 loc_range = getOr(ops, 'loc_range', [5 4]);
 long_range = getOr(ops, 'long_range', [30 6]);
 Th = ops.spkTh;

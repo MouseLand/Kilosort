@@ -1,9 +1,10 @@
 function [rez, X] = splitAllClusters(rez, flag)
-% i call this algorithm "bimodal pursui"
+% i call this algorithm "bimodal pursuit"
 % split clusters if they have bimodal projections
 % the strategy is to maximize a bimodality score and find a single vector projection
 % that maximizes it. If the distribution along that maximal projection crosses a
 % bimodality threshold, then the cluster is split along that direction
+% it only uses the PC features for each spike, stored in rez.cProjPC
 
 ops = rez.ops;
 wPCA = gather(ops.wPCA); % use PCA projections to reconstruct templates when we do splits

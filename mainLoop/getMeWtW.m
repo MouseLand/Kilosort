@@ -2,8 +2,10 @@ function [WtW, iList] = getMeWtW(W, U0, Nnearest)
 % this function computes correlation between templates at ALL timelags from each other
 % takes the max over timelags to obtain a similarity score
 % also returns lists of most similar templates to each template
+% takes as input the low-rank factorization of templates (W for time and U0
+% for space)
 
-[nt0, Nfilt, Nrank] = size(W);
+[nt0, Nfilt, Nrank] = size(W); % W is timesamples (default = 61 ), by number of templates, by rank (default = 3)
 
 Params = double([1 Nfilt 0 0 0 0 0 0 0 nt0]);
 

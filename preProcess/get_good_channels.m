@@ -1,4 +1,10 @@
 function igood = get_good_channels(ops, chanMap)
+% of the channels indicated by the user as good (chanMap)
+% further subset those that have a mean firing rate above a certain value
+% (default is ops.minfr_goodchannels = 0.1Hz)
+% needs the same filtering parameters in ops as usual
+% also needs to know where to start processing batches (twind)
+% and how many channels there are in total (NchanTOT)
 
 Nbatch = ops.Nbatch;
 twind = ops.twind;
@@ -31,7 +37,7 @@ while ibatch<=Nbatch
         break;
     end
 
-    datr    = gpufilter(buff, ops); % apply filters and median subtraction
+    datr    = gpufilter(buff, ops, chanMap); % apply filters and median subtraction
 
     % very basic threshold crossings calculation
     datr = datr./std(datr,1,1); % standardize each channel ( but don't whiten)

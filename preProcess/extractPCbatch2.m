@@ -1,4 +1,10 @@
 function [uS, idchan] = extractPCbatch2(rez, wPCA, ibatch, iC)
+% this function finds threshold crossings in the data using
+% projections onto the pre-determined principal components
+% wPCA is number of time samples by number of PCs
+% ibatch is a scalar indicating which batch to analyze
+% iC is NchanNear by Nchan, indicating for each channel the nearest
+% channels to it
 
 % starts with predefined PCA waveforms
 wPCA = gpuArray(single(wPCA(:, 1:3)));

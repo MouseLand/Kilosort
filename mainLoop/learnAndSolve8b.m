@@ -1,4 +1,5 @@
 function rez = learnAndSolve8b(rez)
+% This is the main optimization. Takes the longest time and uses the GPU heavily.  
 
 ops = rez.ops;
 ops.fig = getOr(ops, 'fig', 1); % whether to show plots every N batches

@@ -1,6 +1,6 @@
 function clips = get_SpikeSample(dataRAW, row, col, ops, dc, flag)
-% given a batch of data, and some time and channel indices for spikes, this function returns
-% the 1D time clips of voltage around those spike times
+% given a batch of data (time by channels), and some time (row) and channel (col) indices for spikes, 
+% this function returns the 1D time clips of voltage around those spike times
 
 [nT, nChan] = size(dataRAW);
 
