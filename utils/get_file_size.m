@@ -1,5 +1,6 @@
 function bytes = get_file_size(fname)
-% gets file size ensuring that symlinks are dereferenced
+% gets file size in bytes, ensuring that symlinks are dereferenced
+% MP: not sure who wrote this code, but they were careful to do it right on Linux
     bytes = NaN;
     if isunix
         cmd = sprintf('stat -Lc %%s %s', fname);

@@ -30,16 +30,16 @@ nnew = Nfilt - size(dWU,2);
 
 while 1
     k = k+1;
-    
+
     N0 = size(dWU,2);
     if N0>=Nfilt
-       break; 
+       break;
     end
-    
+
     inew = find(dxdnu < Th(k), Nfilt-N0);
 
     for j = numel(inew):-1:1
-        dWU(double(ioff(inew(j))) + [1:nFeat], j + N0) = uproj(:, inew(j));        
+        dWU(double(ioff(inew(j))) + [1:nFeat], j + N0) = uproj(:, inew(j));
     end
-       
+
 end
