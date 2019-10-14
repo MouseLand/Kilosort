@@ -109,17 +109,17 @@ for ibatch = 1:Nbatch
     dataRAW = dataRAW(:, chanMap);
     
     % subtract the mean from each channel
-    dataRAW = dataRAW - mean(dataRAW, 1);    
+    dataRAW = dataRAW - mean(dataRAW, 1);   
+    
+    % CAR, common average referencing by median
+    if getOr(ops, 'CAR', 1)
+        dataRAW = dataRAW - median(dataRAW, 2);
+    end
     
     datr = filter(b1, a1, dataRAW);
     datr = flipud(datr);
     datr = filter(b1, a1, datr);
     datr = flipud(datr);
-    
-    % CAR, common average referencing by median
-    if getOr(ops, 'CAR', 1)
-        datr = datr - median(datr, 2);
-    end
     
     datr = datr(ioffset + (1:NT),:);
     

@@ -7,6 +7,7 @@ function make_eMouseData_drift(fpath, KS2path, chanMapName, useGPU, useParPool)
 % you can play with the parameters just below here to achieve a signal more similar to your own data!!! 
 norm_amp  = 20; % if 0, use amplitudes of input waveforms; if > 0, set all amplitudes to norm_amp*rms_noise
 mu_mean   = 0.75; % mean of mean spike amplitudes. Incoming waveforms are in uV; make <1 to make sorting harder
+noise_model = 'fromData'; %'gauss' or 'fromData'; 'fromData' requires a noiseModel.mat built by make_noise_model
 rms_noise = 12; % rms noise in uV. Will be added to the spike signal. 15-20 uV an OK estimate from real data
 t_record  = 1200; % duration in seconds of simulation. longer is better (and slower!) (1000)
 fr_bounds = [1 10]; % min and max of firing rates ([1 10])
@@ -23,8 +24,9 @@ drift.tType = 'sine';   %'exp' or 'sine'
 drift.y0 = 3800;        %in um, position along probe where motion is largest
                         %y = 0 is the tip of the probe                        
 drift.halfDistance = 1000;   %in um, distance along probe over which the motion decays
-drift.amplitude = 10;    %in um
-drift.halfLife = 10;     %in seconds
+drift.amplitude = 10;        %in um for a sine wave
+%                             peak variation is 2Xdrift.amplitude
+drift.halfLife = 2;     %in seconds
 drift.period = 600;      %in seconds
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %waveform source data
@@ -48,10 +50,10 @@ useDefault = 1;     %use waveforms from eMouse folder in KS2
 
 if useDefault
     %get waveforms from eMouse folder in KS2
-    filePath{1} = [KS2path,'\eMouse_drift\','kampff_St_unit_waves_allNeg_2X'];
-    fileCopies(1) = 2;
-    filePath{2} = [KS2path,'\eMouse_drift\','121817_single_unit_waves_allNeg.mat'];
-    fileCopies(2) = 2;
+     filePath{1} = [KS2path,'\eMouse_drift\','kampff_St_unit_waves_allNeg_2X.mat'];
+     fileCopies(1) = 2;
+     filePath{2} = [KS2path,'\eMouse_drift\','121817_SU_waves_allNeg_gridEst.mat'];
+     fileCopies(2) = 2;
 else
     %fill in paths to waveform files 
     filePath = {};
@@ -65,6 +67,20 @@ end
 bPair     = 0; % set to 0 for randomly distributed units, 1 for units in pairs
 pairDist  = 50; % distance between paired units
 bPlot     = 0; %make diagnostic plots of waveforms
+
+% Noise can either be generated from a gaussian distribution, or modeled on
+% noise from real data, matching the frequency spectrum and cross channel
+% correlation. The sample noise data is taken from a 3B2 recording performed
+% by Susu Chen. Note that the noise data should come from a probe with
+% the same geometry as the model probe.
+if ( strcmp(noise_model,'fromData') )
+    if useDefault
+        nmPath = [KS2path,'\eMouse_drift\','SC026_3Bstag_noiseModel.mat'];
+    else
+        %fill in path to desired noise model.mat file
+    end
+    noiseFromData = load(nmPath);
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 rng('default');
@@ -77,9 +93,10 @@ bitPerUV = 0.42667; %imec 3A or 3B, gain = 500
 chanMapFile = fullfile(fpath, chanMapName);
 load(chanMapFile);
 
+zeroSites = find(connected == 0);
 
-Nchan = numel(chanMap);
-invChanMap(chanMap) = [1:Nchan]; % invert the  channel map here--create the order in which to write output
+Nchan = NchanTOT; %physical sites on the probe
+%invChanMap(chanMap) = [1:Nchan]; % invert the  channel map here--create the order in which to write output
 
 % range of y positions to place units
 minY = min(ycoords(find(connected==1)));
@@ -162,16 +179,25 @@ for fileIndex = 1:nFile
         for i = 1:nUnit
             uData.uColl(i).waves = uData.uColl(i).waves*scaleIntensity(i);
         end
-    end
-  
+   end
+
+    %deprecated
+    %allowed use of scattered interpolants (non-grid sampling of the
+    %waveforms -- but the calculations are 5-10X slower than gridded
+    %interpolants. For non-square sampling of waveforms (e.g. Neuropixels
+    %probes) -- make a scattered interpolant and then sample on a gridded
+    %interpolant to feed to the simulator.
     %for these units, create an intepolant which will be used to
     %calculate the waveform at arbitrary sites
     
-    if (uType(unitRange(1)) == 1)
-        [uFcurr, uRcurr] = makeGridInt( uData.uColl, nt );
-    else
-        [uFcurr, uRcurr] = makeScatInt( uData.uColl, nt );
-    end
+%     if (uType(unitRange(1)) == 1)
+%         [uFcurr, uRcurr] = makeGridInt( uData.uColl, nt );
+%     else
+%         [uFcurr, uRcurr] = makeScatInt( uData.uColl, nt );
+%     end
+    
+    % with both types gridded, always make a gridded interpolant
+    [uFcurr, uRcurr] = makeGridInt( uData.uColl, nt );
     
     %append these to the array over all units
     uF = [uF, uFcurr];
@@ -184,7 +210,12 @@ for fileIndex = 1:nFile
     NN = NN + nUnit;
 end
 
-
+% calculate a size for each unit
+  uSize = zeros(1,NN);
+  for i = 1:NN
+      uSize(i) = (uR(i).maxX - uR(i).minX) * (uR(i).maxY - uR(i).minY);
+  end
+  
 % distribute units along the length the probe, either in pairs separated
 % by unitDist um, or fully randomly.
 % for now, keep x = the original position (i.e. don't try to recenter)
@@ -396,6 +427,9 @@ end
 yDriftRec = zeros( length(spk_times), 5, 'double' );
 allspks = 0;
 
+% The parpool option can speed up the calculation when using scattered
+% interpolants AND running with a large number of workers (>8). With all
+% gridded interpolants, the overhead is too large and 
 if (useParPool)
     %delete any currently running pool
     delete(gcp('nocreate'))
@@ -415,30 +449,39 @@ if (useParPool)
 end
 
 while t_all<t_record
-    if useGPU
-        enoise = gpuArray.randn(NT, Nchan, 'single');
-    else
-        enoise = randn(NT, Nchan, 'single');
-    end
-    if t_all>0
-        enoise(1:buff, :) = enoise_old(NT-buff + [1:buff], :);
+    
+    if ( strcmp(noise_model,'gauss') )
+        if useGPU
+            enoise = gpuArray.randn(NT, Nchan, 'single');
+        else
+            enoise = randn(NT, Nchan, 'single');
+        end
+        if t_all>0
+            enoise(1:buff, :) = enoise_old(NT-buff + [1:buff], :);
+        end
+
+        dat = enoise;
+        dat = my_conv2(dat, [tsmooth chsmooth], [1 2]);
+        %rescale the smoothed data to make the std = 1;
+        dat = zscore(dat, 1, 1);
+        dat = gather_try(dat);
+        %multiply the final noise calculation by the expected rms in uV
+        dat = dat*rms_noise;
+        %fprintf( 'Noise mean = %.3f; std = %.3f\n', mean(dat(:,1)), std(dat(:,1)));
+    elseif ( strcmp(noise_model,'fromData') )        
+        enoise = makeNoise( NT, noiseFromData, chanMap, connected, NchanTOT );
+        if t_all>0
+            enoise(1:buff, :) = enoise_old(NT-buff + [1:buff], :);
+        end
+        dat = enoise;
     end
     
-    dat = enoise;
-    dat = my_conv2(dat, [tsmooth chsmooth], [1 2]);
-    %rescale the smoothed data to make the std = 1;
-    dat = zscore(dat, 1, 1);
-    dat = gather_try(dat);
-    %multiply the final noise calculation by the expected rms in uV
-    dat = dat*rms_noise;
-    %fprintf( 'Noise mean = %.3f; std = %.3f\n', mean(dat(:,1)), std(dat(:,1)));
     if t_all>0
         dat(1:buff/2, :) = dat_old(NT-buff/2 + [1:buff/2], :);
     end
     
-    dat(:, find(connected==0)) = 0; % these are the reference and dig channels
     
-    % now we add spikes on non-dead channels.
+    % now we add spikes all channels; ref channels zeroed out after
     ibatch = (spk_times >= t_all*fs) & (spk_times < t_all*fs+NT-buff);
     ts = spk_times(ibatch) - t_all*fs;
     ids = clu(ibatch);
@@ -490,7 +533,7 @@ while t_all<t_record
             tempWav = squeeze(currWavArray(i,1:currNsiteArray(i),:));
             dat(ts(i) + tRange, uSites) = dat(ts(i) + tRange, uSites) + tempWav';
         else
-            %calculate the interpolants now
+            %calculate the interpolations now            
             [tempWav, uSites] = ...
                 intWav( uF{cc}, uX(cc), currYPos, uR(cc), xcoords, ycoords, connected, nt );
             
@@ -509,10 +552,15 @@ while t_all<t_record
         
     end
     
+    %zero out the unconnected channels
+
+    dat(:, zeroSites') = 0; % these are the reference and dig channels
+    
     dat_old    =  dat;
     %convert to 16 bit integers; waveforms are in uV
     dat = int16(bitPerUV * dat);
-    fwrite(fidW, dat(1:(NT-buff),invChanMap)', 'int16');
+    fwrite(fidW, dat(1:(NT-buff),:)', 'int16');
+  
     t_all = t_all + (NT-buff)/fs;
     elapsedTime = toc;
     fprintf( 'created %.2f seconds of data; nSpikes %d; calcTime: %.3f\n ', t_all, length(ts), elapsedTime );
@@ -624,9 +672,10 @@ end
 
 function [uWav, uSites] = intWav( currF, xPos, yPos, uR, xcoords, ycoords, connected, nt )
 
+
     % figure out for which sites we need to calculate the waveform
     uSites = findSites( xPos, yPos, xcoords, ycoords, connected, uR );
-    
+
     % given an array of sites on the probe, calculate the waveform using
     % the interpolant determined for this unit  
     % xPos and yPos are the positions of the current unit
@@ -641,7 +690,10 @@ function [uWav, uSites] = intWav( currF, xPos, yPos, uR, xcoords, ycoords, conne
     tq = (double(repmat(1:nt, 1, nSites )))';
     %remember, y = rows in the grid, and x = columns in the grid
     %interpolation, and scattered interpolation set to match.
+    nVal = numel(currF.Values);
+    %tic
     uWav = currF( yq, xq, tq );
+    %fprintf( '%d\t%d\t%.3f\n', numel(uSites), nVal, 1000*toc);
     uWav = (reshape(uWav', [nt,nSites]))';
     
 end
@@ -734,4 +786,77 @@ end
 
 end
 
+
+function eNoise = makeNoise( noiseSamp,noiseModel,chanMap,connected,NchanTOT )
+
+    %if chanMap is a short version of a 3A probe, use the first
+    %nChan good channels to generate noise, then copy that array 
+    %into an NT X NChanTot array
+    
+    nChan = numel(chanMap);        %number of noise channels to generate
+    goodChan = sum(connected);
+    tempNoise = zeros( noiseSamp, goodChan, 'single' );
+    nT_fft = noiseModel.nm.nt;         %number of time points in the original time series
+    fftSamp = noiseModel.nm.fft;
+    
+    noiseBatch = ceil(noiseSamp/nT_fft);    
+    lastWind = noiseSamp - (noiseBatch-1)*nT_fft; %in samples
+    
+    for j = 1:goodChan     
+            for i = 1:noiseBatch-1
+                tStart = (i-1)*nT_fft+1;
+                tEnd = i * nT_fft;            
+                tempNoise(tStart:tEnd,j) = fftnoise(fftSamp(:,j),1);
+            end
+            %for last batch, call one more time and truncate
+            lastBatch = fftnoise(fftSamp(:,j),1);
+            tStart = (noiseBatch-1)*nT_fft+1;
+            tEnd = noiseSamp;
+            tempNoise(tStart:tEnd,j) = lastBatch(1:lastWind);             
+    end
+    
+    %unwhiten this array
+    Wrot = noiseModel.nm.Wrot(1:goodChan,1:goodChan);
+    tempNoise_unwh = tempNoise/Wrot;
+    
+    %scale to uV; will get scaled back to bits at the end
+    tempNoise_unwh = tempNoise_unwh/noiseModel.nm.bitPerUV;
+    
+    %to get the final noise array, map to an array including all channels
+    eNoise = zeros(noiseSamp, NchanTOT, 'single');
+    %indicies of the good channels
+    goodChanIndex = find(connected);
+    eNoise(:,chanMap(goodChanIndex)) = tempNoise_unwh;
+    
+end
+
+function noise=fftnoise(f,Nseries)
+% Generate noise with a given power spectrum.
+% Useful helper function for Monte Carlo null-hypothesis tests and confidence interval estimation.
+%  
+% noise=fftnoise(f[,Nseries])
+%
+% INPUTS:
+% f: the fft of a time series (must be a column vector)
+% Nseries: number of noise series to generate. (default=1)
+% 
+% OUTPUT:
+% noise: surrogate series with same power spectrum as f. (each column is a surrogate).
+%
+%   --- Aslak Grinsted (2009)
+%  
+if nargin<2
+    Nseries=1;
+end
+f=f(:);     %ensures f is a column vector
+N=length(f); 
+Np=floor((N-1)/2);
+phases=rand(Np,Nseries)*2*pi;
+phases=complex(cos(phases),sin(phases)); % this was the fastest alternative in my tests. 
+f=repmat(f,1,Nseries);
+f(2:Np+1,:)=f(2:Np+1,:).*phases;
+f(end:-1:end-Np+1,:)=conj(f(2:Np+1,:));
+noise=real(ifft(f,[],1)); 
+
+end
 
