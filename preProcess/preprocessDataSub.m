@@ -76,13 +76,6 @@ fprintf('Time %3.0fs. Loading raw data and applying filters... \n', toc);
 fid         = fopen(ops.fbinary, 'r'); % open for reading raw data
 fidW        = fopen(ops.fproc,   'w'); % open for writing processed data
 
-% load data into patches, filter, compute covariance
-if isfield(ops,'fslow')&&ops.fslow<ops.fs/2
-    [b1, a1] = butter(3, [ops.fshigh/ops.fs,ops.fslow/ops.fs]*2, 'bandpass'); % butterworth filter with only 3 nodes (otherwise it's unstable for float32)
-else
-    [b1, a1] = butter(3, ops.fshigh/ops.fs*2, 'high'); % the default is to only do high-pass filtering at 150Hz
-end
-
 for ibatch = 1:Nbatch
     % we'll create a binary file of batches of NT samples, which overlap consecutively on ops.ntbuff samples
     % in addition to that, we'll read another ops.ntbuff samples from before and after, to have as buffers for filtering
@@ -103,7 +96,7 @@ for ibatch = 1:Nbatch
         buff(:, nsampcurr+1:NTbuff) = repmat(buff(:,nsampcurr), 1, NTbuff-nsampcurr); % pad with zeros, if this is the last batch
     end
 
-    datr    = gpufilter(buff, ops); % apply filters and median subtraction
+    datr    = gpufilter(buff, ops, chanMap); % apply filters and median subtraction
 
     datr    = datr(ioffset + (1:NT),:); % remove timepoints used as buffers
 

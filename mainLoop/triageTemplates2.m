@@ -1,8 +1,10 @@
 function [W, U, dWU, mu, nsp, ndrop] = ...
     triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, ndrop)
-% this function checks if some templates should be dropped
+% This function checks if some templates should be dropped
 % either because they are very similar to another template,
-% or because they are not catching any spikes, (low mean firing rate)
+% or because they are not catching any spikes, (low mean firing rate).
+% Takes as inputs almost all the information that determines templates, and
+% outputs the same variables back after removing some clusters. 
 
 % this is the firing rate threshold
 m0 = ops.minFR * ops.NT/ops.fs;

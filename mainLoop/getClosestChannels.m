@@ -1,6 +1,7 @@
 function [iC, mask, C2C] = getClosestChannels(rez, sigma, NchanClosest)
 % this function outputs the closest channels to each channel,
 % as well as a Gaussian-decaying mask as a function of pairwise distances
+% sigma is the standard deviation of this Gaussian-mask
 
 % compute distances between all pairs of channels
 C2C = (rez.xc(:) - rez.xc(:)').^2 + (rez.yc(:) - rez.yc(:)').^2;

@@ -1,4 +1,17 @@
-function datr = gpufilter(buff, ops)
+function datr = gpufilter(buff, ops, chanMap)
+% filter this batch of data after common average referencing with the
+% median
+% buff is timepoints by channels
+% chanMap are indices of the channels to be kep
+% ops.fs and ops.fshigh are sampling and high-pass frequencies respectively
+% if ops.fslow is present, it is used as low-pass frequency (discouraged)
+
+% set up the parameters of the filter
+if isfield(ops,'fslow')&&ops.fslow<ops.fs/2
+    [b1, a1] = butter(3, [ops.fshigh/ops.fs,ops.fslow/ops.fs]*2, 'bandpass'); % butterworth filter with only 3 nodes (otherwise it's unstable for float32)
+else
+    [b1, a1] = butter(3, ops.fshigh/ops.fs*2, 'high'); % the default is to only do high-pass filtering at 150Hz
+end
 
 dataRAW = gpuArray(buff); % move int16 data to GPU
 dataRAW = dataRAW';

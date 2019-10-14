@@ -1,7 +1,9 @@
 function [UtU, maskU, iList] = getMeUtU(iU, iC, mask, Nnearest, Nchan)
 % this function determines if two templates share any channels
-% iU are the channels that each template is assigned to, one per template
+% iU are the channels that each template is assigned to, one main channel per template
 % iC has as column K the list of neigboring channels for channel K
+% mask are the weights assigned for the corresponding neighboring channels
+% in iC (gaussian-decaying)
 
 Nfilt = numel(iU);
 

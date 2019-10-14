@@ -1,5 +1,7 @@
 function [wTEMP, wPCA] = extractTemplatesfromSnippets(rez, nPCs)
-% this function is very similar to extractPCfromSnippets
+% this function is very similar to extractPCfromSnippets.
+% outputs not just the PC waveforms, but also the template "prototype", 
+% basically k-means clustering of 1D waveforms. 
 
 ops = rez.ops;
 

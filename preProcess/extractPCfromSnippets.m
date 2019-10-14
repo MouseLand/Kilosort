@@ -1,4 +1,6 @@
 function wPCA = extractPCfromSnippets(rez, nPCs)
+% extracts principal components for 1D snippets of spikes from all channels
+% loads a subset of batches to find these snippets
 
 ops = rez.ops;
 Nbatch      = rez.temp.Nbatch;

@@ -1,5 +1,8 @@
 function [W, mu, Wheights, irand] = initializeWdata2(call, uprojDAT, Nchan, nPCs, Nfilt, iC)
 % this function initializes cluster means for the fast kmeans per batch
+% call are time indices for the spikes
+% uprojDAT are features projections (Nfeatures by Nspikes)
+% some more parameters need to be passed in from the main workspace
 
 irand = ceil(rand(Nfilt,1) * size(uprojDAT,2)); % pick random spikes from the sample
 % irand = 1:Nfilt;

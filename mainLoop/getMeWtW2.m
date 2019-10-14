@@ -3,6 +3,10 @@ function [WtW, iList] = getMeWtW2(W, U0, Nnearest)
 % it relies on the fact that the W and U0 are unit normalized, so that the product of a
 % template with itself is 1, as it should be if we're trying to calculate correlations
 
+% takes input the temporal and spatial factors of the low-rank template, as
+% well as the number of most similar template pairs desired to be output in
+% iList
+
 [nt0, Nfilt, Nrank] = size(W);
 WtW     = gpuArray.zeros(Nfilt,Nfilt, 'single');
 
