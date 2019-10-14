@@ -27,6 +27,9 @@ ops.sigmaMask = 30;
 
 % threshold crossings for pre-clustering (in PCA projection space)
 ops.ThPre = 8; 
+ops.reorder         = 1;       % whether to reorder batches for drift correction. 
+ops.nskip           = 25;      % how many batches to skip for determining spike PCs
+
 %% danger, changing these settings can lead to fatal errors
 % options for determining PCs
 ops.spkTh           = -6;      % spike threshold in standard deviations (-6)

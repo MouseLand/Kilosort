@@ -1,6 +1,6 @@
 
 
-function [allScores, allFPs, allMisses, allMerges, GTcluIDs] = compareClustering2(cluGT, resGT, cluTest, resTest, datFilename)
+function [allScores, allFPs, allMisses, allMerges, unDetected, overDetected, GTcluIDs] = compareClustering2(cluGT, resGT, cluTest, resTest, datFilename)
 % function compareClustering(cluGT, resGT, cluTest, resTest[, datFilename])
 % - clu and res variables are length nSpikes, for ground truth (GT) and for
 % the clustering to be evaluated (Test). 
@@ -12,14 +12,14 @@ end
 
 GTcluIDs = unique(cluGT);   %makes a sorted list of the unique labels
 testCluIDs = unique(cluTest);
-jitter = 12;
+jitter = 6;
 
 %count up spikes for each label in the test set
 nSp = zeros(max(testCluIDs), 1);
 for j = 1:max(testCluIDs);
     nSp(j) = max(1, sum(cluTest==j));
 end
-nSp0 = nSp;
+nSp0 = nSp; %array of nSpikes per test cluster
 
 for cGT = 1:length(GTcluIDs)
 %     fprintf(1,'ground truth cluster ID = %d (%d spikes)\n', GTcluIDs(cGT), sum(cluGT==GTcluIDs(cGT)));
@@ -30,6 +30,8 @@ for cGT = 1:length(GTcluIDs)
     % allocate space for counting test cluster assignments to each spike in
     % the set of GT spikes for this cluster
     %"spalloc" specifies that this must be a sparse matrix.
+    % creates an M-by-N all zero sparse matrix
+    % with room to eventually hold NZMAX nonzeros.
     S = spalloc(numel(rGT), double(max((testCluIDs))), numel(rGT) * 10); 
     % find the initial best match
     mergeIDs = [];
@@ -61,7 +63,10 @@ for cGT = 1:length(GTcluIDs)
               S(igt, cluTest(j)) = 1;
         end
     end
-    numMatch = sum(S,1)';   %array of matched spikes from each test cluster
+    numMatch = sum(S,1)';   %array of matched spikes from each test cluster for this GT cluster
+    timesMatch = full(sum(S,2)); %array matches per gt time
+    udFrac = (sum(timesMatch==0)/nrGT); %fraction of GT spikes matched, independent of cluster assignment (scalar);  
+    odFrac = (sum(timesMatch>1)/nrGT);
     misses = (nrGT-numMatch)/nrGT; % missed these spikes, as a proportion of the total true spikes
     fps = (nSp-numMatch)./nSp; % number of comparison spikes not near a GT spike, as a proportion of the number of guesses
         %
@@ -126,7 +131,8 @@ for cGT = 1:length(GTcluIDs)
         allFPs{cGT} = falsePos(1:end-1);
         allMisses{cGT} = missRate(1:end-1);
     end
-    
+    unDetected(cGT) = udFrac;
+    overDetected(cGT) = odFrac;
 end    %end of loop over GT cluster IDs
 
 initScore = zeros(1, length(GTcluIDs));
@@ -142,6 +148,7 @@ for cGT = 1:length(GTcluIDs)
      initScore(cGT) = allScores{cGT}(1);
      finalScore(cGT) = allScores{cGT}(end);
      numMerges(cGT) = length(allScores{cGT})-1;
+     
 end
 
 
