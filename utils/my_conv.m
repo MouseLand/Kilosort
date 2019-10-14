@@ -1,4 +1,7 @@
-function Smooth = my_conv(S1, sig, varargin)
+function Smooth = my_conv(S1, sig)
+% fast gaussian smoothing, ensures that the filter on the edges is still unit norm
+% works on GPU as well
+% works on second axis by default
 
 NN = size(S1,1);
 NT = size(S1,2);

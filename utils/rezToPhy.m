@@ -6,9 +6,6 @@ function rezToPhy(rez, savePath)
 % available (https://github.com/kwikteam/npy-matlab)
 
 
-
-
-
 % spikeTimes will be in samples, not seconds
 rez.W = gather(single(rez.Wphy));
 rez.U = gather(single(rez.U));
@@ -30,7 +27,7 @@ rez.cProjPC  = rez.cProjPC(isort, :, :);
 
 fs = dir(fullfile(savePath, '*.npy'));
 for i = 1:length(fs)
-   delete(fullfile(savePath, fs(i).name)); 
+   delete(fullfile(savePath, fs(i).name));
 end
 if exist(fullfile(savePath, '.phy'), 'dir')
     rmdir(fullfile(savePath, '.phy'), 's');
@@ -59,7 +56,7 @@ Nfilt = size(W,2);
 
 templates = zeros(Nchan, nt0, Nfilt, 'single');
 for iNN = 1:size(templates,3)
-   templates(:,:,iNN) = squeeze(U(:,iNN,:)) * squeeze(W(:,iNN,:))'; 
+   templates(:,:,iNN) = squeeze(U(:,iNN,:)) * squeeze(W(:,iNN,:))';
 end
 templates = permute(templates, [3 2 1]); % now it's nTemplates x nSamples x nChannels
 templatesInds = repmat([0:size(templates,3)-1], size(templates,1), 1); % we include all channels so this is trivial
@@ -83,7 +80,7 @@ end
 % The amplitude on each channel is the positive peak minus the negative
 tempChanAmps = squeeze(max(tempsUnW,[],2))-squeeze(min(tempsUnW,[],2));
 
-% The template amplitude is the amplitude of its largest channel 
+% The template amplitude is the amplitude of its largest channel
 tempAmpsUnscaled = max(tempChanAmps,[],2);
 
 % assign all spikes the amplitude of their template multiplied by their
@@ -99,7 +96,7 @@ gain = getOr(rez.ops, 'gain', 1);
 tempAmps = gain*tempAmps'; % for consistency, make first dimension template number
 
 if ~isempty(savePath)
-    
+
     writeNPY(spikeTimes, fullfile(savePath, 'spike_times.npy'));
     writeNPY(uint32(spikeTemplates-1), fullfile(savePath, 'spike_templates.npy')); % -1 for zero indexing
     if size(rez.st3,2)>4
@@ -110,54 +107,54 @@ if ~isempty(savePath)
     writeNPY(amplitudes, fullfile(savePath, 'amplitudes.npy'));
     writeNPY(templates, fullfile(savePath, 'templates.npy'));
     writeNPY(templatesInds, fullfile(savePath, 'templates_ind.npy'));
-    
+
     chanMap0ind = int32(chanMap0ind);
-    
+
     writeNPY(chanMap0ind, fullfile(savePath, 'channel_map.npy'));
     writeNPY([xcoords ycoords], fullfile(savePath, 'channel_positions.npy'));
-    
+
     writeNPY(templateFeatures, fullfile(savePath, 'template_features.npy'));
     writeNPY(templateFeatureInds'-1, fullfile(savePath, 'template_feature_ind.npy'));% -1 for zero indexing
     writeNPY(pcFeatures, fullfile(savePath, 'pc_features.npy'));
     writeNPY(pcFeatureInds'-1, fullfile(savePath, 'pc_feature_ind.npy'));% -1 for zero indexing
-    
-    
+
+
     writeNPY(whiteningMatrix, fullfile(savePath, 'whitening_mat.npy'));
     writeNPY(whiteningMatrixInv, fullfile(savePath, 'whitening_mat_inv.npy'));
-    
+
     if isfield(rez, 'simScore')
         similarTemplates = rez.simScore;
         writeNPY(similarTemplates, fullfile(savePath, 'similar_templates.npy'));
     end
-    
+
     % save a list of "good" clusters for Phy
     fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
     fprintf(fileID, 'cluster_id%sKSLabel', char(9));
     fprintf(fileID, char([13 10]));
-    
+
     fileIDCP = fopen(fullfile(savePath, 'cluster_ContamPct.tsv'),'w');
     fprintf(fileIDCP, 'cluster_id%sContamPct', char(9));
     fprintf(fileIDCP, char([13 10]));
-    
+
     fileIDA = fopen(fullfile(savePath, 'cluster_Amplitude.tsv'),'w');
     fprintf(fileIDA, 'cluster_id%sAmplitude', char(9));
     fprintf(fileIDA, char([13 10]));
-    
+
     rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
     for j = 1:length(rez.good)
         if rez.good(j)
-            fprintf(fileID, '%d%sgood', j-1, char(9));             
+            fprintf(fileID, '%d%sgood', j-1, char(9));
         else
             fprintf(fileID, '%d%smua', j-1, char(9));
         end
-        fprintf(fileID, char([13 10]));           
-        
+        fprintf(fileID, char([13 10]));
+
         fprintf(fileIDCP, '%d%s%.1f', j-1, char(9), rez.est_contam_rate(j)*100);
         fprintf(fileIDCP, char([13 10]));
-        
+
         fprintf(fileIDA, '%d%s%.1f', j-1, char(9), tempAmps(j));
         fprintf(fileIDA, char([13 10]));
-        
+
     end
     fclose(fileID);
     fclose(fileIDCP);
@@ -166,9 +163,9 @@ if ~isempty(savePath)
      %make params file
     if ~exist(fullfile(savePath,'params.py'),'file')
         fid = fopen(fullfile(savePath,'params.py'), 'w');
-        
+
         [~, fname, ext] = fileparts(rez.ops.fbinary);
-        
+
         fprintf(fid,['dat_path = ''',fname ext '''\n']);
         fprintf(fid,'n_channels_dat = %i\n',rez.ops.NchanTOT);
         fprintf(fid,'dtype = ''int16''\n');
