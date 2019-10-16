@@ -22,12 +22,12 @@ using namespace std;
 
 
 
-const int  Nthreads = 1024, maxFR = 100000, NrankMax = 3, nmaxiter = 500, NchanMax = 32;
+const int  Nthreads = 1024, maxFR = 100000, NrankMax = 3, nmaxiter = 500, NchanMax = 64;
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	spaceFilter(const double *Params, const float *data, const float *U, 
         const int *iC, const int *iW, float *dprod){    
-  volatile __shared__ float  sU[32*NrankMax];
-  volatile __shared__ int iU[32]; 
+  volatile __shared__ float  sU[NchanMax*NrankMax];
+  volatile __shared__ int iU[NchanMax]; 
   float x;
   int tid, bid, i,k, Nrank, Nchan, NT, Nfilt, NchanU;
 
@@ -65,8 +65,8 @@ __global__ void	spaceFilter(const double *Params, const float *data, const float
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	spaceFilterUpdate(const double *Params, const float *data, const float *U, const bool *UtU,
         const int *iC, const int *iW, float *dprod,  const int *st, const int *id, const int *counter){
-    volatile __shared__ float  sU[32*NrankMax];
-    volatile __shared__ int iU[32];
+    volatile __shared__ float  sU[NchanMax*NrankMax];
+    volatile __shared__ int iU[NchanMax];
     float x;
     int tid, bid, ind, nt0, i, t, k, Nrank, NT, Nfilt, NchanU, Nchan;
     
