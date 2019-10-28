@@ -5,7 +5,7 @@ import numpy as np
 import cupy as cp
 from tqdm import tqdm
 
-from .cptools import svdecon
+from .cptools import svdecon, median
 from .cluster import isolated_peaks_new, get_SpikeSample, getClosestChannels
 from .utils import get_cuda, Bunch
 
@@ -956,12 +956,12 @@ def learnAndSolve8b(ctx):
         #     # NchanNear is the number of nearest channels to take PC features from
         #     fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
 
-        # ibatch, niter, Nfilt, nsp.sum(), median(mu), st0.size, ndrop
-
-        #     if ibatch % 100 == 0:
-                # this is some of the relevant diagnostic information to be printed during training
-        #         print('%d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, nst0: %d, merges: %2.4f, %2.4f.' % (
-        #               ibatch, niter, Nfilt, nsp.sum(), median(mu), st0.size, ndrop))
+        if ibatch % 100 == 0:
+            # this is some of the relevant diagnostic information to be printed during training
+            logger.info(
+                ('%d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, '
+                 'nst0: %d, merges: %2.4f, %2.4f'),
+                ibatch, niter, Nfilt, nsp.sum(), median(mu), st0.size, ndrop)
 
         # discards the unused portion of the arrays
         #st3 = st3(1:ntot, :)

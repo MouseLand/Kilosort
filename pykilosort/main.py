@@ -7,9 +7,9 @@ from tqdm import tqdm
 from .preprocess import preprocess
 from .cluster import clusterSingleBatches
 from .learn import learnAndSolve8b
-from .postprocess import find_merges, splitAllClusters, set_cutoff, rezToPhy
+from .postprocess import find_merges, splitAllClusters, set_cutoff
 from .utils import Bunch
-from .default_params import default_params
+from .default_params import default_params, set_dependent_params
 
 import numpy as np
 import cupy as cp
@@ -22,6 +22,7 @@ class Context(Bunch):
         super(Context, self).__init__()
         self.dir_path = dir_path
         self.intermediate = Bunch()
+        self.context_path.mkdir(exist_ok=True, parents=True)
 
     @property
     def context_path(self):
@@ -30,26 +31,26 @@ class Context(Bunch):
 
     def path(self, name):
         """Path to an array in the context directory."""
-        return self.context_path / ('%s.npy' % name)
+        return self.context_path / (name + '.npy')
 
     def read(self, *names):
         """Read several arrays, from memory (intermediate object) or from disk."""
         out = [self.intermediate.get(name, np.load(self.path(name))) for name in names]
-        if len(out) == 1:
-            return out[0]
+        return out
 
     def write(self, **kwargs):
         """Write several arrays."""
-        for k, v in kwargs:
+        for k, v in kwargs.items():
             if isinstance(v, cp.ndarray):
                 v = cp.asnumpy(v)
-            logger.debug("Saving %s.npy", k)
-            np.save(self.path(k), v)
+            if isinstance(v, np.ndarray):
+                logger.debug("Saving %s.npy", k)
+                np.save(self.path(k), v)
 
     def load(self):
         """Load intermediate results from disk."""
-        names = self.context_path.glob('*.npy')
-        self.intermediate.update({name: value for name, value in zip(names, self.read(names))})
+        names = [f.stem for f in self.context_path.glob('*.npy')]
+        self.intermediate.update({name: value for name, value in zip(names, self.read(*names))})
 
     def save(self):
         """Save intermediate results to disk."""
@@ -67,6 +68,7 @@ def run(dir_path=None, raw_data=None, probe=None, params=None):
     probe has the following attributes:
     - xc
     - yc
+    - kcoords
     - Nchan
 
     """
@@ -85,9 +87,10 @@ def run(dir_path=None, raw_data=None, probe=None, params=None):
     assert probe
 
     # Get params.
-    user_params = params
+    user_params = params or {}
     params = default_params.copy()
     params.update(user_params)
+    set_dependent_params(params)
     assert params
 
     # Create the context.
@@ -100,45 +103,61 @@ def run(dir_path=None, raw_data=None, probe=None, params=None):
     ctx.load()
     ir = ctx.intermediate
 
-    # preprocess data to create proc.dat
+    # -------------------------------------------------------------------------
+    # Preprocess data to create proc.dat
     proc_path = dir_path / 'proc.dat'
-    if not proc_path.exists():
+    if 1 or not proc_path.exists():
         # Do not preprocess again if the proc.dat file already exists.
-        ir.Wrot = preprocess(raw_data=raw_data, probe=probe, params=params, proc_path=proc_path)
+        ir.Nbatch, ir.Wrot = preprocess(
+            raw_data=raw_data, probe=probe, params=params, proc_path=proc_path)
+        ctx.save()
     # Get the whitening matrix, from memory if it has already been computed/loaded, or from disk.
-    ir.Nbatch, ir.Wrot = ctx.read('Wrot')
+    ir.Wrot = ctx.read('Wrot')
 
     # Open the proc file.
     assert proc_path.exists()
     ir.proc = np.memmap(proc_path, dtype=raw_data.dtype, mode='r', order='F')
 
-    # time-reordering as a function of drift
+    # -------------------------------------------------------------------------
+    # Time-reordering as a function of drift.
     # This function adds to the intermediate object: iorig, ccb0, ccbsort
-    clusterSingleBatches(ctx)
+    if 'iorig' not in ir:
+        clusterSingleBatches(ctx)
+    ctx.save()
 
-    # main tracking and template matching algorithm
-    learnAndSolve8b(ctx)
+    # -------------------------------------------------------------------------
+    # Main tracking and template matching algorithm.
+    # this function adds many intermediate results, notably st3
+    if 'st3' not in ir:
+        learnAndSolve8b(ctx)
+    ctx.save()
 
-    # final merges
-    find_merges(ctx, 1)
+    # -------------------------------------------------------------------------
+    # Final merges.
+    # This function adds: R_CCG, Q_CCG, K_CCG
+    if 'R_CCG' not in ir:
+        find_merges(ctx, 1)
+    ctx.save()
 
-    # final splits by SVD
-    splitAllClusters(ctx, 1)
+    # -------------------------------------------------------------------------
+    # Final splits.
+    # This function adds many intermediate results, including isplit.
+    if 'isplit' not in ir:
+        # final splits by SVD
+        splitAllClusters(ctx, 1)
+        # final splits by amplitudes
+        splitAllClusters(ctx, 0)
+    ctx.save()
 
-    # final splits by amplitudes
-    splitAllClusters(ctx, 0)
-
-    # decide on cutoff
-    set_cutoff(ctx)
+    # -------------------------------------------------------------------------
+    # Decide on cutoff.
+    # This function adds: good, est_contam_rate.
+    if 'est_contam_rate' not in ir:
+        set_cutoff(ctx)
+    ctx.save()
 
     logger.info('Found %d good units.', np.sum(ctx.good > 0))
 
     # write to Phy
-    logger.info('Saving results to Phy.')
-    rezToPhy(ctx, rootZ)
-
-    # if you want to save the results to a Matlab file...
-
-    # discard features in final rez file (too slow to save)
-    # rez.cProj = []
-    # rez.cProjPC = []
+    logger.info('Saving results to phy.')
+    # TODO: save npy files

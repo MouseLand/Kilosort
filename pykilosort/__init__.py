@@ -1,6 +1,9 @@
 import logging
 import os.path as op
 
+from .utils import Bunch, memmap_raw_data, read_data
+from .main import run
+
 
 __version__ = '3.0.0a0'
 
