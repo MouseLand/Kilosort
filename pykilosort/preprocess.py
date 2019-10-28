@@ -7,7 +7,7 @@ import cupy as cp
 from tqdm import tqdm
 
 from .cptools import lfilter, median
-from .utils import is_fortran, p
+from .utils import is_fortran
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,10 @@ def whiteningLocal(CC, yc, xc, nRange):
 
 
 def get_whitening_matrix(raw_data=None, probe=None, params=None):
-
+    """
+    based on a subset of the data, compute a channel whitening matrix
+    this requires temporal filtering first (gpufilter)
+    """
     Nbatch = get_Nbatch(raw_data, params)
     ntbuff = params.ntbuff
     NTbuff = params.NTbuff
@@ -218,6 +221,14 @@ def get_whitening_matrix(raw_data=None, probe=None, params=None):
 
 
 def get_good_channels(raw_data=None, probe=None, params=None):
+    """
+    of the channels indicated by the user as good (chanMap)
+    further subset those that have a mean firing rate above a certain value
+    (default is ops.minfr_goodchannels = 0.1Hz)
+    needs the same filtering parameters in ops as usual
+    also needs to know where to start processing batches (twind)
+    and how many channels there are in total (NchanTOT)
+    """
     fs = params.fs
     fshigh = params.fshigh
     fslow = params.fslow
@@ -370,3 +381,5 @@ def preprocess(raw_data=None, probe=None, params=None, proc_path=None):
 
             # write this batch to binary file
             fw.write(datcpu.tobytes('F'))
+
+    return Nbatch, Wrot

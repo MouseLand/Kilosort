@@ -7,8 +7,7 @@ from tqdm import tqdm
 
 from .cptools import svdecon
 from .cluster import isolated_peaks_new, get_SpikeSample, getClosestChannels
-from .preprocess import get_Nbatch
-from .utils import get_cuda, p, Bunch
+from .utils import get_cuda, Bunch
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +16,6 @@ def extractTemplatesfromSnippets(proc=None, probe=None, params=None, Nbatch=None
     # this function is very similar to extractPCfromSnippets.
     # outputs not just the PC waveforms, but also the template "prototype",
     # basically k-means clustering of 1D waveforms.
-
-    np.random.seed(1)  # DEBUG
 
     NT = params.NT
     # skip every this many batches
@@ -594,11 +591,19 @@ def triageTemplates2(params, iW, C2C, W, U, dWU, mu, nsp, ndrop):
     return W, U, dWU, mu, nsp, ndrop
 
 
-def learnAndSolve8b(params=None, probe=None, raw_data=None, proc=None, iorig=None):
+def learnAndSolve8b(ctx):
+    """This is the main optimization. Takes the longest time and uses the GPU heavily."""
+
+    Nbatch = ctx.intermediate.Nbatch
+    params = ctx.params
+    probe = ctx.probe
+    proc = ctx.proc
+    ir = ctx.intermediate
+
+    iorig = ir.iorig
+
     NrankPC = 6  # this one is the rank of the PCs, used to detect spikes with threshold crossings
     Nrank = 3  # this one is the rank of the templates
-
-    Nbatch = get_Nbatch(raw_data, params)  # TODO: improve
 
     wTEMP, wPCA = extractTemplatesfromSnippets(
         proc=proc, probe=probe, params=params, Nbatch=Nbatch, nPCs=NrankPC)
@@ -647,7 +652,7 @@ def learnAndSolve8b(params=None, probe=None, raw_data=None, proc=None, iorig=Non
         raise ValueError('Mismatch between number of batches')
 
     # these two flags are used to keep track of what stage of model fitting we're at
-    flag_final = 0
+    # flag_final = 0
     flag_resort = 1
 
     # this is the absolute temporal offset in seconds corresponding to the start of the
@@ -692,7 +697,22 @@ def learnAndSolve8b(params=None, probe=None, raw_data=None, proc=None, iorig=Non
     # this is the minimum firing rate that all templates must maintain, or be dropped
     m0 = params.minFR * params.NT / params.fs
 
-    temp = Bunch()  # used to store temp results, replaces the "rez", TODO to be improved
+    temp = Bunch()  # used to store temp results
+
+    # allocate variables when switching to extraction phase
+    # this holds spike times, clusters and other info per spike
+    st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
+
+    # these next three store the low-d template decompositions
+    temp.WA = []  # zeros(nt0, Nfilt, Nrank,nBatches,  'single')
+    temp.UA = []  # zeros(Nchan, Nfilt, Nrank,nBatches,  'single')
+    temp.muA = []  # zeros(Nfilt, nBatches,  'single')
+
+    # these ones store features per spike
+    # Nnearest is the number of nearest templates to store features for
+    fW = []  # zeros(Nnearest, 1e7, 'single')
+    # NchanNear is the number of nearest channels to take PC features from
+    fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
 
     for ibatch in tqdm(range(niter), desc="Optimizing templates"):
 
@@ -799,7 +819,7 @@ def learnAndSolve8b(params=None, probe=None, raw_data=None, proc=None, iorig=Non
             # templates at this timepoint, and set the processing mode to "extraction and tracking"
 
             flag_resort = 0  # no need to resort templates by channel any more
-            flag_final = 1  # this is the "final" pass
+            # flag_final = 1  # this is the "final" pass
 
             # final clean up, triage templates one last time
             W, U, dWU, mu, nsp, ndrop = triageTemplates2(
@@ -901,13 +921,13 @@ def learnAndSolve8b(params=None, probe=None, raw_data=None, proc=None, iorig=Non
         #            fWpc[:, :, 2 * st3.shape[0]] = 0
         #            st3[2 * st3.shape[0] - 1, 0] = 0
 
-            st3.append((
+            st3.append(cp.c_[
                 st,  # spike times
                 id0,  # spike clusters (1-indexing)
                 x0,  # template amplitudes
                 vexp,  # residual variance of this spike
                 korder,  # batch from which this spike was found
-            ))
+            ])
         #         st3[irange, 1] = id0  # spike clusters (1-indexing)
         #         st3[irange, 2] = x0  # template amplitudes
         #         st3[irange, 3] = vexp  # residual variance of this spike
@@ -920,21 +940,21 @@ def learnAndSolve8b(params=None, probe=None, raw_data=None, proc=None, iorig=Non
 
             ntot = ntot + x0.size  # keeps track of total number of spikes so far
 
-        if ibatch == niter - nBatches - 1:
-            # allocate variables when switching to extraction phase
-            # this holds spike times, clusters and other info per spike
-            st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
+        # if ibatch == niter - nBatches - 1:
+        #     # allocate variables when switching to extraction phase
+        #     # this holds spike times, clusters and other info per spike
+        #     st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
 
-            # these next three store the low-d template decompositions
-            temp.WA = []  # zeros(nt0, Nfilt, Nrank,nBatches,  'single')
-            temp.UA = []  # zeros(Nchan, Nfilt, Nrank,nBatches,  'single')
-            temp.muA = []  # zeros(Nfilt, nBatches,  'single')
+        #     # these next three store the low-d template decompositions
+        #     temp.WA = []  # zeros(nt0, Nfilt, Nrank,nBatches,  'single')
+        #     temp.UA = []  # zeros(Nchan, Nfilt, Nrank,nBatches,  'single')
+        #     temp.muA = []  # zeros(Nfilt, nBatches,  'single')
 
-            # these ones store features per spike
-            # Nnearest is the number of nearest templates to store features for
-            fW = []  # zeros(Nnearest, 1e7, 'single')
-            # NchanNear is the number of nearest channels to take PC features from
-            fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
+        #     # these ones store features per spike
+        #     # Nnearest is the number of nearest templates to store features for
+        #     fW = []  # zeros(Nnearest, 1e7, 'single')
+        #     # NchanNear is the number of nearest channels to take PC features from
+        #     fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
 
         # ibatch, niter, Nfilt, nsp.sum(), median(mu), st0.size, ndrop
 
@@ -951,22 +971,25 @@ def learnAndSolve8b(params=None, probe=None, raw_data=None, proc=None, iorig=Non
     # just display the total number of spikes
     # ntot
 
+    # Save results to the ctx.intermediate object.
+    ir.st3 = cp.concatenate(st3, axis=0)
+
     # the similarity score between templates is simply the correlation,
     # taken as the max over several consecutive time delays
-    simScore = cp.max(WtW, axis=2)
+    ir.simScore = cp.max(WtW, axis=2)
 
     fWa = cp.concatenate(fW, axis=-1)
     fWpca = cp.concatenate(fWpc, axis=-1)
 
     # the template features are stored in cProj, like in Kilosort1
-    cProj = fWa.T
+    ir.cProj = fWa.T
     # the neihboring templates idnices are stored in iNeigh
-    iNeigh = iList
+    ir.iNeigh = iList
 
     #  permute the PC projections in the right order
-    cProjPC = cp.transpose(fWpca, (2, 1, 0))
+    ir.cProjPC = cp.transpose(fWpca, (2, 1, 0))
     # iNeighPC keeps the indices of the channels corresponding to the PC features
-    iNeighPC = iC[:, iW]
+    ir.iNeighPC = iC[:, iW]
 
     WA = cp.concatenate(temp.WA, axis=-1)
     UA = cp.concatenate(temp.UA, axis=-1)
@@ -998,4 +1021,9 @@ def learnAndSolve8b(params=None, probe=None, raw_data=None, proc=None, iorig=Non
         U_a[:, :, j] = cp.dot(A[:, :nKeep], B[:nKeep, :nKeep])
         U_b[:, :, j] = C[:, :nKeep]
 
-    print('Finished compressing time-varying templates.')
+    ir.W_a = W_a
+    ir.W_b = W_b
+    ir.U_a = U_a
+    ir.U_b = U_b
+
+    logger.info('Finished compressing time-varying templates.')

@@ -5,7 +5,7 @@ import numpy as np
 import cupy as cp
 from tqdm import tqdm
 
-from .preprocess import my_min, my_sum, get_Nbatch
+from .preprocess import my_min, my_sum
 from .cptools import svdecon, zscore
 from .utils import get_cuda
 
@@ -42,25 +42,44 @@ def getClosestChannels(probe, sigma, NchanClosest):
 
 
 def isolated_peaks_new(S1, params):
+    """
+    takes a matrix of timepoints by channels S1
+    outputs threshold crossings that are relatively isolated from other peaks
+    outputs row, column and magnitude of the threshold crossing
+    """
     S1 = cp.asarray(S1)
+
+    # finding the local minimum in a sliding window within plus/minus loc_range extent
+    # across time and across channels
     smin = my_min(S1, params.loc_range, [0, 1])
 
+    # the peaks are samples that achieve this local minimum, AND have negativities less
+    # than a preset threshold
     peaks = (S1 < smin + 1e-3) & (S1 < params.spkTh)
 
+    # only take local peaks that are isolated from other local peaks
+    # if there is another local peak close by, this sum will be at least 2
     sum_peaks = my_sum(peaks, params.long_range, [0, 1])
+    # set to 0 peaks that are not isolated, and multiply with the voltage values
     peaks = peaks * (sum_peaks < 1.2) * S1
 
+    # exclude temporal buffers
     peaks[:params.nt0, :] = 0
     peaks[-params.nt0:, :] = 0
 
+    # find the non-zero peaks, and take their amplitudes
     col, row = cp.nonzero(peaks.T)
-
+    # invert the sign of the amplitudes
     mu = -peaks[row, col]
 
     return row, col, mu
 
 
 def get_SpikeSample(dataRAW, row, col, params):
+    """
+    given a batch of data (time by channels), and some time (row) and channel (col) indices for
+    spikes, this function returns the 1D time clips of voltage around those spike times
+    """
     nT, nChan = dataRAW.shape
 
     # times around the peak to consider
@@ -391,8 +410,21 @@ def mexDistances2(Params, Ws, W, iMatch, iC, Wh, mus, mu):
     return d_id, d_x
 
 
-def clusterSingleBatches(raw_data=None, proc=None, probe=None, params=None):
-    Nbatch = get_Nbatch(raw_data, params)
+def clusterSingleBatches(ctx):
+    """
+    outputs an ordering of the batches according to drift
+    for each batch, it extracts spikes as threshold crossings and clusters them with kmeans
+    the resulting cluster means are then compared for all pairs of batches, and a dissimilarity
+    score is assigned to each pair
+    the matrix of similarity scores is then re-ordered so that low dissimilaity is along
+    the diagonal
+    """
+    Nbatch = ctx.intermediate.Nbatch
+    params = ctx.params
+    probe = ctx.probe
+    raw_data = ctx.raw_data
+    proc = ctx.proc
+    ir = ctx.intermediate
 
     if not params.reorder:
         # if reordering is turned off, return consecutive order
@@ -409,7 +441,7 @@ def clusterSingleBatches(raw_data=None, proc=None, probe=None, params=None):
     niter = 10  # iterations for k-means. we won't run it to convergence to save time
 
     nBatches = Nbatch
-    NchanNear = min(Nchan, 2*8+1)
+    NchanNear = min(Nchan, 2 * 8 + 1)
 
     # initialize big arrays on the GPU to hold the results from each batch
     # this holds the unit norm templates
@@ -431,7 +463,7 @@ def clusterSingleBatches(raw_data=None, proc=None, probe=None, params=None):
 
         # extract spikes using PCA waveforms
         uproj, call = extractPCbatch2(
-            proc, params, probe, wPCA, min(nBatches-2, ibatch), iC, Nbatch)
+            proc, params, probe, wPCA, min(nBatches - 2, ibatch), iC, Nbatch)
 
         if cp.sum(cp.isnan(uproj)) > 0:
             break  # I am not sure what case this safeguards against....
@@ -531,4 +563,7 @@ def clusterSingleBatches(raw_data=None, proc=None, probe=None, params=None):
 
     logger.info("Finished clustering.")
 
-    return iorig, ccb0, ccbsort
+    # Write some arrays to the context.intermediate object.
+    ir.iorig = iorig
+    ir.ccb0 = ccb0
+    ir.ccbsort = ccbsort
