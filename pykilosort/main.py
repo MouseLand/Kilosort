@@ -8,53 +8,13 @@ from .preprocess import preprocess
 from .cluster import clusterSingleBatches
 from .learn import learnAndSolve8b
 from .postprocess import find_merges, splitAllClusters, set_cutoff
-from .utils import Bunch
+from .utils import Bunch, Context
 from .default_params import default_params, set_dependent_params
 
 import numpy as np
 import cupy as cp
 
 logger = logging.getLogger(__name__)
-
-
-class Context(Bunch):
-    def __init__(self, dir_path):
-        super(Context, self).__init__()
-        self.dir_path = dir_path
-        self.intermediate = Bunch()
-        self.context_path.mkdir(exist_ok=True, parents=True)
-
-    @property
-    def context_path(self):
-        """Path to the context directory."""
-        return self.dir_path / '.kilosort/context/'
-
-    def path(self, name):
-        """Path to an array in the context directory."""
-        return self.context_path / (name + '.npy')
-
-    def read(self, *names):
-        """Read several arrays, from memory (intermediate object) or from disk."""
-        out = [self.intermediate.get(name, np.load(self.path(name))) for name in names]
-        return out
-
-    def write(self, **kwargs):
-        """Write several arrays."""
-        for k, v in kwargs.items():
-            if isinstance(v, cp.ndarray):
-                v = cp.asnumpy(v)
-            if isinstance(v, np.ndarray):
-                logger.debug("Saving %s.npy", k)
-                np.save(self.path(k), v)
-
-    def load(self):
-        """Load intermediate results from disk."""
-        names = [f.stem for f in self.context_path.glob('*.npy')]
-        self.intermediate.update({name: value for name, value in zip(names, self.read(*names))})
-
-    def save(self):
-        """Save intermediate results to disk."""
-        self.write(**self.intermediate)
 
 
 def default_probe(raw_data):
