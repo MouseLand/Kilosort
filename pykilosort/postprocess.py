@@ -165,8 +165,8 @@ def find_merges(ctx, flag):
     if not flag:
         # if the flag is off, then no merges are performed
         # this function is then just used to compute cross- and auto- correlograms
-        ir.R_CCG = cp.inf * cp.ones(Xsim.shape, order='F')
-        ir.Q_CCG = cp.inf * cp.ones(Xsim.shape, order='F')
+        ir.R_CCG = cp.inf * cp.ones_like(Xsim, order='F')
+        ir.Q_CCG = cp.inf * cp.ones_like(Xsim, order='F')
         ir.K_CCG = cp.zeros((*Xsim.shape, 2 * nbins + 1), order='F')
 
     for j in range(Nk):
