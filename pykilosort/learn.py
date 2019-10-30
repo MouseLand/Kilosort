@@ -5,7 +5,7 @@ import numpy as np
 import cupy as cp
 from tqdm import tqdm
 
-from .cptools import svdecon, median
+from .cptools import svdecon, svdecon_cpu, median, free_gpu_memory
 from .cluster import isolated_peaks_new, get_SpikeSample, getClosestChannels
 from .utils import get_cuda, Bunch
 
@@ -421,7 +421,7 @@ def mexMPnu8(Params, dataRAW, U, W, mu, iC, iW, UtU, iList, wPCA):
         if Params[12] > 1:
             extractFEAT = cp.RawKernel(code, 'extractFEAT')
             extractFEAT(
-                (64,), (tpF,), (d_Params, d_st, d_id, d_counter, d_dout, d_iList, d_mu, d_feat))
+                (64,), tpF, (d_Params, d_st, d_id, d_counter, d_dout, d_iList, d_mu, d_feat))
 
         # subtract spikes from raw data here
         subtract_spikes = cp.RawKernel(code, 'subtract_spikes')
@@ -597,8 +597,8 @@ def learnAndSolve8b(ctx):
     Nbatch = ctx.intermediate.Nbatch
     params = ctx.params
     probe = ctx.probe
-    proc = ctx.proc
     ir = ctx.intermediate
+    proc = ir.proc
 
     iorig = ir.iorig
 
@@ -703,11 +703,6 @@ def learnAndSolve8b(ctx):
     # this holds spike times, clusters and other info per spike
     st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
 
-    # these next three store the low-d template decompositions
-    temp.WA = []  # zeros(nt0, Nfilt, Nrank,nBatches,  'single')
-    temp.UA = []  # zeros(Nchan, Nfilt, Nrank,nBatches,  'single')
-    temp.muA = []  # zeros(Nfilt, nBatches,  'single')
-
     # these ones store features per spike
     # Nnearest is the number of nearest templates to store features for
     fW = []  # zeros(Nnearest, 1e7, 'single')
@@ -715,6 +710,10 @@ def learnAndSolve8b(ctx):
     fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
 
     for ibatch in tqdm(range(niter), desc="Optimizing templates"):
+
+        # DEBUG
+        if 'st3' in ir:
+            break
 
         # korder is the index of the batch at this point in the schedule
         korder = int(irounds[ibatch])
@@ -901,9 +900,9 @@ def learnAndSolve8b(ctx):
             # we memorize the spatio-temporal decomposition of the waveforms at this batch
             # this is currently only used in the GUI to provide an accurate reconstruction
             # of the raw data at this time
-            temp.WA.append(W)
-            temp.UA.append(U)
-            temp.muA.append(mu)
+            temp.WA[..., k] = cp.asnumpy(W)
+            temp.UA[..., k] = cp.asnumpy(U)
+            temp.muA[..., k] = cp.asnumpy(mu)
 
             # we carefully assign the correct absolute times to spikes found in this batch
             ioffset = params.ntbuff - 1
@@ -921,12 +920,12 @@ def learnAndSolve8b(ctx):
         #            fWpc[:, :, 2 * st3.shape[0]] = 0
         #            st3[2 * st3.shape[0] - 1, 0] = 0
 
-            st3.append(cp.c_[
-                st,  # spike times
-                id0,  # spike clusters (1-indexing)
-                x0,  # template amplitudes
-                vexp,  # residual variance of this spike
-                korder,  # batch from which this spike was found
+            st3.append(np.c_[
+                cp.asnumpy(st),  # spike times
+                cp.asnumpy(id0),  # spike clusters (1-indexing)
+                cp.asnumpy(x0),  # template amplitudes
+                cp.asnumpy(vexp),  # residual variance of this spike
+                korder * np.ones(st.size),  # batch from which this spike was found
             ])
         #         st3[irange, 1] = id0  # spike clusters (1-indexing)
         #         st3[irange, 2] = x0  # template amplitudes
@@ -935,26 +934,31 @@ def learnAndSolve8b(ctx):
 
         #         fW[:, irange] = featW  # template features for this batch
         #         fWpc[:, :, irange] = featPC  # PC features
-            fW.append(featW)
-            fWpc.append(featPC)
+            fW.append(cp.asnumpy(featW))
+            fWpc.append(cp.asnumpy(featPC))
 
             ntot = ntot + x0.size  # keeps track of total number of spikes so far
 
-        # if ibatch == niter - nBatches - 1:
-        #     # allocate variables when switching to extraction phase
-        #     # this holds spike times, clusters and other info per spike
-        #     st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
+        if ibatch == niter - nBatches - 1:
+            # # allocate variables when switching to extraction phase
+            # # this holds spike times, clusters and other info per spike
+            # st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
 
-        #     # these next three store the low-d template decompositions
-        #     temp.WA = []  # zeros(nt0, Nfilt, Nrank,nBatches,  'single')
-        #     temp.UA = []  # zeros(Nchan, Nfilt, Nrank,nBatches,  'single')
-        #     temp.muA = []  # zeros(Nfilt, nBatches,  'single')
+            # these next three store the low-d template decompositions
+            temp.WA = np.zeros((nt0, Nfilt, Nrank, nBatches), dtype=np.float32, order='F')
+            temp.UA = np.zeros((Nchan, Nfilt, Nrank, nBatches), dtype=np.float32, order='F')
+            temp.muA = np.zeros((Nfilt, nBatches), dtype=np.float32, order='F')
 
-        #     # these ones store features per spike
-        #     # Nnearest is the number of nearest templates to store features for
-        #     fW = []  # zeros(Nnearest, 1e7, 'single')
-        #     # NchanNear is the number of nearest channels to take PC features from
-        #     fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
+            # # these next three store the low-d template decompositions
+            # temp.WA = []  # zeros(nt0, Nfilt, Nrank,nBatches,  'single')
+            # temp.UA = []  # zeros(Nchan, Nfilt, Nrank,nBatches,  'single')
+            # temp.muA = []  # zeros(Nfilt, nBatches,  'single')
+
+            # # these ones store features per spike
+            # # Nnearest is the number of nearest templates to store features for
+            # fW = []  # zeros(Nnearest, 1e7, 'single')
+            # # NchanNear is the number of nearest channels to take PC features from
+            # fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
 
         if ibatch % 100 == 0:
             # this is some of the relevant diagnostic information to be printed during training
@@ -968,62 +972,89 @@ def learnAndSolve8b(ctx):
         #fW = fW(:, 1:ntot)
         #fWpc = fWpc(:,:, 1:ntot)
 
+        free_gpu_memory()
+
     # just display the total number of spikes
     # ntot
 
-    # Save results to the ctx.intermediate object.
-    ir.st3 = cp.concatenate(st3, axis=0)
+    if 'st3' not in ir:
+        # Save results to the ctx.intermediate object.
+        ir.st3 = np.concatenate(st3, axis=0)
 
-    # the similarity score between templates is simply the correlation,
-    # taken as the max over several consecutive time delays
-    ir.simScore = cp.max(WtW, axis=2)
+        # the similarity score between templates is simply the correlation,
+        # taken as the max over several consecutive time delays
+        ir.simScore = cp.asnumpy(cp.max(WtW, axis=2))
 
-    fWa = cp.concatenate(fW, axis=-1)
-    fWpca = cp.concatenate(fWpc, axis=-1)
+        fWa = np.concatenate(fW, axis=-1)
+        fWpca = np.concatenate(fWpc, axis=-1)
 
-    # the template features are stored in cProj, like in Kilosort1
-    ir.cProj = fWa.T
-    # the neihboring templates idnices are stored in iNeigh
-    ir.iNeigh = iList
+        # the template features are stored in cProj, like in Kilosort1
+        ir.cProj = fWa.T
+        # the neihboring templates idnices are stored in iNeigh
+        ir.iNeigh = cp.asnumpy(iList)
 
-    #  permute the PC projections in the right order
-    ir.cProjPC = cp.transpose(fWpca, (2, 1, 0))
-    # iNeighPC keeps the indices of the channels corresponding to the PC features
-    ir.iNeighPC = iC[:, iW]
+        #  permute the PC projections in the right order
+        ir.cProjPC = np.transpose(fWpca, (2, 1, 0))
+        # iNeighPC keeps the indices of the channels corresponding to the PC features
+        ir.iNeighPC = cp.asnumpy(iC[:, iW])
 
-    WA = cp.concatenate(temp.WA, axis=-1)
-    UA = cp.concatenate(temp.UA, axis=-1)
+        ir.WA = temp.WA
+        ir.UA = temp.UA
 
-    # this whole next block is just done to compress the compressed templates
-    # we separately svd the time components of each template, and the spatial components
-    # this also requires a careful decompression function, available somewhere in the GUI code
-    nKeep = min(Nchan * 3, 20)  # how many PCs to keep
-    W_a = cp.zeros((nt0 * Nrank, nKeep, Nfilt), dtype=np.float32)
-    W_b = cp.zeros((nBatches, nKeep, Nfilt), dtype=np.float32)
-    U_a = cp.zeros((Nchan * Nrank, nKeep, Nfilt), dtype=np.float32)
-    U_b = cp.zeros((nBatches, nKeep, Nfilt), dtype=np.float32)
+    # These are the variables set by the code above:
+    # - st3
+    # - simScore
+    # - fWpca
+    # - cProj
+    # - cProjPC
+    # - iNeigh
+    # - iNeighPC
+    # - WA
+    # - UA
+        ctx.save(
+            st3=ir.st3,
+            simScore=ir.simScore,
+            cProj=ir.cProj,
+            cProjPC=ir.cProjPC,
+            iNeigh=ir.iNeigh,
+            iNeighPC=ir.iNeighPC,
+            WA=ir.WA,
+            UA=ir.UA,
+        )
 
-    for j in range(Nfilt):
-        # do this for every template separately
-        WA = cp.reshape(WA[:, j, ...], (-1, nBatches), order='F')
-        # svd on the GPU was faster for this, but the Python randomized CPU version
-        # might be faster still
-        # WA = gpuArray(WA)
-        A, B, C = svdecon(WA)
-        # W_a times W_b results in a reconstruction of the time components
-        W_a[:, :, j] = cp.dot(A[:, :nKeep], B[:nKeep, :nKeep])
-        W_b[:, :, j] = C[:, :nKeep]
+    if 'W_a' not in ir:
+        # this whole next block is just done to compress the compressed templates
+        # we separately svd the time components of each template, and the spatial components
+        # this also requires a careful decompression function, available somewhere in the GUI code
+        nKeep = min(Nchan * 3, 20)  # how many PCs to keep
+        W_a = np.zeros((nt0 * Nrank, nKeep, Nfilt), dtype=np.float32)
+        W_b = np.zeros((nBatches, nKeep, Nfilt), dtype=np.float32)
+        U_a = np.zeros((Nchan * Nrank, nKeep, Nfilt), dtype=np.float32)
+        U_b = np.zeros((nBatches, nKeep, Nfilt), dtype=np.float32)
 
-        UA = cp.reshape(UA[:, j, ...], (-1, nBatches), order='F')
-        # UA = gpuArray(UA)
-        A, B, C = svdecon(UA)
-        # U_a times U_b results in a reconstruction of the time components
-        U_a[:, :, j] = cp.dot(A[:, :nKeep], B[:nKeep, :nKeep])
-        U_b[:, :, j] = C[:, :nKeep]
+        for j in tqdm(range(Nfilt), desc='Compressing templates'):
+            # do this for every template separately
+            WA = np.reshape(ir.WA[:, j, ...], (-1, nBatches), order='F')
+            # svd on the GPU was faster for this, but the Python randomized CPU version
+            # might be faster still
+            # WA = gpuArray(WA)
+            A, B, C = svdecon_cpu(WA)
+            # W_a times W_b results in a reconstruction of the time components
+            W_a[:, :, j] = np.dot(A[:, :nKeep], B[:nKeep, :nKeep])
+            W_b[:, :, j] = C[:, :nKeep]
 
-    ir.W_a = W_a
-    ir.W_b = W_b
-    ir.U_a = U_a
-    ir.U_b = U_b
+            UA = np.reshape(ir.UA[:, j, ...], (-1, nBatches), order='F')
+            # UA = gpuArray(UA)
+            A, B, C = svdecon_cpu(UA)
+            # U_a times U_b results in a reconstruction of the time components
+            U_a[:, :, j] = np.dot(A[:, :nKeep], B[:nKeep, :nKeep])
+            U_b[:, :, j] = C[:, :nKeep]
+
+        ctx.save(
+            W_a=W_a,
+            W_b=W_b,
+            U_a=U_a,
+            U_b=U_b,
+        )
 
     logger.info('Finished compressing time-varying templates.')

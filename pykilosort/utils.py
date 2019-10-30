@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 import os.path as op
@@ -85,30 +86,82 @@ class Context(Bunch):
         """Path to the context directory."""
         return self.dir_path / '.kilosort/context/'
 
+    @property
+    def metadata_path(self):
+        return self.context_path / 'metadata.json'
+
     def path(self, name):
         """Path to an array in the context directory."""
         return self.context_path / (name + '.npy')
 
+    def read_metadata(self):
+        """Read the metadata dictionary from the metadata.json file in the context dir."""
+        if not self.metadata_path.exists():
+            return Bunch()
+        with open(self.metadata_path, 'r') as f:
+            return Bunch(json.load(f))
+
+    def write_metadata(self, metadata):
+        """Write metadata dictionary in the metadata.json file."""
+        with open(self.metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2, sort_keys=True)
+
     def read(self, name):
         """Read an array from memory (intermediate object) or from disk."""
         if name not in self.intermediate:
-            self.intermediate[name] = np.load(self.path(name))
+            path = self.path(name)
+            # Load a NumPy file.
+            if path.exists():
+                logger.debug("Loading %s.npy", name)
+                # Memmap for large files.
+                mmap_mode = 'r' if op.getsize(path) > 1e8 else None
+                self.intermediate[name] = np.load(path, mmap_mode=mmap_mode)
+            else:
+                # Load a value from the metadata file.
+                self.intermediate[name] = self.read_metadata().get(name, None)
         return self.intermediate[name]
 
     def write(self, **kwargs):
         """Write several arrays."""
+        # Load the metadata.
+        if self.metadata_path.exists():
+            metadata = self.read_metadata()
+        else:
+            metadata = Bunch()
+        # Write all variables.
         for k, v in kwargs.items():
+            # Transfer GPU arrays to the CPU before saving them.
             if isinstance(v, cp.ndarray):
                 v = cp.asnumpy(v)
             if isinstance(v, np.ndarray):
                 logger.debug("Saving %s.npy", k)
                 np.save(self.path(k), v)
+            else:
+                logger.debug("Save %s in the metadata.json file.", k)
+                metadata[k] = v
+        # Write the metadata file.
+        self.write_metadata(metadata)
 
     def load(self):
         """Load intermediate results from disk."""
+        # Load metadata values that are not already loaded in the intermediate dictionary.
+        self.intermediate.update(
+            {k: v for k, v in self.read_metadata().items() if k not in self.intermediate})
+        # Load NumPy arrays that are not already loaded in the intermediate dictionary.
         names = [f.stem for f in self.context_path.glob('*.npy')]
-        self.intermediate.update({name: value for name, value in zip(names, self.read(*names))})
+        self.intermediate.update(
+            {name: self.read(name) for name in names if name not in self.intermediate})
 
-    def save(self):
-        """Save intermediate results to disk."""
-        self.write(**self.intermediate)
+    def save(self, **kwargs):
+        """Save intermediate results to the ctx.intermediate dictionary, and to disk also.
+
+        This has two effects:
+        1. variables are available via ctx.intermediate in the current session
+        2. In a future session with ctx.load(), these variables will be readily available in
+           ctx.intermediate
+
+        """
+        for k, v in kwargs.items():
+            self.intermediate[k] = v
+        kwargs = kwargs or self.intermediate
+        self.write(**kwargs)

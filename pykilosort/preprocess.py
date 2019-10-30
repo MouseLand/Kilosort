@@ -302,7 +302,7 @@ def get_Nbatch(raw_data, params):
     return ceil(n_samples / (params.NT - params.ntbuff))  # number of data batches
 
 
-def preprocess(raw_data=None, probe=None, params=None, proc_path=None):
+def preprocess(ctx):
     # function rez = preprocessDataSub(ops)
     # this function takes an ops struct, which contains all the Kilosort2 settings and file paths
     # and creates a new binary file of preprocessed data, logging new variables into rez.
@@ -313,37 +313,21 @@ def preprocess(raw_data=None, probe=None, params=None, proc_path=None):
     # 4) channel whitening
     # 5) scaling to int16 values
 
+    params = ctx.params
+    probe = ctx.probe
+    raw_data = ctx.raw_data
+    ir = ctx.intermediate
+
     fs = params.fs
     fshigh = params.fshigh
     fslow = params.fslow
-    Nbatch = get_Nbatch(raw_data, params)
+    Nbatch = ir.Nbatch
     NT = params.NT
     NTbuff = params.NTbuff
 
-    if params.minfr_goodchannels > 0:  # discard channels that have very few spikes
-        # determine bad channels
-        probe.igood = get_good_channels(raw_data=raw_data, probe=probe, params=params)
-
-        # it's enough to remove bad channels from the channel map, which treats them
-        # as if they are dead
-        probe.chanMap = probe.chanMap[probe.igood]
-        probe.xc = probe.xc[probe.igood]  # removes coordinates of bad channels
-        probe.yc = probe.yc[probe.igood]
-        probe.kcoords = probe.kcoords[probe.igood]
-    else:
-        probe.igood = None
-    probe.Nchan = len(probe.chanMap)  # total number of good channels that we will spike sort
-
-    # upper bound on the number of templates we can have
-    params.Nfilt = params.nfilt_factor * probe.Nchan
-
-    # outputs a rotation matrix (Nchan by Nchan) which whitens the zero-timelag covariance
-    # of the data
-    Wrot = get_whitening_matrix(raw_data=raw_data, probe=probe, params=params)
-
     logger.info("Loading raw data and applying filters.")
 
-    with open(proc_path, 'wb') as fw:  # open for writing processed data
+    with open(ir.proc_path, 'wb') as fw:  # open for writing processed data
         for ibatch in tqdm(range(Nbatch), desc="Preprocessing"):
             # we'll create a binary file of batches of NT samples, which overlap consecutively
             # on params.ntbuff samples
@@ -374,12 +358,10 @@ def preprocess(raw_data=None, probe=None, params=None, proc_path=None):
             datr = gpufilter(buff, chanMap=probe.chanMap, fs=fs, fshigh=fshigh, fslow=fslow)
 
             datr = datr[ioffset:ioffset + NT, :]  # remove timepoints used as buffers
-            datr = cp.dot(datr, Wrot)  # whiten the data and scale by 200 for int16 range
+            datr = cp.dot(datr, ir.Wrot)  # whiten the data and scale by 200 for int16 range
 
             # convert to int16, and gather on the CPU side
             datcpu = cp.asnumpy(datr).astype(np.int16)
 
             # write this batch to binary file
             fw.write(datcpu.tobytes('F'))
-
-    return Nbatch, Wrot

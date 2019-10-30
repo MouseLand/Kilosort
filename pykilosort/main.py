@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-from .preprocess import preprocess
+from .preprocess import preprocess, get_good_channels, get_whitening_matrix, get_Nbatch
 from .cluster import clusterSingleBatches
 from .learn import learnAndSolve8b
 from .postprocess import find_merges, splitAllClusters, set_cutoff
@@ -63,41 +63,68 @@ def run(dir_path=None, raw_data=None, probe=None, params=None):
     ctx.load()
     ir = ctx.intermediate
 
+    ir.Nbatch = get_Nbatch(raw_data, params)
+
+    # -------------------------------------------------------------------------
+    # Find good channels.
+    if params.minfr_goodchannels > 0:  # discard channels that have very few spikes
+        if 'igood' not in ir:
+            # determine bad channels
+            ir.igood = get_good_channels(raw_data=raw_data, probe=probe, params=params)
+            # Cache the result.
+            ctx.write(igood=ir.igood)
+
+        # it's enough to remove bad channels from the channel map, which treats them
+        # as if they are dead
+        probe.chanMap = probe.chanMap[ir.igood]
+        probe.xc = probe.xc[ir.igood]  # removes coordinates of bad channels
+        probe.yc = probe.yc[ir.igood]
+        probe.kcoords = probe.kcoords[ir.igood]
+    probe.Nchan = len(probe.chanMap)  # total number of good channels that we will spike sort
+
+    # upper bound on the number of templates we can have
+    params.Nfilt = params.nfilt_factor * probe.Nchan
+
+    # -------------------------------------------------------------------------
+    # Find the whitening matrix.
+    if 'Wrot' not in ir:
+        # outputs a rotation matrix (Nchan by Nchan) which whitens the zero-timelag covariance
+        # of the data
+        ir.Wrot = get_whitening_matrix(raw_data=raw_data, probe=probe, params=params)
+        # Cache the result.
+        ctx.write(Wrot=ir.Wrot)
+
     # -------------------------------------------------------------------------
     # Preprocess data to create proc.dat
-    proc_path = dir_path / 'proc.dat'
-    if 1 or not proc_path.exists():
+    ir.proc_path = dir_path / 'proc.dat'
+    if not ir.proc_path.exists():
         # Do not preprocess again if the proc.dat file already exists.
-        ir.Nbatch, ir.Wrot = preprocess(
-            raw_data=raw_data, probe=probe, params=params, proc_path=proc_path)
-        ctx.save()
-    # Get the whitening matrix, from memory if it has already been computed/loaded, or from disk.
-    ir.Wrot = ctx.read('Wrot')
+        preprocess(ctx)
 
     # Open the proc file.
-    assert proc_path.exists()
-    ir.proc = np.memmap(proc_path, dtype=raw_data.dtype, mode='r', order='F')
+    assert ir.proc_path.exists()
+    ir.proc = np.memmap(ir.proc_path, dtype=raw_data.dtype, mode='r', order='F')
 
     # -------------------------------------------------------------------------
     # Time-reordering as a function of drift.
     # This function adds to the intermediate object: iorig, ccb0, ccbsort
     if 'iorig' not in ir:
         clusterSingleBatches(ctx)
-    ctx.save()
 
     # -------------------------------------------------------------------------
     # Main tracking and template matching algorithm.
     # this function adds many intermediate results, notably st3
-    if 'st3' not in ir:
-        learnAndSolve8b(ctx)
-    ctx.save()
+    # if 'st3' not in ir:
+    learnAndSolve8b(ctx)
+
+    return
 
     # -------------------------------------------------------------------------
     # Final merges.
     # This function adds: R_CCG, Q_CCG, K_CCG
     if 'R_CCG' not in ir:
         find_merges(ctx, 1)
-    ctx.save()
+        # ctx.save()
 
     # -------------------------------------------------------------------------
     # Final splits.
@@ -107,14 +134,14 @@ def run(dir_path=None, raw_data=None, probe=None, params=None):
         splitAllClusters(ctx, 1)
         # final splits by amplitudes
         splitAllClusters(ctx, 0)
-    ctx.save()
+        # ctx.save()
 
     # -------------------------------------------------------------------------
     # Decide on cutoff.
     # This function adds: good, est_contam_rate.
     if 'est_contam_rate' not in ir:
         set_cutoff(ctx)
-    ctx.save()
+        # ctx.save()
 
     logger.info('Found %d good units.', np.sum(ctx.good > 0))
 

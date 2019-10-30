@@ -174,6 +174,11 @@ def svdecon(X, nPC0=None):
     return U, S, V
 
 
+def svdecon_cpu(X):
+    U, S, V = np.linalg.svd(cp.asnumpy(X))
+    return U, np.diag(S), V
+
+
 def zscore(a, axis=0):
     mns = a.mean(axis=axis)
     sstd = a.std(axis=axis, ddof=0)

@@ -423,8 +423,8 @@ def clusterSingleBatches(ctx):
     params = ctx.params
     probe = ctx.probe
     raw_data = ctx.raw_data
-    proc = ctx.proc
     ir = ctx.intermediate
+    proc = ir.proc
 
     if not params.reorder:
         # if reordering is turned off, return consecutive order
@@ -457,7 +457,7 @@ def clusterSingleBatches(ctx):
     NrankPC = 3  # I am not sure if this gets used, but it goes into the function
 
     # return an array of closest channels for each channel
-    iC = getClosestChannels(probe, params.sigmaMask, probe.NchanNear)[0]
+    iC = getClosestChannels(probe, params.sigmaMask, NchanNear)[0]
 
     for ibatch in tqdm(range(nBatches), desc="Clustering spikes"):
 
@@ -564,6 +564,4 @@ def clusterSingleBatches(ctx):
     logger.info("Finished clustering.")
 
     # Write some arrays to the context.intermediate object.
-    ir.iorig = iorig
-    ir.ccb0 = ccb0
-    ir.ccbsort = ccbsort
+    ctx.save(iorig=iorig, ccb0=ccb0, ccbsort=ccbsort)

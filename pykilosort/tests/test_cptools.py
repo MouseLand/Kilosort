@@ -1,9 +1,10 @@
 import numpy as np
 from scipy.signal import lfilter as lfilter_cpu
+from numpy.linalg import svd
 import cupy as cp
 
-from ..cptools import median, lfilter
-# from ..utils import p
+from ..cptools import median, lfilter, svdecon, svdecon_cpu
+from ..utils import p
 
 
 def test_median_1(dtype, axis):
@@ -22,3 +23,12 @@ def test_lfilter_1():
     fil_cpu = lfilter_cpu(b, a, arr, axis=0)
 
     assert np.allclose(fil_cpu, fil_gpu, atol=.2)
+
+
+def test_svdecon_1():
+    X = cp.random.rand(10, 10)
+
+    U, S, V = svdecon(X)
+    Un, Sn, Vn = svdecon_cpu(X)
+
+    assert np.allclose(S, Sn)

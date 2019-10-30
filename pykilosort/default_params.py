@@ -57,6 +57,9 @@ default_params.nt0min = 20
 default_params.nup = 10
 default_params.sig = 1
 
+default_params.loc_range = [5, 4]
+default_params.long_range = [30, 6]
+
 
 def set_dependent_params(params):
     """Add dependent parameters."""

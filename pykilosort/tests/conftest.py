@@ -13,7 +13,7 @@ add_default_handler(level='DEBUG')
 
 @fixture
 def data_path():
-    path = Path(__file__).parent / '../../data/'
+    path = (Path(__file__).parent / '../../data/').resolve()
     assert path.exists()
     return path
 

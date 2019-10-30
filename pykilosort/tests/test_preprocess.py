@@ -12,7 +12,7 @@ def test_good_channels(raw_data, probe, params):
 def test_whitening_matrix(data_path, raw_data, probe_good, params):
     Wrot = get_whitening_matrix(raw_data, probe_good, params)
     Wrot_mat = np.load(data_path / 'whitening_matrix.npy')
-    assert np.allclose(Wrot, Wrot_mat, atol=5)
+    assert np.allclose(Wrot, Wrot_mat, atol=10)
 
 
 def test_preprocess_1(data_path, raw_data, probe_good, params):
