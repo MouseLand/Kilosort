@@ -114,27 +114,25 @@ def run(dir_path=None, raw_data=None, probe=None, params=None):
     # -------------------------------------------------------------------------
     # Main tracking and template matching algorithm.
     # this function adds many intermediate results, notably st3
-    # if 'st3' not in ir:
-    learnAndSolve8b(ctx)
-
-    return
+    if 'st3' not in ir:
+        learnAndSolve8b(ctx)
 
     # -------------------------------------------------------------------------
     # Final merges.
     # This function adds: R_CCG, Q_CCG, K_CCG
-    if 'R_CCG' not in ir:
-        find_merges(ctx, 1)
-        # ctx.save()
+    if 'st3_after_merges' not in ir:
+        find_merges(ctx, True)
 
     # -------------------------------------------------------------------------
     # Final splits.
     # This function adds many intermediate results, including isplit.
     if 'isplit' not in ir:
         # final splits by SVD
-        splitAllClusters(ctx, 1)
+        splitAllClusters(ctx, True)
         # final splits by amplitudes
-        splitAllClusters(ctx, 0)
-        # ctx.save()
+        splitAllClusters(ctx, False)
+
+    return
 
     # -------------------------------------------------------------------------
     # Decide on cutoff.

@@ -136,7 +136,7 @@ class Context(Bunch):
             if isinstance(v, np.ndarray):
                 logger.debug("Saving %s.npy", k)
                 np.save(self.path(k), v)
-            else:
+            elif v is not None:
                 logger.debug("Save %s in the metadata.json file.", k)
                 metadata[k] = v
         # Write the metadata file.
@@ -162,6 +162,7 @@ class Context(Bunch):
 
         """
         for k, v in kwargs.items():
-            self.intermediate[k] = v
+            if v is not None:
+                self.intermediate[k] = v
         kwargs = kwargs or self.intermediate
         self.write(**kwargs)

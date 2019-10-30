@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from .cptools import svdecon, svdecon_cpu, median, free_gpu_memory
 from .cluster import isolated_peaks_new, get_SpikeSample, getClosestChannels
-from .utils import get_cuda, Bunch
+from .utils import get_cuda
 
 logger = logging.getLogger(__name__)
 
@@ -608,6 +608,9 @@ def learnAndSolve8b(ctx):
     wTEMP, wPCA = extractTemplatesfromSnippets(
         proc=proc, probe=probe, params=params, Nbatch=Nbatch, nPCs=NrankPC)
 
+    if 'wPCA' not in ir:
+        ctx.save(wPCA=wPCA, wTEMP=wTEMP)
+
     # move these to the GPU
     wPCA = cp.asarray(wPCA[:, :Nrank], dtype=np.float32, order='F')
     wTEMP = cp.asarray(wTEMP, dtype=np.float32, order='F')
@@ -697,8 +700,6 @@ def learnAndSolve8b(ctx):
     # this is the minimum firing rate that all templates must maintain, or be dropped
     m0 = params.minFR * params.NT / params.fs
 
-    temp = Bunch()  # used to store temp results
-
     # allocate variables when switching to extraction phase
     # this holds spike times, clusters and other info per spike
     st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
@@ -709,275 +710,276 @@ def learnAndSolve8b(ctx):
     # NchanNear is the number of nearest channels to take PC features from
     fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
 
-    for ibatch in tqdm(range(niter), desc="Optimizing templates"):
+    if 'st3' not in ir:
+        for ibatch in tqdm(range(niter), desc="Optimizing templates"):
+            # korder is the index of the batch at this point in the schedule
+            korder = int(irounds[ibatch])
+            # k is the index of the batch in absolute terms
+            k = int(isortbatches[korder])
 
-        # DEBUG
-        if 'st3' in ir:
-            break
+            if ibatch > niter - nBatches - 1 and korder == nhalf:
+                # this is required to revert back to the template states in the middle of the
+                # batches
+                W, dWU = ir.W, ir.dWU
+                logger.debug('Reverted back to middle timepoint.')
 
-        # korder is the index of the batch at this point in the schedule
-        korder = int(irounds[ibatch])
-        # k is the index of the batch in absolute terms
-        k = int(isortbatches[korder])
+            if ibatch < niter - nBatches:
+                # obtained pm for this batch
+                Params[8] = float(pmi[ibatch])
+                pm = pmi[ibatch] * (1 + cp.zeros((Nfilt,), dtype=np.float64, order='F'))
 
-        if ibatch > niter - nBatches - 1 and korder == nhalf:
-            # this is required to revert back to the template states in the middle of the batches
-            W, dWU = temp.W, temp.dWU
-            logger.debug('Reverted back to middle timepoint.')
+            # loading a single batch (same as everywhere)
+            offset = Nchan * batchstart[k]
+            dat = proc.flat[offset:offset + NT * Nchan].reshape((-1, Nchan), order='F')
+            dataRAW = cp.asarray(dat, dtype=np.float32) / params.scaleproc
 
-        if ibatch < niter - nBatches:
-            # obtained pm for this batch
-            Params[8] = float(pmi[ibatch])
-            pm = pmi[ibatch] * (1 + cp.zeros((Nfilt,), dtype=np.float64, order='F'))
+            if ibatch == 0:
+                # only on the first batch, we first get a new set of spikes from the residuals,
+                # which in this case is the unmodified data because we start with no templates
+                # CUDA function to get spatiotemporal clips from spike detections
+                dWU, cmap = mexGetSpikes2(Params, dataRAW, wTEMP, iC)
 
-        # loading a single batch (same as everywhere)
-        offset = Nchan * batchstart[k]
-        dat = proc.flat[offset:offset + NT * Nchan].reshape((-1, Nchan), order='F')
-        dataRAW = cp.asarray(dat, dtype=np.float32) / params.scaleproc
+                dWU = cp.asarray(dWU, dtype=np.float64, order='F')
 
-        if ibatch == 0:
-            # only on the first batch, we first get a new set of spikes from the residuals,
-            # which in this case is the unmodified data because we start with no templates
-            # CUDA function to get spatiotemporal clips from spike detections
-            dWU, cmap = mexGetSpikes2(Params, dataRAW, wTEMP, iC)
+                # project these into the wPCA waveforms
+                dWU = cp.reshape(
+                    cp.dot(wPCAd, cp.dot(wPCAd.T, dWU.reshape((dWU.shape[0], -1), order='F'))),
+                    dWU.shape, order='F')
 
-            dWU = cp.asarray(dWU, dtype=np.float64, order='F')
+                # initialize the low-rank decomposition with standard waves
+                W = W0[:, cp.ones(dWU.shape[2], dtype=np.int32), :]
+                Nfilt = W.shape[1]  # update the number of filters/templates
+                if nsp.size < Nfilt:
+                    nsp = cp.zeros(Nfilt, dtype=np.float64, order='F')
+                # initialize the number of spikes for new templates with the minimum allowed value,
+                # so it doesn't get thrown back out right away
+                nsp[:Nfilt] = m0
+                Params[1] = Nfilt  # update in the CUDA parameters
 
-            # project these into the wPCA waveforms
-            dWU = cp.reshape(
-                cp.dot(wPCAd, cp.dot(wPCAd.T, dWU.reshape((dWU.shape[0], -1), order='F'))),
-                dWU.shape, order='F')
+            if flag_resort:
+                # this is a flag to resort the order of the templates according to best peak
+                # channel
+                # this is important in order to have cohesive memory requests from the GPU RAM
+                # max channel (either positive or negative peak)
+                iW = cp.argmax(cp.abs(dWU[nt0min - 1, :, :]), axis=0)
+                # iW = int32(squeeze(iW))
 
-            # initialize the low-rank decomposition with standard waves
-            W = W0[:, cp.ones(dWU.shape[2], dtype=np.int32), :]
-            Nfilt = W.shape[1]  # update the number of filters/templates
-            if nsp.size < Nfilt:
-                nsp = cp.zeros(Nfilt, dtype=np.float64, order='F')
-            # initialize the number of spikes for new templates with the minimum allowed value,
-            # so it doesn't get thrown back out right away
-            nsp[:Nfilt] = m0
-            Params[1] = Nfilt  # update in the CUDA parameters
+                isort = cp.argsort(iW)  # sort by max abs channel
+                iW = iW[isort]
+                W = W[:, isort, :]  # user ordering to resort all the other template variables
+                dWU = dWU[:, :, isort]
+                nsp = nsp[isort]
 
-        if flag_resort:
-            # this is a flag to resort the order of the templates according to best peak channel
-            # this is important in order to have cohesive memory requests from the GPU RAM
-            # max channel (either positive or negative peak)
-            iW = cp.argmax(cp.abs(dWU[nt0min - 1, :, :]), axis=0)
-            # iW = int32(squeeze(iW))
+            # decompose dWU by svd of time and space (via covariance matrix of 61 by 61 samples)
+            # this uses a "warm start" by remembering the W from the previous iteration
+            W, U, mu = mexSVDsmall2(Params, dWU, W, iC, iW, Ka, Kb)
 
-            isort = cp.argsort(iW)  # sort by max abs channel
-            iW = iW[isort]
-            W = W[:, isort, :]  # user ordering to resort all the other template variables
-            dWU = dWU[:, :, isort]
-            nsp = nsp[isort]
+            # UtU is the gram matrix of the spatial components of the low-rank SVDs
+            # it tells us which pairs of templates are likely to "interfere" with each other
+            # such as when we subtract off a template
+            # this needs to change (but I don't know why!)
+            UtU, maskU, _ = getMeUtU(iW, iC, mask, Nnearest, Nchan)
 
-        # decompose dWU by svd of time and space (via covariance matrix of 61 by 61 samples)
-        # this uses a "warm start" by remembering the W from the previous iteration
-        W, U, mu = mexSVDsmall2(Params, dWU, W, iC, iW, Ka, Kb)
+            # main CUDA function in the whole codebase. does the iterative template matching
+            # based on the current templates, gets features for these templates if requested
+            # (featW, featPC),
+            # gets scores for the template fits to each spike (vexp), outputs the average of
+            # waveforms assigned to each cluster (dWU0),
+            # and probably a few more things I forget about
+            st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp = mexMPnu8(
+                Params, dataRAW, U, W, mu, iC, iW, UtU, iList, wPCA)
 
-        # UtU is the gram matrix of the spatial components of the low-rank SVDs
-        # it tells us which pairs of templates are likely to "interfere" with each other
-        # such as when we subtract off a template
-        # this needs to change (but I don't know why!)
-        UtU, maskU, _ = getMeUtU(iW, iC, mask, Nnearest, Nchan)
+            # Sometimes nsp can get transposed (think this has to do with it being
+            # a single element in one iteration, to which elements are added
+            # nsp, nsp0, and pm must all be row vectors (Nfilt x 1), so force nsp
+            # to be a row vector.
+            # nsp = cp.atleast_2d(nsp)
+            # nsprow, nspcol = nsp.shape
+            # if nsprow < nspcol:
+            #     nsp = nsp.T
+            nsp = nsp.squeeze()
 
-        # main CUDA function in the whole codebase. does the iterative template matching
-        # based on the current templates, gets features for these templates if requested
-        # (featW, featPC),
-        # gets scores for the template fits to each spike (vexp), outputs the average of
-        # waveforms assigned to each cluster (dWU0),
-        # and probably a few more things I forget about
-        st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp = mexMPnu8(
-            Params, dataRAW, U, W, mu, iC, iW, UtU, iList, wPCA)
+            # updates the templates as a running average weighted by recency
+            # since some clusters have different number of spikes, we need to apply the
+            # exp(pm) factor several times, and fexp is the resulting update factor
+            # for each template
+            fexp = np.exp(nsp0 * cp.log(pm[:Nfilt]))
+            fexp = cp.reshape(fexp, (1, 1, -1), order='F')
+            dWU = dWU * fexp + (1 - fexp) * (dWU0 / cp.reshape(
+                cp.maximum(1, nsp0), (1, 1, -1), order='F'))
 
-        # Sometimes nsp can get transposed (think this has to do with it being
-        # a single element in one iteration, to which elements are added
-        # nsp, nsp0, and pm must all be row vectors (Nfilt x 1), so force nsp
-        # to be a row vector.
-        # nsp = cp.atleast_2d(nsp)
-        # nsprow, nspcol = nsp.shape
-        # if nsprow < nspcol:
-        #     nsp = nsp.T
-        nsp = nsp.squeeze()
+            # nsp just gets updated according to the fixed factor p1
+            nsp = nsp * p1 + (1 - p1) * nsp0
 
-        # updates the templates as a running average weighted by recency
-        # since some clusters have different number of spikes, we need to apply the
-        # exp(pm) factor several times, and fexp is the resulting update factor
-        # for each template
-        fexp = np.exp(nsp0 * cp.log(pm[:Nfilt]))
-        fexp = cp.reshape(fexp, (1, 1, -1), order='F')
-        dWU = dWU * fexp + (1 - fexp) * (dWU0 / cp.reshape(
-            cp.maximum(1, nsp0), (1, 1, -1), order='F'))
+            if ibatch == niter - nBatches - 1:
+                # if we reached this point, we need to disable secondary template updates
+                # like dropping, and adding new templates. We need to memorize the state of the
+                # templates at this timepoint, and set the processing mode to "extraction and
+                # tracking"
 
-        # nsp just gets updated according to the fixed factor p1
-        nsp = nsp * p1 + (1 - p1) * nsp0
+                flag_resort = 0  # no need to resort templates by channel any more
+                # flag_final = 1  # this is the "final" pass
 
-        if ibatch == niter - nBatches - 1:
-            # if we reached this point, we need to disable secondary template updates
-            # like dropping, and adding new templates. We need to memorize the state of the
-            # templates at this timepoint, and set the processing mode to "extraction and tracking"
-
-            flag_resort = 0  # no need to resort templates by channel any more
-            # flag_final = 1  # this is the "final" pass
-
-            # final clean up, triage templates one last time
-            W, U, dWU, mu, nsp, ndrop = triageTemplates2(
-                params, iW, C2C, W, U, dWU, mu, nsp, ndrop)
-
-            # final number of templates
-            Nfilt = W.shape[1]
-            Params[1] = Nfilt
-
-            # final covariance matrix between all templates
-            WtW, iList = getMeWtW(W, U, Nnearest)
-
-            # iW is the final channel assigned to each template
-            iW = cp.argmax(cp.abs(dWU[nt0min - 1, :, :]), axis=0)
-
-            # extract ALL features on the last pass
-            Params[12] = 2  # this is a flag to output features (PC and template features)
-
-            # different threshold on last pass?
-            Params[2] = params.Th[-1]  # usually the threshold is much lower on the last pass
-
-            # memorize the state of the templates
-            temp.W, temp.dWU, temp.U, temp.mu = W, dWU, U, mu
-            temp.Wraw = cp.zeros((U.shape[0], W.shape[0], U.shape[1]), dtype=np.float64, order='F')
-            for n in range(U.shape[1]):
-                # temporarily use U rather Urot until I have a chance to test it
-                temp.Wraw[:, :, n] = mu[n] * cp.dot(U[:, n, :], W[:, n, :].T)
-
-        if ibatch < niter - nBatches - 1:
-            # during the main "learning" phase of fitting a model
-            if ibatch % 5 == 0:
-                # this drops templates based on spike rates and/or similarities to other templates
+                # final clean up, triage templates one last time
                 W, U, dWU, mu, nsp, ndrop = triageTemplates2(
                     params, iW, C2C, W, U, dWU, mu, nsp, ndrop)
 
-            Nfilt = W.shape[1]  # update the number of filters
-            Params[1] = Nfilt
-
-            # this adds new templates if they are detected in the residual
-            dWU0, cmap = mexGetSpikes2(Params, drez, wTEMP, iC)
-
-            if dWU0.shape[2] > 0:
-                # new templates need to be integrated into the same format as all templates
-                # apply PCA for smoothing purposes
-                dWU0 = cp.reshape(cp.dot(wPCAd, cp.dot(
-                    wPCAd.T, dWU0.reshape(
-                        (dWU0.shape[0], dWU0.shape[1] * dWU0.shape[2]), order='F'))),
-                    dWU0.shape, order='F')
-                dWU = cp.concatenate((dWU, dWU0), axis=2)
-
-                m = dWU0.shape[2]
-
-                if W.shape[1] < Nfilt + m:
-                    W = cp.concatenate(
-                        (W, cp.zeros(
-                            (W.shape[0], Nfilt + m - W.shape[1], W.shape[2]),
-                            dtype=W.dtype)), axis=1)
-
-                # initialize temporal components of waveforms
-                W[:, Nfilt:Nfilt + m, :] = W0[:, cp.ones(m, dtype=np.int32), :]
-
-                # initialize the number of spikes with the minimum allowed
-                nsp[Nfilt:Nfilt + m] = params.minFR * NT / params.fs
-                # initialize the amplitude of this spike with a lowish number
-                mu[Nfilt:Nfilt + m] = 10
-
-                # if the number of filters exceed the maximum allowed, clip it
-                Nfilt = min(params.Nfilt, W.shape[1])
+                # final number of templates
+                Nfilt = W.shape[1]
                 Params[1] = Nfilt
 
-                W = W[:, :Nfilt, :]  # remove any new filters over the maximum allowed
-                dWU = dWU[:, :, :Nfilt]  # remove any new filters over the maximum allowed
-                nsp = nsp[:Nfilt]  # remove any new filters over the maximum allowed
-                mu = mu[:Nfilt]  # remove any new filters over the maximum allowed
+                # final covariance matrix between all templates
+                WtW, iList = getMeWtW(W, U, Nnearest)
 
-        if ibatch > niter - nBatches - 1:
-            # during the final extraction pass, this keesp track of all spikes and features
+                # iW is the final channel assigned to each template
+                iW = cp.argmax(cp.abs(dWU[nt0min - 1, :, :]), axis=0)
 
-            # we memorize the spatio-temporal decomposition of the waveforms at this batch
-            # this is currently only used in the GUI to provide an accurate reconstruction
-            # of the raw data at this time
-            temp.WA[..., k] = cp.asnumpy(W)
-            temp.UA[..., k] = cp.asnumpy(U)
-            temp.muA[..., k] = cp.asnumpy(mu)
+                # extract ALL features on the last pass
+                Params[12] = 2  # this is a flag to output features (PC and template features)
 
-            # we carefully assign the correct absolute times to spikes found in this batch
-            ioffset = params.ntbuff - 1
-            if k == 0:
-                ioffset = 0  # the first batch is special (no pre-buffer)
+                # different threshold on last pass?
+                Params[2] = params.Th[-1]  # usually the threshold is much lower on the last pass
 
-            toff = nt0min + t0 - ioffset + (NT - params.ntbuff) * (k - 1)
-            st = toff + st0
+                # memorize the state of the templates
+                ir.W, ir.dWU, ir.U, ir.mu = W, dWU, U, mu
+                ir.Wraw = cp.zeros(
+                    (U.shape[0], W.shape[0], U.shape[1]), dtype=np.float64, order='F')
+                for n in range(U.shape[1]):
+                    # temporarily use U rather Urot until I have a chance to test it
+                    ir.Wraw[:, :, n] = mu[n] * cp.dot(U[:, n, :], W[:, n, :].T)
 
-            # irange = np.arange(ntot, ntot+x0.size)  # spikes and features go into these indices
+            if ibatch < niter - nBatches - 1:
+                # during the main "learning" phase of fitting a model
+                if ibatch % 5 == 0:
+                    # this drops templates based on spike rates and/or similarities to
+                    # other templates
+                    W, U, dWU, mu, nsp, ndrop = triageTemplates2(
+                        params, iW, C2C, W, U, dWU, mu, nsp, ndrop)
 
-        #         if ntot + x0.size > st3.shape[0]:
-        #            # if we exceed the original allocated memory, double the allocated sizes
-        #            fW[:, 2 * st3.shape[0]] = 0
-        #            fWpc[:, :, 2 * st3.shape[0]] = 0
-        #            st3[2 * st3.shape[0] - 1, 0] = 0
+                Nfilt = W.shape[1]  # update the number of filters
+                Params[1] = Nfilt
 
-            st3.append(np.c_[
-                cp.asnumpy(st),  # spike times
-                cp.asnumpy(id0),  # spike clusters (1-indexing)
-                cp.asnumpy(x0),  # template amplitudes
-                cp.asnumpy(vexp),  # residual variance of this spike
-                korder * np.ones(st.size),  # batch from which this spike was found
-            ])
-        #         st3[irange, 1] = id0  # spike clusters (1-indexing)
-        #         st3[irange, 2] = x0  # template amplitudes
-        #         st3[irange, 3] = vexp  # residual variance of this spike
-        #         st3[irange, 4] = korder  # batch from which this spike was found
+                # this adds new templates if they are detected in the residual
+                dWU0, cmap = mexGetSpikes2(Params, drez, wTEMP, iC)
 
-        #         fW[:, irange] = featW  # template features for this batch
-        #         fWpc[:, :, irange] = featPC  # PC features
-            fW.append(cp.asnumpy(featW))
-            fWpc.append(cp.asnumpy(featPC))
+                if dWU0.shape[2] > 0:
+                    # new templates need to be integrated into the same format as all templates
+                    # apply PCA for smoothing purposes
+                    dWU0 = cp.reshape(cp.dot(wPCAd, cp.dot(
+                        wPCAd.T, dWU0.reshape(
+                            (dWU0.shape[0], dWU0.shape[1] * dWU0.shape[2]), order='F'))),
+                        dWU0.shape, order='F')
+                    dWU = cp.concatenate((dWU, dWU0), axis=2)
 
-            ntot = ntot + x0.size  # keeps track of total number of spikes so far
+                    m = dWU0.shape[2]
 
-        if ibatch == niter - nBatches - 1:
-            # # allocate variables when switching to extraction phase
-            # # this holds spike times, clusters and other info per spike
-            # st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
+                    if W.shape[1] < Nfilt + m:
+                        W = cp.concatenate(
+                            (W, cp.zeros(
+                                (W.shape[0], Nfilt + m - W.shape[1], W.shape[2]),
+                                dtype=W.dtype)), axis=1)
 
-            # these next three store the low-d template decompositions
-            temp.WA = np.zeros((nt0, Nfilt, Nrank, nBatches), dtype=np.float32, order='F')
-            temp.UA = np.zeros((Nchan, Nfilt, Nrank, nBatches), dtype=np.float32, order='F')
-            temp.muA = np.zeros((Nfilt, nBatches), dtype=np.float32, order='F')
+                    # initialize temporal components of waveforms
+                    W[:, Nfilt:Nfilt + m, :] = W0[:, cp.ones(m, dtype=np.int32), :]
 
-            # # these next three store the low-d template decompositions
-            # temp.WA = []  # zeros(nt0, Nfilt, Nrank,nBatches,  'single')
-            # temp.UA = []  # zeros(Nchan, Nfilt, Nrank,nBatches,  'single')
-            # temp.muA = []  # zeros(Nfilt, nBatches,  'single')
+                    # initialize the number of spikes with the minimum allowed
+                    nsp[Nfilt:Nfilt + m] = params.minFR * NT / params.fs
+                    # initialize the amplitude of this spike with a lowish number
+                    mu[Nfilt:Nfilt + m] = 10
 
-            # # these ones store features per spike
-            # # Nnearest is the number of nearest templates to store features for
-            # fW = []  # zeros(Nnearest, 1e7, 'single')
-            # # NchanNear is the number of nearest channels to take PC features from
-            # fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
+                    # if the number of filters exceed the maximum allowed, clip it
+                    Nfilt = min(params.Nfilt, W.shape[1])
+                    Params[1] = Nfilt
 
-        if ibatch % 100 == 0:
-            # this is some of the relevant diagnostic information to be printed during training
-            logger.info(
-                ('%d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, '
-                 'nst0: %d, merges: %2.4f, %2.4f'),
-                ibatch, niter, Nfilt, nsp.sum(), median(mu), st0.size, ndrop)
+                    W = W[:, :Nfilt, :]  # remove any new filters over the maximum allowed
+                    dWU = dWU[:, :, :Nfilt]  # remove any new filters over the maximum allowed
+                    nsp = nsp[:Nfilt]  # remove any new filters over the maximum allowed
+                    mu = mu[:Nfilt]  # remove any new filters over the maximum allowed
 
-        # discards the unused portion of the arrays
-        #st3 = st3(1:ntot, :)
-        #fW = fW(:, 1:ntot)
-        #fWpc = fWpc(:,:, 1:ntot)
+            if ibatch > niter - nBatches - 1:
+                # during the final extraction pass, this keesp track of all spikes and features
 
-        free_gpu_memory()
+                # we memorize the spatio-temporal decomposition of the waveforms at this batch
+                # this is currently only used in the GUI to provide an accurate reconstruction
+                # of the raw data at this time
+                ir.WA[..., k] = cp.asnumpy(W)
+                ir.UA[..., k] = cp.asnumpy(U)
+                ir.muA[..., k] = cp.asnumpy(mu)
 
-    # just display the total number of spikes
-    # ntot
+                # we carefully assign the correct absolute times to spikes found in this batch
+                ioffset = params.ntbuff - 1
+                if k == 0:
+                    ioffset = 0  # the first batch is special (no pre-buffer)
 
-    if 'st3' not in ir:
+                toff = nt0min + t0 - ioffset + (NT - params.ntbuff) * (k - 1)
+                st = toff + st0
+
+                # irange = np.arange(ntot, ntot+x0.size)  # spikes and features go into
+                # these indices
+
+            #         if ntot + x0.size > st3.shape[0]:
+            #            # if we exceed the original allocated memory, double the allocated sizes
+            #            fW[:, 2 * st3.shape[0]] = 0
+            #            fWpc[:, :, 2 * st3.shape[0]] = 0
+            #            st3[2 * st3.shape[0] - 1, 0] = 0
+
+                st3.append(np.c_[
+                    cp.asnumpy(st),  # spike times
+                    cp.asnumpy(id0),  # spike clusters (0-indexing)
+                    cp.asnumpy(x0),  # template amplitudes
+                    cp.asnumpy(vexp),  # residual variance of this spike
+                    korder * np.ones(st.size),  # batch from which this spike was found
+                ])
+            #         st3[irange, 1] = id0  # spike clusters (1-indexing)
+            #         st3[irange, 2] = x0  # template amplitudes
+            #         st3[irange, 3] = vexp  # residual variance of this spike
+            #         st3[irange, 4] = korder  # batch from which this spike was found
+
+            #         fW[:, irange] = featW  # template features for this batch
+            #         fWpc[:, :, irange] = featPC  # PC features
+                fW.append(cp.asnumpy(featW))
+                fWpc.append(cp.asnumpy(featPC))
+
+                ntot = ntot + x0.size  # keeps track of total number of spikes so far
+
+            if ibatch == niter - nBatches - 1:
+                # # allocate variables when switching to extraction phase
+                # # this holds spike times, clusters and other info per spike
+                # st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
+
+                # these next three store the low-d template decompositions
+                ir.WA = np.zeros((nt0, Nfilt, Nrank, nBatches), dtype=np.float32, order='F')
+                ir.UA = np.zeros((Nchan, Nfilt, Nrank, nBatches), dtype=np.float32, order='F')
+                ir.muA = np.zeros((Nfilt, nBatches), dtype=np.float32, order='F')
+
+                # # these next three store the low-d template decompositions
+                # ir.WA = []  # zeros(nt0, Nfilt, Nrank,nBatches,  'single')
+                # ir.UA = []  # zeros(Nchan, Nfilt, Nrank,nBatches,  'single')
+                # ir.muA = []  # zeros(Nfilt, nBatches,  'single')
+
+                # # these ones store features per spike
+                # # Nnearest is the number of nearest templates to store features for
+                # fW = []  # zeros(Nnearest, 1e7, 'single')
+                # # NchanNear is the number of nearest channels to take PC features from
+                # fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
+
+            if ibatch % 100 == 0:
+                # this is some of the relevant diagnostic information to be printed during training
+                logger.info(
+                    ('%d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, '
+                     'nst0: %d, merges: %2.4f, %2.4f'),
+                    ibatch, niter, Nfilt, nsp.sum(), median(mu), st0.size, ndrop)
+
+            # discards the unused portion of the arrays
+            #st3 = st3(1:ntot, :)
+            #fW = fW(:, 1:ntot)
+            #fWpc = fWpc(:,:, 1:ntot)
+
+            free_gpu_memory()
+
+        # just display the total number of spikes
+        logger.info("Found %d spikes.", ntot)
+
         # Save results to the ctx.intermediate object.
         ir.st3 = np.concatenate(st3, axis=0)
 
@@ -998,19 +1000,7 @@ def learnAndSolve8b(ctx):
         # iNeighPC keeps the indices of the channels corresponding to the PC features
         ir.iNeighPC = cp.asnumpy(iC[:, iW])
 
-        ir.WA = temp.WA
-        ir.UA = temp.UA
-
-    # These are the variables set by the code above:
-    # - st3
-    # - simScore
-    # - fWpca
-    # - cProj
-    # - cProjPC
-    # - iNeigh
-    # - iNeighPC
-    # - WA
-    # - UA
+        # These are the variables set by the code above:
         ctx.save(
             st3=ir.st3,
             simScore=ir.simScore,
@@ -1020,6 +1010,10 @@ def learnAndSolve8b(ctx):
             iNeighPC=ir.iNeighPC,
             WA=ir.WA,
             UA=ir.UA,
+            W=ir.W,
+            U=ir.U,
+            dWU=ir.dWU,
+            mu=ir.mu,
         )
 
     if 'W_a' not in ir:
