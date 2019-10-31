@@ -6,12 +6,8 @@ import numpy as np
 import cupy as cp
 
 
-def ones(shape, dtype=None, order=None):
-    # HACK: cp.ones() has no order kwarg at the moment !
-    x = cp.zeros(shape, dtype=dtype, order=order)
-    x.fill(1)
-    return x
-
+# LTI filter on GPU
+# -----------------------------------------------------------------------------
 
 def make_kernel(kernel, name, **const_arrs):
     """Compile a kernel and pass optional constant ararys."""
@@ -80,54 +76,31 @@ def lfilter(b, a, arr, axis=0, reverse=False):
     assert isinstance(arr, cp.ndarray)
     assert axis == 0, "Only filtering along the first axis is currently supported."
 
+    if arr.ndim == 1:
+        arr = arr[:, np.newaxis]
     n_samples, n_channels = arr.shape
 
-    block = (128,)
+    block = (min(128, n_channels),)
     grid = (int(ceil(n_channels / float(block[0]))),)
 
-    b = np.array(b, dtype=np.float32)
-    a = np.array(a, dtype=np.float32)
-    kernel = get_lfilter_kernel(len(b) - 1, cp.isfortran(arr), reverse=reverse)
+    b = np.atleast_1d(b).astype(np.float32)
+    a = np.atleast_1d(a).astype(np.float32)
+    N = max(len(b), len(a))
+    if len(b) < N:
+        b = np.pad(b, (0, (N - len(b))), mode='constant')
+    if len(a) < N:
+        a = np.pad(a, (0, (N - len(a))), mode='constant')
+    assert len(a) == len(b)
+    kernel = get_lfilter_kernel(N - 1, cp.isfortran(arr), reverse=reverse)
 
     lfilter = make_kernel(kernel, 'lfilter', b=b, a=a)
 
-    y = cp.zeros_like(arr)
+    arr = cp.asarray(arr, dtype=np.float32)
+    y = cp.zeros_like(arr, order='F' if cp.isfortran(arr) else 'C', dtype=arr.dtype)
+
     lfilter(grid, block, (arr, y, y.shape[0], y.shape[1]))
 
     return y
-
-
-def median(a, axis=0):
-    """Compute the median of a CuPy array on the GPU."""
-    a = cp.asarray(a)
-
-    if axis is None:
-        sz = a.size
-    else:
-        sz = a.shape[axis]
-    if sz % 2 == 0:
-        szh = sz // 2
-        kth = [szh - 1, szh]
-    else:
-        kth = [(sz - 1) // 2]
-
-    part = cp.partition(a, kth, axis=axis)
-
-    if part.shape == ():
-        # make 0-D arrays work
-        return part.item()
-    if axis is None:
-        axis = 0
-
-    indexer = [slice(None)] * part.ndim
-    index = part.shape[axis] // 2
-    if part.shape[axis] % 2 == 1:
-        # index with slice to allow mean (below) to work
-        indexer[axis] = slice(index, index + 1)
-    else:
-        indexer[axis] = slice(index - 1, index + 1)
-
-    return cp.mean(part[indexer], axis=axis)
 
 
 def svdecon(X, nPC0=None):
@@ -186,14 +159,65 @@ def svdecon_cpu(X):
     return U, np.diag(S), V
 
 
-def zscore(a, axis=0):
-    mns = a.mean(axis=axis)
-    sstd = a.std(axis=axis, ddof=0)
-    return (a - mns) / sstd
-
-
 def free_gpu_memory():
     mempool = cp.get_default_memory_pool()
     pinned_mempool = cp.get_default_pinned_memory_pool()
     mempool.free_all_blocks()
     pinned_mempool.free_all_blocks()
+
+
+# Work around CuPy bugs and limitations
+# -----------------------------------------------------------------------------
+
+def mean(x, *args, **kwargs):
+    return cp.mean(x) if x.size else cp.nan
+
+
+def median(a, axis=0):
+    """Compute the median of a CuPy array on the GPU."""
+    a = cp.asarray(a)
+
+    if axis is None:
+        sz = a.size
+    else:
+        sz = a.shape[axis]
+    if sz % 2 == 0:
+        szh = sz // 2
+        kth = [szh - 1, szh]
+    else:
+        kth = [(sz - 1) // 2]
+
+    part = cp.partition(a, kth, axis=axis)
+
+    if part.shape == ():
+        # make 0-D arrays work
+        return part.item()
+    if axis is None:
+        axis = 0
+
+    indexer = [slice(None)] * part.ndim
+    index = part.shape[axis] // 2
+    if part.shape[axis] % 2 == 1:
+        # index with slice to allow mean (below) to work
+        indexer[axis] = slice(index, index + 1)
+    else:
+        indexer[axis] = slice(index - 1, index + 1)
+
+    return cp.mean(part[indexer], axis=axis)
+
+
+def var(x, *args, **kwargs):
+    return cp.var(x) if x.size > 0 else cp.nan
+
+
+def ones(shape, dtype=None, order=None):
+    # HACK: cp.ones() has no order kwarg at the moment !
+    x = cp.zeros(shape, dtype=dtype, order=order)
+    x.fill(1)
+    return x
+
+
+def zscore(a, axis=0):
+    mns = a.mean(axis=axis)
+    sstd = a.std(axis=axis, ddof=0)
+    return (a - mns) / sstd
