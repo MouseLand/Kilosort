@@ -125,6 +125,46 @@ def my_sum(S1, sig, varargin=None):
     return S1
 
 
+def my_conv2(S1, sig, varargin=None):
+    # S1 is the matrix to be filtered along a choice of axes
+    # sig is either a scalar or a sequence of scalars, one for each axis to be filtered
+    # varargin can be the dimensions to do filtering, if len(sig) != x.shape
+    # if sig is scalar and no axes are provided, the default axis is 2
+    if sig <= .25:
+        return S1
+    idims = 1
+    if varargin is not None:
+        idims = varargin
+    idims = _make_vect(idims)
+    if _is_vect(idims) and _is_vect(sig):
+        sigall = sig
+    else:
+        sigall = np.tile(sig, len(idims))
+
+    for sig, idim in zip(sigall, idims):
+        Nd = S1.ndim
+        S1 = cp.transpose(S1, [idim] + list(range(0, idim)) + list(range(idim + 1, Nd)))
+        dsnew = S1.shape
+        S1 = cp.reshape(S1, (S1.shape[0], -1))
+        dsnew2 = S1.shape
+
+        tmax = ceil(4 * sig)
+        dt = cp.arange(-tmax, tmax + 1)
+        gaus = cp.exp(-dt ** 2 / (2 * sig ** 2))
+        gaus = gaus / cp.sum(gaus)
+
+        cNorm = lfilter(gaus, 1, cp.concatenate((cp.ones(dsnew2[0]), cp.zeros(tmax))), axis=0)
+        cNorm = cNorm[tmax:, :]
+        S1 = lfilter(
+            gaus, 1, cp.concatenate((S1, cp.zeros((tmax, dsnew2[1]), order='F')), axis=0), axis=0)
+        S1 = S1[tmax:, :]
+        S1 = S1.reshape(dsnew, order='F')
+        S1 = S1 / cNorm
+
+        S1 = cp.transpose(S1, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
+    return S1
+
+
 def whiteningFromCovariance(CC):
     # function Wrot = whiteningFromCovariance(CC)
     # takes as input the matrix CC of channel pairwise correlations

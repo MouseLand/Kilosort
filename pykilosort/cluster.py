@@ -6,7 +6,7 @@ import cupy as cp
 from tqdm import tqdm
 
 from .preprocess import my_min, my_sum
-from .cptools import svdecon, zscore
+from .cptools import svdecon, zscore, ones
 from .utils import get_cuda
 
 logger = logging.getLogger(__name__)
@@ -451,7 +451,7 @@ def clusterSingleBatches(ctx):
     # this holds the number of spikes for that cluster
     ns = cp.zeros((Nfilt, nBatches), dtype=np.float32, order='F')
     # this holds the center channel for each template
-    Whs = 1 + cp.zeros((Nfilt, nBatches), dtype=np.int32, order='F')
+    Whs = ones((Nfilt, nBatches), dtype=np.int32, order='F')
 
     i0 = 0
     NrankPC = 3  # I am not sure if this gets used, but it goes into the function

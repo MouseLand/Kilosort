@@ -53,9 +53,9 @@ default_params.nPCs = 3  # how many PCs to project the spikes into
 # default_params.useRAM = 0  # not yet available
 
 default_params.nt0 = 61
-default_params.nt0min = 20
 default_params.nup = 10
 default_params.sig = 1
+default_params.gain = 1
 
 default_params.loc_range = [5, 4]
 default_params.long_range = [30, 6]

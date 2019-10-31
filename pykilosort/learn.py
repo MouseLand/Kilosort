@@ -5,7 +5,7 @@ import numpy as np
 import cupy as cp
 from tqdm import tqdm
 
-from .cptools import svdecon, svdecon_cpu, median, free_gpu_memory
+from .cptools import svdecon, svdecon_cpu, median, free_gpu_memory, ones
 from .cluster import isolated_peaks_new, get_SpikeSample, getClosestChannels
 from .utils import get_cuda
 
@@ -726,7 +726,7 @@ def learnAndSolve8b(ctx):
             if ibatch < niter - nBatches:
                 # obtained pm for this batch
                 Params[8] = float(pmi[ibatch])
-                pm = pmi[ibatch] * (1 + cp.zeros((Nfilt,), dtype=np.float64, order='F'))
+                pm = pmi[ibatch] * ones((Nfilt,), dtype=np.float64, order='F')
 
             # loading a single batch (same as everywhere)
             offset = Nchan * batchstart[k]

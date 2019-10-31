@@ -6,6 +6,13 @@ import numpy as np
 import cupy as cp
 
 
+def ones(shape, dtype=None, order=None):
+    # HACK: cp.ones() has no order kwarg at the moment !
+    x = cp.zeros(shape, dtype=dtype, order=order)
+    x.fill(1)
+    return x
+
+
 def make_kernel(kernel, name, **const_arrs):
     """Compile a kernel and pass optional constant ararys."""
     mod = cp.core.core.compile_with_cache(kernel, prepend_cupy_headers=False)

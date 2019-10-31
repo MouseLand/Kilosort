@@ -1,4 +1,4 @@
-from math import erf, log, sqrt, ceil
+from math import erf, log, sqrt
 import logging
 import os
 from os.path import join
@@ -9,9 +9,10 @@ import numpy as np
 import cupy as cp
 from cupyx.scipy.sparse import coo_matrix
 
-from .cptools import svdecon, lfilter
+from .cptools import ones, svdecon
 from .cluster import getClosestChannels
 from .learn import getKernels, getMeWtW, mexSVDsmall2
+from .preprocess import my_conv2
 
 logger = logging.getLogger(__name__)
 
@@ -139,28 +140,6 @@ def clusterAverage(clu, spikeQuantity):
     return clusterQuantity
 
 
-def my_conv2(S1, sig, axis):
-    # S1 is matrix to be filtered
-    # sig is a scalar for standard deviation of gaussian filter
-    # axis to filter on
-    # currently only filtering on axis 0 is supported
-    # (DEV_NOTES) uses numpy arrays for compatibility with lfilter
-
-    tmax = ceil(4 * sig)
-    dt = cp.arange(-tmax, tmax + 1)
-    gaus = cp.exp(-dt ** 2 / (2 * sig ** 2))
-    gaus /= cp.sum(gaus)
-
-    cNorm = lfilter(gaus, 1, cp.concatenate((cp.ones(S1.shape[0]), cp.zeros(tmax))), axis=axis)
-    cNorm = cNorm[tmax:, :]
-    S1 = lfilter(
-        gaus, 1, cp.concatenate((S1, cp.zeros((tmax, S1.shape[1]), order='F')), axis=0), axis=axis)
-    S1 = S1[tmax:, :]
-    S1 /= cNorm
-
-    return S1
-
-
 def find_merges(ctx, flag):
     # this function merges clusters based on template correlation
     # however, a merge is veto-ed if refractory period violations are introduced
@@ -184,11 +163,8 @@ def find_merges(ctx, flag):
         # determine total number of spikes in each neuron
         nspk[j] = cp.sum(ir.st3[:, 1] == j)
 
-    # (DEV_NOTES) currently neurons follow 1 based indexing, prior Python code may change this
-    # in which case the line above should be: [CR: done]
-    #             nspk[j] = cp.sum(ir.st3[:, 1] == j)
-
     ir.st3 = cp.asarray(ir.st3)
+    # we traverse the set of neurons in ascending order of firing rates
     isort = cp.argsort(nspk)
 
     logger.debug('Initialized spike counts.')
@@ -196,45 +172,40 @@ def find_merges(ctx, flag):
     if not flag:
         # if the flag is off, then no merges are performed
         # this function is then just used to compute cross- and auto- correlograms
-        ir.R_CCG = cp.inf * cp.ones_like(Xsim, order='F')
-        ir.Q_CCG = cp.inf * cp.ones_like(Xsim, order='F')
+        ir.R_CCG = cp.inf * ones(Nk, order='F')
+        ir.Q_CCG = cp.inf * ones(Nk, order='F')
         ir.K_CCG = cp.zeros((*Xsim.shape, 2 * nbins + 1), order='F')
 
     for j in tqdm(range(Nk), desc='Finding merges'):
         # find all spikes from this cluster
         s1 = ir.st3[:, 0][ir.st3[:, 1] == isort[j]] / params.fs
 
-        # (DEV_NOTES) above line will need modifying if neurons follow 0 based indexing and if
-        # ir.st3 ordering is reversed to optimise for C rather than Fortran [CR: done]
-
-        if len(s1) != nspk[isort[j]]:
+        if s1.size != nspk[isort[j]]:
             # this is a check to make sure new clusters are combined correctly into bigger clusters
             logger.warn('Lost track of spike counts.')
 
         # sort all the pairs of this neuron, discarding any that have fewer spikes
 
-        # (DEV_NOTES) sorting below and calculating ienu can probably be improved
+        uu = Xsim[isort[j], :] * [nspk > s1.size]
+        ix = cp.argsort(uu)[::-1]
+        ccsort = uu[ix]
+        ienu = np.nonzero(ccsort < .5)[0][0]
 
-        ccsort = -cp.sort(-Xsim[isort[j]] * (nspk > len(s1)))  # sort in descending order
-        ix = cp.argsort(-Xsim[isort[j]] * (nspk > len(s1)))
+        # ccsort = -cp.sort(-Xsim[isort[j]] * (nspk > len(s1)))  # sort in descending order
+        # ix = cp.argsort(-Xsim[isort[j]] * (nspk > len(s1)))
 
-        if ccsort[len(ccsort) - 1] > 0.5:
-            ienu = len(ccsort)
-        else:
-            ienu = cp.argmax(ccsort < 0.5)
+        # if ccsort[len(ccsort) - 1] > 0.5:
+        #     ienu = len(ccsort)
+        # else:
+        #     ienu = cp.argmax(ccsort < 0.5)
 
         # for all pairs above 0.5 correlation
 
-        for k in cp.arange(ienu):
+        for k in range(ienu):
             # find the spikes of the pair
             s2 = ir.st3[:, 0][ir.st3[:, 1] == ix[k]] / params.fs
-
-            # (DEV_NOTES) above line will need modifying if neurons follow 0 based indexing and
-            # if ir.st3 ordering is reversed to optimise for C rather than Fortran
-
             # compute cross-correlograms, refractoriness scores (Qi and rir), and normalization
             # for these scores
-
             K, Qi, Q00, Q01, rir = ccg(s1, s2, nbins, dt)
             # normalize the central cross-correlogram bin by its shoulders OR
             # by its mean firing rate
@@ -249,10 +220,10 @@ def find_merges(ctx, flag):
                     # now merge j into i and move on
                     # simply overwrite all the spikes of neuron j with i (i>j by construction)
                     ir.st3[:, 1][ir.st3[:, 1] == isort[j]] = i
-                    nspk[i] += nspk[isort[j]]  # update number of spikes for cluster i
+                    nspk[i] = nspk[i] + nspk[isort[j]]  # update number of spikes for cluster i
                     logger.info(f'Merged {isort[j]} into {i}')
                     # YOU REALLY SHOULD MAKE SURE THE PC CHANNELS MATCH HERE
-                    # break; % if a pair is found, we don't need to keep going
+                    # break % if a pair is found, we don't need to keep going
                     # (we'll revisit this cluster when we get to the merged cluster)
                     break
             else:
@@ -300,24 +271,20 @@ def splitAllClusters(ctx, flag):
     sigmaMask = params.sigmaMask
 
     ik = -1
-
-    Nfilt = ir.W.shape[1]  # - 1
-
+    Nfilt = ir.W.shape[1]
     nsplits = 0
 
     # determine what channels each template lives on
     iC, mask, C2C = getClosestChannels(probe, sigmaMask, NchanNear)
 
+    # the waveforms must be aligned to this sample
+    nt0min = params.nt0min
     # find the peak abs channel for each template
-    iW = cp.argmax(cp.abs(cp.asarray(ir.dWU[params.nt0min, :, :])), axis=1)
-    iW = iW.astype(cp.int32)
+    iW = cp.argmax(cp.abs(cp.asarray(ir.dWU[nt0min - 1, :, :])), axis=1)
 
     # keep track of original cluster for each cluster. starts with all clusters being their
     # own origin.
     isplit = cp.arange(Nfilt)
-
-    # (DEV_NOTES) isplit will need modifying in 0-index case
-
     dt = 1. / 1000
     nccg = 0
 
@@ -329,8 +296,8 @@ def splitAllClusters(ctx, flag):
         ik += 1
         pbar.update(ik)
 
-        isp = cp.where(st3[:, 1] == ik)  # get all spikes from this cluster
-        nSpikes = len(isp)
+        isp = cp.nonzero(st3[:, 1] == ik)[0]  # get all spikes from this cluster
+        nSpikes = isp.size
 
         if nSpikes < 300:
             # do not split if fewer than 300 spikes (we cannot estimate
@@ -348,7 +315,7 @@ def splitAllClusters(ctx, flag):
         # the projections are reformed later
 
         # subtract a running average, because the projections are NOT drift corrected
-        clp = clp - my_conv2(clp, 250, axis=0)
+        clp = clp - my_conv2(clp, 250, 0)
 
         # now use two different ways to initialize the bimodal direction
         # the main script calls this function twice, and does both initializations
@@ -358,10 +325,9 @@ def splitAllClusters(ctx, flag):
             w = u[:, 0]  # initialize with the top PC
         else:
             w = cp.mean(clp0, axis=0)  # initialize with the mean of NOT drift-corrected trace
-            w /= cp.sum(w ** 2) ** 0.5  # unit-normalize
+            w = w / cp.sum(w ** 2) ** 0.5  # unit-normalize
 
         # initial projections of waveform PCs onto 1D vector
-
         x = cp.dot(clp, w)
         s1 = cp.var(x[x > cp.mean(x)])  # initialize estimates of variance for the first
         s2 = cp.var(x[x < cp.mean(x)])  # and second gaussian in the mixture of 1D gaussians
@@ -373,7 +339,7 @@ def splitAllClusters(ctx, flag):
 
         # initialize matrix of log probabilities that each spike is assigned to the first
         # or second cluster
-        logp = cp.zeros((len(isp), 2), order='F')
+        logp = cp.zeros((isp.size, 2), order='F')
 
         # do 50 pursuit iteration
 
@@ -385,13 +351,13 @@ def splitAllClusters(ctx, flag):
             logp[:, 1] = -1 / 2 * log(s2) - ((x - mu2) ** 2) / (2 * s2) + log(1 - p)
 
             lMax = cp.max(logp, axis=1)
-            logp -= lMax[:, cp.newaxis]  # subtract the max for floating point accuracy
+            logp = logp - lMax[:, cp.newaxis]  # subtract the max for floating point accuracy
             rs = cp.exp(logp)  # exponentiate the probabilities
 
             pval = cp.log(cp.sum(rs, axis=1)) + lMax  # get the normalizer and add back the max
             logP[k] = cp.mean(pval)  # this is the cost function: we can monitor its increase
 
-            rs /= cp.sum(rs, axis=1)[:, cp.newaxis]  # normalize so that probabilities sum to 1
+            rs = rs / cp.sum(rs, axis=1)[:, cp.newaxis]  # normalize so that probabilities sum to 1
 
             p = cp.mean(rs[:, 0])  # mean probability to be assigned to Gaussian 1
             # new estimate of mean of cluster 1 (weighted by "responsibilities")
@@ -402,7 +368,7 @@ def splitAllClusters(ctx, flag):
             s1 = cp.dot(rs[:, 0], (x - mu1) ** 2) / cp.sum(rs[:, 0])  # new estimates of variances
             s2 = cp.dot(rs[:, 1], (x - mu2) ** 2) / cp.sum(rs[:, 1])
 
-            if (k > 10) and (k % 2 == 1):
+            if (k >= 10) and (k % 2 == 0):
                 # starting at iteration 10, we start re-estimating the pursuit direction
                 # that is, given the Gaussian cluster assignments, and the mean and variances,
                 # we re-estimate w
@@ -413,7 +379,7 @@ def splitAllClusters(ctx, flag):
 
                 # this is the new estimate of the best pursuit direction
                 w = cp.linalg.solve(StS.T, StMu)
-                w /= cp.sum(w ** 2) ** 0.5  # which we unit normalize
+                w = w / cp.sum(w ** 2) ** 0.5  # which we unit normalize
                 x = cp.dot(clp, w)
 
         ilow = rs[:, 0] > rs[:, 1]  # these spikes are assigned to cluster 1
@@ -437,10 +403,10 @@ def splitAllClusters(ctx, flag):
         # now decide if the split would result in waveforms that are too similar
         # the reconstructed mean waveforms for putative cluster 1
         # c1 = cp.matmul(wPCA, cp.reshape((cp.mean(clp0[ilow, :], 0), 3, -1), order='F'))
-        c1 = cp.matmul(wPCA, cp.mean(clp0[ilow, :], 0).reshape(3, -1))
+        c1 = cp.matmul(wPCA, cp.mean(clp0[ilow, :], 0).reshape((3, -1), order='F'))
         # the reconstructed mean waveforms for putative cluster 2
         # c2 = cp.matmul(wPCA, cp.reshape((cp.mean(clp0[~ilow, :], 0), 3, -1), order='F'))
-        c2 = cp.matmul(wPCA, cp.mean(clp0[~ilow, :], 0).reshape(3, -1))
+        c2 = cp.matmul(wPCA, cp.mean(clp0[~ilow, :], 0).reshape((3, -1), order='F'))
 
         cc = cp.corrcoef(c1, c2)  # correlation of mean waveforms
         n1 = sqrt(cp.sum(c1 ** 2))  # the amplitude estimate 1
@@ -467,32 +433,28 @@ def splitAllClusters(ctx, flag):
             # the extra cluster, this could potentially be done more efficiently?
 
             ir.dWU = cp.concatenate((ir.dWU, cp.zeros((*ir.dWU.shape[:-1], 1), order='F')), axis=2)
-            ir.dWU[:, iC[:, iW[ik]], Nfilt] = c2
+            ir.dWU[:, iC[:, iW[ik]], Nfilt - 1] = c2
             ir.dWU[:, iC[:, iW[ik]], ik] = c1
 
             # the temporal components are therefore just the PC waveforms
-            ir.W = cp.concatenate(
-                (ir.W, wPCA.reshape((wPCA.shape[0], 1, wPCA.shape[1]), order='F')), axis=1)
+            ir.W = cp.concatenate((ir.W, cp.transpose(wPCA, (0, 2, 1))), axis=1)
+            assert ir.W.shape[1] == Nfilt
             iW = cp.concatenate((iW, iW[ik]))  # copy the best channel from the original template
             # copy the provenance index to keep track of splits
             isplit = cp.concatenate((isplit, isplit[ik]))
 
-            st3[isp[ilow], 1] = (Nfilt + 1)  # overwrite spike indices with the new index
+            st3[isp[ilow], 1] = Nfilt - 1  # overwrite spike indices with the new index
             # copy similarity scores from the original
-            ir.simScore = cp.concatenate(
-                (ir.simScore, ir.simScore[:, ik].reshape((-1, 1), order='F')), axis=1)
+            ir.simScore = cp.concatenate((ir.simScore, ir.simScore[:, ik][:, np.newaxis]), axis=1)
             # copy similarity scores from the original
-            ir.simScore = cp.concatenate(
-                (ir.simScore, ir.simScore[ik, :].reshape((1, -1), order='F')), axis=0)
-            ir.simScore[ik, Nfilt] = 1  # set the similarity with original to 1
-            ir.simScore[Nfilt, ik] = 1  # set the similarity with original to 1
+            ir.simScore = cp.concatenate((ir.simScore, ir.simScore[ik, :]), axis=0)
+            ir.simScore[ik, Nfilt - 1] = 1  # set the similarity with original to 1
+            ir.simScore[Nfilt - 1, ik] = 1  # set the similarity with original to 1
 
             # copy neighbor template list from the original
-            ir.iNeigh = cp.concatenate(
-                (ir.iNeigh, ir.iNeigh[:, ik].reshape((-1, 1), order='F')), axis=0)
+            ir.iNeigh = cp.concatenate((ir.iNeigh, ir.iNeigh[:, ik][:, np.newaxis]), axis=0)
             # copy neighbor channel list from the original
-            ir.iNeighPC = cp.concatenate(
-                (ir.iNeighPC, ir.iNeighPC[:, ik].reshape((-1, 1), order='F')), axis=0)
+            ir.iNeighPC = cp.concatenate((ir.iNeighPC, ir.iNeighPC[:, ik]), axis=0)
 
             # try this cluster again
             # the cluster piece that stays at this index needs to be tested for splits again
@@ -512,7 +474,7 @@ def splitAllClusters(ctx, flag):
     Nrank = 3
     Nchan = probe.Nchan
     Params = cp.array(
-        [0, Nfilt, 0, 0, ir.W.shape[0], Nnearest, Nrank, 0, 0, Nchan, NchanNear, params.nt0min, 0],
+        [0, Nfilt, 0, 0, ir.W.shape[0], Nnearest, Nrank, 0, 0, Nchan, NchanNear, nt0min, 0],
         dtype=cp.float64)  # make a new Params to pass on parameters to CUDA
 
     # we need to re-estimate the spatial profiles
@@ -530,13 +492,13 @@ def splitAllClusters(ctx, flag):
     ir.simScore = cp.max(WtW, axis=2)
     ir.simScore[isplit] = 1  # 1 means they come from the same parent
 
-    ir.iNeigh = iList[:, 0:Nfilt]  # get the new neighbor templates
-    ir.iNeighPC = iC[:, iW[0:Nfilt]]  # get the new neighbor channels
+    ir.iNeigh = iList[:, :Nfilt]  # get the new neighbor templates
+    ir.iNeighPC = iC[:, iW[:Nfilt]]  # get the new neighbor channels
 
     # for Phy, we need to pad the spikes with zeros so the spikes are aligned to the center of
     # the window
     ir.Wphy = cp.concatenate(
-        (cp.zeros((1 + params.nt0min, Nfilt + 1, Nrank), order='F'), ir.W), axis=0)
+        (cp.zeros((1 + nt0min, Nfilt, Nrank), order='F'), ir.W), axis=0)
 
     ir.isplit = isplit  # keep track of origins for each cluster
 
@@ -566,7 +528,7 @@ def set_cutoff(ctx):
 
     dt = 1. / 1000  # step size for CCG binning
 
-    Nk = len(cp.unique(st3[:, 1]))  # number of templates
+    Nk = int(cp.max(st3[:, 1])) + 1  # number of templates
 
     # (DEV_NOTES) easier way to calculate Nk using cp.max but this doesn't return an integer
     # compatible with cp.zeros
@@ -577,13 +539,13 @@ def set_cutoff(ctx):
 
     ir.est_contam_rate = cp.zeros(Nk)
 
-    for j in cp.arange(Nk):
-        ix = cp.where(st3[:, 1] == (j + 1))[0]
-        ss = st3[ix, 1] / params.fs
-        if len(ss) == 0:
+    for j in range(Nk):
+        ix = cp.where(st3[:, 1] == j)[0]
+        ss = st3[ix, 0] / params.fs
+        if ss.size == 0:
             continue  # break if there are no spikes
 
-        vexp = st3[ix, 4]  # vexp is the relative residual variance of the spikes
+        vexp = st3[ix, 3]  # vexp is the relative residual variance of the spikes
 
         Th = params.Th[0]  # start with a high threshold
 
@@ -623,7 +585,7 @@ def set_cutoff(ctx):
         # we exited the loop because the contamination was too high. We revert to the higher
         # threshold
         Th += 0.05
-        st = ss[vexp > Th]
+        st = ss[vexp > Th]  # take spikes above the current threshold
         # compute the auto-correlogram with 500 bins at 1ms bins
         K, Qi, Q00, Q01, rir = ccg(st, st, 500, dt)
         # this is a measure of refractoriness
@@ -635,8 +597,6 @@ def set_cutoff(ctx):
         # any spikes below the threshold get discarded into a 0-th cluster
         st3[ix[vexp <= Th], 1] = -1
 
-        # (DEV_NOTES) will need to change to -1-th cluster if spikes are 0-indexed
-
     # we sometimes get NaNs, why? replace with full contamination
     # (DEV_NOTES) this seems to occur when both Qi and max(Q00, Q01) are zero thus when dividing
     # the two to get Q the result is a NaN
@@ -647,18 +607,23 @@ def set_cutoff(ctx):
 
     # (DEV_NOTES) 0 cluster may change if clusters switch to 0-indexing
 
-    ix = st3[:, 1] >= 0
+    ix = st3[:, 1] == 0
 
     # (DEV_NOTES) "empty" values in code below needs checking before it can be used, in Matlab code
     #              [] is used for all cases, here I use cp.nan
 
-    st3 = st3[ix, :]
+    st3 = st3[~ix, :]
 
-    if len(ir.cProj) != 0:
-        ir.cProj = ir.cProj[ix, :]  # remove their template projections too
-        ir.cProjPC = ir.cProjPC[ix, :, :]  # and their PC projections
+    if len(ir.cProj) > 0:
+        ir.cProj = ir.cProj[~ix, :]  # remove their template projections too
+        ir.cProjPC = ir.cProjPC[~ix, :, :]  # and their PC projections
 
-    ctx.save(st3_after_split=st3)
+    ctx.save(
+        st3_after_split=st3,
+        cProj=ir.cProj,
+        cProjPC=ir.cProjPC,
+        est_contam_rate=ir.est_contam_rate,
+    )
 
 
 def rezToPhy(ctx, savePath=None):
@@ -666,8 +631,10 @@ def rezToPhy(ctx, savePath=None):
     # save in the appropriate format for the phy GUI to run on. If you provide
     # a savePath it should be a folder
 
-    # probe = ctx.probe
+    probe = ctx.probe
     ir = ctx.intermediate
+    params = ctx.params
+    nt0 = params.nt0
 
     # spikeTimes will be in samples, not seconds
     ir.W = cp.asnumpy(ir.Wphy).astype(np.float32)
@@ -677,7 +644,7 @@ def rezToPhy(ctx, savePath=None):
     if ir.st3.shape[1] > 4:
         ir.st3 = ir.st3[:, :4]
 
-    isort = cp.argsort(ir.st3[:, 1])
+    isort = cp.argsort(ir.st3[:, 0])
     ir.st3 = ir.st3[isort, :]
     ir.cProj = ir.cProj[isort, :]
     ir.cProjPC = ir.cProjPC[isort, :, :]
@@ -698,38 +665,45 @@ def rezToPhy(ctx, savePath=None):
 
     amplitudes = ir.st3[:, 2]
 
-    # Nchan = probe.Nchan
+    Nchan = probe.Nchan
 
     # FIX THIS PART: are the flattens below needed?
-    xcords = ir.xcords.flatten()
-    ycords = ir.ycords.flatten()
-    chanMap = ir.ops.chanMap.flatten()
-    chanMap0ind = chanMap #  - 1
+    xcords = probe.xcords
+    ycords = probe.ycords
+    chanMap = probe.chanMap
+    chanMap0ind = chanMap  # - 1
 
     # nt0 = ir.W.shape[0]
     # (DEV_NOTES) do we need U and ir.U?
     U = ir.U
     W = ir.W
 
-    # Nfilt = ir.W.shape[1]
+    Nfilt = ir.W.shape[1]
 
     # (DEV_NOTES) 2 lines below can be combined
-    templates = cp.einsum('ikl,jkl->ijk', U, W).astype(cp.float32)
+    # templates = cp.einsum('ikl,jkl->ijk', U, W).astype(cp.float32)
+    templates = cp.zeros((Nchan, nt0, Nfilt), dtype=np.float32, order='F')
+    for iNN in range(templates.shape[2]):
+        templates[:, :, iNN] = cp.dot(U[:, iNN, :], W[:, iNN, :].T)
     templates = cp.transpose(templates, (2, 1, 0))  # now it's nTemplates x nSamples x nChannels
     # we include all channels so this is trivial
-    templatesInds = cp.tile(np.arange(templates.shape[2]), templates.shape[0])
+    templatesInds = cp.tile(np.arange(templates.shape[2]), (templates.shape[0], 1))
 
     templateFeatures = ir.cProj
     templateFeatureInds = ir.iNeigh.astype(cp.uint32)
     pcFeatures = ir.cProjPC
     pcFeatureInds = ir.iNeighPC.astype(cp.uint32)
-    whiteningMatrix = ir.Wrot / ir.ops.scaleproc
-    whiteningMatrixinv = cp.linalg.pinv(whiteningMatrix)
+
+    whiteningMatrix = ir.Wrot / params.scaleproc
+    whiteningMatrixInv = cp.linalg.pinv(whiteningMatrix)
 
     # here we compute the amplitude of every template...
 
     # unwhiten all the templates
-    tempsUnW = cp.einsum('ijk,kl->ijl', templates, whiteningMatrixinv)
+    # tempsUnW = cp.einsum('ijk,kl->ijl', templates, whiteningMatrixinv)
+    tempsUnW = cp.zeros(templates.shape, dtype=np.float32, order='F')
+    for t in range(templates.shape[0]):
+        tempsUnW[t, :, :] = cp.dot(templates[t, :, :], whiteningMatrixInv)
 
     # The amplitude on each channel is the positive peak minus the negative
     tempChanAmps = cp.max(tempsUnW, axis=1) - cp.min(tempsUnW, axis=1)
@@ -744,23 +718,26 @@ def rezToPhy(ctx, savePath=None):
     # take the average of all spike amps to get actual template amps (since
     # tempScalingAmps are equal mean for all templates)
     ta = clusterAverage(spikeTemplates, spikeAmps)
-    tids = cp.unique(spikeTemplates)
-    # (DEV_NOTES) line below is a horrible workaround as cp.max(tids) can't be read as an int
-    tempAmps = cp.array(np.zeros(cp.asnumpy(cp.max(tids))))
-    # because ta only has entries for templates that had at least one spike
-    tempAmps[tids - 1] = ta
-    if 'gain' in ir.ops:
-        gain = ir.ops.gain
-    else:
-        gain = 1
-    tempAmps = gain * cp.transpose(tempAmps)
+    tids = cp.unique(spikeTemplates).astype(np.int64)
+    # # (DEV_NOTES) line below is a horrible workaround as cp.max(tids) can't be read as an int
+    # tempAmps = cp.array(np.zeros(cp.asnumpy(cp.max(tids))))
+    # # because ta only has entries for templates that had at least one spike
+    # tempAmps[tids - 1] = ta
+    # if 'gain' in ir.ops:
+    #     gain = ir.ops.gain
+    # else:
+    #     gain = 1
+    # tempAmps = gain * cp.transpose(tempAmps)
+    tempAmps = cp.zeros_like(tempAmpsUnscaled, order='F')
+    tempAmps[tids] = ta  # because ta only has entries for templates that had at least one spike
+    tempAmps = params.gain * tempAmps  # for consistency, make first dimension template number
 
     # (DEV_NOTES) currently setting allow_pickle = False for compatibility, possibly worth changing
     def _save(name, arr, dtype=None):
         cp.save(join(savePath, name + '.npy'), arr.astype(dtype or arr.dtype), allow_pickle=False)
 
     if savePath is not None:
-        _save('spike_times', spikeTimes, allow_pickle=False)
+        _save('spike_times', spikeTimes)
         _save('spike_templates', spikeTemplates, cp.uint32)
         if ir.st3.shape[1] > 4:
             _save('spike_clusters', spikeClusters, cp.uint32)
@@ -781,18 +758,37 @@ def rezToPhy(ctx, savePath=None):
         _save('pc_feature_ind', pcFeatureInds.T)
 
         _save('whitening_mat', whiteningMatrix)
-        _save('whitening_mat_inv', whiteningMatrixinv)
+        _save('whitening_mat_inv', whiteningMatrixInv)
 
         if 'SimScore' in ir:
             similarTemplates = ir.SimScore
             _save('similar_templates.npy', similarTemplates)
 
-        # (DEV_NOTES) unused raw Matlab code
-        # % save a list of "good" clusters for Phy
-        # %     fileID = fopen(fullfile(savePath, 'channel_names.tsv'), 'w');
-        # %     fprintf(fileID, 'cluster_id%sKSLabel', char(9));
-        # %     for j = 1:Nchan
-        # %         fprintf(fileID, '%d%s%d', j-1,char(9),chanMap0ind(j));
-        # %         fprintf(fileID, char([13 10]));
-        # %     end
-        # %     fclose(fileID);
+        ir.est_contam_rate[cp.isnan(ir.est_contam_rate)] = 1
+        with open(join(savePath, 'cluster_KSLabel.tsv'), 'w') as f:
+            f.write('cluster_id\tKSLabel\n')
+            for j in range(len(ir.good)):
+                if ir.good[j]:
+                    f.write('%d\tgood' % j)
+                else:
+                    f.write('%d\tmua' % j)
+
+        with open(join(savePath, 'cluster_ContamPct.tsv'), 'w') as f:
+            f.write('cluster_id\tContamPct\n')
+            for j in range(len(ir.good)):
+                f.write('%d\t%.1f' % (j, 100 * ir.est_contam_rate[j]))
+
+        with open(join(savePath, 'cluster_Amplitude.tsv'), 'w') as f:
+            f.write('cluster_id\tAmplitude\n')
+            for j in range(len(ir.good)):
+                f.write('%d\t%.1f' % (j, tempAmps[j]))
+
+        # make params file
+        if not os.path.exists(join(savePath, 'params.py')):
+            with open(join(savePath, 'params.py'), 'w') as f:
+                f.write('dat_path = %s\n' % params.dat_path)
+                f.write('n_channels_dat = %d\n' % params.NchanTOT)
+                f.write('dtype = "int16"\n')
+                f.write('offset = 0\n')
+                f.write('hp_filtered = False\n')
+                f.write('sample_rate = %i\n' % params.fs)
