@@ -9,7 +9,7 @@ import numpy as np
 import cupy as cp
 from cupyx.scipy.sparse import coo_matrix
 
-from .cptools import ones, svdecon
+from .cptools import ones, svdecon, var, mean
 from .cluster import getClosestChannels
 from .learn import getKernels, getMeWtW, mexSVDsmall2
 from .preprocess import my_conv2
@@ -186,10 +186,10 @@ def find_merges(ctx, flag):
 
         # sort all the pairs of this neuron, discarding any that have fewer spikes
 
-        uu = Xsim[isort[j], :] * [nspk > s1.size]
+        uu = Xsim[isort[j], :] * (nspk > s1.size)
         ix = cp.argsort(uu)[::-1]
         ccsort = uu[ix]
-        ienu = np.nonzero(ccsort < .5)[0][0]
+        ienu = int(np.nonzero(ccsort < .5)[0][0])
 
         # ccsort = -cp.sort(-Xsim[isort[j]] * (nspk > len(s1)))  # sort in descending order
         # ix = cp.argsort(-Xsim[isort[j]] * (nspk > len(s1)))
@@ -259,7 +259,7 @@ def splitAllClusters(ctx, flag):
     ir = ctx.intermediate
     Nchan = ctx.probe.Nchan
 
-    wPCA = ir.wPCA  # use PCA projections to reconstruct templates when we do splits
+    wPCA = cp.asarray(ir.wPCA)  # use PCA projections to reconstruct templates when we do splits
 
     # this is the threshold for splits, and is one of the main parameters users can change
     ccsplit = params.AUCsplit
@@ -306,7 +306,7 @@ def splitAllClusters(ctx, flag):
 
         ss = st3[:, 0][isp] / params.fs  # convert to seconds
 
-        clp0 = ir.cProjPC[isp, :, :]  # get the PC projections for these spikes
+        clp0 = cp.asarray(ir.cProjPC)[isp, :, :]  # get the PC projections for these spikes
         clp0 = clp0.reshape((clp0.shape[0], -1), order='F')
         clp = clp0 - cp.mean(clp0, axis=0)  # mean center them
 
@@ -329,13 +329,13 @@ def splitAllClusters(ctx, flag):
 
         # initial projections of waveform PCs onto 1D vector
         x = cp.dot(clp, w)
-        s1 = cp.var(x[x > cp.mean(x)])  # initialize estimates of variance for the first
-        s2 = cp.var(x[x < cp.mean(x)])  # and second gaussian in the mixture of 1D gaussians
+        s1 = var(x[x > mean(x)])  # initialize estimates of variance for the first
+        s2 = var(x[x < mean(x)])  # and second gaussian in the mixture of 1D gaussians
 
-        mu1 = cp.mean(x[x > cp.mean(x)])  # initialize the means as well
-        mu2 = cp.mean(x[x < cp.mean(x)])
+        mu1 = mean(x[x > mean(x)])  # initialize the means as well
+        mu2 = mean(x[x < mean(x)])
         # and the probability that a spike is assigned to the first Gaussian
-        p = cp.mean(x > cp.mean(x))
+        p = mean(x > mean(x))
 
         # initialize matrix of log probabilities that each spike is assigned to the first
         # or second cluster
@@ -432,29 +432,40 @@ def splitAllClusters(ctx, flag):
             # (DEV_NOTES) code below involves multiple CuPy arrays changing shape to accomodate
             # the extra cluster, this could potentially be done more efficiently?
 
-            ir.dWU = cp.concatenate((ir.dWU, cp.zeros((*ir.dWU.shape[:-1], 1), order='F')), axis=2)
+            ir.dWU = cp.concatenate((
+                cp.asarray(ir.dWU), cp.zeros((*ir.dWU.shape[:-1], 1), order='F')), axis=2)
             ir.dWU[:, iC[:, iW[ik]], Nfilt - 1] = c2
             ir.dWU[:, iC[:, iW[ik]], ik] = c1
 
             # the temporal components are therefore just the PC waveforms
-            ir.W = cp.concatenate((ir.W, cp.transpose(wPCA, (0, 2, 1))), axis=1)
+            ir.W = cp.asarray(ir.W)
+            ir.W = cp.concatenate((ir.W, cp.transpose(cp.atleast_3d(wPCA), (0, 2, 1))), axis=1)
             assert ir.W.shape[1] == Nfilt
-            iW = cp.concatenate((iW, iW[ik]))  # copy the best channel from the original template
+
+            # copy the best channel from the original template
+            iW = cp.concatenate((iW, cp.atleast_1d(iW[ik])))
+
             # copy the provenance index to keep track of splits
-            isplit = cp.concatenate((isplit, isplit[ik]))
+            isplit = cp.asarray(isplit)
+            isplit = cp.concatenate((isplit, cp.atleast_1d(isplit[ik])))
 
             st3[isp[ilow], 1] = Nfilt - 1  # overwrite spike indices with the new index
+
             # copy similarity scores from the original
+            ir.simScore = cp.asarray(ir.simScore)
             ir.simScore = cp.concatenate((ir.simScore, ir.simScore[:, ik][:, np.newaxis]), axis=1)
             # copy similarity scores from the original
-            ir.simScore = cp.concatenate((ir.simScore, ir.simScore[ik, :]), axis=0)
+            ir.simScore = cp.concatenate((ir.simScore, ir.simScore[ik, :][np.newaxis, :]), axis=0)
             ir.simScore[ik, Nfilt - 1] = 1  # set the similarity with original to 1
             ir.simScore[Nfilt - 1, ik] = 1  # set the similarity with original to 1
 
             # copy neighbor template list from the original
-            ir.iNeigh = cp.concatenate((ir.iNeigh, ir.iNeigh[:, ik][:, np.newaxis]), axis=0)
+            ir.iNeigh = cp.asarray(ir.iNeigh)
+            ir.iNeigh = cp.concatenate((ir.iNeigh, ir.iNeigh[:, ik][:, np.newaxis]), axis=1)
+
             # copy neighbor channel list from the original
-            ir.iNeighPC = cp.concatenate((ir.iNeighPC, ir.iNeighPC[:, ik]), axis=0)
+            ir.iNeighPC = cp.asarray(ir.iNeighPC)
+            ir.iNeighPC = cp.concatenate((ir.iNeighPC, ir.iNeighPC[:, ik][:, np.newaxis]), axis=1)
 
             # try this cluster again
             # the cluster piece that stays at this index needs to be tested for splits again

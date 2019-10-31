@@ -81,14 +81,14 @@ def my_min(S1, sig, varargin=None):
         Nd = S1.ndim
         S1 = cp.transpose(S1, [idim] + list(range(0, idim)) + list(range(idim + 1, Nd)))
         dsnew = S1.shape
-        S1 = cp.reshape(S1, (S1.shape[0], -1))
+        S1 = cp.reshape(S1, (S1.shape[0], -1), order='F')
         dsnew2 = S1.shape
         S1 = cp.concatenate(
             (cp.full((sig, dsnew2[1]), np.inf), S1, cp.full((sig, dsnew2[1]), np.inf)), axis=0)
         Smax = S1[:dsnew2[0], :]
         for j in range(1, 2 * sig + 1):
             Smax = cp.minimum(Smax, S1[j:j + dsnew2[0], :])
-        S1 = cp.reshape(Smax, dsnew)
+        S1 = cp.reshape(Smax, dsnew, order='F')
         S1 = cp.transpose(S1, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
     return S1
 
@@ -113,14 +113,14 @@ def my_sum(S1, sig, varargin=None):
         Nd = S1.ndim
         S1 = cp.transpose(S1, [idim] + list(range(0, idim)) + list(range(idim + 1, Nd)))
         dsnew = S1.shape
-        S1 = cp.reshape(S1, (S1.shape[0], -1))
+        S1 = cp.reshape(S1, (S1.shape[0], -1), order='F')
         dsnew2 = S1.shape
         S1 = cp.concatenate(
             (cp.full((sig, dsnew2[1]), 0), S1, cp.full((sig, dsnew2[1]), 0)), axis=0)
         Smax = S1[:dsnew2[0], :]
         for j in range(1, 2 * sig + 1):
             Smax = Smax + S1[j:j + dsnew2[0], :]
-        S1 = cp.reshape(Smax, dsnew)
+        S1 = cp.reshape(Smax, dsnew, order='F')
         S1 = cp.transpose(S1, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
     return S1
 
@@ -145,15 +145,16 @@ def my_conv2(S1, sig, varargin=None):
         Nd = S1.ndim
         S1 = cp.transpose(S1, [idim] + list(range(0, idim)) + list(range(idim + 1, Nd)))
         dsnew = S1.shape
-        S1 = cp.reshape(S1, (S1.shape[0], -1))
+        S1 = cp.reshape(S1, (S1.shape[0], -1), order='F')
         dsnew2 = S1.shape
 
         tmax = ceil(4 * sig)
-        dt = cp.arange(-tmax, tmax + 1)
-        gaus = cp.exp(-dt ** 2 / (2 * sig ** 2))
-        gaus = gaus / cp.sum(gaus)
+        dt = np.arange(-tmax, tmax + 1)
+        gaus = np.exp(-dt ** 2 / (2 * sig ** 2))
+        gaus = gaus / np.sum(gaus)
 
-        cNorm = lfilter(gaus, 1, cp.concatenate((cp.ones(dsnew2[0]), cp.zeros(tmax))), axis=0)
+        cNorm = lfilter(
+            gaus, 1, cp.concatenate((cp.ones(dsnew2[0]), cp.zeros(tmax)))[:, np.newaxis], axis=0)
         cNorm = cNorm[tmax:, :]
         S1 = lfilter(
             gaus, 1, cp.concatenate((S1, cp.zeros((tmax, dsnew2[1]), order='F')), axis=0), axis=0)

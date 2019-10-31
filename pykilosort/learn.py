@@ -292,6 +292,17 @@ def mexSVDsmall2(Params, dWU, W, iC, iW, Ka, Kb):
     Nrank = int(Params[6])
     Nchan = int(Params[9])
 
+    # print("Nfilt", Nfilt)
+    # print("nt0", nt0)
+    # print("Nrank", Nrank)
+    # print("Nchan", Nchan)
+    # print("dWU", dWU.shape)
+    # print("W", W.shape)
+    # print("iC", iC.shape)
+    # print("iW", iW.shape)
+    # print("Ka", Ka.shape)
+    # print("Kb", Kb.shape)
+
     d_Params = cp.asarray(Params, dtype=np.float64, order='F')
 
     d_dWU = cp.asarray(dWU, dtype=np.float64, order='F')
@@ -608,13 +619,13 @@ def learnAndSolve8b(ctx):
     wTEMP, wPCA = extractTemplatesfromSnippets(
         proc=proc, probe=probe, params=params, Nbatch=Nbatch, nPCs=NrankPC)
 
-    if 'wPCA' not in ir:
-        ctx.save(wPCA=wPCA, wTEMP=wTEMP)
-
     # move these to the GPU
     wPCA = cp.asarray(wPCA[:, :Nrank], dtype=np.float32, order='F')
     wTEMP = cp.asarray(wTEMP, dtype=np.float32, order='F')
     wPCAd = cp.asarray(wPCA, dtype=np.float64, order='F')  # convert to double for extra precision
+
+    if 'wPCA' not in ir:
+        ctx.save(wPCA=wPCA, wTEMP=wTEMP)
 
     nt0 = params.nt0
     nt0min = params.nt0min
