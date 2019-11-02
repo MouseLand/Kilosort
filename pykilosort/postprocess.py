@@ -280,7 +280,7 @@ def splitAllClusters(ctx, flag):
     # the waveforms must be aligned to this sample
     nt0min = params.nt0min
     # find the peak abs channel for each template
-    iW = cp.argmax(cp.abs(cp.asarray(ir.dWU[nt0min - 1, :, :])), axis=1)
+    iW = cp.argmax(cp.abs(cp.asarray(ir.dWU[nt0min - 1, :, :])), axis=0)
 
     # keep track of original cluster for each cluster. starts with all clusters being their
     # own origin.
