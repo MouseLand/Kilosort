@@ -2,9 +2,11 @@ from math import erf, log, sqrt
 import logging
 import os
 from os.path import join
+from pathlib import Path
 import shutil
 
 from tqdm import tqdm
+import numba
 import numpy as np
 import cupy as cp
 from cupyx.scipy.sparse import coo_matrix
@@ -17,7 +19,7 @@ from .preprocess import my_conv2
 logger = logging.getLogger(__name__)
 
 
-def ccg(st1, st2, nbins, tbin):
+def ccg_slow(st1, st2, nbins, tbin):
     # this function efficiently computes the crosscorrelogram between two sets
     # of spikes (st1, st2), with tbin length each, timelags =  plus/minus nbins
     # and then estimates how refractory the cross-correlogram is, which can be used
@@ -28,7 +30,9 @@ def ccg(st1, st2, nbins, tbin):
 
     dt = nbins * tbin
 
-    T = cp.max(cp.concatenate((st1, st2))) - cp.min(cp.concatenate((st1, st2)))
+    N1 = max(1, len(st1))
+    N2 = max(1, len(st2))
+    T = cp.concatenate((st1, st2)).max() - cp.concatenate((st1, st2)).min()
 
     # we traverse both spike trains together, keeping track of the spikes in the first
     # spike train that are within dt of spikes in the second spike train
@@ -41,15 +45,15 @@ def ccg(st1, st2, nbins, tbin):
 
     # (DEV_NOTES) the while loop below is far too slow as is
 
-    while j <= len(st2) - 1:  # traverse all spikes in the second spike train
+    while j <= N2 - 1:  # traverse all spikes in the second spike train
 
-        while (ihigh <= len(st1) - 1) and (st1[ihigh] < st2[j] + dt):
+        while (ihigh <= N1 - 1) and (st1[ihigh] < st2[j] + dt):
             ihigh += 1  # keep increasing higher bound until it's OUTSIDE of dt range
 
-        while (ilow <= len(st1) - 1) and (st1[ilow] <= st2[j] - dt):
+        while (ilow <= N1 - 1) and (st1[ilow] <= st2[j] - dt):
             ilow += 1  # keep increasing lower bound until it's INSIDE of dt range
 
-        if ilow > len(st1) - 1:
+        if ilow > N1 - 1:
             break  # break if we exhausted the spikes from the first spike train
 
         if st1[ilow] > st2[j] + dt:
@@ -74,11 +78,11 @@ def ccg(st1, st2, nbins, tbin):
     # normalize the shoulders by what's expected from the mean firing rates
     # a non-refractive poisson process should yield 1
 
-    Q00 = cp.sum(K[irange1]) / (len(irange1) * tbin * len(st1) * len(st2) / T)
+    Q00 = cp.sum(K[irange1]) / (len(irange1) * tbin * N1 * N2 / T)
     # do the same for irange 2
-    Q01 = cp.sum(K[irange2]) / (len(irange2) * tbin * len(st1) * len(st2) / T)
+    Q01 = cp.sum(K[irange2]) / (len(irange2) * tbin * N1 * N2 / T)
     # compare to the other shoulder
-    Q01 = max(Q01, cp.sum(K[irange3]) / (len(irange3) * tbin * len(st1) * len(st2) / T))
+    Q01 = max(Q01, cp.sum(K[irange3]) / (len(irange3) * tbin * N1 * N2 / T))
 
     R00 = max(cp.mean(K[irange2]), cp.mean(K[irange3]))  # take the biggest shoulder
     R00 = max(R00, cp.mean(K[irange1]))  # compare this to the asymptotic shoulder
@@ -95,7 +99,7 @@ def ccg(st1, st2, nbins, tbin):
     for i in range(1, 11):
         irange = cp.arange(nbins - i, nbins + i + 1)  # for this central range of the CCG
         # compute the normalised ratio as above. this should be 1 if there is no refractoriness
-        Qi0 = cp.sum(K[irange]) / (2 * i * tbin * len(st1) * len(st2) / T)
+        Qi0 = cp.sum(K[irange]) / (2 * i * tbin * N1 * N2 / T)
         Qi[i - 1] = Qi0  # save the normalised probability
 
         n = cp.sum(K[irange]) / 2
@@ -114,6 +118,120 @@ def ccg(st1, st2, nbins, tbin):
     K[nbins] = a  # restore the center value of the cross-correlogram
 
     return K, Qi, Q00, Q01, Ri
+
+
+# NOTE: we get a 50x time improvement with Numba jit of the existing function,
+# but we could probably achieve even more by improving the implementation
+@numba.jit(nopython=True, cache=False)
+def _ccg(st1, st2, nbins, tbin):
+    # this function efficiently computes the crosscorrelogram between two sets
+    # of spikes (st1, st2), with tbin length each, timelags =  plus/minus nbins
+    # and then estimates how refractory the cross-correlogram is, which can be used
+    # during merge decisions.
+
+    st1 = np.sort(st1)  # makes sure spike trains are sorted in increasing order
+    st2 = np.sort(st2)
+
+    dt = nbins * tbin
+
+    # Avoid divide by zero error.
+    T = max(1e-10, np.max(np.concatenate((st1, st2))) - np.min(np.concatenate((st1, st2))))
+    N1 = max(1, len(st1))
+    N2 = max(1, len(st2))
+
+    # we traverse both spike trains together, keeping track of the spikes in the first
+    # spike train that are within dt of spikes in the second spike train
+
+    ilow = 0  # lower bound index
+    ihigh = 0  # higher bound index
+    j = 0  # index of the considered spike
+
+    K = np.zeros(2 * nbins + 1)
+
+    # (DEV_NOTES) the while loop below is far too slow as is
+
+    while j <= N2 - 1:  # traverse all spikes in the second spike train
+
+        while (ihigh <= N1 - 1) and (st1[ihigh] < st2[j] + dt):
+            ihigh += 1  # keep increasing higher bound until it's OUTSIDE of dt range
+
+        while (ilow <= N1 - 1) and (st1[ilow] <= st2[j] - dt):
+            ilow += 1  # keep increasing lower bound until it's INSIDE of dt range
+
+        if ilow > N1 - 1:
+            break  # break if we exhausted the spikes from the first spike train
+
+        if st1[ilow] > st2[j] + dt:
+            # if the lower bound is actually outside of dt range, means we overshot (there were no
+            # spikes in range)
+            # simply move on to next spike from second spike train
+            j += 1
+            continue
+
+        for k in range(ilow, ihigh):
+            # for all spikes within plus/minus dt range
+            ibin = np.rint((st2[j] - st1[k]) / tbin)  # convert ISI to integer
+            ibin2 = np.asarray(ibin, dtype=np.int64)
+
+            K[ibin2 + nbins] += 1
+
+        j += 1
+
+    irange1 = np.concatenate((np.arange(1, nbins // 2), np.arange(3 * nbins // 2, 2 * nbins)))
+    irange2 = np.arange(nbins - 50, nbins - 10)
+    irange3 = np.arange(nbins + 11, nbins + 50)
+
+    # normalize the shoulders by what's expected from the mean firing rates
+    # a non-refractive poisson process should yield 1
+
+    Q00 = np.sum(K[irange1]) / (len(irange1) * tbin * N1 * N2 / T)
+    # do the same for irange 2
+    Q01 = np.sum(K[irange2]) / (len(irange2) * tbin * N1 * N2 / T)
+    # compare to the other shoulder
+    Q01 = max(Q01, np.sum(K[irange3]) / (len(irange3) * tbin * N1 * N2 / T))
+
+    R00 = max(np.mean(K[irange2]), np.mean(K[irange3]))  # take the biggest shoulder
+    R00 = max(R00, np.mean(K[irange1]))  # compare this to the asymptotic shoulder
+
+    # test the probability that a central area in the autocorrelogram might be refractory
+    # test increasingly larger areas of the central CCG
+
+    a = K[nbins]
+    K[nbins] = 0
+
+    Qi = np.zeros(10)
+    Ri = np.zeros(10)
+
+    for i in range(1, 11):
+        irange = np.arange(nbins - i, nbins + i + 1)  # for this central range of the CCG
+        # compute the normalised ratio as above. this should be 1 if there is no refractoriness
+        Qi0 = np.sum(K[irange]) / (2 * i * tbin * N1 * N2 / T)
+        Qi[i - 1] = Qi0  # save the normalised probability
+
+        n = np.sum(K[irange]) / 2
+        # lam = R00 * i
+        # NOTE: make sure lam is not zero to avoid divide by zero error
+        lam = max(1e-10, R00 * i)
+
+        # log(p) = log(lam) * n - lam - gammaln(n+1)
+
+        # this is tricky: we approximate the Poisson likelihood with a gaussian of equal mean and
+        # variance that allows us to integrate the probability that we would see <N spikes in the
+        # center of the cross-correlogram from a distribution with mean R00*i spikes
+
+        p = 1 / 2 * (1 + erf((n - lam) / sqrt(2 * lam)))
+
+        Ri[i - 1] = p  # keep track of p for each bin size i
+
+    K[nbins] = a  # restore the center value of the cross-correlogram
+
+    return K, Qi, Q00, Q01, Ri
+
+
+def ccg(st1, st2, nbins, tbin):
+    st1 = cp.asnumpy(st1)
+    st2 = cp.asnumpy(st2)
+    return _ccg(st1, st2, nbins, tbin)
 
 
 def clusterAverage(clu, spikeQuantity):
@@ -209,10 +327,10 @@ def find_merges(ctx, flag):
             K, Qi, Q00, Q01, rir = ccg(s1, s2, nbins, dt)
             # normalize the central cross-correlogram bin by its shoulders OR
             # by its mean firing rate
-            Q = cp.min(Qi / max(Q00, Q01))
+            Q = (Qi / max(Q00, Q01)).min()
             # R is the estimated probability that any of the center bins are refractory,
             # and kicks in when there are very few spikes
-            R = cp.min(rir)
+            R = rir.min()
 
             if flag:
                 if (Q < 0.2) and (R < 0.5):  # if both refractory criteria are met
@@ -221,7 +339,7 @@ def find_merges(ctx, flag):
                     # simply overwrite all the spikes of neuron j with i (i>j by construction)
                     ir.st3[:, 1][ir.st3[:, 1] == isort[j]] = i
                     nspk[i] = nspk[i] + nspk[isort[j]]  # update number of spikes for cluster i
-                    logger.info(f'Merged {isort[j]} into {i}')
+                    logger.debug(f'Merged {isort[j]} into {i}')
                     # YOU REALLY SHOULD MAKE SURE THE PC CHANNELS MATCH HERE
                     # break % if a pair is found, we don't need to keep going
                     # (we'll revisit this cluster when we get to the merged cluster)
@@ -288,13 +406,13 @@ def splitAllClusters(ctx, flag):
     dt = 1. / 1000
     nccg = 0
 
-    pbar = tqdm(total=Nfilt, desc="Splitting clusters")
+    # pbar = tqdm(total=Nfilt, desc="Splitting clusters")
     while ik < Nfilt:
         if ik % 100 == 0:
             # periodically write updates
             logger.info(f'Found {nsplits} splits, checked {ik}/{Nfilt} clusters, nccg {nccg}')
         ik += 1
-        pbar.update(ik)
+        # pbar.update(ik)
 
         isp = cp.nonzero(st3[:, 1] == ik)[0]  # get all spikes from this cluster
         nSpikes = isp.size
@@ -350,7 +468,7 @@ def splitAllClusters(ctx, flag):
             logp[:, 0] = -1 / 2 * log(s1) - ((x - mu1) ** 2) / (2 * s1) + log(p)
             logp[:, 1] = -1 / 2 * log(s2) - ((x - mu2) ** 2) / (2 * s2) + log(1 - p)
 
-            lMax = cp.max(logp, axis=1)
+            lMax = logp.max(axis=1)
             logp = logp - lMax[:, cp.newaxis]  # subtract the max for floating point accuracy
             rs = cp.exp(logp)  # exponentiate the probabilities
 
@@ -391,8 +509,8 @@ def splitAllClusters(ctx, flag):
         # did this split fix the autocorrelograms?
         # compute the cross-correlogram between spikes in the putative new clusters
         K, Qi, Q00, Q01, rir = ccg(ss[ilow], ss[~ilow], 500, dt)
-        Q12 = cp.min(Qi / max(Q00, Q01))  # refractoriness metric 1
-        R = cp.min(rir)  # refractoriness metric 2
+        Q12 = (Qi / max(Q00, Q01)).min()  # refractoriness metric 1
+        R = rir.min()  # refractoriness metric 2
 
         # if the CCG has a dip, don't do the split.
         # These thresholds are consistent with the ones from merges.
@@ -443,29 +561,41 @@ def splitAllClusters(ctx, flag):
             assert ir.W.shape[1] == Nfilt
 
             # copy the best channel from the original template
-            iW = cp.concatenate((iW, cp.atleast_1d(iW[ik])))
+            iW = cp.pad(iW, (0, (Nfilt - len(iW))), mode='constant')
+            iW[Nfilt - 1] = iW[ik]
+            assert iW.shape[0] == Nfilt
 
             # copy the provenance index to keep track of splits
             isplit = cp.asarray(isplit)
-            isplit = cp.concatenate((isplit, cp.atleast_1d(isplit[ik])))
+            isplit = cp.pad(isplit, (0, (Nfilt - len(isplit))), mode='constant')
+            isplit[Nfilt - 1] = isplit[ik]
+            assert isplit.shape[0] == Nfilt
 
             st3[isp[ilow], 1] = Nfilt - 1  # overwrite spike indices with the new index
 
             # copy similarity scores from the original
             ir.simScore = cp.asarray(ir.simScore)
-            ir.simScore = cp.concatenate((ir.simScore, ir.simScore[:, ik][:, np.newaxis]), axis=1)
+            ir.simScore = cp.pad(
+                ir.simScore, (0, (Nfilt - ir.simScore.shape[0])), mode='constant')
+            ir.simScore[:, Nfilt - 1] = ir.simScore[:, ik]
+            ir.simScore[Nfilt - 1, :] = ir.simScore[ik, :]
             # copy similarity scores from the original
-            ir.simScore = cp.concatenate((ir.simScore, ir.simScore[ik, :][np.newaxis, :]), axis=0)
             ir.simScore[ik, Nfilt - 1] = 1  # set the similarity with original to 1
             ir.simScore[Nfilt - 1, ik] = 1  # set the similarity with original to 1
+            assert ir.simScore.shape == (Nfilt, Nfilt)
 
             # copy neighbor template list from the original
             ir.iNeigh = cp.asarray(ir.iNeigh)
-            ir.iNeigh = cp.concatenate((ir.iNeigh, ir.iNeigh[:, ik][:, np.newaxis]), axis=1)
+            ir.iNeigh = cp.pad(
+                ir.iNeigh, ((0, 0), (0, (Nfilt - ir.iNeigh.shape[1]))), mode='constant')
+            ir.iNeigh[:, Nfilt - 1] = ir.iNeigh[:, ik]
+            assert ir.iNeigh.shape[1] == Nfilt
 
             # copy neighbor channel list from the original
-            ir.iNeighPC = cp.asarray(ir.iNeighPC)
-            ir.iNeighPC = cp.concatenate((ir.iNeighPC, ir.iNeighPC[:, ik][:, np.newaxis]), axis=1)
+            ir.iNeighPC = cp.pad(
+                ir.iNeighPC, ((0, 0), (0, (Nfilt - ir.iNeighPC.shape[1]))), mode='constant')
+            ir.iNeighPC[:, Nfilt - 1] = ir.iNeighPC[:, ik]
+            assert ir.iNeighPC.shape[1] == Nfilt
 
             # try this cluster again
             # the cluster piece that stays at this index needs to be tested for splits again
@@ -474,8 +604,8 @@ def splitAllClusters(ctx, flag):
             # the piece that became a new cluster will be tested again when we get to the end
             # of the list
             nsplits += 1  # keep track of how many splits we did
-            pbar.update(ik)
-    pbar.close()
+    #         pbar.update(ik)
+    # pbar.close()
 
     logger.info(
         f'Finished splitting. Found {nsplits} splits, checked '
@@ -500,7 +630,7 @@ def splitAllClusters(ctx, flag):
     ir.iList = iList  # over-write the list of nearest templates
 
     isplit = ir.simScore == 1  # overwrite the similarity scores of clusters with same parent
-    ir.simScore = cp.max(WtW, axis=2)
+    ir.simScore = WtW.max(axis=2)
     ir.simScore[isplit] = 1  # 1 means they come from the same parent
 
     ir.iNeigh = iList[:, :Nfilt]  # get the new neighbor templates
@@ -514,6 +644,7 @@ def splitAllClusters(ctx, flag):
     ir.isplit = isplit  # keep track of origins for each cluster
 
     ctx.save(
+        st3_after_split=st3,
         W=ir.W,
         U=ir.U,
         mu=ir.mu,
@@ -535,18 +666,16 @@ def set_cutoff(ctx):
 
     ir = ctx.intermediate
     params = ctx.params
-    st3 = ir.st3_after_merges
+    st3 = cp.asarray(ir.st3_after_split)
 
     dt = 1. / 1000  # step size for CCG binning
 
-    Nk = int(cp.max(st3[:, 1])) + 1  # number of templates
-
-    # (DEV_NOTES) easier way to calculate Nk using cp.max but this doesn't return an integer
-    # compatible with cp.zeros
+    Nk = int(st3[:, 1].max()) + 1  # number of templates
 
     # sort by firing rate first
 
     ir.good = cp.zeros(Nk)
+    ir.Ths = cp.zeros(Nk)
 
     ir.est_contam_rate = cp.zeros(Nk)
 
@@ -572,9 +701,9 @@ def set_cutoff(ctx):
             # compute the auto-correlogram with 500 bins at 1ms bins
             K, Qi, Q00, Q01, rir = ccg(st, st, 500, dt)
             # this is a measure of refractoriness
-            Q = cp.min(Qi / max(Q00, Q01))
+            Q = (Qi / max(Q00, Q01)).min()
             # this is a second measure of refractoriness (kicks in for very low firing rates)
-            R = cp.min(rir)
+            R = rir.min()
             # if the unit is already contaminated, we break, and use the next higher threshold
             if (Q > fcontamination) or (R > 0.05):
                 break
@@ -600,7 +729,7 @@ def set_cutoff(ctx):
         # compute the auto-correlogram with 500 bins at 1ms bins
         K, Qi, Q00, Q01, rir = ccg(st, st, 500, dt)
         # this is a measure of refractoriness
-        Q = cp.min(Qi / max(Q00, Q01))
+        Q = (Qi / max(Q00, Q01)).min()
         ir.est_contam_rate[j] = Q  # this score will be displayed in Phy
 
         ir.Ths[j] = Th  # store the threshold for potential debugging
@@ -626,21 +755,33 @@ def set_cutoff(ctx):
     st3 = st3[~ix, :]
 
     if len(ir.cProj) > 0:
+        ix = cp.asnumpy(ix)
+        if len(ix) > ir.cProj.shape[0]:
+            ix = ix[:ir.cProj.shape[0]]
+        else:
+            ix = np.pad(ix, (0, ir.cProj.shape[0] - len(ix)), mode='constant')
+        assert ix.shape[0] == ir.cProj.shape[0] == ir.cProjPC.shape[0]
         ir.cProj = ir.cProj[~ix, :]  # remove their template projections too
         ir.cProjPC = ir.cProjPC[~ix, :, :]  # and their PC projections
+        assert st3.shape[0] == ir.cProj.shape[0] == ir.cProjPC.shape[0]
 
     ctx.save(
-        st3_after_split=st3,
+        st3_after_cutoff=st3,
         cProj=ir.cProj,
         cProjPC=ir.cProjPC,
         est_contam_rate=ir.est_contam_rate,
+        Ths=ir.Ths,
+        good=ir.good,
     )
 
 
-def rezToPhy(ctx, savePath=None):
+def rezToPhy(ctx, dat_path=None, output_dir=None):
     # pull out results from kilosort's rez to either return to workspace or to
     # save in the appropriate format for the phy GUI to run on. If you provide
     # a savePath it should be a folder
+
+    savePath = output_dir
+    Path(savePath).mkdir(exist_ok=True, parents=True)
 
     probe = ctx.probe
     ir = ctx.intermediate
@@ -652,13 +793,15 @@ def rezToPhy(ctx, savePath=None):
     ir.U = cp.asnumpy(ir.U).astype(np.float32)
     ir.mu = cp.asnumpy(ir.mu).astype(np.float32)
 
-    if ir.st3.shape[1] > 4:
-        ir.st3 = ir.st3[:, :4]
+    st3 = cp.asarray(ir.st3_after_cutoff)
 
-    isort = cp.argsort(ir.st3[:, 0])
-    ir.st3 = ir.st3[isort, :]
-    ir.cProj = ir.cProj[isort, :]
-    ir.cProjPC = ir.cProjPC[isort, :, :]
+    if st3.shape[1] > 4:
+        st3 = st3[:, :4]
+
+    isort = cp.argsort(st3[:, 0])
+    st3 = st3[isort, :]
+    ir.cProj = cp.asarray(ir.cProj)[isort, :]
+    ir.cProjPC = cp.asarray(ir.cProjPC)[isort, :, :]
 
     fs = os.listdir(savePath)
     for file in fs:
@@ -667,29 +810,28 @@ def rezToPhy(ctx, savePath=None):
     if os.path.isdir(join(savePath, '.phy')):
         shutil.rmtree(join(savePath, '.phy'))
 
-    spikeTimes = ir.st3[:, 0].astype(cp.uint64)
-    spikeTemplates = ir.st3[:, 1].astype(cp.uint32)
+    spikeTimes = st3[:, 0].astype(cp.uint64)
+    spikeTemplates = st3[:, 1].astype(cp.uint32)
 
     # (DEV_NOTES) if statement below seems useless due to above if statement
-    if ir.st3.shape[1] > 4:
-        spikeClusters = (1 + ir.st3[:, 4]).astype(cp.uint32)
+    if st3.shape[1] > 4:
+        spikeClusters = (1 + st3[:, 4]).astype(cp.uint32)
 
-    amplitudes = ir.st3[:, 2]
+    amplitudes = st3[:, 2]
 
     Nchan = probe.Nchan
 
     # FIX THIS PART: are the flattens below needed?
-    xcords = probe.xcords
-    ycords = probe.ycords
+    xcoords = probe.xc
+    ycoords = probe.yc
     chanMap = probe.chanMap
     chanMap0ind = chanMap  # - 1
 
-    # nt0 = ir.W.shape[0]
     # (DEV_NOTES) do we need U and ir.U?
-    U = ir.U
-    W = ir.W
+    U = cp.asarray(ir.U)
+    W = cp.asarray(ir.W)
 
-    Nfilt = ir.W.shape[1]
+    nt0, Nfilt = ir.W.shape[:2]
 
     # (DEV_NOTES) 2 lines below can be combined
     # templates = cp.einsum('ikl,jkl->ijk', U, W).astype(cp.float32)
@@ -705,7 +847,7 @@ def rezToPhy(ctx, savePath=None):
     pcFeatures = ir.cProjPC
     pcFeatureInds = ir.iNeighPC.astype(cp.uint32)
 
-    whiteningMatrix = ir.Wrot / params.scaleproc
+    whiteningMatrix = cp.asarray(ir.Wrot) / params.scaleproc
     whiteningMatrixInv = cp.linalg.pinv(whiteningMatrix)
 
     # here we compute the amplitude of every template...
@@ -717,10 +859,10 @@ def rezToPhy(ctx, savePath=None):
         tempsUnW[t, :, :] = cp.dot(templates[t, :, :], whiteningMatrixInv)
 
     # The amplitude on each channel is the positive peak minus the negative
-    tempChanAmps = cp.max(tempsUnW, axis=1) - cp.min(tempsUnW, axis=1)
+    tempChanAmps = tempsUnW.max(axis=1) - tempsUnW.min(axis=1)
 
     # The template amplitude is the amplitude of its largest channel
-    tempAmpsUnscaled = cp.max(tempChanAmps, axis=1)
+    tempAmpsUnscaled = tempChanAmps.max(axis=1)
 
     # assign all spikes the amplitude of their template multiplied by their
     # scaling amplitudes
@@ -730,27 +872,18 @@ def rezToPhy(ctx, savePath=None):
     # tempScalingAmps are equal mean for all templates)
     ta = clusterAverage(spikeTemplates, spikeAmps)
     tids = cp.unique(spikeTemplates).astype(np.int64)
-    # # (DEV_NOTES) line below is a horrible workaround as cp.max(tids) can't be read as an int
-    # tempAmps = cp.array(np.zeros(cp.asnumpy(cp.max(tids))))
-    # # because ta only has entries for templates that had at least one spike
-    # tempAmps[tids - 1] = ta
-    # if 'gain' in ir.ops:
-    #     gain = ir.ops.gain
-    # else:
-    #     gain = 1
-    # tempAmps = gain * cp.transpose(tempAmps)
     tempAmps = cp.zeros_like(tempAmpsUnscaled, order='F')
     tempAmps[tids] = ta  # because ta only has entries for templates that had at least one spike
     tempAmps = params.gain * tempAmps  # for consistency, make first dimension template number
 
     # (DEV_NOTES) currently setting allow_pickle = False for compatibility, possibly worth changing
     def _save(name, arr, dtype=None):
-        cp.save(join(savePath, name + '.npy'), arr.astype(dtype or arr.dtype), allow_pickle=False)
+        cp.save(join(savePath, name + '.npy'), arr.astype(dtype or arr.dtype))
 
     if savePath is not None:
         _save('spike_times', spikeTimes)
         _save('spike_templates', spikeTemplates, cp.uint32)
-        if ir.st3.shape[1] > 4:
+        if st3.shape[1] > 4:
             _save('spike_clusters', spikeClusters, cp.uint32)
         else:
             _save('spike_clusters', spikeTemplates, cp.uint32)
@@ -761,7 +894,7 @@ def rezToPhy(ctx, savePath=None):
         chanMap0ind = chanMap0ind.astype(cp.int32)
 
         _save('channel_map', chanMap0ind)
-        _save('channel_positions', cp.concatenate((xcords, ycords), axis=1))
+        _save('channel_positions', np.c_[xcoords, ycoords])
 
         _save('template_features', templateFeatures)
         _save('template_feature_ind', templateFeatureInds.T)
@@ -775,7 +908,7 @@ def rezToPhy(ctx, savePath=None):
             similarTemplates = ir.SimScore
             _save('similar_templates.npy', similarTemplates)
 
-        ir.est_contam_rate[cp.isnan(ir.est_contam_rate)] = 1
+        ir.est_contam_rate[np.isnan(ir.est_contam_rate)] = 1
         with open(join(savePath, 'cluster_KSLabel.tsv'), 'w') as f:
             f.write('cluster_id\tKSLabel\n')
             for j in range(len(ir.good)):
@@ -797,8 +930,8 @@ def rezToPhy(ctx, savePath=None):
         # make params file
         if not os.path.exists(join(savePath, 'params.py')):
             with open(join(savePath, 'params.py'), 'w') as f:
-                f.write('dat_path = %s\n' % params.dat_path)
-                f.write('n_channels_dat = %d\n' % params.NchanTOT)
+                f.write('dat_path = "../%s"\n' % dat_path)
+                f.write('n_channels_dat = %d\n' % probe.NchanTOT)
                 f.write('dtype = "int16"\n')
                 f.write('offset = 0\n')
                 f.write('hp_filtered = False\n')

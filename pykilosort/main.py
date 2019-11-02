@@ -7,7 +7,7 @@ from tqdm import tqdm
 from .preprocess import preprocess, get_good_channels, get_whitening_matrix, get_Nbatch
 from .cluster import clusterSingleBatches
 from .learn import learnAndSolve8b
-from .postprocess import find_merges, splitAllClusters, set_cutoff
+from .postprocess import find_merges, splitAllClusters, set_cutoff, rezToPhy
 from .utils import Bunch, Context
 from .default_params import default_params, set_dependent_params
 
@@ -22,7 +22,7 @@ def default_probe(raw_data):
     return Bunch(Nchan=nc, xc=np.zeros(nc), yc=np.arange(nc))
 
 
-def run(dir_path=None, raw_data=None, probe=None, params=None):
+def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     """
 
     probe has the following attributes:
@@ -116,33 +116,33 @@ def run(dir_path=None, raw_data=None, probe=None, params=None):
     # this function adds many intermediate results, notably st3
     if 'st3' not in ir:
         learnAndSolve8b(ctx)
+    logger.info("%d spikes.", ir.st3.shape[0])
 
     # -------------------------------------------------------------------------
     # Final merges.
     # This function adds: R_CCG, Q_CCG, K_CCG
     if 'st3_after_merges' not in ir:
         find_merges(ctx, True)
+    logger.info("%d spikes.", ir.st3_after_merges.shape[0])
 
     # -------------------------------------------------------------------------
     # Final splits.
     # This function adds many intermediate results, including isplit.
-    if 'isplit' not in ir:
+    if 'st3_after_split' not in ir:
         # final splits by SVD
         splitAllClusters(ctx, True)
         # final splits by amplitudes
         splitAllClusters(ctx, False)
-
-    return
+    logger.info("%d spikes.", ir.st3_after_split.shape[0])
 
     # -------------------------------------------------------------------------
     # Decide on cutoff.
     # This function adds: good, est_contam_rate.
     if 'est_contam_rate' not in ir:
         set_cutoff(ctx)
-        # ctx.save()
 
-    logger.info('Found %d good units.', np.sum(ctx.good > 0))
+    logger.info('Found %d good units.', np.sum(ir.good > 0))
 
     # write to Phy
     logger.info('Saving results to phy.')
-    # TODO: save npy files
+    rezToPhy(ctx, dat_path=dat_path, output_dir=dir_path / 'output')
