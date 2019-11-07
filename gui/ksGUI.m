@@ -867,7 +867,7 @@ classdef ksGUI < handle
                     % filtered, whitened
                     obj.prepareForRun();
                     datAllF = ksFilter(datAll, obj.ops);
-                    datAllF = double(gather_try(datAllF));
+                    datAllF = double(gather(datAllF));
                     if isfield(obj.P, 'Wrot') && ~isempty(obj.P.Wrot)
                         %Wrot = obj.P.Wrot/obj.ops.scaleproc;
                         conn = obj.P.chanMap.connected;
