@@ -76,6 +76,7 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
 
         # it's enough to remove bad channels from the channel map, which treats them
         # as if they are dead
+        ir.igood = ir.igood.ravel()
         probe.chanMap = probe.chanMap[ir.igood]
         probe.xc = probe.xc[ir.igood]  # removes coordinates of bad channels
         probe.yc = probe.yc[ir.igood]
@@ -107,39 +108,55 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
 
     # -------------------------------------------------------------------------
     # Time-reordering as a function of drift.
-    # This function adds to the intermediate object: iorig, ccb0, ccbsort
+    # This function saves:
+    #
+    #     iorig, ccb0, ccbsort
+    #
     if 'iorig' not in ir:
         clusterSingleBatches(ctx)
 
     # -------------------------------------------------------------------------
     # Main tracking and template matching algorithm.
-    # this function adds many intermediate results, notably st3
+    # this function saves:
+    #
+    #     wPCA, wTEMP
+    #     st3, simScore, cProj, cProjPC, iNeigh, iNeighPC
+    #     WA, UA, W, U, dWU, mu,
+    #     W_a, W_b, U_a, U_b
+    #
     if 'st3' not in ir:
         learnAndSolve8b(ctx)
     logger.info("%d spikes.", ir.st3.shape[0])
 
     # -------------------------------------------------------------------------
     # Final merges.
-    # This function adds: R_CCG, Q_CCG, K_CCG
+    # This function saves:
+    #
+    #         R_CCG, Q_CCG, K_CCG
+    #
     if 'st3_after_merges' not in ir:
         find_merges(ctx, True)
-    logger.info("%d spikes.", ir.st3_after_merges.shape[0])
+    logger.info("%d spikes after merge.", ir.st3_after_merges.shape[0])
 
     # -------------------------------------------------------------------------
     # Final splits.
-    # This function adds many intermediate results, including isplit.
+    # This function saves:
+    #
+    #       st3_after_split, W, U, mu, iList, simScore, iNeigh, iNeighPC, Wphy, isplit
+    #
     if 'st3_after_split' not in ir:
         # final splits by SVD
         splitAllClusters(ctx, True)
         # final splits by amplitudes
         splitAllClusters(ctx, False)
-    logger.info("%d spikes.", ir.st3_after_split.shape[0])
+    logger.info("%d spikes after split.", ir.st3_after_split.shape[0])
 
     # -------------------------------------------------------------------------
     # Decide on cutoff.
     # This function adds: good, est_contam_rate.
     if 'est_contam_rate' not in ir:
         set_cutoff(ctx)
+    logger.info("%d spikes after cutoff.", ir.st3_after_cutoff.shape[0])
 
     logger.info('Found %d good units.', np.sum(ir.good > 0))
 
