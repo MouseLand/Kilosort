@@ -104,21 +104,30 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
 
     # -------------------------------------------------------------------------
     # Time-reordering as a function of drift.
+    #
     # This function saves:
     #
-    #     iorig, ccb0, ccbsort
+    #       iorig, ccb0, ccbsort
     #
     if 'iorig' not in ir:
         clusterSingleBatches(ctx)
 
     # -------------------------------------------------------------------------
     # Main tracking and template matching algorithm.
-    # this function saves:
     #
-    #     wPCA, wTEMP
-    #     st3, simScore, cProj, cProjPC, iNeigh, iNeighPC
-    #     WA, UA, W, U, dWU, mu,
-    #     W_a, W_b, U_a, U_b
+    # This function uses:
+    #
+    #         proc file
+    #         iorig
+    #
+    # This function saves:
+    #
+    #         wPCA, wTEMP
+    #         st3, simScore
+    #         cProj, cProjPC
+    #         iNeigh, iNeighPC
+    #         WA, UA, W, U, dWU, mu,
+    #         W_a, W_b, U_a, U_b
     #
     if 'st3' not in ir:
         learnAndSolve8b(ctx)
@@ -126,6 +135,11 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
 
     # -------------------------------------------------------------------------
     # Final merges.
+    #
+    # This function uses:
+    #
+    #       st3, simScore
+    #
     # This function saves:
     #
     #         R_CCG, Q_CCG, K_CCG
@@ -136,9 +150,17 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
 
     # -------------------------------------------------------------------------
     # Final splits.
+    #
+    # This function uses:
+    #
+    #       st3_after_merges
+    #       wPCA, W, dWU, cProjPC
+    #
     # This function saves:
     #
-    #       st3_after_split, W, U, mu, iList, simScore, iNeigh, iNeighPC, Wphy, isplit
+    #       st3_after_split
+    #       W, U, mu, Wphy, simScore
+    #       iNeigh, iNeighPC, iList, isplit
     #
     if 'st3_after_split' not in ir:
         # final splits by SVD
@@ -149,8 +171,19 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
 
     # -------------------------------------------------------------------------
     # Decide on cutoff.
-    # This function adds: good, est_contam_rate.
-    if 'est_contam_rate' not in ir:
+    #
+    # This function uses:
+    #
+    #       st3_after_split
+    #       wPCA, W, dWU, cProjPC
+    #
+    # This function saves:
+    #
+    #       st3_after_cutoff
+    #       cProj, cProjPC
+    #       est_contam_rate, Ths, good
+    #
+    if 'st3_after_cutoff' not in ir:
         set_cutoff(ctx)
     logger.info("%d spikes after cutoff.", ir.st3_after_cutoff.shape[0])
 

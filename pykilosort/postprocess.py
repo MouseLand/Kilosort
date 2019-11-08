@@ -879,7 +879,6 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     tempAmps[tids] = ta  # because ta only has entries for templates that had at least one spike
     tempAmps = params.gain * tempAmps  # for consistency, make first dimension template number
 
-    # (DEV_NOTES) currently setting allow_pickle = False for compatibility, possibly worth changing
     def _save(name, arr, dtype=None):
         cp.save(join(savePath, name + '.npy'), arr.astype(dtype or arr.dtype))
 
