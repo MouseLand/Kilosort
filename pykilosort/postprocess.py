@@ -912,23 +912,23 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
             _save('similar_templates.npy', similarTemplates)
 
         ir.est_contam_rate[np.isnan(ir.est_contam_rate)] = 1
-        with open(join(savePath, 'cluster_KSLabel.tsv'), 'w') as f:
-            f.write('cluster_id\tKSLabel\n')
+        with open(join(savePath, 'cluster_group.tsv'), 'w') as f:
+            f.write('cluster_id\tgroup\n')
             for j in range(len(ir.good)):
                 if ir.good[j]:
-                    f.write('%d\tgood' % j)
+                    f.write('%d\tgood\n' % j)
                 else:
-                    f.write('%d\tmua' % j)
+                    f.write('%d\tmua\n' % j)
 
         with open(join(savePath, 'cluster_ContamPct.tsv'), 'w') as f:
             f.write('cluster_id\tContamPct\n')
             for j in range(len(ir.good)):
-                f.write('%d\t%.1f' % (j, 100 * ir.est_contam_rate[j]))
+                f.write('%d\t%.1f\n' % (j, 100 * ir.est_contam_rate[j]))
 
         with open(join(savePath, 'cluster_Amplitude.tsv'), 'w') as f:
             f.write('cluster_id\tAmplitude\n')
             for j in range(len(ir.good)):
-                f.write('%d\t%.1f' % (j, tempAmps[j]))
+                f.write('%d\t%.1f\n' % (j, tempAmps[j]))
 
         # make params file
         if not os.path.exists(join(savePath, 'params.py')):

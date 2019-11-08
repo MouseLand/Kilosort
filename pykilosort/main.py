@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 
 import numpy as np
-from tqdm import tqdm
 
 from .preprocess import preprocess, get_good_channels, get_whitening_matrix, get_Nbatch
 from .cluster import clusterSingleBatches
@@ -10,9 +9,6 @@ from .learn import learnAndSolve8b
 from .postprocess import find_merges, splitAllClusters, set_cutoff, rezToPhy
 from .utils import Bunch, Context
 from .default_params import default_params, set_dependent_params
-
-import numpy as np
-import cupy as cp
 
 logger = logging.getLogger(__name__)
 
