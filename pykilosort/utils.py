@@ -30,6 +30,23 @@ def p(x):
     print(x[-2:, -2:])
 
 
+def _extend(x, i0, i1, val, axis=0):
+    """Extend an array along a dimension and fill it with some values."""
+    shape = x.shape
+    if x.shape[axis] < i1:
+        s = list(x.shape)
+        s[axis] = i1 - s[axis]
+        x = cp.concatenate((x, cp.zeros(tuple(s), dtype=x.dtype, order='F')), axis=axis)
+        assert x.shape[axis] == i1
+    s = [slice(None, None, None)] * x.ndim
+    s[axis] = slice(i0, i1, 1)
+    x[s] = val
+    for i in range(x.ndim):
+        if i != axis:
+            assert x.shape[i] == shape[i]
+    return x
+
+
 def is_fortran(x):
     if isinstance(x, np.ndarray):
         return x.flags.f_contiguous
