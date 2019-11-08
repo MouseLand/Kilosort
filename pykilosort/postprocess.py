@@ -84,8 +84,8 @@ def ccg_slow(st1, st2, nbins, tbin):
     # compare to the other shoulder
     Q01 = max(Q01, cp.sum(K[irange3]) / (len(irange3) * tbin * N1 * N2 / T))
 
-    R00 = max(cp.mean(K[irange2]), cp.mean(K[irange3]))  # take the biggest shoulder
-    R00 = max(R00, cp.mean(K[irange1]))  # compare this to the asymptotic shoulder
+    R00 = max(mean(K[irange2]), mean(K[irange3]))  # take the biggest shoulder
+    R00 = max(R00, mean(K[irange1]))  # compare this to the asymptotic shoulder
 
     # test the probability that a central area in the autocorrelogram might be refractory
     # test increasingly larger areas of the central CCG
@@ -378,6 +378,7 @@ def splitAllClusters(ctx, flag):
     Nchan = ctx.probe.Nchan
 
     wPCA = cp.asarray(ir.wPCA)  # use PCA projections to reconstruct templates when we do splits
+    assert wPCA.shape[1] == 3
 
     # this is the threshold for splits, and is one of the main parameters users can change
     ccsplit = params.AUCsplit
@@ -426,7 +427,7 @@ def splitAllClusters(ctx, flag):
 
         clp0 = cp.asarray(ir.cProjPC)[isp, :, :]  # get the PC projections for these spikes
         clp0 = clp0.reshape((clp0.shape[0], -1), order='F')
-        clp = clp0 - cp.mean(clp0, axis=0)  # mean center them
+        clp = clp0 - mean(clp0, axis=0)  # mean center them
 
         # (DEV_NOTES) Python flattens clp0 in C order rather than Fortran order so the
         # flattened PC projections will be slightly different, however this is fixed when
@@ -442,7 +443,7 @@ def splitAllClusters(ctx, flag):
             u, s, v = svdecon(clp.T)
             w = u[:, 0]  # initialize with the top PC
         else:
-            w = cp.mean(clp0, axis=0)  # initialize with the mean of NOT drift-corrected trace
+            w = mean(clp0, axis=0)  # initialize with the mean of NOT drift-corrected trace
             w = w / cp.sum(w ** 2) ** 0.5  # unit-normalize
 
         # initial projections of waveform PCs onto 1D vector
@@ -473,11 +474,11 @@ def splitAllClusters(ctx, flag):
             rs = cp.exp(logp)  # exponentiate the probabilities
 
             pval = cp.log(cp.sum(rs, axis=1)) + lMax  # get the normalizer and add back the max
-            logP[k] = cp.mean(pval)  # this is the cost function: we can monitor its increase
+            logP[k] = mean(pval)  # this is the cost function: we can monitor its increase
 
             rs = rs / cp.sum(rs, axis=1)[:, cp.newaxis]  # normalize so that probabilities sum to 1
 
-            p = cp.mean(rs[:, 0])  # mean probability to be assigned to Gaussian 1
+            p = mean(rs[:, 0])  # mean probability to be assigned to Gaussian 1
             # new estimate of mean of cluster 1 (weighted by "responsibilities")
             mu1 = cp.dot(rs[:, 0], x) / cp.sum(rs[:, 0])
             # new estimate of mean of cluster 2 (weighted by "responsibilities")
@@ -500,11 +501,13 @@ def splitAllClusters(ctx, flag):
                 w = w / cp.sum(w ** 2) ** 0.5  # which we unit normalize
                 x = cp.dot(clp, w)
 
-        ilow = rs[:, 0] > rs[:, 1]  # these spikes are assigned to cluster 1
-        plow = cp.mean(rs[:, 0][ilow])  # the mean probability of spikes assigned to cluster 1
-        phigh = cp.mean(rs[:, 1][~ilow])  # same for cluster 2
+        # these spikes are assigned to cluster 1
+        ilow = rs[:, 0] > rs[:, 1]
+        # the mean probability of spikes assigned to cluster 1
+        plow = mean(rs[:, 0][ilow])
+        phigh = mean(rs[:, 1][~ilow])  # same for cluster 2
         # the smallest cluster has this proportion of all spikes
-        nremove = min(cp.mean(ilow), cp.mean(~ilow))
+        nremove = min(mean(ilow), mean(~ilow))
 
         # did this split fix the autocorrelograms?
         # compute the cross-correlogram between spikes in the putative new clusters
@@ -520,11 +523,11 @@ def splitAllClusters(ctx, flag):
 
         # now decide if the split would result in waveforms that are too similar
         # the reconstructed mean waveforms for putative cluster 1
-        # c1 = cp.matmul(wPCA, cp.reshape((cp.mean(clp0[ilow, :], 0), 3, -1), order='F'))
-        c1 = cp.matmul(wPCA, cp.mean(clp0[ilow, :], 0).reshape((3, -1), order='F'))
+        # c1 = cp.matmul(wPCA, cp.reshape((mean(clp0[ilow, :], 0), 3, -1), order='F'))
+        c1 = cp.matmul(wPCA, mean(clp0[ilow, :], 0).reshape((3, -1), order='F'))
         # the reconstructed mean waveforms for putative cluster 2
-        # c2 = cp.matmul(wPCA, cp.reshape((cp.mean(clp0[~ilow, :], 0), 3, -1), order='F'))
-        c2 = cp.matmul(wPCA, cp.mean(clp0[~ilow, :], 0).reshape((3, -1), order='F'))
+        # c2 = cp.matmul(wPCA, cp.reshape((mean(clp0[~ilow, :], 0), 3, -1), order='F'))
+        c2 = cp.matmul(wPCA, mean(clp0[~ilow, :], 0).reshape((3, -1), order='F'))
 
         cc = cp.corrcoef(c1, c2)  # correlation of mean waveforms
         n1 = sqrt(cp.sum(c1 ** 2))  # the amplitude estimate 1
@@ -747,7 +750,7 @@ def set_cutoff(ctx):
 
     # (DEV_NOTES) 0 cluster may change if clusters switch to 0-indexing
 
-    ix = st3[:, 1] == 0
+    ix = st3[:, 1] == -1
 
     # (DEV_NOTES) "empty" values in code below needs checking before it can be used, in Matlab code
     #              [] is used for all cases, here I use cp.nan
