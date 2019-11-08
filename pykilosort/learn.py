@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from .cptools import svdecon, svdecon_cpu, median, free_gpu_memory, ones
 from .cluster import isolated_peaks_new, get_SpikeSample, getClosestChannels
-from .utils import get_cuda, _extend, p
+from .utils import get_cuda, _extend
 
 logger = logging.getLogger(__name__)
 
