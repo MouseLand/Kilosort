@@ -53,6 +53,11 @@ def get_lfilter_kernel(N, isfortran, reverse=False):
 
         // Column index.
         int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+
+        // IMPORTANT: avoid out of bounds memory accesses, which cause no errors but weird bugs.
+        if (col >= n_channels) return;
+
         for (int n = 0; n < n_samples; n++) {
             idx = get_idx_%s(%s, col, n_samples, n_channels);
             // Load the input element.
@@ -95,10 +100,14 @@ def lfilter(b, a, arr, axis=0, reverse=False):
 
     lfilter = make_kernel(kernel, 'lfilter', b=b, a=a)
 
-    arr = cp.asarray(arr, dtype=np.float32)
+    arr = cp.asarray(arr, order='F', dtype=np.float32)
     y = cp.zeros_like(arr, order='F' if cp.isfortran(arr) else 'C', dtype=arr.dtype)
 
-    lfilter(grid, block, (arr, y, y.shape[0], y.shape[1]))
+    assert arr.dtype == np.float32
+    assert y.dtype == np.float32
+    assert arr.shape == y.shape
+
+    lfilter(grid, block, (arr, y, int(y.shape[0]), int(y.shape[1])))
 
     return y
 

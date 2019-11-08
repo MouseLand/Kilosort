@@ -240,9 +240,9 @@ def get_whitening_matrix(raw_data=None, probe=None, params=None):
         # apply filters and median subtraction
         datr = gpufilter(buff_g, fs=fs, fshigh=fshigh, chanMap=chanMap)
 
-        CC += cp.dot(datr.T, datr) / NT  # sample covariance
+        CC = CC + cp.dot(datr.T, datr) / NT  # sample covariance
 
-    CC /= ceil((Nbatch - 1) / nSkipCov)
+    CC = CC / ceil((Nbatch - 1) / nSkipCov)
 
     if whiteningRange < np.inf:
         #  if there are too many channels, a finite whiteningRange is more robust to noise
@@ -254,7 +254,7 @@ def get_whitening_matrix(raw_data=None, probe=None, params=None):
     else:
         Wrot = whiteningFromCovariance(CC)
 
-    Wrot *= scaleproc
+    Wrot = Wrot * scaleproc
 
     logger.info("Computed the whitening matrix.")
 
@@ -302,7 +302,7 @@ def get_good_channels(raw_data=None, probe=None, params=None):
 
         # very basic threshold crossings calculation
         s = cp.std(datr, axis=0)
-        datr /= s  # standardize each channel ( but don't whiten)
+        datr = datr / s  # standardize each channel ( but don't whiten)
         mdat = my_min(datr, 30, 0)  # get local minima as min value in +/- 30-sample range
 
         # take local minima that cross the negative threshold
@@ -366,6 +366,8 @@ def preprocess(ctx):
     NT = params.NT
     NTbuff = params.NTbuff
 
+    Wrot = cp.asarray(ir.Wrot)
+
     logger.info("Loading raw data and applying filters.")
 
     with open(ir.proc_path, 'wb') as fw:  # open for writing processed data
@@ -399,7 +401,7 @@ def preprocess(ctx):
             datr = gpufilter(buff, chanMap=probe.chanMap, fs=fs, fshigh=fshigh, fslow=fslow)
 
             datr = datr[ioffset:ioffset + NT, :]  # remove timepoints used as buffers
-            datr = cp.dot(datr, ir.Wrot)  # whiten the data and scale by 200 for int16 range
+            datr = cp.dot(datr, Wrot)  # whiten the data and scale by 200 for int16 range
 
             # convert to int16, and gather on the CPU side
             datcpu = cp.asnumpy(datr).astype(np.int16)

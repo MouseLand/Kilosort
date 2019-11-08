@@ -152,7 +152,7 @@ class Context(Bunch):
                 v = cp.asnumpy(v)
             if isinstance(v, np.ndarray):
                 logger.debug("Saving %s.npy", k)
-                np.save(self.path(k), v)
+                np.save(self.path(k), np.asfortranarray(v))
             elif v is not None:
                 logger.debug("Save %s in the metadata.json file.", k)
                 metadata[k] = v
