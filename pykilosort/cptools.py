@@ -169,8 +169,15 @@ def free_gpu_memory():
 # Work around CuPy bugs and limitations
 # -----------------------------------------------------------------------------
 
-def mean(x, *args, **kwargs):
-    return cp.mean(x) if x.size else cp.nan
+def mean(x, axis=0):
+    if x.ndim == 1:
+        return cp.mean(x) if x.size else cp.nan
+    else:
+        s = list(x.shape)
+        del s[axis]
+        return (
+            cp.mean(x, axis=axis) if x.shape[axis] > 0
+            else cp.zeros(s, dtype=x.dtype, order='F'))
 
 
 def median(a, axis=0):
