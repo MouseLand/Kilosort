@@ -909,8 +909,8 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
             for j in range(len(ir.good)):
                 if ir.good[j]:
                     f.write('%d\tgood\n' % j)
-                else:
-                    f.write('%d\tmua\n' % j)
+                # else:
+                #     f.write('%d\tmua\n' % j)
 
         with open(join(savePath, 'cluster_ContamPct.tsv'), 'w') as f:
             f.write('cluster_id\tContamPct\n')

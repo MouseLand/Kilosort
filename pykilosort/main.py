@@ -131,7 +131,7 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #
     if 'st3' not in ir:
         learnAndSolve8b(ctx)
-    logger.info("%d spikes.", ir.st3.shape[0])
+        logger.info("%d spikes.", ir.st3.shape[0])
 
     # -------------------------------------------------------------------------
     # Final merges.
@@ -166,7 +166,6 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
         splitAllClusters(ctx, True)
         # final splits by amplitudes
         splitAllClusters(ctx, False)
-    logger.info("%d spikes after split.", ir.st3_after_split.shape[0])
 
     # -------------------------------------------------------------------------
     # Decide on cutoff.

@@ -775,7 +775,7 @@ def learnAndSolve8b(ctx):
         st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp = mexMPnu8(
             Params, dataRAW, U, W, mu, iC, iW, UtU, iList, wPCA)
 
-        logger.debug("Iter %d/%d, %d spikes.", ibatch, niter, x0.size)
+        logger.debug("%d spikes.", x0.size)
 
         # Sometimes nsp can get transposed (think this has to do with it being
         # a single element in one iteration, to which elements are added
