@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from .cptools import svdecon, svdecon_cpu, median, free_gpu_memory, ones
 from .cluster import isolated_peaks_new, get_SpikeSample, getClosestChannels
-from .utils import get_cuda
+from .utils import get_cuda, _extend, p
 
 logger = logging.getLogger(__name__)
 
@@ -125,16 +125,6 @@ def getKernels(params):
     return A.astype(np.float64), B.astype(np.float64)
 
 
-def memorizeW(W, U, mu):
-    Wraw = cp.zeros((U.shape[0], W.shape[0], U.shape[1]), dtype=np.float64, order='F')
-
-    for n in range(U.shape[1]):
-        # temporarily use U rather Urot until I have a chance to test it
-        Wraw[:, :, n] = mu[n] * cp.dot(U[:, n, :], W[:, n, :].T)
-
-    return Wraw
-
-
 def getMeUtU(iU, iC, mask, Nnearest, Nchan):
     # function [UtU, maskU, iList] = getMeUtU(iU, iC, mask, Nnearest, Nchan)
     # this function determines if two templates share any channels
@@ -146,11 +136,12 @@ def getMeUtU(iU, iC, mask, Nnearest, Nchan):
     Nfilt = iU.size
 
     # create a sparse matrix with ones if a channel K belongs to a template
-    U = cp.zeros((Nchan, Nfilt), dtype=np.float32, order='F')
+    U = np.zeros((Nchan, Nfilt), dtype=np.float32, order='F')
 
     # use the template primary channel to obtain its neighboring channels from iC
-    ix = iC[:, iU] + cp.arange(0, Nchan * Nfilt, Nchan).astype(np.int32)
-    U[ix] = 1  # use this as an awkward index into U
+    ix = cp.asnumpy(iC[:, iU]) + np.arange(0, Nchan * Nfilt, Nchan).astype(np.int32)
+    # WARNING: transpose because the indexing assumes F ordering.
+    U.T.flat[ix] = 1  # use this as an awkward index into U
 
     # if this is 0, the templates had not pair of channels in common
     UtU = (cp.dot(U.T, U) > 0).astype(np.int32)
@@ -159,11 +150,11 @@ def getMeUtU(iU, iC, mask, Nnearest, Nchan):
     # their primary channel
     maskU = mask[:, iU]
 
-    # sort template pairs in order of how many channels they share
-    isort = cp.argsort(UtU, axis=0)[::-1]
-    iList = isort[:Nnearest, :]  # take the Nnearest templates for each template
+    # # sort template pairs in order of how many channels they share
+    # isort = cp.argsort(UtU, axis=0)[::-1]
+    # iList = isort[:Nnearest, :]  # take the Nnearest templates for each template
 
-    return UtU, maskU, iList
+    return UtU, maskU  # , iList
 
 
 def getMeWtW2(W, U0, Nnearest=None):
@@ -291,17 +282,6 @@ def mexSVDsmall2(Params, dWU, W, iC, iW, Ka, Kb):
     nt0 = int(Params[4])
     Nrank = int(Params[6])
     Nchan = int(Params[9])
-
-    # print("Nfilt", Nfilt)
-    # print("nt0", nt0)
-    # print("Nrank", Nrank)
-    # print("Nchan", Nchan)
-    # print("dWU", dWU.shape)
-    # print("W", W.shape)
-    # print("iC", iC.shape)
-    # print("iW", iW.shape)
-    # print("Ka", Ka.shape)
-    # print("Kb", Kb.shape)
 
     d_Params = cp.asarray(Params, dtype=np.float64, order='F')
 
@@ -624,9 +604,6 @@ def learnAndSolve8b(ctx):
     wTEMP = cp.asarray(wTEMP, dtype=np.float32, order='F')
     wPCAd = cp.asarray(wPCA, dtype=np.float64, order='F')  # convert to double for extra precision
 
-    if 'wPCA' not in ir:
-        ctx.save(wPCA=wPCA, wTEMP=wTEMP)
-
     nt0 = params.nt0
     nt0min = params.nt0min
     nBatches = Nbatch
@@ -726,6 +703,7 @@ def learnAndSolve8b(ctx):
         korder = int(irounds[ibatch])
         # k is the index of the batch in absolute terms
         k = int(isortbatches[korder])
+        logger.debug("Batch %d/%d, %d spikes, %d templates.", ibatch, niter, ntot, Nfilt)
 
         if ibatch > niter - nBatches - 1 and korder == nhalf:
             # this is required to revert back to the template states in the middle of the
@@ -759,11 +737,9 @@ def learnAndSolve8b(ctx):
             # initialize the low-rank decomposition with standard waves
             W = W0[:, cp.ones(dWU.shape[2], dtype=np.int32), :]
             Nfilt = W.shape[1]  # update the number of filters/templates
-            if nsp.size < Nfilt:
-                nsp = cp.zeros(Nfilt, dtype=np.float64, order='F')
             # initialize the number of spikes for new templates with the minimum allowed value,
             # so it doesn't get thrown back out right away
-            nsp[:Nfilt] = m0
+            nsp = _extend(nsp, 0, Nfilt, m0)
             Params[1] = Nfilt  # update in the CUDA parameters
 
         if flag_resort:
@@ -788,7 +764,7 @@ def learnAndSolve8b(ctx):
         # it tells us which pairs of templates are likely to "interfere" with each other
         # such as when we subtract off a template
         # this needs to change (but I don't know why!)
-        UtU, maskU, _ = getMeUtU(iW, iC, mask, Nnearest, Nchan)
+        UtU, maskU = getMeUtU(iW, iC, mask, Nnearest, Nchan)
 
         # main CUDA function in the whole codebase. does the iterative template matching
         # based on the current templates, gets features for these templates if requested
@@ -798,6 +774,8 @@ def learnAndSolve8b(ctx):
         # and probably a few more things I forget about
         st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp = mexMPnu8(
             Params, dataRAW, U, W, mu, iC, iW, UtU, iList, wPCA)
+
+        logger.debug("Iter %d/%d, %d spikes.", ibatch, niter, x0.size)
 
         # Sometimes nsp can get transposed (think this has to do with it being
         # a single element in one iteration, to which elements are added
@@ -851,6 +829,7 @@ def learnAndSolve8b(ctx):
             Params[2] = params.Th[-1]  # usually the threshold is much lower on the last pass
 
             # memorize the state of the templates
+            logger.debug("Memorized middle timepoint.")
             ir.W, ir.dWU, ir.U, ir.mu = W, dWU, U, mu
             ir.Wraw = cp.zeros(
                 (U.shape[0], W.shape[0], U.shape[1]), dtype=np.float64, order='F')
@@ -882,20 +861,13 @@ def learnAndSolve8b(ctx):
                 dWU = cp.concatenate((dWU, dWU0), axis=2)
 
                 m = dWU0.shape[2]
-
-                if W.shape[1] < Nfilt + m:
-                    W = cp.concatenate(
-                        (W, cp.zeros(
-                            (W.shape[0], Nfilt + m - W.shape[1], W.shape[2]),
-                            dtype=W.dtype)), axis=1)
-
                 # initialize temporal components of waveforms
-                W[:, Nfilt:Nfilt + m, :] = W0[:, cp.ones(m, dtype=np.int32), :]
+                W = _extend(W, Nfilt, Nfilt + m, W0[:, cp.ones(m, dtype=np.int32), :], axis=1)
 
                 # initialize the number of spikes with the minimum allowed
-                nsp[Nfilt:Nfilt + m] = params.minFR * NT / params.fs
+                nsp = _extend(nsp, Nfilt, Nfilt + m, params.minFR * NT / params.fs)
                 # initialize the amplitude of this spike with a lowish number
-                mu[Nfilt:Nfilt + m] = 10
+                mu = _extend(mu, Nfilt, Nfilt + m, 10)
 
                 # if the number of filters exceed the maximum allowed, clip it
                 Nfilt = min(params.Nfilt, W.shape[1])
@@ -907,7 +879,7 @@ def learnAndSolve8b(ctx):
                 mu = mu[:Nfilt]  # remove any new filters over the maximum allowed
 
         if ibatch > niter - nBatches - 1:
-            # during the final extraction pass, this keesp track of all spikes and features
+            # during the final extraction pass, this keeps track of all spikes and features
 
             # we memorize the spatio-temporal decomposition of the waveforms at this batch
             # this is currently only used in the GUI to provide an accurate reconstruction
@@ -921,17 +893,8 @@ def learnAndSolve8b(ctx):
             if k == 0:
                 ioffset = 0  # the first batch is special (no pre-buffer)
 
-            toff = nt0min + t0 - ioffset + (NT - params.ntbuff) * (k - 1)
+            toff = nt0min + t0 - ioffset + (NT - params.ntbuff) * k
             st = toff + st0
-
-            # irange = np.arange(ntot, ntot+x0.size)  # spikes and features go into
-            # these indices
-
-        #         if ntot + x0.size > st3.shape[0]:
-        #            # if we exceed the original allocated memory, double the allocated sizes
-        #            fW[:, 2 * st3.shape[0]] = 0
-        #            fWpc[:, :, 2 * st3.shape[0]] = 0
-        #            st3[2 * st3.shape[0] - 1, 0] = 0
 
             st30 = np.c_[
                 cp.asnumpy(st),  # spike times
@@ -943,38 +906,16 @@ def learnAndSolve8b(ctx):
             # Number of spikes.
             assert st30.shape[0] == featW.shape[1] == featPC.shape[2]
             st3.append(st30)
-        #         st3[irange, 1] = id0  # spike clusters (1-indexing)
-        #         st3[irange, 2] = x0  # template amplitudes
-        #         st3[irange, 3] = vexp  # residual variance of this spike
-        #         st3[irange, 4] = korder  # batch from which this spike was found
-
-        #         fW[:, irange] = featW  # template features for this batch
-        #         fWpc[:, :, irange] = featPC  # PC features
             fW.append(cp.asnumpy(featW))
             fWpc.append(cp.asnumpy(featPC))
 
             ntot = ntot + x0.size  # keeps track of total number of spikes so far
 
         if ibatch == niter - nBatches - 1:
-            # # allocate variables when switching to extraction phase
-            # # this holds spike times, clusters and other info per spike
-            # st3 = []  # cp.zeros((int(1e7), 5), dtype=np.float32, order='F')
-
             # these next three store the low-d template decompositions
             ir.WA = np.zeros((nt0, Nfilt, Nrank, nBatches), dtype=np.float32, order='F')
             ir.UA = np.zeros((Nchan, Nfilt, Nrank, nBatches), dtype=np.float32, order='F')
             ir.muA = np.zeros((Nfilt, nBatches), dtype=np.float32, order='F')
-
-            # # these next three store the low-d template decompositions
-            # ir.WA = []  # zeros(nt0, Nfilt, Nrank,nBatches,  'single')
-            # ir.UA = []  # zeros(Nchan, Nfilt, Nrank,nBatches,  'single')
-            # ir.muA = []  # zeros(Nfilt, nBatches,  'single')
-
-            # # these ones store features per spike
-            # # Nnearest is the number of nearest templates to store features for
-            # fW = []  # zeros(Nnearest, 1e7, 'single')
-            # # NchanNear is the number of nearest channels to take PC features from
-            # fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
 
         if ibatch % 100 == 0:
             # this is some of the relevant diagnostic information to be printed during training
@@ -982,11 +923,6 @@ def learnAndSolve8b(ctx):
                 ('%d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, '
                     'nst0: %d, merges: %2.4f, %2.4f'),
                 ibatch, niter, Nfilt, nsp.sum(), median(mu), st0.size, *ndrop)
-
-        # discards the unused portion of the arrays
-        #st3 = st3(1:ntot, :)
-        #fW = fW(:, 1:ntot)
-        #fWpc = fWpc(:,:, 1:ntot)
 
         free_gpu_memory()
 
@@ -1018,6 +954,8 @@ def learnAndSolve8b(ctx):
 
     # These are the variables set by the code above:
     ctx.save(
+        wPCA=wPCA[:, :Nrank],
+        wTEMP=wTEMP,
         st3=ir.st3,
         simScore=ir.simScore,
         cProj=ir.cProj,
