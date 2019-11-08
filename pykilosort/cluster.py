@@ -155,10 +155,13 @@ def sortBatches2(ccb0):
     # ccb1 = ccb0(isort, isort)
 
     # put this matrix on the GPU
-    ccb0 = cp.asarray(ccb0)
+    ccb0 = cp.asarray(ccb0, order='F')
 
     # compute its svd on the GPU (this might also be fast enough on CPU)
     u, s, v = svdecon(ccb0)
+    # HACK: consistency with MATLAB
+    u = u * cp.sign(u[0, 0])
+    v = v * cp.sign(u[0, 0])
 
     # initialize the positions xs of the batch embeddings to be very small but proportional to
     # the first PC
@@ -180,7 +183,7 @@ def sortBatches2(ccb0):
         err = ccb0 - W
 
         # ignore the mean value of ccb0
-        err = err - cp.mean(err)
+        err = err - cp.mean(err, axis=0)
 
         # backpropagate the gradients
         err = err / (1 + ds)
