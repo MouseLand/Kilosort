@@ -146,7 +146,6 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #
     if 'st3_after_merges' not in ir:
         find_merges(ctx, True)
-    logger.info("%d spikes after merge.", ir.st3_after_merges.shape[0])
 
     # -------------------------------------------------------------------------
     # Final splits.

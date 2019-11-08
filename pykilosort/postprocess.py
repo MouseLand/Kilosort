@@ -746,15 +746,8 @@ def set_cutoff(ctx):
 
     ir.est_contam_rate[cp.isnan(ir.est_contam_rate)] = 1
 
-    # remove spikes assigned to the 0 cluster
-
-    # (DEV_NOTES) 0 cluster may change if clusters switch to 0-indexing
-
+    # remove spikes assigned to the -1 cluster
     ix = st3[:, 1] == -1
-
-    # (DEV_NOTES) "empty" values in code below needs checking before it can be used, in Matlab code
-    #              [] is used for all cases, here I use cp.nan
-
     st3 = st3[~ix, :]
 
     if len(ir.cProj) > 0:
@@ -906,9 +899,9 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
         _save('whitening_mat', whiteningMatrix)
         _save('whitening_mat_inv', whiteningMatrixInv)
 
-        if 'SimScore' in ir:
-            similarTemplates = ir.SimScore
-            _save('similar_templates.npy', similarTemplates)
+        if 'simScore' in ir:
+            similarTemplates = ir.simScore
+            _save('similar_templates', similarTemplates)
 
         ir.est_contam_rate[np.isnan(ir.est_contam_rate)] = 1
         with open(join(savePath, 'cluster_group.tsv'), 'w') as f:

@@ -703,7 +703,7 @@ def learnAndSolve8b(ctx):
         korder = int(irounds[ibatch])
         # k is the index of the batch in absolute terms
         k = int(isortbatches[korder])
-        logger.debug("Batch %d/%d, %d spikes, %d templates.", ibatch, niter, ntot, Nfilt)
+        logger.debug("Batch %d/%d, %d templates.", ibatch, niter, Nfilt)
 
         if ibatch > niter - nBatches - 1 and korder == nhalf:
             # this is required to revert back to the template states in the middle of the
