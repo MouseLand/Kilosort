@@ -1,4 +1,4 @@
-from math import erf, log, sqrt
+from math import erf, log as log_, sqrt
 import logging
 import os
 from os.path import join
@@ -17,6 +17,12 @@ from .learn import getKernels, getMeWtW, mexSVDsmall2
 from .preprocess import my_conv2
 
 logger = logging.getLogger(__name__)
+
+
+def log(x):
+    if x == 0:
+        return -np.inf
+    return log_(x)
 
 
 def ccg_slow(st1, st2, nbins, tbin):
@@ -209,17 +215,20 @@ def _ccg(st1, st2, nbins, tbin):
         Qi[i - 1] = Qi0  # save the normalised probability
 
         n = np.sum(K[irange]) / 2
-        # lam = R00 * i
-        # NOTE: make sure lam is not zero to avoid divide by zero error
-        lam = max(1e-10, R00 * i)
+        lam = R00 * i
+        if lam == 0:
+            p = np.nan
+        else:
+            # NOTE: make sure lam is not zero to avoid divide by zero error
+            # lam = max(1e-10, R00 * i)
 
-        # log(p) = log(lam) * n - lam - gammaln(n+1)
+            # log(p) = log(lam) * n - lam - gammaln(n+1)
 
-        # this is tricky: we approximate the Poisson likelihood with a gaussian of equal mean and
-        # variance that allows us to integrate the probability that we would see <N spikes in the
-        # center of the cross-correlogram from a distribution with mean R00*i spikes
+            # this is tricky: we approximate the Poisson likelihood with a gaussian of equal mean and
+            # variance that allows us to integrate the probability that we would see <N spikes in the
+            # center of the cross-correlogram from a distribution with mean R00*i spikes
 
-        p = 1 / 2 * (1 + erf((n - lam) / sqrt(2 * lam)))
+            p = 1 / 2 * (1 + erf((n - lam) / sqrt(2 * lam)))
 
         Ri[i - 1] = p  # keep track of p for each bin size i
 
