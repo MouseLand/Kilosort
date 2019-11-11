@@ -70,8 +70,11 @@ The Python version makes the distinction beteween:
 - `raw_data`: a NumPy-like object of shape `(n_samples, n_channels_total)`
 - `probe`: a Bunch instance (dictionary) with the channel coordinates, the indices of the "good channels"
 - `params`: a Bunch instance (dictionary) with optional user-defined parameters. It can be empty. Any missing parameter is transparently replaced by the default as found in `default_params.py` file in the repository.
+- `intermediate`: a Bunch instance (dictionary) with intermediate arrays.
 
-These objects are accessible via the *context* (`ctx`) which replaces the MATLAB `rez` object: `ctx.raw_data`, etc. This context also stores a special object called `ctx.intermediate` which stores intermediate arrays. This object derives from `Bunch` and implements special methods to save and load arrays in a temporary folder. By default, an intermediate array called `ctx.intermediate.myarray` is stored in `./.kilosort/context/myarray.npy`.
+These objects are accessible via the *context* (`ctx`) which replaces the MATLAB `rez` object: `ctx.raw_data`, etc.
+
+This context also stores a special object called `ctx.intermediate` which stores intermediate arrays. This object derives from `Bunch` and implements special methods to save and load arrays in a temporary folder. By default, an intermediate result called `ctx.intermediate.myarray` is stored in `./.kilosort/context/myarray.npy`.
 
 The main `run()` function checks the existence of some of these intermediate arrays to skip some steps that might have run already, for a given dataset.
 
