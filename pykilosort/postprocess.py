@@ -441,6 +441,7 @@ def splitAllClusters(ctx, flag):
 
         if flag:
             u, s, v = svdecon(clp.T)
+            u, v = -u, -v  # change sign for consistency with MATLAB
             w = u[:, 0]  # initialize with the top PC
         else:
             w = mean(clp0, axis=0)  # initialize with the mean of NOT drift-corrected trace
@@ -466,8 +467,8 @@ def splitAllClusters(ctx, flag):
 
         for k in range(50):
             # for each spike, estimate its probability to come from either Gaussian cluster
-            logp[:, 0] = -1 / 2 * log(s1) - ((x - mu1) ** 2) / (2 * s1) + log(p)
-            logp[:, 1] = -1 / 2 * log(s2) - ((x - mu2) ** 2) / (2 * s2) + log(1 - p)
+            logp[:, 0] = -1. / 2 * log(s1) - ((x - mu1) ** 2) / (2 * s1) + log(p)
+            logp[:, 1] = -1. / 2 * log(s2) - ((x - mu2) ** 2) / (2 * s2) + log(1 - p)
 
             lMax = logp.max(axis=1)
             logp = logp - lMax[:, cp.newaxis]  # subtract the max for floating point accuracy
@@ -529,7 +530,7 @@ def splitAllClusters(ctx, flag):
         # c2 = cp.matmul(wPCA, cp.reshape((mean(clp0[~ilow, :], 0), 3, -1), order='F'))
         c2 = cp.matmul(wPCA, mean(clp0[~ilow, :], 0).reshape((3, -1), order='F'))
 
-        cc = cp.corrcoef(c1, c2)  # correlation of mean waveforms
+        cc = cp.corrcoef(c1.ravel(), c2.ravel())  # correlation of mean waveforms
         n1 = sqrt(cp.sum(c1 ** 2))  # the amplitude estimate 1
         n2 = sqrt(cp.sum(c2 ** 2))  # the amplitude estimate 2
 

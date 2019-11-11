@@ -151,13 +151,14 @@ def my_conv2(S1, sig, varargin=None):
         tmax = ceil(4 * sig)
         dt = np.arange(-tmax, tmax + 1)
         gaus = np.exp(-dt ** 2 / (2 * sig ** 2))
-        gaus = gaus / np.sum(gaus)
+        gaus = gaus[:, np.newaxis] / np.sum(gaus)
 
         cNorm = lfilter(
             gaus, 1, cp.concatenate((cp.ones(dsnew2[0]), cp.zeros(tmax)))[:, np.newaxis], axis=0)
         cNorm = cNorm[tmax:, :]
         S1 = lfilter(
-            gaus, 1, cp.concatenate((S1, cp.zeros((tmax, dsnew2[1]), order='F')), axis=0), axis=0)
+            gaus, 1, cp.asfortranarray(cp.concatenate(
+                (S1, cp.zeros((tmax, dsnew2[1]), order='F')), axis=0)), axis=0)
         S1 = S1[tmax:, :]
         S1 = S1.reshape(dsnew, order='F')
         S1 = S1 / cNorm

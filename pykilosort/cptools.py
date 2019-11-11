@@ -222,8 +222,8 @@ def median(a, axis=0):
     return cp.mean(part[indexer], axis=axis)
 
 
-def var(x, *args, **kwargs):
-    return cp.var(x) if x.size > 0 else cp.nan
+def var(x):
+    return cp.var(x, ddof=1) if x.size > 0 else cp.nan
 
 
 def ones(shape, dtype=None, order=None):

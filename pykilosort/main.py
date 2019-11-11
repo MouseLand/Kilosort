@@ -123,9 +123,9 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     # This function saves:
     #
     #         wPCA, wTEMP
-    #         st3, simScore
-    #         cProj, cProjPC
-    #         iNeigh, iNeighPC
+    #         st3, simScore,
+    #         cProj, cProjPC,
+    #         iNeigh, iNeighPC,
     #         WA, UA, W, U, dWU, mu,
     #         W_a, W_b, U_a, U_b
     #
@@ -142,7 +142,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #
     # This function saves:
     #
-    #         R_CCG, Q_CCG, K_CCG
+    #         st3_after_merges,
+    #         R_CCG, Q_CCG, K_CCG [optional]
     #
     if 'st3_after_merges' not in ir:
         find_merges(ctx, True)
@@ -153,7 +154,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     # This function uses:
     #
     #       st3_after_merges
-    #       W, dWU, cProjPC
+    #       W, dWU, cProjPC,
+    #       iNeigh, simScore
     #       wPCA
     #
     # This function saves:
