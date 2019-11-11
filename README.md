@@ -24,11 +24,40 @@ A good CPU and a large amount of RAM (minimum 32GB or 64GB) is also required.
 
 ## Usage example
 
-```python
-from pykilosort import run
+The programming interface is subject to change. The following code example should be saved in a directory, along with the following files:
 
-# TODO
-run(dat_path=dat_path, raw_data=raw_data, probe=probe, params=params)
+* imec_385_100s.bin
+* chanMap.npy (be careful with 0- and 1- indexing discrepancy between MATLAB and Python: don't forget to subtract 1 if this file was used in Kilosort)
+* xc.npy
+* yc.npy
+* kcoords.npy
+
+```python
+from pathlib import Path
+import numpy as np
+
+from pykilosort import add_default_handler, run, Bunch, read_data
+
+add_default_handler(level='DEBUG')
+
+dat_path = Path('imec_385_100s.bin')
+dir_path = dat_path.parent
+
+probe = Bunch()
+probe.NchanTOT = 385
+
+# WARNING: indexing mismatch with MATLAB hence the -1
+probe.chanMap = np.load(dir_path / 'chanMap.npy').squeeze().astype(np.int64) - 1
+
+probe.xc = np.load(dir_path / 'xc.npy').squeeze()
+probe.yc = np.load(dir_path / 'yc.npy').squeeze()
+probe.kcoords = np.load(dir_path / 'kcoords.npy').squeeze()
+
+# The raw data file is loaded in Fortran order, its shape is therefore (n_channels, n_samples).
+raw_data = read_data(dat_path, shape=(probe.NchanTOT, -1), dtype=np.int16)
+
+run(dir_path, raw_data, probe, dat_path=dat_path)
+
 ```
 
 
