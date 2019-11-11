@@ -333,7 +333,7 @@ def find_merges(ctx, flag):
             R = rir.min()
 
             if flag:
-                if (Q < 0.2) and (R < 0.5):  # if both refractory criteria are met
+                if (Q < 0.2) and (R < 0.05):  # if both refractory criteria are met
                     i = ix[k]
                     # now merge j into i and move on
                     # simply overwrite all the spikes of neuron j with i (i>j by construction)
@@ -676,15 +676,13 @@ def set_cutoff(ctx):
     Nk = int(st3[:, 1].max()) + 1  # number of templates
 
     # sort by firing rate first
-
     ir.good = cp.zeros(Nk)
     ir.Ths = cp.zeros(Nk)
-
     ir.est_contam_rate = cp.zeros(Nk)
 
     for j in range(Nk):
-        ix = cp.where(st3[:, 1] == j)[0]
-        ss = st3[ix, 0] / params.fs
+        ix = cp.where(st3[:, 1] == j)[0]  # find all spikes from this neuron
+        ss = st3[ix, 0] / params.fs  # convert to seconds
         if ss.size == 0:
             continue  # break if there are no spikes
 
@@ -693,6 +691,7 @@ def set_cutoff(ctx):
         Th = params.Th[0]  # start with a high threshold
 
         fcontamination = 0.1  # acceptable contamination rate
+        ir.est_contam_rate[j] = 1
 
         while Th > params.Th[1]:
             # continually lower the threshold, while the estimated unit contamination is low
@@ -723,11 +722,11 @@ def set_cutoff(ctx):
                 # this unit is good, because we will stop lowering the threshold when it
                 # becomes bad
                 ir.good[j] = 1
-                Th -= 0.05
+                Th -= 0.5
 
         # we exited the loop because the contamination was too high. We revert to the higher
         # threshold
-        Th += 0.05
+        Th += 0.5
         st = ss[vexp > Th]  # take spikes above the current threshold
         # compute the auto-correlogram with 500 bins at 1ms bins
         K, Qi, Q00, Q01, rir = ccg(st, st, 500, dt)

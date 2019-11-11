@@ -153,7 +153,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     # This function uses:
     #
     #       st3_after_merges
-    #       wPCA, W, dWU, cProjPC
+    #       W, dWU, cProjPC
+    #       wPCA
     #
     # This function saves:
     #
@@ -173,7 +174,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     # This function uses:
     #
     #       st3_after_split
-    #       wPCA, W, dWU, cProjPC
+    #       W, dWU, cProj, cProjPC
+    #       wPCA
     #
     # This function saves:
     #
