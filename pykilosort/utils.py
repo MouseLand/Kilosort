@@ -151,8 +151,10 @@ class Context(Bunch):
             if isinstance(v, cp.ndarray):
                 v = cp.asnumpy(v)
             if isinstance(v, np.ndarray):
-                logger.debug("Saving %s.npy", k)
-                np.save(self.path(k), np.asfortranarray(v))
+                p = self.path(k)
+                overwrite = ' (overwrite)' if p.exists() else ''
+                logger.debug("Saving %s.npy%s", k, overwrite)
+                np.save(p, np.asfortranarray(v))
             elif v is not None:
                 logger.debug("Save %s in the metadata.json file.", k)
                 metadata[k] = v

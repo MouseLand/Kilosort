@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from .preprocess import my_min, my_sum
 from .cptools import svdecon, zscore, ones
-from .utils import get_cuda
+from .utils import Bunch, get_cuda
 
 logger = logging.getLogger(__name__)
 
@@ -566,5 +566,4 @@ def clusterSingleBatches(ctx):
 
     logger.info("Finished clustering.")
 
-    # Write some arrays to the context.intermediate object.
-    ctx.save(iorig=iorig, ccb0=ccb0, ccbsort=ccbsort)
+    return Bunch(iorig=iorig, ccb0=ccb0, ccbsort=ccbsort)

@@ -15,6 +15,7 @@ from .cptools import ones, svdecon, var, mean
 from .cluster import getClosestChannels
 from .learn import getKernels, getMeWtW, mexSVDsmall2
 from .preprocess import my_conv2
+from .utils import Bunch
 
 logger = logging.getLogger(__name__)
 
@@ -224,9 +225,9 @@ def _ccg(st1, st2, nbins, tbin):
 
             # log(p) = log(lam) * n - lam - gammaln(n+1)
 
-            # this is tricky: we approximate the Poisson likelihood with a gaussian of equal mean and
-            # variance that allows us to integrate the probability that we would see <N spikes in the
-            # center of the cross-correlogram from a distribution with mean R00*i spikes
+            # this is tricky: we approximate the Poisson likelihood with a gaussian of equal mean
+            # and variance that allows us to integrate the probability that we would see <N spikes
+            # in the center of the cross-correlogram from a distribution with mean R00*i spikes
 
             p = 1 / 2 * (1 + erf((n - lam) / sqrt(2 * lam)))
 
@@ -280,6 +281,7 @@ def find_merges(ctx, flag):
     # (DEV_NOTES) nbins is not a variable in Marius' code, I include it here to avoid
     # unexplainable, hard-coded constants later
 
+    st3 = cp.asarray(ir.st3)
     Xsim = cp.asarray(ir.simScore)  # this is the pairwise similarity score
     Nk = Xsim.shape[0]
     Xsim = Xsim - cp.diag(cp.diag(Xsim))
@@ -288,9 +290,8 @@ def find_merges(ctx, flag):
     nspk = cp.zeros(Nk)
     for j in range(Nk):
         # determine total number of spikes in each neuron
-        nspk[j] = cp.sum(ir.st3[:, 1] == j)
+        nspk[j] = cp.sum(st3[:, 1] == j)
 
-    ir.st3 = cp.asarray(ir.st3)
     # we traverse the set of neurons in ascending order of firing rates
     isort = cp.argsort(nspk)
 
@@ -299,13 +300,17 @@ def find_merges(ctx, flag):
     if not flag:
         # if the flag is off, then no merges are performed
         # this function is then just used to compute cross- and auto- correlograms
-        ir.R_CCG = cp.inf * ones(Nk, order='F')
-        ir.Q_CCG = cp.inf * ones(Nk, order='F')
-        ir.K_CCG = cp.zeros((*Xsim.shape, 2 * nbins + 1), order='F')
+        R_CCG = cp.inf * ones(Nk, order='F')
+        Q_CCG = cp.inf * ones(Nk, order='F')
+        K_CCG = cp.zeros((*Xsim.shape, 2 * nbins + 1), order='F')
+    else:
+        K_CCG = None
+        R_CCG = None
+        Q_CCG = None
 
     for j in tqdm(range(Nk), desc='Finding merges'):
         # find all spikes from this cluster
-        s1 = ir.st3[:, 0][ir.st3[:, 1] == isort[j]] / params.fs
+        s1 = st3[:, 0][st3[:, 1] == isort[j]] / params.fs
 
         if s1.size != nspk[isort[j]]:
             # this is a check to make sure new clusters are combined correctly into bigger clusters
@@ -330,7 +335,7 @@ def find_merges(ctx, flag):
 
         for k in range(ienu):
             # find the spikes of the pair
-            s2 = ir.st3[:, 0][ir.st3[:, 1] == ix[k]] / params.fs
+            s2 = st3[:, 0][st3[:, 1] == ix[k]] / params.fs
             # compute cross-correlograms, refractoriness scores (Qi and rir), and normalization
             # for these scores
             K, Qi, Q00, Q01, rir = ccg(s1, s2, nbins, dt)
@@ -346,7 +351,7 @@ def find_merges(ctx, flag):
                     i = ix[k]
                     # now merge j into i and move on
                     # simply overwrite all the spikes of neuron j with i (i>j by construction)
-                    ir.st3[:, 1][ir.st3[:, 1] == isort[j]] = i
+                    st3[:, 1][st3[:, 1] == isort[j]] = i
                     nspk[i] = nspk[i] + nspk[isort[j]]  # update number of spikes for cluster i
                     logger.debug(f'Merged {isort[j]} into {i}')
                     # YOU REALLY SHOULD MAKE SURE THE PC CHANNELS MATCH HERE
@@ -355,21 +360,21 @@ def find_merges(ctx, flag):
                     break
             else:
                 # sometimes we just want to get the refractory scores and CCG
-                ir.R_CCG[isort[j], ix[k]] = R
-                ir.Q_CCG[isort[j], ix[k]] = Q
+                R_CCG[isort[j], ix[k]] = R
+                Q_CCG[isort[j], ix[k]] = Q
 
-                ir.K_CCG[isort[j], ix[k]] = K
-                ir.K_CCG[ix[k], isort[j]] = K[::-1]
+                K_CCG[isort[j], ix[k]] = K
+                K_CCG[ix[k], isort[j]] = K[::-1]
 
     if not flag:
-        ir.R_CCG = cp.minimum(ir.R_CCG, ir.R_CCG.T)  # symmetrize the scores
-        ir.Q_CCG = cp.minimum(ir.Q_CCG, ir.Q_CCG.T)
+        R_CCG = cp.minimum(R_CCG, R_CCG.T)  # symmetrize the scores
+        Q_CCG = cp.minimum(Q_CCG, Q_CCG.T)
 
-    ctx.save(
-        st3_after_merges=ir.st3,
-        K_CCG=ir.get('K_CCG', None),
-        R_CCG=ir.get('R_CCG', None),
-        Q_CCG=ir.get('Q_CCG', None),
+    return Bunch(
+        st3_m=st3,
+        K_CCG=K_CCG,
+        R_CCG=R_CCG,
+        Q_CCG=Q_CCG,
     )
 
 
@@ -389,17 +394,28 @@ def splitAllClusters(ctx, flag):
     wPCA = cp.asarray(ir.wPCA)  # use PCA projections to reconstruct templates when we do splits
     assert wPCA.shape[1] == 3
 
+    # Take intermediate arrays from context.
+    st3 = cp.asarray(ir.st3_m)
+    cProjPC = ir.cProjPC
+    dWU = ir.dWU
+
+    # For the following arrays that will be overwritten by this function, try to get
+    # it from a previous call to this function (as it is called twice), otherwise
+    # get it from before (without the _s suffix).
+    W = ir.get('W_s', ir.W)
+    simScore = ir.get('simScore_s', ir.simScore)
+    iNeigh = ir.get('iNeigh_s', ir.iNeigh)
+    iNeighPC = ir.get('iNeighPC_s', ir.iNeighPC)
+
     # this is the threshold for splits, and is one of the main parameters users can change
     ccsplit = params.AUCsplit
-
-    st3 = cp.asarray(ir.st3_after_merges)
 
     NchanNear = min(Nchan, 32)
     Nnearest = min(Nchan, 32)
     sigmaMask = params.sigmaMask
 
     ik = -1
-    Nfilt = ir.W.shape[1]
+    Nfilt = W.shape[1]
     nsplits = 0
 
     # determine what channels each template lives on
@@ -408,7 +424,7 @@ def splitAllClusters(ctx, flag):
     # the waveforms must be aligned to this sample
     nt0min = params.nt0min
     # find the peak abs channel for each template
-    iW = cp.argmax(cp.abs(cp.asarray(ir.dWU[nt0min - 1, :, :])), axis=0)
+    iW = cp.argmax(cp.abs(cp.asarray(dWU[nt0min - 1, :, :])), axis=0)
 
     # keep track of original cluster for each cluster. starts with all clusters being their
     # own origin.
@@ -434,7 +450,7 @@ def splitAllClusters(ctx, flag):
 
         ss = st3[:, 0][isp] / params.fs  # convert to seconds
 
-        clp0 = cp.asarray(ir.cProjPC)[isp, :, :]  # get the PC projections for these spikes
+        clp0 = cp.asarray(cProjPC)[isp, :, :]  # get the PC projections for these spikes
         clp0 = clp0.reshape((clp0.shape[0], -1), order='F')
         clp = clp0 - mean(clp0, axis=0)  # mean center them
 
@@ -563,15 +579,15 @@ def splitAllClusters(ctx, flag):
             # (DEV_NOTES) code below involves multiple CuPy arrays changing shape to accomodate
             # the extra cluster, this could potentially be done more efficiently?
 
-            ir.dWU = cp.concatenate((
-                cp.asarray(ir.dWU), cp.zeros((*ir.dWU.shape[:-1], 1), order='F')), axis=2)
-            ir.dWU[:, iC[:, iW[ik]], Nfilt - 1] = c2
-            ir.dWU[:, iC[:, iW[ik]], ik] = c1
+            dWU = cp.concatenate((
+                cp.asarray(dWU), cp.zeros((*dWU.shape[:-1], 1), order='F')), axis=2)
+            dWU[:, iC[:, iW[ik]], Nfilt - 1] = c2
+            dWU[:, iC[:, iW[ik]], ik] = c1
 
             # the temporal components are therefore just the PC waveforms
-            ir.W = cp.asarray(ir.W)
-            ir.W = cp.concatenate((ir.W, cp.transpose(cp.atleast_3d(wPCA), (0, 2, 1))), axis=1)
-            assert ir.W.shape[1] == Nfilt
+            W = cp.asarray(W)
+            W = cp.concatenate((W, cp.transpose(cp.atleast_3d(wPCA), (0, 2, 1))), axis=1)
+            assert W.shape[1] == Nfilt
 
             # copy the best channel from the original template
             iW = cp.pad(iW, (0, (Nfilt - len(iW))), mode='constant')
@@ -587,28 +603,28 @@ def splitAllClusters(ctx, flag):
             st3[isp[ilow], 1] = Nfilt - 1  # overwrite spike indices with the new index
 
             # copy similarity scores from the original
-            ir.simScore = cp.asarray(ir.simScore)
-            ir.simScore = cp.pad(
-                ir.simScore, (0, (Nfilt - ir.simScore.shape[0])), mode='constant')
-            ir.simScore[:, Nfilt - 1] = ir.simScore[:, ik]
-            ir.simScore[Nfilt - 1, :] = ir.simScore[ik, :]
+            simScore = cp.asarray(simScore)
+            simScore = cp.pad(
+                simScore, (0, (Nfilt - simScore.shape[0])), mode='constant')
+            simScore[:, Nfilt - 1] = simScore[:, ik]
+            simScore[Nfilt - 1, :] = simScore[ik, :]
             # copy similarity scores from the original
-            ir.simScore[ik, Nfilt - 1] = 1  # set the similarity with original to 1
-            ir.simScore[Nfilt - 1, ik] = 1  # set the similarity with original to 1
-            assert ir.simScore.shape == (Nfilt, Nfilt)
+            simScore[ik, Nfilt - 1] = 1  # set the similarity with original to 1
+            simScore[Nfilt - 1, ik] = 1  # set the similarity with original to 1
+            assert simScore.shape == (Nfilt, Nfilt)
 
             # copy neighbor template list from the original
-            ir.iNeigh = cp.asarray(ir.iNeigh)
-            ir.iNeigh = cp.pad(
-                ir.iNeigh, ((0, 0), (0, (Nfilt - ir.iNeigh.shape[1]))), mode='constant')
-            ir.iNeigh[:, Nfilt - 1] = ir.iNeigh[:, ik]
-            assert ir.iNeigh.shape[1] == Nfilt
+            iNeigh = cp.asarray(iNeigh)
+            iNeigh = cp.pad(
+                iNeigh, ((0, 0), (0, (Nfilt - iNeigh.shape[1]))), mode='constant')
+            iNeigh[:, Nfilt - 1] = iNeigh[:, ik]
+            assert iNeigh.shape[1] == Nfilt
 
             # copy neighbor channel list from the original
-            ir.iNeighPC = cp.pad(
-                ir.iNeighPC, ((0, 0), (0, (Nfilt - ir.iNeighPC.shape[1]))), mode='constant')
-            ir.iNeighPC[:, Nfilt - 1] = ir.iNeighPC[:, ik]
-            assert ir.iNeighPC.shape[1] == Nfilt
+            iNeighPC = cp.pad(
+                iNeighPC, ((0, 0), (0, (Nfilt - iNeighPC.shape[1]))), mode='constant')
+            iNeighPC[:, Nfilt - 1] = iNeighPC[:, ik]
+            assert iNeighPC.shape[1] == Nfilt
 
             # try this cluster again
             # the cluster piece that stays at this index needs to be tested for splits again
@@ -624,11 +640,11 @@ def splitAllClusters(ctx, flag):
         f'Finished splitting. Found {nsplits} splits, checked '
         f'{ik}/{Nfilt} clusters, nccg {nccg}')
 
-    Nfilt = ir.W.shape[1]  # new number of templates
+    Nfilt = W.shape[1]  # new number of templates
     Nrank = 3
     Nchan = probe.Nchan
     Params = cp.array(
-        [0, Nfilt, 0, 0, ir.W.shape[0], Nnearest, Nrank, 0, 0, Nchan, NchanNear, nt0min, 0],
+        [0, Nfilt, 0, 0, W.shape[0], Nnearest, Nrank, 0, 0, Nchan, NchanNear, nt0min, 0],
         dtype=cp.float64)  # make a new Params to pass on parameters to CUDA
 
     # we need to re-estimate the spatial profiles
@@ -636,37 +652,39 @@ def splitAllClusters(ctx, flag):
     # we get the time upsampling kernels again
     Ka, Kb = getKernels(params)
     # we run SVD
-    ir.W, ir.U, ir.mu = mexSVDsmall2(Params, ir.dWU, ir.W, iC, iW, Ka, Kb)
+    W, U, mu = mexSVDsmall2(Params, dWU, W, iC, iW, Ka, Kb)
 
     # we re-compute similarity scores between templates
-    WtW, iList = getMeWtW(ir.W.astype(cp.float32), ir.U.astype(cp.float32), Nnearest)
-    ir.iList = iList  # over-write the list of nearest templates
+    WtW, iList = getMeWtW(W.astype(cp.float32), U.astype(cp.float32), Nnearest)
+    # ir.iList = iList  # over-write the list of nearest templates
 
-    isplit = ir.simScore == 1  # overwrite the similarity scores of clusters with same parent
-    ir.simScore = WtW.max(axis=2)
-    ir.simScore[isplit] = 1  # 1 means they come from the same parent
+    isplit = simScore == 1  # overwrite the similarity scores of clusters with same parent
+    simScore = WtW.max(axis=2)
+    simScore[isplit] = 1  # 1 means they come from the same parent
 
-    ir.iNeigh = iList[:, :Nfilt]  # get the new neighbor templates
-    ir.iNeighPC = iC[:, iW[:Nfilt]]  # get the new neighbor channels
+    iNeigh = iList[:, :Nfilt]  # get the new neighbor templates
+    iNeighPC = iC[:, iW[:Nfilt]]  # get the new neighbor channels
 
     # for Phy, we need to pad the spikes with zeros so the spikes are aligned to the center of
     # the window
-    ir.Wphy = cp.concatenate(
-        (cp.zeros((1 + nt0min, Nfilt, Nrank), order='F'), ir.W), axis=0)
+    Wphy = cp.concatenate(
+        (cp.zeros((1 + nt0min, Nfilt, Nrank), order='F'), W), axis=0)
 
-    ir.isplit = isplit  # keep track of origins for each cluster
+    # ir.isplit = isplit  # keep track of origins for each cluster
 
-    ctx.save(
-        st3_after_split=st3,
-        W=ir.W,
-        U=ir.U,
-        mu=ir.mu,
-        iList=ir.iList,
-        simScore=ir.simScore,
-        iNeigh=ir.iNeigh,
-        iNeighPC=ir.iNeighPC,
-        Wphy=ir.Wphy,
-        isplit=ir.isplit,
+    return Bunch(
+        st3_s=st3,
+
+        W_s=W,
+        U_s=U,
+        mu_s=mu,
+        simScore_s=simScore,
+        iNeigh_s=iNeigh,
+        iNeighPC_s=iNeighPC,
+
+        Wphy=Wphy,
+        iList=iList,
+        isplit=isplit,
     )
 
 
@@ -679,16 +697,19 @@ def set_cutoff(ctx):
 
     ir = ctx.intermediate
     params = ctx.params
-    st3 = cp.asarray(ir.st3_after_split)
+
+    st3 = cp.asarray(ir.st3_s)
+    cProj = ir.cProj
+    cProjPC = ir.cProjPC
 
     dt = 1. / 1000  # step size for CCG binning
 
     Nk = int(st3[:, 1].max()) + 1  # number of templates
 
     # sort by firing rate first
-    ir.good = cp.zeros(Nk)
-    ir.Ths = cp.zeros(Nk)
-    ir.est_contam_rate = cp.zeros(Nk)
+    good = cp.zeros(Nk)
+    Ths = cp.zeros(Nk)
+    est_contam_rate = cp.zeros(Nk)
 
     for j in range(Nk):
         ix = cp.where(st3[:, 1] == j)[0]  # find all spikes from this neuron
@@ -701,7 +722,7 @@ def set_cutoff(ctx):
         Th = params.Th[0]  # start with a high threshold
 
         fcontamination = 0.1  # acceptable contamination rate
-        ir.est_contam_rate[j] = 1
+        est_contam_rate[j] = 1
 
         while Th > params.Th[1]:
             # continually lower the threshold, while the estimated unit contamination is low
@@ -731,7 +752,7 @@ def set_cutoff(ctx):
 
                 # this unit is good, because we will stop lowering the threshold when it
                 # becomes bad
-                ir.good[j] = 1
+                good[j] = 1
                 Th -= 0.5
 
         # we exited the loop because the contamination was too high. We revert to the higher
@@ -742,9 +763,9 @@ def set_cutoff(ctx):
         K, Qi, Q00, Q01, rir = ccg(st, st, 500, dt)
         # this is a measure of refractoriness
         Q = (Qi / max(Q00, Q01)).min()
-        ir.est_contam_rate[j] = Q  # this score will be displayed in Phy
+        est_contam_rate[j] = Q  # this score will be displayed in Phy
 
-        ir.Ths[j] = Th  # store the threshold for potential debugging
+        Ths[j] = Th  # store the threshold for potential debugging
 
         # any spikes below the threshold get discarded into a 0-th cluster
         st3[ix[vexp <= Th], 1] = -1
@@ -753,30 +774,31 @@ def set_cutoff(ctx):
     # (DEV_NOTES) this seems to occur when both Qi and max(Q00, Q01) are zero thus when dividing
     # the two to get Q the result is a NaN
 
-    ir.est_contam_rate[cp.isnan(ir.est_contam_rate)] = 1
+    est_contam_rate[cp.isnan(est_contam_rate)] = 1
 
     # remove spikes assigned to the -1 cluster
     ix = st3[:, 1] == -1
     st3 = st3[~ix, :]
 
-    if len(ir.cProj) > 0:
+    if len(cProj) > 0:
         ix = cp.asnumpy(ix)
-        if len(ix) > ir.cProj.shape[0]:
-            ix = ix[:ir.cProj.shape[0]]
+        if len(ix) > cProj.shape[0]:
+            ix = ix[:cProj.shape[0]]
         else:
-            ix = np.pad(ix, (0, ir.cProj.shape[0] - len(ix)), mode='constant')
-        assert ix.shape[0] == ir.cProj.shape[0] == ir.cProjPC.shape[0]
-        ir.cProj = ir.cProj[~ix, :]  # remove their template projections too
-        ir.cProjPC = ir.cProjPC[~ix, :, :]  # and their PC projections
-        assert st3.shape[0] == ir.cProj.shape[0] == ir.cProjPC.shape[0]
+            ix = np.pad(ix, (0, cProj.shape[0] - len(ix)), mode='constant')
+        assert ix.shape[0] == cProj.shape[0] == cProjPC.shape[0]
+        cProj = cProj[~ix, :]  # remove their template projections too
+        cProjPC = cProjPC[~ix, :, :]  # and their PC projections
+        assert st3.shape[0] == cProj.shape[0] == cProjPC.shape[0]
 
-    ctx.save(
-        st3_after_cutoff=st3,
-        cProj=ir.cProj,
-        cProjPC=ir.cProjPC,
-        est_contam_rate=ir.est_contam_rate,
-        Ths=ir.Ths,
-        good=ir.good,
+    return Bunch(
+        st3_c=st3,
+        cProj_c=cProj,
+        cProjPC_c=cProjPC,
+
+        est_contam_rate=est_contam_rate,
+        Ths=Ths,
+        good=good,
     )
 
 
@@ -794,19 +816,25 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     nt0 = params.nt0
 
     # spikeTimes will be in samples, not seconds
-    ir.W = cp.asnumpy(ir.Wphy).astype(np.float32)
-    ir.U = cp.asnumpy(ir.U).astype(np.float32)
-    ir.mu = cp.asnumpy(ir.mu).astype(np.float32)
+    W = cp.asarray(ir.Wphy).astype(np.float32)
+    Wrot = ir.Wrot
+    est_contam_rate = ir.est_contam_rate
+    good = ir.good
 
-    st3 = cp.asarray(ir.st3_after_cutoff)
+    st3 = cp.asarray(ir.st3_c)
+
+    U = cp.asarray(ir.U_s).astype(np.float32)
+    iNeigh = ir.iNeigh_s
+    iNeighPC = ir.iNeighPC_s
+    simScore = ir.simScore_s
 
     if st3.shape[1] > 4:
         st3 = st3[:, :4]
 
     isort = cp.argsort(st3[:, 0])
     st3 = st3[isort, :]
-    ir.cProj = cp.asarray(ir.cProj)[isort, :]
-    ir.cProjPC = cp.asarray(ir.cProjPC)[isort, :, :]
+    cProj = cp.asarray(ir.cProj_c)[isort, :]
+    cProjPC = cp.asarray(ir.cProjPC_c)[isort, :, :]
 
     fs = os.listdir(savePath)
     for file in fs:
@@ -832,11 +860,7 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     chanMap = probe.chanMap
     chanMap0ind = chanMap  # - 1
 
-    # (DEV_NOTES) do we need U and ir.U?
-    U = cp.asarray(ir.U)
-    W = cp.asarray(ir.W)
-
-    nt0, Nfilt = ir.W.shape[:2]
+    nt0, Nfilt = W.shape[:2]
 
     # (DEV_NOTES) 2 lines below can be combined
     # templates = cp.einsum('ikl,jkl->ijk', U, W).astype(cp.float32)
@@ -847,12 +871,12 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     # we include all channels so this is trivial
     templatesInds = cp.tile(np.arange(templates.shape[2]), (templates.shape[0], 1))
 
-    templateFeatures = ir.cProj
-    templateFeatureInds = ir.iNeigh.astype(cp.uint32)
-    pcFeatures = ir.cProjPC
-    pcFeatureInds = ir.iNeighPC.astype(cp.uint32)
+    templateFeatures = cProj
+    templateFeatureInds = iNeigh.astype(cp.uint32)
+    pcFeatures = cProjPC
+    pcFeatureInds = iNeighPC.astype(cp.uint32)
 
-    whiteningMatrix = cp.asarray(ir.Wrot) / params.scaleproc
+    whiteningMatrix = cp.asarray(Wrot) / params.scaleproc
     whiteningMatrixInv = cp.linalg.pinv(whiteningMatrix)
 
     # here we compute the amplitude of every template...
@@ -909,26 +933,26 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
         _save('whitening_mat_inv', whiteningMatrixInv)
 
         if 'simScore' in ir:
-            similarTemplates = ir.simScore
+            similarTemplates = simScore
             _save('similar_templates', similarTemplates)
 
-        ir.est_contam_rate[np.isnan(ir.est_contam_rate)] = 1
+        est_contam_rate[np.isnan(est_contam_rate)] = 1
         with open(join(savePath, 'cluster_group.tsv'), 'w') as f:
             f.write('cluster_id\tgroup\n')
-            for j in range(len(ir.good)):
-                if ir.good[j]:
+            for j in range(len(good)):
+                if good[j]:
                     f.write('%d\tgood\n' % j)
                 # else:
                 #     f.write('%d\tmua\n' % j)
 
         with open(join(savePath, 'cluster_ContamPct.tsv'), 'w') as f:
             f.write('cluster_id\tContamPct\n')
-            for j in range(len(ir.good)):
-                f.write('%d\t%.1f\n' % (j, 100 * ir.est_contam_rate[j]))
+            for j in range(len(good)):
+                f.write('%d\t%.1f\n' % (j, 100 * est_contam_rate[j]))
 
         with open(join(savePath, 'cluster_Amplitude.tsv'), 'w') as f:
             f.write('cluster_id\tAmplitude\n')
-            for j in range(len(ir.good)):
+            for j in range(len(good)):
                 f.write('%d\t%.1f\n' % (j, tempAmps[j]))
 
         # make params file

@@ -110,14 +110,15 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #       iorig, ccb0, ccbsort
     #
     if 'iorig' not in ir:
-        clusterSingleBatches(ctx)
+        out = clusterSingleBatches(ctx)
+        ctx.save(**out)
 
     # -------------------------------------------------------------------------
     # Main tracking and template matching algorithm.
     #
     # This function uses:
     #
-    #         proc file
+    #         procfile
     #         iorig
     #
     # This function saves:
@@ -130,8 +131,9 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #         W_a, W_b, U_a, U_b
     #
     if 'st3' not in ir:
-        learnAndSolve8b(ctx)
+        out = learnAndSolve8b(ctx)
         logger.info("%d spikes.", ir.st3.shape[0])
+        ctx.save(**out)
 
     # -------------------------------------------------------------------------
     # Final merges.
@@ -142,53 +144,58 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #
     # This function saves:
     #
-    #         st3_after_merges,
+    #         st3_m,
     #         R_CCG, Q_CCG, K_CCG [optional]
     #
-    if 'st3_after_merges' not in ir:
-        find_merges(ctx, True)
+    if 'st3_m' not in ir:
+        out = find_merges(ctx, True)
+        ctx.save(**out)
 
     # -------------------------------------------------------------------------
     # Final splits.
     #
     # This function uses:
     #
-    #       st3_after_merges
+    #       st3_m
     #       W, dWU, cProjPC,
     #       iNeigh, simScore
     #       wPCA
     #
     # This function saves:
     #
-    #       st3_after_split
-    #       W, U, mu, Wphy, simScore
-    #       iNeigh, iNeighPC, iList, isplit
+    #       st3_s
+    #       W_s, U_s, mu_s, simScore_s
+    #       iNeigh_s, iNeighPC_s,
+    #       Wphy, iList, isplit
     #
-    if 'st3_after_split' not in ir:
+    if 'st3_s' not in ir:
         # final splits by SVD
-        splitAllClusters(ctx, True)
+        out = splitAllClusters(ctx, True)
+        ctx.save(**out)
         # final splits by amplitudes
-        splitAllClusters(ctx, False)
+        out = splitAllClusters(ctx, False)
+        ctx.save(**out)
 
     # -------------------------------------------------------------------------
     # Decide on cutoff.
     #
     # This function uses:
     #
-    #       st3_after_split
-    #       W, dWU, cProj, cProjPC
+    #       st3_s
+    #       dWU, cProj, cProjPC
     #       wPCA
     #
     # This function saves:
     #
-    #       st3_after_cutoff
-    #       cProj, cProjPC
+    #       st3_c
+    #       cProj_c, cProjPC_c
     #       est_contam_rate, Ths, good
     #
-    if 'st3_after_cutoff' not in ir:
-        set_cutoff(ctx)
-    logger.info("%d spikes after cutoff.", ir.st3_after_cutoff.shape[0])
+    if 'st3_c' not in ir:
+        out = set_cutoff(ctx)
+        ctx.save(**out)
 
+    logger.info("%d spikes after cutoff.", ir.st3_c.shape[0])
     logger.info('Found %d good units.', np.sum(ir.good > 0))
 
     # write to Phy

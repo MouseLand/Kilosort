@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from .cptools import svdecon, svdecon_cpu, median, free_gpu_memory, ones
 from .cluster import isolated_peaks_new, get_SpikeSample, getClosestChannels
-from .utils import get_cuda, _extend
+from .utils import Bunch, get_cuda, _extend
 
 logger = logging.getLogger(__name__)
 
@@ -952,24 +952,6 @@ def learnAndSolve8b(ctx):
     # Number of spikes.
     assert ir.st3.shape[0] == ir.cProj.shape[0] == ir.cProjPC.shape[0]
 
-    # These are the variables set by the code above:
-    ctx.save(
-        wPCA=wPCA[:, :Nrank],
-        wTEMP=wTEMP,
-        st3=ir.st3,
-        simScore=ir.simScore,
-        cProj=ir.cProj,
-        cProjPC=ir.cProjPC,
-        iNeigh=ir.iNeigh,
-        iNeighPC=ir.iNeighPC,
-        WA=ir.WA,
-        UA=ir.UA,
-        W=ir.W,
-        U=ir.U,
-        dWU=ir.dWU,
-        mu=ir.mu,
-    )
-
     # this whole next block is just done to compress the compressed templates
     # we separately svd the time components of each template, and the spatial components
     # this also requires a careful decompression function, available somewhere in the GUI code
@@ -997,11 +979,25 @@ def learnAndSolve8b(ctx):
         U_a[:, :, j] = np.dot(A[:, :nKeep], B[:nKeep, :nKeep])
         U_b[:, :, j] = C[:, :nKeep]
 
-    ctx.save(
+    logger.info('Finished compressing time-varying templates.')
+
+    return Bunch(
+        wPCA=wPCA[:, :Nrank],
+        wTEMP=wTEMP,
+        st3=ir.st3,
+        simScore=ir.simScore,
+        cProj=ir.cProj,
+        cProjPC=ir.cProjPC,
+        iNeigh=ir.iNeigh,
+        iNeighPC=ir.iNeighPC,
+        WA=ir.WA,
+        UA=ir.UA,
+        W=ir.W,
+        U=ir.U,
+        dWU=ir.dWU,
+        mu=ir.mu,
         W_a=W_a,
         W_b=W_b,
         U_a=U_a,
         U_b=U_b,
     )
-
-    logger.info('Finished compressing time-varying templates.')
