@@ -65,9 +65,9 @@ run(dir_path, raw_data, probe, dat_path=dat_path)
 
 The MATLAB version used a big `rez` structured object containing the input data, the parameters, intermediate and final results.
 
-The Python version makes the distinction beteween:
+The Python version makes the distinction between:
 
-- `raw_data`: a NumPy-like object of shape `(n_samples, n_channels_total)`
+- `raw_data`: a NumPy-like object of shape `(n_channels_total, n_samples)`
 - `probe`: a Bunch instance (dictionary) with the channel coordinates, the indices of the "good channels"
 - `params`: a Bunch instance (dictionary) with optional user-defined parameters. It can be empty. Any missing parameter is transparently replaced by the default as found in `default_params.py` file in the repository.
 - `intermediate`: a Bunch instance (dictionary) with intermediate arrays.
@@ -77,6 +77,8 @@ These objects are accessible via the *context* (`ctx`) which replaces the MATLAB
 This context also stores a special object called `ctx.intermediate` which stores intermediate arrays. This object derives from `Bunch` and implements special methods to save and load arrays in a temporary folder. By default, an intermediate result called `ctx.intermediate.myarray` is stored in `./.kilosort/context/myarray.npy`.
 
 The main `run()` function checks the existence of some of these intermediate arrays to skip some steps that might have run already, for a given dataset.
+
+The suffixes `_m` (merge), `_s` (split), `_c` (cutoff) are used to disambiguate between multiple processing steps for the same arrays (they would be overwritten otherwise).
 
 
 ## Technical notes about the port
