@@ -1,6 +1,6 @@
 
 
-function [chanMap, xcoords, ycoords, kcoords, NchanTOT] = loadChanMap(cmIn)
+function [chanMap, xcoords, ycoords, kcoords, NchanTOT, fwdmap] = loadChanMap(cmIn)
 % function [chanMap, xcoords, ycoords, kcoords] = loadChanMap(cmIn)
 %
 % Load and sanitize a channel map provided to Kilosort
@@ -29,6 +29,7 @@ function [chanMap, xcoords, ycoords, kcoords, NchanTOT] = loadChanMap(cmIn)
 %  - kcoords - a vector of the group number of each channel
 % 
 % ops.Nchan should then be numel(chanMap)
+
 
 if ischar(cmIn)    
     if exist(cmIn, 'file')        
@@ -61,8 +62,16 @@ else
     kcoords = cmIn.kcoords(:);
 end
 
-if isfield(cmIn, 'connected') && ~isempty(cmIn.connected) 
+
+fwdmap = 1:length(chanMap);
+if isfield(cmIn, 'connected') && ~isempty(cmIn.connected)         
     connected = logical(cmIn.connected(:));
+    
+    fwdmap = ones(length(chanMap), 1);
+    fwdmap(~connected) = 0;
+    fwdmap = cumsum(fwdmap);
+    fwdmap(~connected) = 0;
+    
     chanMap = chanMap(connected);
     xcoords = xcoords(connected);
     ycoords = ycoords(connected);
@@ -71,6 +80,7 @@ if isfield(cmIn, 'connected') && ~isempty(cmIn.connected)
     
     NchanTOT = sum(connected);
 end
+
 
 if ~exist('NchanTOT', 'var')
    NchanTOT = numel(chanMap); 

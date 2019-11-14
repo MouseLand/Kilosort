@@ -51,6 +51,7 @@ fclose(fid);
 dd = dd(:, 1:k);
 
 % initialize the template clustering with random waveforms
+rng(1);
 wTEMP = dd(:, randperm(size(dd,2), nPCs));
 wTEMP = wTEMP ./ sum(wTEMP.^2,1).^.5; % normalize them
 

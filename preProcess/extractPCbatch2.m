@@ -1,4 +1,4 @@
-function [uS, idchan] = extractPCbatch2(rez, wPCA, ibatch, iC)
+function [uS, idchan, st] = extractPCbatch2(rez, wPCA, ibatch, iC)
 % this function finds threshold crossings in the data using
 % projections onto the pre-determined principal components
 % wPCA is number of time samples by number of PCs
@@ -38,6 +38,7 @@ Params = [NT Nchan NchanNear nt0 nt0min spkTh NrankPC];
 
 % call a CUDA function to do the hard work
 % returns a matrix of features uS, as well as the center channels for each spike
-[uS, idchan] = mexThSpkPC(Params, dataRAW, wPCA, iC-1);
+[uS, st] = mexThSpkPC(Params, dataRAW, wPCA, iC-1);
 
+idchan = st(2,:);
 idchan = idchan + 1; % go from 0-indexing to 1-indexing

@@ -61,7 +61,7 @@ __global__ void	Conv1D(const double *Params, const float *data, const float *W, 
 }
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void  computeProjections(const double *Params, const float *dataraw,
-        const int *iC, const int *st, const int *id, const float *W, float *feat){
+        const int *iC, const int *st, const float *W, float *feat){
     
     float x;
     int tidx, nt0min, tidy, my_chan, this_chan, tid, bid, nt0, NchanNear, j, t, NT, NrankPC;
@@ -87,10 +87,10 @@ __global__ void  computeProjections(const double *Params, const float *dataraw,
     tid = tidx + tidy*blockDim.x;
     // move raw data to shared memory    
     while (tid<nt0){
-        my_chan = id[bid];
+        my_chan = st[1+2*bid];
         for (j=0;j<NchanNear;j++){
             this_chan = iC[j + NchanNear*my_chan];
-            sD[tid + nt0*j] = dataraw[tid + st[bid]+nt0min-1 + NT * this_chan];
+            sD[tid + nt0*j] = dataraw[tid + st[2*bid]+nt0min-1 + NT * this_chan];
         }
         tid+=blockDim.x*blockDim.y;
     }
@@ -106,7 +106,7 @@ __global__ void  computeProjections(const double *Params, const float *dataraw,
 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void  maxChannels(const double *Params, const float *dataraw, const float *data,
-	const int *iC, int *st, int *id, int *counter){
+	const int *iC, int *st, int *counter){
     
   int nt0, indx, tid, tid0, i, bid, NT, Nchan, NchanNear,j,iChan, nt0min;
   double Cf, d;
@@ -146,8 +146,8 @@ __global__ void  maxChannels(const double *Params, const float *dataraw, const f
                       // this is a hit, atomicAdd and return spikes
                       indx = atomicAdd(&counter[0], 1);
                       if (indx<maxFR){
-                          st[indx] = tid0;
-                          id[indx] = iChan;
+                          st[2*indx] = tid0;
+                          st[1+2*indx] = iChan;
                       }
                   }
               }
@@ -164,17 +164,17 @@ __global__ void	max1D(const double *Params, const float *data, float *conv_sig){
     float y, spkTh;
     int tid, tid0, bid, i, NT, nt0;
     
-    NT 		= (int) Params[0];        
-    nt0       = (int) Params[3];    
-    spkTh    = (float) Params[5];    
+    NT 		    = (int) Params[0];        
+    nt0         = (int) Params[3];    
+    spkTh       = (float) Params[5];    
     tid 		= threadIdx.x;
     bid 		= blockIdx.x;
   
     tid0 = 0;
     while (tid0<NT-Nthreads-nt0+1){
         if (tid<nt0)
-            sdata[tid]   = data[tid0 + tid + NT*bid];
-        sdata[tid + nt0] = data[nt0+tid0 + tid+ NT*bid];
+            sdata[tid]   = data[tid0 + tid       + NT*bid];
+        sdata[tid + nt0] = data[tid0 + tid + nt0 + NT*bid];
         __syncthreads();
 
         y = 0.0f;
@@ -232,18 +232,16 @@ void mexFunction(int nlhs, mxArray *plhs[],
   
   /* allocate new GPU variables*/  
   float *d_dmax, *d_dout;
-  int *d_st,  *d_id, *d_counter;
+  int *d_st,  *d_counter;
   
   cudaMalloc(&d_dout,   NT * Nchan* sizeof(float));
   cudaMalloc(&d_dmax,  NT * Nchan* sizeof(float));
-  cudaMalloc(&d_st,     maxFR * sizeof(int));
-  cudaMalloc(&d_id,     maxFR * sizeof(int));
+  cudaMalloc(&d_st,     2*maxFR * sizeof(int));  
   cudaMalloc(&d_counter,   2*sizeof(int));
 
    cudaMemset(d_dout,   0, NT * Nchan* sizeof(float)); 
   cudaMemset(d_dmax,   0, NT * Nchan * sizeof(float));
-  cudaMemset(d_st,      0, maxFR *   sizeof(int));
-  cudaMemset(d_id,      0, maxFR *   sizeof(int));
+  cudaMemset(d_st,      0, 2*maxFR *   sizeof(int));  
    cudaMemset(d_counter, 0, 2*sizeof(int));
      
   int *counter;
@@ -256,7 +254,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   max1D<<<Nchan, Nthreads>>>(d_Params, d_dout, d_dmax);
   
   // take max across nearby channels
-  maxChannels<<<NT/Nthreads,Nthreads>>>(d_Params, d_dout, d_dmax, d_iC, d_st, d_id, d_counter);
+  maxChannels<<<NT/Nthreads,Nthreads>>>(d_Params, d_dout, d_dmax, d_iC, d_st, d_counter);
  
   cudaMemcpy(counter,     d_counter, sizeof(int), cudaMemcpyDeviceToHost);
   
@@ -269,15 +267,15 @@ void mexFunction(int nlhs, mxArray *plhs[],
   d_featPC 		= (float *)(mxGPUGetData(featPC));
   cudaMemset(d_featPC, 0, NrankPC*NchanNear*minSize*sizeof(float));
       
-  const mwSize did[] 	= {minSize, 1};
+  const mwSize did[] 	= {2, minSize};
   id 		= mxGPUCreateGPUArray(2, did, mxINT32_CLASS, mxREAL, MX_GPU_DO_NOT_INITIALIZE);
   d_id2 		= (int *)(mxGPUGetData(id));
   
   dim3 tpP(NchanNear, NrankPC);
   if (minSize>0)      
-      computeProjections<<<minSize, tpP>>>(d_Params, d_data, d_iC, d_st, d_id, d_W, d_featPC);  
+      computeProjections<<<minSize, tpP>>>(d_Params, d_data, d_iC, d_st, d_W, d_featPC);  
   
-  cudaMemcpy(d_id2, d_id, minSize * sizeof(int),   cudaMemcpyDeviceToDevice);
+  cudaMemcpy(d_id2, d_st, 2*minSize * sizeof(int),   cudaMemcpyDeviceToDevice);
   
   // dWU stays a GPU array
   plhs[0] 	= mxGPUCreateMxArrayOnGPU(featPC);  
@@ -285,7 +283,6 @@ void mexFunction(int nlhs, mxArray *plhs[],
 
   
   cudaFree(d_st);
-  cudaFree(d_id);  
   cudaFree(d_counter);
   cudaFree(d_Params); 
   cudaFree(d_dmax);

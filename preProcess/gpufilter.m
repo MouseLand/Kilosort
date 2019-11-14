@@ -22,7 +22,7 @@ dataRAW = dataRAW(:, chanMap); % subsample only good channels
 dataRAW = dataRAW - mean(dataRAW, 1); % subtract mean of each channel
 
 % CAR, common average referencing by median
-if getOr(ops, 'CAR', 1)
+if 0 %getOr(ops, 'CAR', 1)
     dataRAW = dataRAW - median(dataRAW, 2); % subtract median across channels
 end
 

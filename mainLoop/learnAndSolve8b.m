@@ -30,7 +30,7 @@ NchanNear   = min(ops.Nchan, 32);
 Nnearest    = min(ops.Nchan, 32);
 
 % decay of gaussian spatial mask centered on a channel
-sigmaMask  = ops.sigmaMask
+sigmaMask  = ops.sigmaMask;
 
 % spike threshold for finding missed spikes in residuals
 ops.spkTh = -6; % why am I overwriting this here?
