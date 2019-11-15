@@ -124,6 +124,8 @@ def extractPCfromSnippets(proc, probe=None, params=None, Nbatch=None):
     for ibatch in range(0, Nbatch, 100):
         offset = Nchan * batchstart[ibatch]
         dat = proc.flat[offset:offset + NT * Nchan].reshape((-1, Nchan), order='F')
+        if dat.shape[0] == 0:
+            continue
 
         # move data to GPU and scale it back to unit variance
         dataRAW = cp.asarray(dat, dtype=np.float32) / params.scaleproc
