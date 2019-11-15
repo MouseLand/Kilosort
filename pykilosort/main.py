@@ -7,7 +7,7 @@ from .preprocess import preprocess, get_good_channels, get_whitening_matrix, get
 from .cluster import clusterSingleBatches
 from .learn import learnAndSolve8b
 from .postprocess import find_merges, splitAllClusters, set_cutoff, rezToPhy
-from .utils import Bunch, Context
+from .utils import Bunch, Context, memmap_raw_data
 from .default_params import default_params, set_dependent_params
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def default_probe(raw_data):
     return Bunch(Nchan=nc, xc=np.zeros(nc), yc=np.arange(nc))
 
 
-def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
+def run(dat_path=None, probe=None, params=None, dir_path=None):
     """
 
     probe has the following attributes:
@@ -29,14 +29,15 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
 
     """
 
-    if dir_path is None:
-        raise ValueError("Please provide a dir_path.")
-    if raw_data is None:
-        raise ValueError("Please provide a raw_data array.")
+    # if dir_path is None:
+    #     raise ValueError("Please provide a dir_path.")
+    # if raw_data is None:
+    #     raise ValueError("Please provide a raw_data array.")
 
-    dir_path = Path(dir_path)
-    dir_path.mkdir(exist_ok=True, parents=True)
-    assert dir_path.exists()
+    # WARNING: F order, shape (n_channels, n_samples) given the layout of the file on disk,
+    # and for consistency with MATLAB.
+    raw_data = memmap_raw_data(dat_path, n_channels=probe.NchanTOT, dtype=np.int16)
+    assert raw_data.shape[0] < raw_data.shape[1]
 
     # Get or create the probe object.
     probe = probe or default_probe(raw_data)
@@ -49,8 +50,15 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     set_dependent_params(params)
     assert params
 
+    # dir path
+    dat_path = Path(dat_path)
+    dir_path = dir_path or dat_path.parent
+    dir_path.mkdir(exist_ok=True, parents=True)
+    assert dir_path.exists()
+
     # Create the context.
-    ctx = Context(dir_path)
+    ctx_path = dir_path / '.kilosort' / dat_path.name
+    ctx = Context(ctx_path)
     ctx.params = params
     ctx.probe = probe
     ctx.raw_data = raw_data
@@ -66,7 +74,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     if params.minfr_goodchannels > 0:  # discard channels that have very few spikes
         if 'igood' not in ir:
             # determine bad channels
-            ir.igood = get_good_channels(raw_data=raw_data, probe=probe, params=params)
+            with ctx.time('good_channels'):
+                ir.igood = get_good_channels(raw_data=raw_data, probe=probe, params=params)
             # Cache the result.
             ctx.write(igood=ir.igood)
 
@@ -87,7 +96,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     if 'Wrot' not in ir:
         # outputs a rotation matrix (Nchan by Nchan) which whitens the zero-timelag covariance
         # of the data
-        ir.Wrot = get_whitening_matrix(raw_data=raw_data, probe=probe, params=params)
+        with ctx.time('whitening_matrix'):
+            ir.Wrot = get_whitening_matrix(raw_data=raw_data, probe=probe, params=params)
         # Cache the result.
         ctx.write(Wrot=ir.Wrot)
 
@@ -96,7 +106,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     ir.proc_path = dir_path / 'proc.dat'
     if not ir.proc_path.exists():
         # Do not preprocess again if the proc.dat file already exists.
-        preprocess(ctx)
+        with ctx.time('preprocess'):
+            preprocess(ctx)
 
     # Open the proc file.
     assert ir.proc_path.exists()
@@ -110,7 +121,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #       iorig, ccb0, ccbsort
     #
     if 'iorig' not in ir:
-        out = clusterSingleBatches(ctx)
+        with ctx.time('cluster'):
+            out = clusterSingleBatches(ctx)
         ctx.save(**out)
 
     # -------------------------------------------------------------------------
@@ -131,7 +143,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #         W_a, W_b, U_a, U_b
     #
     if 'st3' not in ir:
-        out = learnAndSolve8b(ctx)
+        with ctx.time('learn'):
+            out = learnAndSolve8b(ctx)
         logger.info("%d spikes.", ir.st3.shape[0])
         ctx.save(**out)
 
@@ -148,7 +161,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #         R_CCG, Q_CCG, K_CCG [optional]
     #
     if 'st3_m' not in ir:
-        out = find_merges(ctx, True)
+        with ctx.time('merge'):
+            out = find_merges(ctx, True)
         ctx.save(**out)
 
     # -------------------------------------------------------------------------
@@ -170,10 +184,12 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #
     if 'st3_s' not in ir:
         # final splits by SVD
-        out = splitAllClusters(ctx, True)
+        with ctx.time('split_1'):
+            out = splitAllClusters(ctx, True)
         ctx.save(**out)
         # final splits by amplitudes
-        out = splitAllClusters(ctx, False)
+        with ctx.time('split_2'):
+            out = splitAllClusters(ctx, False)
         ctx.save(**out)
 
     # -------------------------------------------------------------------------
@@ -192,7 +208,8 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
     #       est_contam_rate, Ths, good
     #
     if 'st3_c' not in ir:
-        out = set_cutoff(ctx)
+        with ctx.time('cutoff'):
+            out = set_cutoff(ctx)
         ctx.save(**out)
 
     logger.info("%d spikes after cutoff.", ir.st3_c.shape[0])
@@ -200,4 +217,9 @@ def run(dir_path=None, raw_data=None, probe=None, params=None, dat_path=None):
 
     # write to Phy
     logger.info('Saving results to phy.')
-    rezToPhy(ctx, dat_path=dat_path, output_dir=dir_path / 'output')
+    with ctx.time('output'):
+        rezToPhy(ctx, dat_path=dat_path, output_dir=dir_path / 'output')
+
+    # Show timing information.
+    ctx.show_timer()
+    ctx.write(timer=ctx.timer)

@@ -36,28 +36,21 @@ The programming interface is subject to change. The following code example shoul
 from pathlib import Path
 import numpy as np
 
-from pykilosort import add_default_handler, run, Bunch, read_data
+from pykilosort import add_default_handler, run, Bunch
 
 add_default_handler(level='DEBUG')
 
 dat_path = Path('imec_385_100s.bin')
 dir_path = dat_path.parent
-
 probe = Bunch()
 probe.NchanTOT = 385
-
 # WARNING: indexing mismatch with MATLAB hence the -1
 probe.chanMap = np.load(dir_path / 'chanMap.npy').squeeze().astype(np.int64) - 1
-
 probe.xc = np.load(dir_path / 'xc.npy').squeeze()
 probe.yc = np.load(dir_path / 'yc.npy').squeeze()
 probe.kcoords = np.load(dir_path / 'kcoords.npy').squeeze()
 
-# The raw data file is loaded in Fortran order, its shape is therefore (n_channels, n_samples).
-raw_data = read_data(dat_path, shape=(probe.NchanTOT, -1), dtype=np.int16)
-
-run(dir_path, raw_data, probe, dat_path=dat_path)
-
+run(dat_path, probe, dir_path=dir_path)
 ```
 
 

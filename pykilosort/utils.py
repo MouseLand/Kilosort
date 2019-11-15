@@ -1,8 +1,10 @@
+from contextlib import contextmanager
 import json
 import logging
 from pathlib import Path
 import os.path as op
 import re
+from time import perf_counter
 
 import numpy as np
 import cupy as cp
@@ -62,7 +64,7 @@ def read_data(dat_path, offset=0, shape=None, dtype=None, axis=0):
     return buff
 
 
-def memmap_raw_data(dat_path, n_channels=None, dtype=None, offset=None, order=None):
+def memmap_raw_data(dat_path, n_channels=None, dtype=None, offset=None):
     """Memmap a dat file."""
     assert dtype is not None
     assert n_channels is not None
@@ -70,7 +72,7 @@ def memmap_raw_data(dat_path, n_channels=None, dtype=None, offset=None, order=No
     offset = offset if offset else 0
     n_samples = (op.getsize(str(dat_path)) - offset) // (item_size * n_channels)
     return np.memmap(
-        str(dat_path), dtype=dtype, shape=(n_samples, n_channels), offset=offset, order=order)
+        str(dat_path), dtype=dtype, shape=(n_channels, n_samples), offset=offset, order='F')
 
 
 def extract_constants_from_cuda(code):
@@ -92,16 +94,12 @@ def get_cuda(fn):
 
 
 class Context(Bunch):
-    def __init__(self, dir_path):
+    def __init__(self, context_path):
         super(Context, self).__init__()
-        self.dir_path = dir_path
+        self.context_path = context_path
         self.intermediate = Bunch()
         self.context_path.mkdir(exist_ok=True, parents=True)
-
-    @property
-    def context_path(self):
-        """Path to the context directory."""
-        return self.dir_path / '.kilosort/context/'
+        self.timer = {}
 
     @property
     def metadata_path(self):
@@ -121,7 +119,7 @@ class Context(Bunch):
     def write_metadata(self, metadata):
         """Write metadata dictionary in the metadata.json file."""
         with open(self.metadata_path, 'w') as f:
-            json.dump(metadata, f, indent=2, sort_keys=True)
+            json.dump(metadata, f, indent=2)
 
     def read(self, name):
         """Read an array from memory (intermediate object) or from disk."""
@@ -185,3 +183,20 @@ class Context(Bunch):
                 self.intermediate[k] = v
         kwargs = kwargs or self.intermediate
         self.write(**kwargs)
+
+    @contextmanager
+    def time(self, name):
+        """Context manager to measure the time of a section of code."""
+        t0 = perf_counter()
+        yield
+        t1 = perf_counter()
+        self.timer[name] = t1 - t0
+        self.show_timer(name)
+
+    def show_timer(self, name=None):
+        """Display the results of the timer."""
+        if name:
+            logger.info("Step `{:s}` took {:.2f}s.".format(name, self.timer[name]))
+            return
+        for name in self.timer.keys():
+            self.show_timer(name)
