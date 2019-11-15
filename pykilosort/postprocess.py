@@ -915,7 +915,7 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
             _save('spike_clusters', spikeClusters, cp.uint32)
         else:
             _save('spike_clusters', spikeTemplates, cp.uint32)
-        _save('amplitudes', spikeTimes)
+        _save('amplitudes', amplitudes)
         _save('templates', templates)
         _save('templates_ind', templatesInds)
 
