@@ -8,7 +8,7 @@
 
 from pytest import raises
 
-from ..event import EventEmitter, connect
+from ..event import EventEmitter
 
 
 #------------------------------------------------------------------------------

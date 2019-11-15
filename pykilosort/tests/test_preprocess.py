@@ -1,6 +1,6 @@
 import numpy as np
 from ..preprocess import get_good_channels, get_whitening_matrix, preprocess
-from ..utils import p, read_data
+from ..utils import read_data
 
 
 def test_good_channels(raw_data, probe, params):
