@@ -103,7 +103,7 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
 
     # -------------------------------------------------------------------------
     # Preprocess data to create proc.dat
-    ir.proc_path = dir_path / 'proc.dat'
+    ir.proc_path = ctx.path('proc', '.dat')
     if not ir.proc_path.exists():
         # Do not preprocess again if the proc.dat file already exists.
         with ctx.time('preprocess'):

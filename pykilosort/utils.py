@@ -105,9 +105,9 @@ class Context(Bunch):
     def metadata_path(self):
         return self.context_path / 'metadata.json'
 
-    def path(self, name):
+    def path(self, name, ext='.npy'):
         """Path to an array in the context directory."""
-        return self.context_path / (name + '.npy')
+        return self.context_path / (name + ext)
 
     def read_metadata(self):
         """Read the metadata dictionary from the metadata.json file in the context dir."""
