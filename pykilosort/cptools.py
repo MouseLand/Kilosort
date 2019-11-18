@@ -75,18 +75,8 @@ def get_lfilter_kernel(N, isfortran, reverse=False):
     """ % (N, order, 'n' if not reverse else 'n_samples - 1 - n'))
 
 
-def lfilter(b, a, arr, axis=0, reverse=False):
-    """Perform a linear filter along the first axis on a GPU array."""
-
-    assert isinstance(arr, cp.ndarray)
+def _get_lfilter_fun(b, a, is_fortran=True, axis=0, reverse=False):
     assert axis == 0, "Only filtering along the first axis is currently supported."
-
-    if arr.ndim == 1:
-        arr = arr[:, np.newaxis]
-    n_samples, n_channels = arr.shape
-
-    block = (min(128, n_channels),)
-    grid = (int(ceil(n_channels / float(block[0]))),)
 
     b = np.atleast_1d(b).astype(np.float32)
     a = np.atleast_1d(a).astype(np.float32)
@@ -96,9 +86,21 @@ def lfilter(b, a, arr, axis=0, reverse=False):
     if len(a) < N:
         a = np.pad(a, (0, (N - len(a))), mode='constant')
     assert len(a) == len(b)
-    kernel = get_lfilter_kernel(N - 1, cp.isfortran(arr), reverse=reverse)
+    kernel = get_lfilter_kernel(N - 1, is_fortran, reverse=reverse)
 
     lfilter = make_kernel(kernel, 'lfilter', b=b, a=a)
+
+    return lfilter
+
+
+def _apply_lfilter(lfilter_fun, arr):
+    assert isinstance(arr, cp.ndarray)
+    if arr.ndim == 1:
+        arr = arr[:, np.newaxis]
+    n_samples, n_channels = arr.shape
+
+    block = (min(128, n_channels),)
+    grid = (int(ceil(n_channels / float(block[0]))),)
 
     arr = cp.asarray(arr, dtype=np.float32)
     y = cp.zeros_like(arr, order='F' if cp.isfortran(arr) else 'C', dtype=arr.dtype)
@@ -107,9 +109,14 @@ def lfilter(b, a, arr, axis=0, reverse=False):
     assert y.dtype == np.float32
     assert arr.shape == y.shape
 
-    lfilter(grid, block, (arr, y, int(y.shape[0]), int(y.shape[1])))
-
+    lfilter_fun(grid, block, (arr, y, int(y.shape[0]), int(y.shape[1])))
     return y
+
+
+def lfilter(b, a, arr, axis=0, reverse=False):
+    """Perform a linear filter along the first axis on a GPU array."""
+    lfilter_fun = _get_lfilter_fun(b, a, is_fortran=cp.isfortran(arr), axis=axis, reverse=reverse)
+    return _apply_lfilter(lfilter_fun, arr)
 
 
 def svdecon(X, nPC0=None):

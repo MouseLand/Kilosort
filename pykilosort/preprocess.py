@@ -1,12 +1,13 @@
 import logging
 from math import ceil
+from functools import lru_cache
 
 import numpy as np
 from scipy.signal import butter
 import cupy as cp
 from tqdm import tqdm
 
-from .cptools import lfilter, median
+from .cptools import lfilter, _get_lfilter_fun, _apply_lfilter, median
 from .utils import is_fortran
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,15 @@ def my_sum(S1, sig, varargin=None):
     return S1
 
 
+@lru_cache(128)
+def _gaus_lfilter(sig, axis=0, is_fortran=True, reverse=False):
+    tmax = ceil(4 * sig)
+    dt = np.arange(-tmax, tmax + 1)
+    gaus = np.exp(-dt ** 2 / (2 * sig ** 2))
+    gaus = gaus[:, np.newaxis] / np.sum(gaus)
+    return _get_lfilter_fun(gaus, 1, is_fortran=is_fortran, axis=axis, reverse=reverse)
+
+
 def my_conv2(S1, sig, varargin=None):
     # S1 is the matrix to be filtered along a choice of axes
     # sig is either a scalar or a sequence of scalars, one for each axis to be filtered
@@ -149,16 +159,11 @@ def my_conv2(S1, sig, varargin=None):
         dsnew2 = S1.shape
 
         tmax = ceil(4 * sig)
-        dt = np.arange(-tmax, tmax + 1)
-        gaus = np.exp(-dt ** 2 / (2 * sig ** 2))
-        gaus = gaus[:, np.newaxis] / np.sum(gaus)
 
-        cNorm = lfilter(
-            gaus, 1, cp.concatenate((cp.ones(dsnew2[0]), cp.zeros(tmax)))[:, np.newaxis], axis=0)
+        cNorm = _apply_lfilter(_gaus_lfilter(sig), cp.concatenate((cp.ones(dsnew2[0]), cp.zeros(tmax)))[:, np.newaxis])
         cNorm = cNorm[tmax:, :]
-        S1 = lfilter(
-            gaus, 1, cp.asfortranarray(cp.concatenate(
-                (S1, cp.zeros((tmax, dsnew2[1]), order='F')), axis=0)), axis=0)
+        S1 = _apply_lfilter(_gaus_lfilter(sig), cp.asfortranarray(cp.concatenate(
+            (S1, cp.zeros((tmax, dsnew2[1]), order='F')), axis=0)))
         S1 = S1[tmax:, :]
         S1 = S1.reshape(dsnew, order='F')
         S1 = S1 / cNorm
