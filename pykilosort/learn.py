@@ -43,7 +43,7 @@ def extractTemplatesfromSnippets(proc=None, probe=None, params=None, Nbatch=None
         c = get_SpikeSample(dataRAW, row, col, params)
 
         if k + c.shape[1] > dd.shape[1]:
-            dd[:, 2 * dd.shape[1]] = 0
+            dd = cp.pad(dd, (0, dd.shape[1]), mode='constant')
 
         dd[:, k:k + c.shape[1]] = c
         k = k + c.shape[1]
