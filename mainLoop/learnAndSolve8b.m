@@ -2,10 +2,6 @@ function rez = learnAndSolve8b(rez)
 % This is the main optimization. Takes the longest time and uses the GPU heavily.  
 
 
-if ~isfield(rez, 'W')
-    error('are you trying to resume kilosort? use the other masterscript')
-end
-
 Nbatches = numel(rez.iorig);
 ihalf = ceil(Nbatches/2); % more robust to start the tracking in the middle of the re-ordered batches
 
