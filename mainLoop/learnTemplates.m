@@ -206,14 +206,17 @@ for ibatch = 1:niter
             toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0), ndrop)
 
         % these diagnostic figures should be mostly self-explanatory
-        if ibatch==1
-            figHand = figure;
-        else
-            figure(figHand);
-        end
-
-       if ops.fig
-           make_fig(W, U, mu, nsp)           
+        if ops.fig
+            try
+                if ibatch==1
+                    figHand = figure;
+                else
+                    figure(figHand);
+                end
+                make_fig(W, U, mu, nsp)           
+            catch ME
+               warning('Error making figure was: %s',ME.message);
+            end
         end
     end
 end
