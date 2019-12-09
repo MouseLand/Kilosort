@@ -119,6 +119,24 @@ def lfilter(b, a, arr, axis=0, reverse=False):
     return _apply_lfilter(lfilter_fun, arr)
 
 
+def convolve(x, b, axis=0):
+    b = b.ravel()
+    assert axis == 0
+    tmax = len(b) // 2
+    xshape = x.shape
+    x = cp.concatenate((x, cp.zeros((tmax, x.shape[1]))))
+    n = x.shape[axis]
+    xf = cp.fft.rfft(x, axis=axis, n=n)
+    if xf.shape[axis] > b.shape[0]:
+        b = cp.pad(b, (0, n - b.shape[0]), mode='constant')
+    bf = cp.fft.rfft(b, n=n)
+    bf = bf[:, np.newaxis]
+    y = cp.fft.irfft(xf * bf, axis=axis)
+    y = y[y.shape[axis] - xshape[axis]:, :]
+    assert y.shape == xshape
+    return y
+
+
 def svdecon(X, nPC0=None):
     """
     Input:
