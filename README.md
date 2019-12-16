@@ -40,7 +40,7 @@ If you are unhappy with the quality of the automated sorting, try changing one o
 
 `ops.AUCsplit = 0.9` (default). Threshold on the area under the curve (AUC) criterion for performing a split in the final step. If the AUC of the split is higher than this, that split is considered good. However, a good split only goes through if, additionally, the cross-correlogram of the split units does not contain a big dip at time 0.
 
-`ops.lambda = 10` (default).  The individual spike amplitudes are biased towards the mean of the cluster by this factor; 50 is a lot, 0 is no bias.
+`ops.lam = 10` (default).  The individual spike amplitudes are biased towards the mean of the cluster by this factor; 50 is a lot, 0 is no bias.
 
 A list of all the adjustable parameters is in the example configuration file.
 
