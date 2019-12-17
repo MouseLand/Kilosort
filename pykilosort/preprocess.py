@@ -422,7 +422,9 @@ def preprocess(ctx):
             datr = cp.dot(datr, Wrot)  # whiten the data and scale by 200 for int16 range
 
             # convert to int16, and gather on the CPU side
-            datcpu = cp.asnumpy(datr).astype(np.int16)
+            # WARNING: transpose because "tofile" always writes in C order, whereas we want
+            # to write in F order.
+            datcpu = cp.asnumpy(datr.T.astype(np.int16))
 
             # write this batch to binary file
-            fw.write(datcpu.tobytes('F'))
+            datcpu.tofile(fw)
