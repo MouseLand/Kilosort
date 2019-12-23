@@ -7,7 +7,7 @@ from scipy.signal import butter
 import cupy as cp
 from tqdm import tqdm
 
-from .cptools import lfilter, _get_lfilter_fun, median, convolve, _apply_lfilter
+from .cptools import lfilter, _get_lfilter_fun, median, convolve
 from .utils import is_fortran
 
 logger = logging.getLogger(__name__)

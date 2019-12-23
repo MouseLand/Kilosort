@@ -182,14 +182,18 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
     #       iNeigh_s, iNeighPC_s,
     #       Wphy, iList, isplit
     #
-    if 'st3_s' not in ir:
+    if 'st3_s1' not in ir:
         # final splits by SVD
         with ctx.time('split_1'):
             out = splitAllClusters(ctx, True)
+        # Use a different name for both splitting steps.
+        out['st3_s1'] = out.pop('st3_s')
         ctx.save(**out)
+    if 'st3_s0' not in ir:
         # final splits by amplitudes
         with ctx.time('split_2'):
             out = splitAllClusters(ctx, False)
+        out['st3_s0'] = out.pop('st3_s')
         ctx.save(**out)
 
     # -------------------------------------------------------------------------

@@ -698,7 +698,7 @@ def set_cutoff(ctx):
     ir = ctx.intermediate
     params = ctx.params
 
-    st3 = cp.asarray(ir.st3_s)
+    st3 = cp.asarray(ir.st3_s0)  # st3_s0 is saved by the second splitting step
     cProj = ir.cProj
     cProjPC = ir.cProjPC
 
