@@ -1,7 +1,9 @@
 from contextlib import contextmanager
+from functools import reduce
 import json
 import logging
 from pathlib import Path
+import operator
 import os.path as op
 import re
 from time import perf_counter
@@ -12,6 +14,10 @@ import cupy as cp
 from .event import emit, connect, unconnect  # noqa
 
 logger = logging.getLogger(__name__)
+
+
+def prod(iterable):
+    return reduce(operator.mul, iterable, 1)
 
 
 class Bunch(dict):
@@ -64,15 +70,18 @@ def read_data(dat_path, offset=0, shape=None, dtype=None, axis=0):
     return buff
 
 
-def memmap_raw_data(dat_path, n_channels=None, dtype=None, offset=None):
+def memmap_binary_file(dat_path, n_channels=None, shape=None, dtype=None, offset=None):
     """Memmap a dat file."""
     assert dtype is not None
-    assert n_channels is not None
     item_size = np.dtype(dtype).itemsize
     offset = offset if offset else 0
-    n_samples = (op.getsize(str(dat_path)) - offset) // (item_size * n_channels)
-    return np.memmap(
-        str(dat_path), dtype=dtype, shape=(n_channels, n_samples), offset=offset, order='F')
+    if shape is None:
+        assert n_channels is not None
+        n_samples = (op.getsize(str(dat_path)) - offset) // (item_size * n_channels)
+        shape = (n_channels, n_samples)
+    assert shape
+    shape = tuple(shape)
+    return np.memmap(str(dat_path), dtype=dtype, shape=shape, offset=offset, order='F')
 
 
 def extract_constants_from_cuda(code):
@@ -91,6 +100,58 @@ def get_cuda(fn):
     code = path.read_text()
     code = code.replace('__global__ void', 'extern "C" __global__ void')
     return code, Bunch(extract_constants_from_cuda(code))
+
+
+class LargeArrayWriter(object):
+    """Save a large array chunk by chunk, in a binary file with FORTRAN order."""
+    def __init__(self, path, dtype=None, shape=None):
+        self.path = Path(path)
+        self.dtype = np.dtype(dtype)
+        self._shape = shape
+        assert shape[-1] == -1  # the last axis must be the extendable axis, in FORTRAN order
+        assert -1 not in shape[:-1]  # shape may not contain -1 outside the last dimension
+        self.fw = open(self.path, 'wb')
+        self.extendable_axis_size = 0
+        self.total_size = 0
+
+    def append(self, arr):
+        # We convert to the requested data type.
+        assert arr.flags.f_contiguous  # only FORTRAN order arrays are currently supported
+        assert arr.shape[:-1] == self._shape[:-1]
+        arr = arr.astype(self.dtype)
+        es = arr.shape[-1]
+        if arr.flags.f_contiguous:
+            arr = arr.T
+        # We download the array from the GPU if required.
+        # We ensure the array is in FORTRAN order now.
+        assert arr.flags.c_contiguous
+        if isinstance(arr, cp.ndarray):
+            arr = cp.asnumpy(arr)
+        arr.tofile(self.fw)
+        self.total_size += arr.size
+        self.extendable_axis_size += es  # the last dimension, but
+        assert prod(self.shape) == self.total_size
+
+    @property
+    def shape(self):
+        return self._shape[:-1] + (self.extendable_axis_size,)
+
+    def close(self):
+        self.fw.close()
+        # Save JSON metadata file.
+        with open(self.path.with_suffix('.json'), 'w') as f:
+            json.dump({'shape': self.shape, 'dtype': str(self.dtype), 'order': 'F'}, f)
+
+
+def memmap_large_array(path):
+    """Memmap a large array saved by LargeArrayWriter."""
+    path = Path(path)
+    with open(path.with_suffix('.json'), 'r') as f:
+        metadata = json.load(f)
+    assert metadata['order'] == 'F'
+    dtype = np.dtype(metadata['dtype'])
+    shape = metadata['shape']
+    return memmap_binary_file(path, shape=shape, dtype=dtype)
 
 
 class Context(Bunch):
