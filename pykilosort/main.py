@@ -7,7 +7,7 @@ from .preprocess import preprocess, get_good_channels, get_whitening_matrix, get
 from .cluster import clusterSingleBatches
 from .learn import learnAndSolve8b
 from .postprocess import find_merges, splitAllClusters, set_cutoff, rezToPhy
-from .utils import Bunch, Context, memmap_raw_data
+from .utils import Bunch, Context, memmap_binary_file, memmap_large_array
 from .default_params import default_params, set_dependent_params
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
 
     # WARNING: F order, shape (n_channels, n_samples) given the layout of the file on disk,
     # and for consistency with MATLAB.
-    raw_data = memmap_raw_data(dat_path, n_channels=probe.NchanTOT, dtype=np.int16)
+    raw_data = memmap_binary_file(dat_path, n_channels=probe.NchanTOT, dtype=np.int16)
     assert raw_data.shape[0] < raw_data.shape[1]
 
     # Get or create the probe object.
@@ -147,6 +147,9 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
             out = learnAndSolve8b(ctx)
         logger.info("%d spikes.", ir.st3.shape[0])
         ctx.save(**out)
+    # Special care for cProj and cProjPC which are memmapped .dat files.
+    ir.cProj = memmap_large_array(ctx.path('fW', ext='.dat')).T
+    ir.cProjPC = np.transpose(memmap_large_array(ctx.path('fWpc', ext='.dat')), (2, 1, 0))
 
     # -------------------------------------------------------------------------
     # Final merges.

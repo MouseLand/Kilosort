@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from .cptools import svdecon, svdecon_cpu, median, free_gpu_memory, ones
 from .cluster import isolated_peaks_new, get_SpikeSample, getClosestChannels
-from .utils import Bunch, get_cuda, _extend
+from .utils import Bunch, get_cuda, _extend, LargeArrayWriter
 
 logger = logging.getLogger(__name__)
 
@@ -694,9 +694,10 @@ def learnAndSolve8b(ctx):
 
     # these ones store features per spike
     # Nnearest is the number of nearest templates to store features for
-    fW = []  # zeros(Nnearest, 1e7, 'single')
+    fW = LargeArrayWriter(ctx.path('fW', ext='.dat'), dtype=np.float32, shape=(Nnearest, -1))
     # NchanNear is the number of nearest channels to take PC features from
-    fWpc = []  # zeros(NchanNear, Nrank, 1e7, 'single')
+    fWpc = LargeArrayWriter(
+        ctx.path('fWpc', ext='.dat'), dtype=np.float32, shape=(NchanNear, Nrank, -1))
 
     for ibatch in tqdm(range(niter), desc="Optimizing templates"):
         # korder is the index of the batch at this point in the schedule
@@ -903,11 +904,11 @@ def learnAndSolve8b(ctx):
                 cp.asnumpy(vexp),  # residual variance of this spike
                 korder * np.ones(st.size),  # batch from which this spike was found
             ]
-            # Number of spikes.
+            # Check the number of spikes.
             assert st30.shape[0] == featW.shape[1] == featPC.shape[2]
             st3.append(st30)
-            fW.append(cp.asnumpy(featW))
-            fWpc.append(cp.asnumpy(featPC))
+            fW.append(featW)
+            fWpc.append(featPC)
 
             ntot = ntot + x0.size  # keeps track of total number of spikes so far
 
@@ -926,6 +927,10 @@ def learnAndSolve8b(ctx):
 
         free_gpu_memory()
 
+    # Close the large array writers and save the JSON metadata files to disk.
+    fW.close()
+    fWpc.close()
+
     # just display the total number of spikes
     logger.info("Found %d spikes.", ntot)
 
@@ -936,21 +941,22 @@ def learnAndSolve8b(ctx):
     # taken as the max over several consecutive time delays
     ir.simScore = cp.asnumpy(cp.max(WtW, axis=2))
 
-    fWa = np.concatenate(fW, axis=-1)
-    fWpca = np.concatenate(fWpc, axis=-1)
+    # NOTE: these are now already saved by LargeArrayWriter
+    # fWa = np.concatenate(fW, axis=-1)
+    # fWpca = np.concatenate(fWpc, axis=-1)
 
     # the template features are stored in cProj, like in Kilosort1
-    ir.cProj = fWa.T
+    # ir.cProj = fWa.T
     # the neihboring templates idnices are stored in iNeigh
     ir.iNeigh = cp.asnumpy(iList)
 
     #  permute the PC projections in the right order
-    ir.cProjPC = np.transpose(fWpca, (2, 1, 0))
+    # ir.cProjPC = np.transpose(fWpca, (2, 1, 0))
     # iNeighPC keeps the indices of the channels corresponding to the PC features
     ir.iNeighPC = cp.asnumpy(iC[:, iW])
 
     # Number of spikes.
-    assert ir.st3.shape[0] == ir.cProj.shape[0] == ir.cProjPC.shape[0]
+    assert ir.st3.shape[0] == fW.shape[-1] == fWpc.shape[-1]
 
     # this whole next block is just done to compress the compressed templates
     # we separately svd the time components of each template, and the spatial components
@@ -986,8 +992,8 @@ def learnAndSolve8b(ctx):
         wTEMP=wTEMP,
         st3=ir.st3,
         simScore=ir.simScore,
-        cProj=ir.cProj,
-        cProjPC=ir.cProjPC,
+        # cProj=ir.cProj,
+        # cProjPC=ir.cProjPC,
         iNeigh=ir.iNeigh,
         iNeighPC=ir.iNeighPC,
         WA=ir.WA,

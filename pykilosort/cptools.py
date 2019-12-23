@@ -103,7 +103,7 @@ def _apply_lfilter(lfilter_fun, arr):
     grid = (int(ceil(n_channels / float(block[0]))),)
 
     arr = cp.asarray(arr, dtype=np.float32)
-    y = cp.zeros_like(arr, order='F' if cp.isfortran(arr) else 'C', dtype=arr.dtype)
+    y = cp.zeros_like(arr, order='F' if arr.flags.f_contiguous else 'C', dtype=arr.dtype)
 
     assert arr.dtype == np.float32
     assert y.dtype == np.float32
@@ -115,7 +115,8 @@ def _apply_lfilter(lfilter_fun, arr):
 
 def lfilter(b, a, arr, axis=0, reverse=False):
     """Perform a linear filter along the first axis on a GPU array."""
-    lfilter_fun = _get_lfilter_fun(b, a, is_fortran=cp.isfortran(arr), axis=axis, reverse=reverse)
+    lfilter_fun = _get_lfilter_fun(
+        b, a, is_fortran=arr.flags.f_contiguous, axis=axis, reverse=reverse)
     return _apply_lfilter(lfilter_fun, arr)
 
 

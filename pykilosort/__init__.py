@@ -1,7 +1,7 @@
 import logging
 import os.path as op
 
-from .utils import Bunch, memmap_raw_data, read_data  # noqa
+from .utils import Bunch, memmap_binary_file, read_data  # noqa
 from .main import run  # noqa
 
 

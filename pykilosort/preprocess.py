@@ -309,13 +309,13 @@ def get_good_channels(raw_data=None, probe=None, params=None):
     for ibatch in tqdm(range(0, Nbatch, int(ceil(Nbatch / 100))), desc="Finding good channels"):
         i = NT * ibatch
         buff = raw_data[:, i:i + NT]
-        assert np.isfortran(buff)
+        assert buff.flags.f_contiguous
         if buff.size == 0:
             break
 
         # Put on GPU.
         buff = cp.asarray(buff, dtype=np.float32)
-        assert cp.isfortran(buff)
+        assert buff.flags.f_contiguous
         datr = gpufilter(buff, chanMap=chanMap, fs=fs, fshigh=fshigh, fslow=fslow)
 
         # very basic threshold crossings calculation
