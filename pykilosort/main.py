@@ -7,7 +7,7 @@ from .preprocess import preprocess, get_good_channels, get_whitening_matrix, get
 from .cluster import clusterSingleBatches
 from .learn import learnAndSolve8b
 from .postprocess import find_merges, splitAllClusters, set_cutoff, rezToPhy
-from .utils import Bunch, Context, memmap_binary_file, memmap_large_array
+from .utils import Bunch, Context, memmap_binary_file, memmap_large_array, load_probe
 from .default_params import default_params, set_dependent_params
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ def default_probe(raw_data):
     return Bunch(Nchan=nc, xc=np.zeros(nc), yc=np.arange(nc))
 
 
-def run(dat_path=None, probe=None, params=None, dir_path=None):
+def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, stop_after=None):
     """
 
     probe has the following attributes:
@@ -34,12 +34,18 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
     # if raw_data is None:
     #     raise ValueError("Please provide a raw_data array.")
 
+    # Get or create the probe object.
+    if isinstance(probe, (str, Path)):
+        probe = load_probe(probe)
+
     # WARNING: F order, shape (n_channels, n_samples) given the layout of the file on disk,
     # and for consistency with MATLAB.
-    raw_data = memmap_binary_file(dat_path, n_channels=probe.NchanTOT, dtype=np.int16)
+    if raw_data is None:
+        dat_path = Path(dat_path)
+        raw_data = memmap_binary_file(dat_path, n_channels=probe.NchanTOT, dtype=np.int16)
+    assert raw_data.ndim == 2
     assert raw_data.shape[0] < raw_data.shape[1]
 
-    # Get or create the probe object.
     probe = probe or default_probe(raw_data)
     assert probe
 
@@ -51,13 +57,12 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
     assert params
 
     # dir path
-    dat_path = Path(dat_path)
     dir_path = dir_path or dat_path.parent
     dir_path.mkdir(exist_ok=True, parents=True)
     assert dir_path.exists()
 
     # Create the context.
-    ctx_path = dir_path / '.kilosort' / dat_path.name
+    ctx_path = dir_path / '.kilosort' / getattr(raw_data, 'name', dat_path.name)
     ctx = Context(ctx_path)
     ctx.params = params
     ctx.probe = probe
@@ -78,6 +83,8 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
                 ir.igood = get_good_channels(raw_data=raw_data, probe=probe, params=params)
             # Cache the result.
             ctx.write(igood=ir.igood)
+        if stop_after == 'good_channels':
+            return
 
         # it's enough to remove bad channels from the channel map, which treats them
         # as if they are dead
@@ -100,6 +107,8 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
             ir.Wrot = get_whitening_matrix(raw_data=raw_data, probe=probe, params=params)
         # Cache the result.
         ctx.write(Wrot=ir.Wrot)
+    if stop_after == 'whitening_matrix':
+        return
 
     # -------------------------------------------------------------------------
     # Preprocess data to create proc.dat
@@ -108,6 +117,8 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
         # Do not preprocess again if the proc.dat file already exists.
         with ctx.time('preprocess'):
             preprocess(ctx)
+    if stop_after == 'preprocess':
+        return
 
     # Open the proc file.
     assert ir.proc_path.exists()
@@ -121,9 +132,11 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
     #       iorig, ccb0, ccbsort
     #
     if 'iorig' not in ir:
-        with ctx.time('cluster'):
+        with ctx.time('reorder'):
             out = clusterSingleBatches(ctx)
         ctx.save(**out)
+    if stop_after == 'reorder':
+        return
 
     # -------------------------------------------------------------------------
     # Main tracking and template matching algorithm.
@@ -147,6 +160,8 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
             out = learnAndSolve8b(ctx)
         logger.info("%d spikes.", ir.st3.shape[0])
         ctx.save(**out)
+    if stop_after == 'learn':
+        return
     # Special care for cProj and cProjPC which are memmapped .dat files.
     ir.cProj = memmap_large_array(ctx.path('fW', ext='.dat')).T
     ir.cProjPC = np.transpose(memmap_large_array(ctx.path('fWpc', ext='.dat')), (2, 1, 0))
@@ -167,6 +182,8 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
         with ctx.time('merge'):
             out = find_merges(ctx, True)
         ctx.save(**out)
+    if stop_after == 'merge':
+        return
 
     # -------------------------------------------------------------------------
     # Final splits.
@@ -192,12 +209,17 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
         # Use a different name for both splitting steps.
         out['st3_s1'] = out.pop('st3_s')
         ctx.save(**out)
+    if stop_after == 'split_1':
+        return
+
     if 'st3_s0' not in ir:
         # final splits by amplitudes
         with ctx.time('split_2'):
             out = splitAllClusters(ctx, False)
         out['st3_s0'] = out.pop('st3_s')
         ctx.save(**out)
+    if stop_after == 'split_2':
+        return
 
     # -------------------------------------------------------------------------
     # Decide on cutoff.
@@ -218,6 +240,8 @@ def run(dat_path=None, probe=None, params=None, dir_path=None):
         with ctx.time('cutoff'):
             out = set_cutoff(ctx)
         ctx.save(**out)
+    if stop_after == 'cutoff':
+        return
 
     logger.info("%d spikes after cutoff.", ir.st3_c.shape[0])
     logger.info('Found %d good units.', np.sum(ir.good > 0))
