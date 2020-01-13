@@ -34,11 +34,15 @@ def gpufilter(buff, chanMap=None, fs=None, fslow=None, fshigh=None, car=True):
     b1, a1 = get_filter_params(fs, fshigh=fshigh, fslow=fslow)
 
     dataRAW = buff.T
+    assert dataRAW.ndim == 2
     if chanMap is not None:
         dataRAW = dataRAW[:, chanMap]  # subsample only good channels
+    assert dataRAW.ndim == 2
 
     # subtract the mean from each channel
+    assert dataRAW.ndim == 2
     dataRAW = dataRAW - cp.mean(dataRAW, axis=0)  # subtract mean of each channel
+    assert dataRAW.ndim == 2
 
     # CAR, common average referencing by median
     if car:

@@ -1,7 +1,7 @@
 
 from pathlib import Path
 import logging
-# import sys
+from textwrap import dedent
 
 import click
 import numpy as np
@@ -13,10 +13,27 @@ from phylib.utils.geometry import linear_positions
 from phy.apps import capture_exceptions
 from phy.cluster.views.trace import TraceImageView, select_traces
 from phy.cluster.views.probe import ProbeView
-from phy.gui import create_app, run_app, GUI, IPythonView
-from phy.gui.qt import QSlider, Qt, QAction, QLabel
+from phy.gui import create_app, run_app, GUI, IPythonView, KeyValueWidget
+from phy.gui.qt import QSlider, Qt, QLabel, QScrollArea, QVBoxLayout, QWidget
+from phy.gui import Actions
+
+from .default_params import default_params
+from .main import run
 
 logger = logging.getLogger(__name__)
+
+
+# DEFAULT_PARAMS_PY = '''
+# dat_path = {dat_path}
+# n_channels_dat = {n_channels_dat}
+# dtype = "{dtype}"
+# offset = {offset}
+# sample_rate = {sample_rate}
+# '''
+
+
+class Parameters(QWidget):
+    pass
 
 
 class KilosortGUICreator(object):
@@ -27,6 +44,7 @@ class KilosortGUICreator(object):
         self.load_data()
 
     def load_data(self):
+        # TODO: use EphysTraces
         dat_path = self.dat_path
         if dat_path.suffix == '.cbin':
             data = load_raw_data(path=dat_path)
@@ -50,53 +68,60 @@ class KilosortGUICreator(object):
                 offset=offset,
                 order=order,
             )
+
+        # Parameters for the creation of params.py
+        self.n_channels_dat = n_channels_dat
+        self.offset = offset
+        self.dtype = dtype
+
         self.data = data
         self.duration = self.data.shape[0] / sample_rate
 
-    def create_params(self):
-        # TODO: generate a params.py (with confirmation if overwrite), and ks2_params dictionary
-        pass
+    # def create_params(self):
+        # paramspy = DEFAULT_PARAMS_PY.format(
+        #     dat_path='["%s"]' % str(self.dat_path),
+        #     n_channels_dat=self.n_channels_dat,
+        #     offset=self.offset,
+        #     dtype=self.dtype,
+        #     sample_rate=self.sample_rate,
+        # )
 
-    def find_dead_channels(self):
-        # TODO
-        pass
+    def _run(self, stop_after=None):
+        # TODO: test
+        run(self.dat_path, self.probe, dir_path=self.dir_path, stop_after=stop_after)
+
+    def find_good_channels(self):
+        self._run('good_channels')
+        # TODO: update probe view
 
     def preprocess(self):
-        # TODO
-        pass
+        self._run('preprocess')
+        # TODO: update trace view
 
     def spike_sort(self):
-        # TODO
-        pass
+        self._run()
+        # TODO: create custom logging handler that redirectors to ipython view
+        # view.append_stream(...)
 
-    def create_buttons(self, gui):
-        action = QAction("Create params.py", gui)
-        action.triggered.connect(self.create_params)
-        gui._toolbar.addAction(action)
-
-        action = QAction("Find dead channels", gui)
-        action.triggered.connect(self.find_dead_channels)
-        gui._toolbar.addAction(action)
-
-        action = QAction("Preprocess", gui)
-        action.triggered.connect(self.preprocess)
-        gui._toolbar.addAction(action)
-
-        action = QAction("Spike sort", gui)
-        action.triggered.connect(self.spike_sort)
-        gui._toolbar.addAction(action)
+    def create_actions(self, gui):
+        """Create the actions."""
+        self.actions = Actions(gui)
+        # self.actions.add(self.create_params, name="Create params.py", toolbar=True)
+        self.actions.add(self.find_good_channels, name="Find good channels", toolbar=True)
+        self.actions.add(self.preprocess, name="Preprocess", toolbar=True)
+        self.actions.add(self.spike_sort, name="Spike sort", toolbar=True)
 
     def create_ipython_view(self, gui):
+        """Add the IPython view."""
         view = IPythonView()
         view.attach(gui)
 
         view.inject(gui=gui, creator=self, data=self.data)
 
-        # TODO: redirect KS2 output in it
-
         return view
 
     def create_trace_view(self, gui):
+        """Add the trace view."""
         gui._toolbar.addWidget(QLabel("Time selection: "))
         time_slider = QSlider(Qt.Horizontal, gui)
         time_slider.setRange(0, 100)
@@ -129,14 +154,42 @@ class KilosortGUICreator(object):
         return view
 
     def move_time_slider_to(self, time):
+        """Move the time slider."""
         self.time_slider.setSliderPosition(int(time / self.duration * 100))
 
     def create_probe_view(self, gui):
+        """Add the view that shows the probe layout."""
         channel_positions = linear_positions(self.n_channels_dat)
         view = ProbeView(channel_positions)
         view.attach(gui)
-        # TODO: update positions dynamically
+        # TODO: update positions dynamically when the probe view changes
         return view
+
+    def create_params_widget(self, gui):
+        """Create the widget that allows to enter parameters for KS2."""
+        widget = KeyValueWidget(gui)
+        for name, default in default_params.items():
+            # HACK: None default params in KS2 are floats
+            vtype = 'float' if default is None else None
+            widget.add_pair(name, default, vtype=vtype)
+        # Time interval (TODO: take it into account with EphysTraces).
+        widget.add_pair('time interval', [0.0, self.duration])
+        widget.add_pair('custom probe', dedent('''
+        # Python code that returns a probe variable which is a Bunch instance,
+        # with the following variables: NchanTOT, chanMap, xc, yc, kcoords.
+        ''').strip(), 'multiline')
+
+        scroll = QScrollArea()
+        scroll.setWidget(widget)
+        scroll.setWidgetResizable(True)
+        # scroll.show()
+
+        widget = Parameters(gui)
+        layout = QVBoxLayout(widget)
+        layout.addWidget(scroll)
+
+        gui.add_view(widget)
+        return widget
 
     def create_gui(self):
         """Create the spike sorting GUI."""
@@ -144,17 +197,11 @@ class KilosortGUICreator(object):
         gui = GUI(name=self.gui_name, subtitle=self.dat_path.resolve(), enable_threading=False)
         gui.has_save_action = False
         gui.set_default_actions()
-        self.create_buttons(gui)
+        self.create_actions(gui)
+        self.create_params_widget(gui)
         self.create_ipython_view(gui)
         self.create_trace_view(gui)
         self.create_probe_view(gui)
-        # TODO: KeyValueWidget with KS2 params (auto generated from default params)
-        # TODO: KeyValueWidget with data params
-        # probe coordinates: text box with python code that loads channel_positions.npy, or
-        #   xc.npy/kcoords: need to define channel_positions variable
-        # channel mapping: load npy, need to define channel_map variable
-        # interval_start
-        # interval_stop
 
         return gui
 
