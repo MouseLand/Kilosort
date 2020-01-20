@@ -27,7 +27,8 @@ def extractTemplatesfromSnippets(proc=None, probe=None, params=None, Nbatch=None
 
     k = 0
     # preallocate matrix to hold 1D spike snippets
-    dd = cp.zeros((params.nt0, int(5e4)), dtype=np.float32, order='F')
+    # dd = cp.zeros((params.nt0, int(5e4)), dtype=np.float32, order='F')
+    dds = []
 
     for ibatch in tqdm(range(0, Nbatch, nskip), desc="Extracting templates"):
         offset = Nchan * batchstart[ibatch]
@@ -42,16 +43,18 @@ def extractTemplatesfromSnippets(proc=None, probe=None, params=None, Nbatch=None
         # for each peak, get the voltage snippet from that channel
         c = get_SpikeSample(dataRAW, row, col, params)
 
-        if k + c.shape[1] > dd.shape[1]:
-            dd = cp.pad(dd, (0, dd.shape[1]), mode='constant')
+        # if k + c.shape[1] > dd.shape[1]:
+        #     dd = cp.pad(dd, (0, dd.shape[1]), mode='constant')
 
-        dd[:, k:k + c.shape[1]] = c
+        # dd[:, k:k + c.shape[1]] = c
+        dds.append(c)
         k = k + c.shape[1]
         if k > 1e5:
             break
 
     # discard empty samples
-    dd = dd[:, :k]
+    # dd = dd[:, :k]
+    dd = cp.asfortranarray(cp.concatenate(dds, axis=1).astype(np.float32))
 
     # initialize the template clustering with random waveforms
     uu = np.random.permutation(dd.shape[1])[:nPCs]
