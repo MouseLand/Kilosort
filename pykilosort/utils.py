@@ -174,7 +174,7 @@ def _npy_header(shape, dtype, order='C'):
     return d
 
 
-def save_large_array(fp, array, axis=0):
+def save_large_array(fp, array, axis=0, desc=None):
     """Save a large, potentially memmapped array, into a NPY file, chunk by chunk to avoid loading
     it entirely in memory."""
     assert axis == 0  # TODO: support other axes
@@ -187,21 +187,29 @@ def save_large_array(fp, array, axis=0):
 
     k = int(ceil(float(N) / 100))  # 100 chunks
     assert k >= 1
-    for i in tqdm(range(0, N, k)):
+    for i in tqdm(range(0, N, k), desc=desc):
         chunk = array[i:i + k, ...]
         fp.write(chunk.tobytes())
 
 
 class NpyWriter(object):
-    def __init__(self, path, shape, dtype):
-        header = _npy_header(shape, dtype)
+    def __init__(self, path, shape, dtype, axis=0):
+        assert axis == 0  # only concatenation along the first axis is supported right now
+        # Only C order is supported at the moment.
+        self.shape = shape
+        self.dtype = np.dtype(dtype)
+        header = _npy_header(self.shape, self.dtype)
         version = None
         _check_version(version)
         self.fp = open(path, 'wb')
         _write_array_header(self.fp, header, version)
 
     def append(self, chunk):
-        self.fp.write(chunk.tobytes())
+        if chunk.ndim == len(self.shape):
+            assert chunk.shape[1:] == self.shape[1:]
+        else:
+            assert chunk.shape == self.shape[1:]
+        self.fp.write(cp.asnumpy(chunk).tobytes())
 
     def close(self):
         self.fp.close()

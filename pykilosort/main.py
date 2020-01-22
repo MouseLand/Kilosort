@@ -84,7 +84,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
             # Cache the result.
             ctx.write(igood=ir.igood)
         if stop_after == 'good_channels':
-            return
+            return ctx
 
         # it's enough to remove bad channels from the channel map, which treats them
         # as if they are dead
@@ -108,7 +108,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
         # Cache the result.
         ctx.write(Wrot=ir.Wrot)
     if stop_after == 'whitening_matrix':
-        return
+        return ctx
 
     # -------------------------------------------------------------------------
     # Preprocess data to create proc.dat
@@ -118,7 +118,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
         with ctx.time('preprocess'):
             preprocess(ctx)
     if stop_after == 'preprocess':
-        return
+        return ctx
 
     # Open the proc file.
     assert ir.proc_path.exists()
@@ -136,7 +136,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
             out = clusterSingleBatches(ctx)
         ctx.save(**out)
     if stop_after == 'reorder':
-        return
+        return ctx
 
     # -------------------------------------------------------------------------
     # Main tracking and template matching algorithm.
@@ -161,10 +161,11 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
         logger.info("%d spikes.", ir.st3.shape[0])
         ctx.save(**out)
     if stop_after == 'learn':
-        return
+        return ctx
     # Special care for cProj and cProjPC which are memmapped .dat files.
     ir.cProj = memmap_large_array(ctx.path('fW', ext='.dat')).T
-    ir.cProjPC = np.transpose(memmap_large_array(ctx.path('fWpc', ext='.dat')), (2, 1, 0))
+    ir.cProjPC = memmap_large_array(ctx.path('fWpc', ext='.dat'))
+    ir.cProjPC = np.transpose(ir.cProjPC, (2, 1, 0)).astype(ir.cProjPC.dtype)
 
     # -------------------------------------------------------------------------
     # Final merges.
@@ -183,7 +184,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
             out = find_merges(ctx, True)
         ctx.save(**out)
     if stop_after == 'merge':
-        return
+        return ctx
 
     # -------------------------------------------------------------------------
     # Final splits.
@@ -210,7 +211,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
         out['st3_s1'] = out.pop('st3_s')
         ctx.save(**out)
     if stop_after == 'split_1':
-        return
+        return ctx
 
     if 'st3_s0' not in ir:
         # final splits by amplitudes
@@ -219,7 +220,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
         out['st3_s0'] = out.pop('st3_s')
         ctx.save(**out)
     if stop_after == 'split_2':
-        return
+        return ctx
 
     # -------------------------------------------------------------------------
     # Decide on cutoff.
@@ -241,7 +242,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
             out = set_cutoff(ctx)
         ctx.save(**out)
     if stop_after == 'cutoff':
-        return
+        return ctx
 
     logger.info("%d spikes after cutoff.", ir.st3_c.shape[0])
     logger.info('Found %d good units.', np.sum(ir.good > 0))

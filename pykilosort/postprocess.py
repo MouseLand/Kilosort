@@ -1,4 +1,4 @@
-from math import erf, log as log_, sqrt
+from math import ceil, erf, log as log_, sqrt
 import logging
 import os
 from os.path import join
@@ -15,7 +15,7 @@ from .cptools import ones, svdecon, var, mean
 from .cluster import getClosestChannels
 from .learn import getKernels, getMeWtW, mexSVDsmall2
 from .preprocess import my_conv2
-from .utils import Bunch
+from .utils import Bunch, NpyWriter
 
 logger = logging.getLogger(__name__)
 
@@ -834,8 +834,8 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
 
     isort = cp.argsort(st3[:, 0])
     st3 = st3[isort, :]
-    cProj = cp.asarray(ir.cProj_c[cp.asnumpy(isort), :])
-    cProjPC = cp.asarray(ir.cProjPC_c[cp.asnumpy(isort), :, :])
+    # cProj = ir.cProj_c[cp.asnumpy(isort), :]
+    # cProjPC = ir.cProjPC_c[cp.asnumpy(isort), :, :]
 
     fs = os.listdir(savePath)
     for file in fs:
@@ -851,6 +851,14 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     if st3.shape[1] > 4:
         spikeClusters = (1 + st3[:, 4]).astype(cp.uint32)
 
+    # templateFeatures = cProj
+    templateFeatureInds = iNeigh.astype(cp.uint32)
+    # pcFeatures = cProjPC
+    pcFeatureInds = iNeighPC.astype(cp.uint32)
+
+    whiteningMatrix = cp.asarray(Wrot) / params.scaleproc
+    whiteningMatrixInv = cp.linalg.pinv(whiteningMatrix)
+
     amplitudes = st3[:, 2]
 
     Nchan = probe.Nchan
@@ -865,37 +873,39 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
 
     # (DEV_NOTES) 2 lines below can be combined
     # templates = cp.einsum('ikl,jkl->ijk', U, W).astype(cp.float32)
-    templates = cp.zeros((Nchan, nt0, Nfilt), dtype=np.float32, order='F')
-    for iNN in tqdm(range(templates.shape[2]), desc="Computing templates"):
-        templates[:, :, iNN] = cp.dot(U[:, iNN, :], W[:, iNN, :].T)
-    templates = cp.transpose(templates, (2, 1, 0))  # now it's nTemplates x nSamples x nChannels
+    # templates = cp.zeros((Nchan, nt0, Nfilt), dtype=np.float32, order='F')
+    tempAmpsUnscaled = cp.zeros(Nfilt, dtype=np.float32)
+    templates_writer = NpyWriter(join(savePath, 'templates.npy'), (Nfilt, nt0, Nchan), np.float32)
+    for iNN in tqdm(range(Nfilt), desc="Computing templates"):
+        t = cp.dot(U[:, iNN, :], W[:, iNN, :].T).T
+        templates_writer.append(t)
+        t_unw = cp.dot(t, whiteningMatrixInv)
+        assert t_unw.ndim == 2
+        tempChanAmps = t_unw.max(axis=0) - t_unw.min(axis=0)
+        tempAmpsUnscaled[iNN] = tempChanAmps.max()
+
+    templates_writer.close()
+    # templates = cp.transpose(templates, (2, 1, 0))  # now it's nTemplates x nSamples x nChannels
     # we include all channels so this is trivial
-    templatesInds = cp.tile(np.arange(templates.shape[2]), (templates.shape[0], 1))
-
-    templateFeatures = cProj
-    templateFeatureInds = iNeigh.astype(cp.uint32)
-    pcFeatures = cProjPC
-    pcFeatureInds = iNeighPC.astype(cp.uint32)
-
-    whiteningMatrix = cp.asarray(Wrot) / params.scaleproc
-    whiteningMatrixInv = cp.linalg.pinv(whiteningMatrix)
+    templatesInds = cp.tile(np.arange(Nfilt), (Nchan, 1))
 
     # here we compute the amplitude of every template...
 
     # unwhiten all the templates
     # tempsUnW = cp.einsum('ijk,kl->ijl', templates, whiteningMatrixinv)
-    tempsUnW = cp.zeros(templates.shape, dtype=np.float32, order='F')
-    for t in tqdm(range(templates.shape[0]), desc="Unwhitening the templates"):
-        tempsUnW[t, :, :] = cp.dot(templates[t, :, :], whiteningMatrixInv)
+    # tempsUnW = cp.zeros(templates.shape, dtype=np.float32, order='F')
+    # for t in tqdm(range(templates.shape[0]), desc="Unwhitening the templates"):
+    #     tempsUnW[t, :, :] = cp.dot(templates[t, :, :], whiteningMatrixInv)
 
     # The amplitude on each channel is the positive peak minus the negative
-    tempChanAmps = tempsUnW.max(axis=1) - tempsUnW.min(axis=1)
+    # tempChanAmps = tempsUnW.max(axis=1) - tempsUnW.min(axis=1)
 
     # The template amplitude is the amplitude of its largest channel
-    tempAmpsUnscaled = tempChanAmps.max(axis=1)
+    # tempAmpsUnscaled = tempChanAmps.max(axis=1)
 
     # assign all spikes the amplitude of their template multiplied by their
     # scaling amplitudes
+    # tempAmpsUnscaled = cp.(tempAmpsUnscaled, axis=0).astype(np.float32)
     spikeAmps = tempAmpsUnscaled[spikeTemplates] * amplitudes
 
     # take the average of all spike amps to get actual template amps (since
@@ -905,6 +915,23 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     tempAmps = cp.zeros_like(tempAmpsUnscaled, order='F')
     tempAmps[tids] = ta  # because ta only has entries for templates that had at least one spike
     tempAmps = params.gain * tempAmps  # for consistency, make first dimension template number
+
+    tfw = NpyWriter(join(savePath, 'template_features.npy'), ir.cProj_c.shape, np.float32)
+    pcw = NpyWriter(join(savePath, 'pc_features.npy'), ir.cProjPC_c.shape, np.float32)
+    ss = cp.asnumpy(isort)
+    N = len(ss)
+    k = int(ceil(float(N) / 100))  # 100 chunks
+    assert k >= 1
+    for i in tqdm(range(0, N, k), desc="Saving template and PC features"):
+        idx = ss[i:i + k, ...]
+        tfw.append(ir.cProj_c[idx])
+        pcw.append(ir.cProjPC_c[idx])
+    tfw.close()
+    pcw.close()
+    # with open(, 'wb') as fp:
+    #     save_large_array(fp, templateFeatures)
+    # cProj = ir.cProj_c[cp.asnumpy(isort), :]
+    # cProjPC = ir.cProjPC_c[cp.asnumpy(isort), :, :]
 
     def _save(name, arr, dtype=None):
         cp.save(join(savePath, name + '.npy'), arr.astype(dtype or arr.dtype))
@@ -917,7 +944,7 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
         else:
             _save('spike_clusters', spikeTemplates, cp.uint32)
         _save('amplitudes', amplitudes)
-        _save('templates', templates)
+        # _save('templates', templates)
         _save('templates_ind', templatesInds)
 
         chanMap0ind = chanMap0ind.astype(cp.int32)
@@ -925,9 +952,14 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
         _save('channel_map', chanMap0ind)
         _save('channel_positions', np.c_[xcoords, ycoords])
 
-        _save('template_features', templateFeatures)
+        # _save('template_features', templateFeatures)
+        # with open(join(savePath, 'template_features.npy'), 'wb') as fp:
+        #     save_large_array(fp, templateFeatures)
         _save('template_feature_ind', templateFeatureInds.T)
-        _save('pc_features', pcFeatures)
+
+        # _save('pc_features', pcFeatures)
+        # with open(join(savePath, 'pc_features.npy'), 'wb') as fp:
+        #     save_large_array(fp, pcFeatures)
         _save('pc_feature_ind', pcFeatureInds.T)
 
         _save('whitening_mat', whiteningMatrix)
@@ -965,3 +997,4 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
                 f.write('offset = 0\n')
                 f.write('hp_filtered = False\n')
                 f.write('sample_rate = %i\n' % params.fs)
+                f.write('template_scaling = %.1f\n' % params.get('templateScaling', 1.0))

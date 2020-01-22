@@ -57,6 +57,8 @@ default_params.nup = 10
 default_params.sig = 1
 default_params.gain = 1
 
+default_params.templateScaling = 20.0
+
 default_params.loc_range = [5, 4]
 default_params.long_range = [30, 6]
 
