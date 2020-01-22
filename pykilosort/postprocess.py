@@ -450,7 +450,8 @@ def splitAllClusters(ctx, flag):
 
         ss = st3[:, 0][isp] / params.fs  # convert to seconds
 
-        clp0 = cp.asarray(cProjPC)[isp, :, :]  # get the PC projections for these spikes
+        clp0 = cProjPC[cp.asnumpy(isp), :, :]  # get the PC projections for these spikes
+        clp0 = cp.asarray(clp0, dtype=cp.float32)  # upload to the GPU
         clp0 = clp0.reshape((clp0.shape[0], -1), order='F')
         clp = clp0 - mean(clp0, axis=0)  # mean center them
 
@@ -711,7 +712,7 @@ def set_cutoff(ctx):
     Ths = cp.zeros(Nk)
     est_contam_rate = cp.zeros(Nk)
 
-    for j in range(Nk):
+    for j in tqdm(range(Nk), desc='Setting cutoff'):
         ix = cp.where(st3[:, 1] == j)[0]  # find all spikes from this neuron
         ss = st3[ix, 0] / params.fs  # convert to seconds
         if ss.size == 0:
@@ -833,8 +834,8 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
 
     isort = cp.argsort(st3[:, 0])
     st3 = st3[isort, :]
-    cProj = cp.asarray(ir.cProj_c)[isort, :]
-    cProjPC = cp.asarray(ir.cProjPC_c)[isort, :, :]
+    cProj = cp.asarray(ir.cProj_c[cp.asnumpy(isort), :])
+    cProjPC = cp.asarray(ir.cProjPC_c[cp.asnumpy(isort), :, :])
 
     fs = os.listdir(savePath)
     for file in fs:
@@ -865,7 +866,7 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     # (DEV_NOTES) 2 lines below can be combined
     # templates = cp.einsum('ikl,jkl->ijk', U, W).astype(cp.float32)
     templates = cp.zeros((Nchan, nt0, Nfilt), dtype=np.float32, order='F')
-    for iNN in range(templates.shape[2]):
+    for iNN in tqdm(range(templates.shape[2]), desc="Computing templates"):
         templates[:, :, iNN] = cp.dot(U[:, iNN, :], W[:, iNN, :].T)
     templates = cp.transpose(templates, (2, 1, 0))  # now it's nTemplates x nSamples x nChannels
     # we include all channels so this is trivial
@@ -884,7 +885,7 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     # unwhiten all the templates
     # tempsUnW = cp.einsum('ijk,kl->ijl', templates, whiteningMatrixinv)
     tempsUnW = cp.zeros(templates.shape, dtype=np.float32, order='F')
-    for t in range(templates.shape[0]):
+    for t in tqdm(range(templates.shape[0]), desc="Unwhitening the templates"):
         tempsUnW[t, :, :] = cp.dot(templates[t, :, :], whiteningMatrixInv)
 
     # The amplitude on each channel is the positive peak minus the negative
