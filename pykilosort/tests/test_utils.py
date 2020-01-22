@@ -3,7 +3,7 @@ from numpy.testing import assert_array_equal as ae
 from numpy.testing import assert_allclose as ac
 from pytest import raises
 
-from ..utils import Context, LargeArrayWriter, memmap_large_array
+from ..utils import Context, LargeArrayWriter, memmap_large_array, save_large_array, NpyWriter
 
 
 def test_context_1(tmp_path):
@@ -86,3 +86,23 @@ def test_large_array_3(tmp_path):
     arr_1 = memmap_large_array(path)
     assert arr_1.shape == arr.shape
     ac(arr_1, arr)
+
+
+def test_save_large_array_1(tmp_path):
+    path = tmp_path / 'arr.npy'
+    for n in (0, 51, 99, 100, 101, 99, 1000, 1010):
+        array = np.random.rand(n, 20, 30)
+        with open(path, 'wb') as fp:
+            save_large_array(fp, array)
+        ac(np.load(path), array)
+
+
+def test_npy_writer_1(tmp_path):
+    path = tmp_path / 'arr.npy'
+    for n in (0, 51, 99, 100, 101, 99, 1000, 1010):
+        array = np.random.rand(n, 20, 30)
+        nw = NpyWriter(path, array.shape, array.dtype)
+        for row in array:
+            nw.append(row)
+        nw.close()
+        ac(np.load(path), array)

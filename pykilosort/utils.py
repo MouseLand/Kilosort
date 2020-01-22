@@ -2,13 +2,17 @@ from contextlib import contextmanager
 from functools import reduce
 import json
 import logging
+from math import ceil
 from pathlib import Path
 import operator
 import os.path as op
 import re
 from time import perf_counter
 
+from tqdm import tqdm
 import numpy as np
+from numpy.lib.format import (
+    _check_version, _write_array_header, header_data_from_array_1_0, dtype_to_descr)
 import cupy as cp
 
 from .event import emit, connect, unconnect  # noqa
@@ -154,6 +158,55 @@ def memmap_large_array(path):
     return memmap_binary_file(path, shape=shape, dtype=dtype)
 
 
+def _npy_header(shape, dtype, order='C'):
+    d = {'shape': shape}
+    if order == 'C':
+        d['fortran_order'] = False
+    elif order == 'F':
+        d['fortran_order'] = True
+    else:
+        # Totally non-contiguous data. We will have to make it C-contiguous
+        # before writing. Note that we need to test for C_CONTIGUOUS first
+        # because a 1-D array is both C_CONTIGUOUS and F_CONTIGUOUS.
+        d['fortran_order'] = False
+
+    d['descr'] = dtype_to_descr(dtype)
+    return d
+
+
+def save_large_array(fp, array, axis=0):
+    """Save a large, potentially memmapped array, into a NPY file, chunk by chunk to avoid loading
+    it entirely in memory."""
+    assert axis == 0  # TODO: support other axes
+    version = None
+    _check_version(version)
+    _write_array_header(fp, header_data_from_array_1_0(array), version)
+    N = array.shape[axis]
+    if N == 0:
+        return
+
+    k = int(ceil(float(N) / 100))  # 100 chunks
+    assert k >= 1
+    for i in tqdm(range(0, N, k)):
+        chunk = array[i:i + k, ...]
+        fp.write(chunk.tobytes())
+
+
+class NpyWriter(object):
+    def __init__(self, path, shape, dtype):
+        header = _npy_header(shape, dtype)
+        version = None
+        _check_version(version)
+        self.fp = open(path, 'wb')
+        _write_array_header(self.fp, header, version)
+
+    def append(self, chunk):
+        self.fp.write(chunk.tobytes())
+
+    def close(self):
+        self.fp.close()
+
+
 class Context(Bunch):
     def __init__(self, context_path):
         super(Context, self).__init__()
@@ -208,6 +261,7 @@ class Context(Bunch):
         for k, v in kwargs.items():
             # Transfer GPU arrays to the CPU before saving them.
             if isinstance(v, cp.ndarray):
+                logger.debug("Loading %s from GPU.", k)
                 v = cp.asnumpy(v)
             if isinstance(v, np.ndarray):
                 p = self.path(k)
@@ -248,6 +302,7 @@ class Context(Bunch):
     @contextmanager
     def time(self, name):
         """Context manager to measure the time of a section of code."""
+        logger.info("Starting step %s.", name)
         t0 = perf_counter()
         yield
         t1 = perf_counter()
