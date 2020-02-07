@@ -19,7 +19,7 @@ def default_probe(raw_data):
 
 
 def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, stop_after=None):
-    """
+    """Launch KiloSort 2.
 
     probe has the following attributes:
     - xc
@@ -28,11 +28,6 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
     - Nchan
 
     """
-
-    # if dir_path is None:
-    #     raise ValueError("Please provide a dir_path.")
-    # if raw_data is None:
-    #     raise ValueError("Please provide a raw_data array.")
 
     # Get or create the probe object.
     if isinstance(probe, (str, Path)):
@@ -44,8 +39,15 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
         dat_path = Path(dat_path)
         raw_data = memmap_binary_file(dat_path, n_channels=probe.NchanTOT, dtype=np.int16)
     assert raw_data.ndim == 2
-    assert raw_data.shape[0] < raw_data.shape[1]
+    name = dat_path.name if dat_path else 'default'
 
+    # Check order of raw data, should be FORTRAN and shape should be (n_channels, n_samples)
+    if not raw_data.shape[0] < raw_data.shape[1]:
+        raw_data = raw_data.T
+    n_channels, n_samples = raw_data.shape
+    logger.info("Loaded raw data with %d channels, %d samples.", n_channels, n_samples)
+
+    # Get probe.
     probe = probe or default_probe(raw_data)
     assert probe
 
@@ -62,7 +64,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
     assert dir_path.exists()
 
     # Create the context.
-    ctx_path = dir_path / '.kilosort' / getattr(raw_data, 'name', dat_path.name)
+    ctx_path = dir_path / '.kilosort' / name
     ctx = Context(ctx_path)
     ctx.params = params
     ctx.probe = probe
@@ -164,8 +166,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
         return ctx
     # Special care for cProj and cProjPC which are memmapped .dat files.
     ir.cProj = memmap_large_array(ctx.path('fW', ext='.dat')).T
-    ir.cProjPC = memmap_large_array(ctx.path('fWpc', ext='.dat'))
-    ir.cProjPC = np.transpose(ir.cProjPC, (2, 1, 0)).astype(ir.cProjPC.dtype)
+    ir.cProjPC = memmap_large_array(ctx.path('fWpc', ext='.dat')).T  # transpose
 
     # -------------------------------------------------------------------------
     # Final merges.

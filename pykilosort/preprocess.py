@@ -8,7 +8,7 @@ import cupy as cp
 from tqdm import tqdm
 
 from .cptools import lfilter, _get_lfilter_fun, median, convolve
-from .utils import is_fortran
+from .utils import _make_fortran
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +251,9 @@ def get_whitening_matrix(raw_data=None, probe=None, params=None):
         # WARNING: we use Fortran order, so raw_data is NchanTOT x nsamples
         i = max(0, (NT - ntbuff) * ibatch - 2 * ntbuff)
         buff = raw_data[:, i:i + NT - ntbuff]
+        buff = _make_fortran(buff)
+        assert buff.shape[0] < buff.shape[1]
+        assert buff.flags.f_contiguous
 
         nsampcurr = buff.shape[1]
         if nsampcurr < NTbuff:
@@ -313,6 +316,8 @@ def get_good_channels(raw_data=None, probe=None, params=None):
     for ibatch in tqdm(range(0, Nbatch, int(ceil(Nbatch / 100))), desc="Finding good channels"):
         i = NT * ibatch
         buff = raw_data[:, i:i + NT]
+        buff = _make_fortran(buff)
+        assert buff.shape[0] < buff.shape[1]
         assert buff.flags.f_contiguous
         if buff.size == 0:
             break
@@ -358,9 +363,7 @@ def get_good_channels(raw_data=None, probe=None, params=None):
 
 
 def get_Nbatch(raw_data, params):
-    # WARNING: F order for now, so (n_channels, n_samples)
-    axis = 1 if is_fortran(raw_data) else 0
-    n_samples = raw_data.shape[axis]
+    n_samples = max(raw_data.shape)
     # we assume raw_data as been already virtually split with the requested trange
     return ceil(n_samples / (params.NT - params.ntbuff))  # number of data batches
 

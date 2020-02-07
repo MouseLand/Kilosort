@@ -62,6 +62,15 @@ def _extend(x, i0, i1, val, axis=0):
 def is_fortran(x):
     if isinstance(x, np.ndarray):
         return x.flags.f_contiguous
+    raise ValueError()
+
+
+def _make_fortran(x):
+    if 'dask' in str(x.__class__):
+        x = x.compute()
+    if isinstance(x, cp.ndarray):
+        x = cp.asnumpy(x)
+    return np.asfortranarray(x)
 
 
 def read_data(dat_path, offset=0, shape=None, dtype=None, axis=0):
@@ -75,7 +84,7 @@ def read_data(dat_path, offset=0, shape=None, dtype=None, axis=0):
 
 
 def memmap_binary_file(dat_path, n_channels=None, shape=None, dtype=None, offset=None):
-    """Memmap a dat file."""
+    """Memmap a dat file in FORTRAN order, shape (n_channels, n_samples)."""
     assert dtype is not None
     item_size = np.dtype(dtype).itemsize
     offset = offset if offset else 0

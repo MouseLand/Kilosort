@@ -11,7 +11,7 @@ import numpy as np
 import cupy as cp
 from cupyx.scipy.sparse import coo_matrix
 
-from .cptools import ones, svdecon, var, mean
+from .cptools import ones, svdecon, var, mean, free_gpu_memory
 from .cluster import getClosestChannels
 from .learn import getKernels, getMeWtW, mexSVDsmall2
 from .preprocess import my_conv2
@@ -395,7 +395,7 @@ def splitAllClusters(ctx, flag):
     assert wPCA.shape[1] == 3
 
     # Take intermediate arrays from context.
-    st3 = cp.asarray(ir.st3_m)
+    st3 = cp.asnumpy(ir.st3_m)
     cProjPC = ir.cProjPC
     dWU = ir.dWU
 
@@ -424,43 +424,48 @@ def splitAllClusters(ctx, flag):
     # the waveforms must be aligned to this sample
     nt0min = params.nt0min
     # find the peak abs channel for each template
-    iW = cp.argmax(cp.abs(cp.asarray(dWU[nt0min - 1, :, :])), axis=0)
+    iW = np.argmax(np.abs((dWU[nt0min - 1, :, :])), axis=0)
 
     # keep track of original cluster for each cluster. starts with all clusters being their
     # own origin.
-    isplit = cp.arange(Nfilt)
+    isplit = np.arange(Nfilt)
     dt = 1. / 1000
     nccg = 0
 
-    # pbar = tqdm(total=Nfilt, desc="Splitting clusters")
     while ik < Nfilt:
         if ik % 100 == 0:
             # periodically write updates
             logger.info(f'Found {nsplits} splits, checked {ik}/{Nfilt} clusters, nccg {nccg}')
         ik += 1
-        # pbar.update(ik)
 
-        isp = cp.nonzero(st3[:, 1] == ik)[0]  # get all spikes from this cluster
-        nSpikes = isp.size
+        isp = (st3[:, 1] == ik)  # get all spikes from this cluster
+        nSpikes = isp.sum()
+        logger.debug(f"Splitting template {ik}/{Nfilt} with {nSpikes} spikes.")
+        free_gpu_memory()
 
         if nSpikes < 300:
             # do not split if fewer than 300 spikes (we cannot estimate
             # cross-correlograms accurately)
             continue
 
-        ss = st3[:, 0][isp] / params.fs  # convert to seconds
+        ss = st3[isp, 0] / params.fs  # convert to seconds
 
-        clp0 = cProjPC[cp.asnumpy(isp), :, :]  # get the PC projections for these spikes
+        clp0 = cProjPC[isp, :, :]  # get the PC projections for these spikes
         clp0 = cp.asarray(clp0, dtype=cp.float32)  # upload to the GPU
         clp0 = clp0.reshape((clp0.shape[0], -1), order='F')
-        clp = clp0 - mean(clp0, axis=0)  # mean center them
+        m = mean(clp0, axis=0)
+        clp = clp0
+        clp -= m  # mean center them
+
+        isp = np.nonzero(isp)[0]
 
         # (DEV_NOTES) Python flattens clp0 in C order rather than Fortran order so the
         # flattened PC projections will be slightly different, however this is fixed when
         # the projections are reformed later
 
         # subtract a running average, because the projections are NOT drift corrected
-        clp = clp - my_conv2(clp, 250, 0)
+        clpc = my_conv2(clp, 250, 0)
+        clp -= clpc
 
         # now use two different ways to initialize the bimodal direction
         # the main script calls this function twice, and does both initializations
@@ -485,7 +490,7 @@ def splitAllClusters(ctx, flag):
 
         # initialize matrix of log probabilities that each spike is assigned to the first
         # or second cluster
-        logp = cp.zeros((isp.size, 2), order='F')
+        logp = cp.zeros((nSpikes, 2), order='F')
 
         # do 50 pursuit iteration
 
@@ -538,7 +543,8 @@ def splitAllClusters(ctx, flag):
 
         # did this split fix the autocorrelograms?
         # compute the cross-correlogram between spikes in the putative new clusters
-        K, Qi, Q00, Q01, rir = ccg(ss[ilow], ss[~ilow], 500, dt)
+        ilow_cpu = cp.asnumpy(ilow)
+        K, Qi, Q00, Q01, rir = ccg(ss[ilow_cpu], ss[~ilow_cpu], 500, dt)
         Q12 = (Qi / max(Q00, Q01)).min()  # refractoriness metric 1
         R = rir.min()  # refractoriness metric 2
 
@@ -591,6 +597,7 @@ def splitAllClusters(ctx, flag):
             assert W.shape[1] == Nfilt
 
             # copy the best channel from the original template
+            iW = cp.asarray(iW)
             iW = cp.pad(iW, (0, (Nfilt - len(iW))), mode='constant')
             iW[Nfilt - 1] = iW[ik]
             assert iW.shape[0] == Nfilt
@@ -601,7 +608,7 @@ def splitAllClusters(ctx, flag):
             isplit[Nfilt - 1] = isplit[ik]
             assert isplit.shape[0] == Nfilt
 
-            st3[isp[ilow], 1] = Nfilt - 1  # overwrite spike indices with the new index
+            st3[isp[ilow_cpu], 1] = Nfilt - 1  # overwrite spike indices with the new index
 
             # copy similarity scores from the original
             simScore = cp.asarray(simScore)
@@ -622,6 +629,7 @@ def splitAllClusters(ctx, flag):
             assert iNeigh.shape[1] == Nfilt
 
             # copy neighbor channel list from the original
+            iNeighPC = cp.asarray(iNeighPC)
             iNeighPC = cp.pad(
                 iNeighPC, ((0, 0), (0, (Nfilt - iNeighPC.shape[1]))), mode='constant')
             iNeighPC[:, Nfilt - 1] = iNeighPC[:, ik]
@@ -863,7 +871,6 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
 
     Nchan = probe.Nchan
 
-    # FIX THIS PART: are the flattens below needed?
     xcoords = probe.xc
     ycoords = probe.yc
     chanMap = probe.chanMap
