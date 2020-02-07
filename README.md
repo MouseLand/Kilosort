@@ -50,7 +50,7 @@ probe.xc = np.load(dir_path / 'xc.npy').squeeze()
 probe.yc = np.load(dir_path / 'yc.npy').squeeze()
 probe.kcoords = np.load(dir_path / 'kcoords.npy').squeeze()
 
-run(dat_path, probe, dir_path=dir_path)
+run(dat_path, probe=probe, dir_path=dir_path)
 ```
 
 
