@@ -1,9 +1,8 @@
 import numpy as np
-from scipy.signal import lfilter as lfilter_cpu
+from scipy.signal import lfilter as lfilter_cpu, convolve as convolve_cpu
 import cupy as cp
 
-from ..cptools import median, lfilter, svdecon, svdecon_cpu
-# from ..utils import p
+from ..cptools import median, lfilter, svdecon, svdecon_cpu, convolve, free_gpu_memory
 
 
 def test_median_1(dtype, axis):
@@ -48,3 +47,15 @@ def test_svdecon_1():
     Un, Sn, Vn = svdecon_cpu(X)
 
     assert np.allclose(S, Sn)
+
+
+def test_convolve():
+    for n in (1000, 10000, 100000, 250000, 450000):
+        free_gpu_memory()
+        x = cp.random.randn(n, 96)
+        b = cp.sin(-cp.linspace(0.0, 5.0, 100))
+        y = cp.asnumpy(convolve(x, b))
+
+        for k in (0, 50, 95):
+            y_cpu = convolve_cpu(cp.asnumpy(x)[:, k], cp.asnumpy(b), mode='same')
+            assert np.max(np.abs(y[:, k] - y_cpu)) < 1e-8

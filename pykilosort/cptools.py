@@ -1,9 +1,14 @@
+from contextlib import redirect_stderr
 import ctypes
+import io
+import logging
 from math import ceil
 from textwrap import dedent
 
 import numpy as np
 import cupy as cp
+
+logger = logging.getLogger(__name__)
 
 
 # LTI filter on GPU
@@ -120,22 +125,48 @@ def lfilter(b, a, arr, axis=0, reverse=False):
     return _apply_lfilter(lfilter_fun, arr)
 
 
-def convolve(x, b, axis=0):
+def _clip(x, a, b):
+    return max(a, min(b, x))
+
+
+def _convolve(x, b, axis=0):
     b = b.ravel()
     assert axis == 0
     tmax = len(b) // 2
     xshape = x.shape
-    x = cp.concatenate((x, cp.zeros((tmax, x.shape[1]))))
+    x = cp.concatenate((x, cp.zeros((tmax, x.shape[1])))).astype(x.dtype)
     n = x.shape[axis]
     xf = cp.fft.rfft(x, axis=axis, n=n)
     if xf.shape[axis] > b.shape[0]:
-        b = cp.pad(b, (0, n - b.shape[0]), mode='constant')
+        b = cp.pad(b, (1, n - b.shape[0] - 1), mode='constant')
     bf = cp.fft.rfft(b, n=n)
     bf = bf[:, np.newaxis]
-    y = cp.fft.irfft(xf * bf, axis=axis)
+    xbf = xf * bf
+    y = cp.fft.irfft(xbf, axis=axis)
     y = y[y.shape[axis] - xshape[axis]:, :]
     assert y.shape == xshape
     return y
+
+
+def convolve(x, b, axis=0):
+    try:
+        f = io.StringIO()
+        with redirect_stderr(f):
+            return _convolve(x, b, axis=axis)
+    except Exception:
+        logger.debug(
+            "Out of memory during convolve on x %s and b %s, trying to split x.", x.shape, b.shape)
+        assert x.ndim == 2
+        n = x.shape[1]
+        if n == 1:
+            raise ValueError("There is not enough GPU memory to run convolve().")
+        free_gpu_memory()
+        ys = []
+        for j in range(n):
+            ys.append(convolve(x[:, j:j + 1], b))
+        y = cp.concatenate(ys, axis=1 - axis)
+        assert y.shape == x.shape
+        return y
 
 
 def svdecon(X, nPC0=None):
