@@ -114,7 +114,7 @@ def extractPCfromSnippets(proc, probe=None, params=None, Nbatch=None):
     nPCs = params.nPCs
     Nchan = probe.Nchan
 
-    batchstart = np.arange(0, NT * Nbatch + 1, NT)
+    batchstart = np.arange(0, NT * Nbatch + 1, NT).astype(np.int64)
 
     # extract the PCA projections
     # initialize the covariance of single-channel spike waveforms
@@ -318,7 +318,7 @@ def extractPCbatch2(proc, params, probe, wPCA, ibatch, iC, Nbatch):
 
     NchanNear = iC.shape[0]
 
-    batchstart = np.arange(0, NT * Nbatch + 1, NT)  # batches start at these timepoints
+    batchstart = np.arange(0, NT * Nbatch + 1, NT).astype(np.int64)  # batches start at these timepoints
 
     offset = Nchan * batchstart[ibatch]
     dat = proc.flat[offset:offset + NT * Nchan].reshape((-1, Nchan), order='F')

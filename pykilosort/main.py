@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from pprint import pprint
 import numpy as np
 
 from .preprocess import preprocess, get_good_channels, get_whitening_matrix, get_Nbatch
@@ -54,8 +55,10 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
     # Get params.
     user_params = params or {}
     params = default_params.copy()
-    params.update(user_params)
     set_dependent_params(params)
+    params.update(user_params)
+    print('Parameters used:')
+    pprint(params)
     assert params
 
     # dir path
