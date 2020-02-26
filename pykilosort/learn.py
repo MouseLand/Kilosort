@@ -23,7 +23,7 @@ def extractTemplatesfromSnippets(proc=None, probe=None, params=None, Nbatch=None
     nPCs = nPCs or params.nPCs
     nt0min = params.nt0min
     Nchan = probe.Nchan
-    batchstart = np.arange(0, NT * Nbatch + 1, NT)
+    batchstart = np.arange(0, NT * Nbatch + 1, NT).astype(np.int64)
 
     k = 0
     # preallocate matrix to hold 1D spike snippets
