@@ -167,19 +167,7 @@ def my_conv2(S1, sig, varargin=None):
         gaus = cp.exp(-dt ** 2 / (2 * sig ** 2))
         gaus = gaus[:, cp.newaxis] / cp.sum(gaus)
 
-        # This GPU FFT-based convolution leads to a splitting step 3.5x faster than the
-        # custom GPU lfilter implementation below.
-        cNorm = convolve(cp.ones((dsnew2[0], 1)), gaus).ravel()[:, cp.newaxis]
-        S1 = convolve(S1, gaus)
-
-        # Slow Custom GPU lfilter implementation:
-        # cNorm = _apply_lfilter(
-        #     _gaus_lfilter(sig),
-        #     cp.concatenate((cp.ones(dsnew2[0]), cp.zeros(tmax)))[:, np.newaxis])
-        # cNorm = cNorm[tmax:, :]
-        # S1 = _apply_lfilter(_gaus_lfilter(sig), cp.asfortranarray(cp.concatenate(
-        #     (S1, cp.zeros((tmax, dsnew2[1]), order='F')), axis=0)))
-        # S1 = S1[tmax:, :]
+        
 
         S1 = S1.reshape(dsnew, order='F')
         S1 = S1 / cNorm
