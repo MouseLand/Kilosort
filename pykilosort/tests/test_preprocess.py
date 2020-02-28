@@ -15,17 +15,19 @@ tmax = 1000
 test_path = Path('/home/olivier/Documents/PYTHON/pykilosort/pykilosort/tests')
 
 
-def test_another_convolve():
+def test_convolve():
 
     s1 = np.load(test_path.joinpath('my_conv2_input.npy'))
     s1_expected = np.load(test_path.joinpath('my_conv2_output.npy'))
     s1_matlab = np.load(test_path.joinpath('my_conv2_output_matlab.npy'))
-    # out = my_conv2(cp.asarray(s1)[:, np.newaxis], 250, 0)
+    
+    out = my_conv2(cp.asarray(s1), 250, 0)
 
-    #
-    # plt.plot(cp.asnumpy(out))
-    # plt.plot(s1_expected[:, :2])
-    # plt.plot(s1_matlab[:, :2])
+    assert np.all((cp.asnumpy(out[1000:-1000, :1]) - s1_expected[1000:-1000, :1]) < 1e-6)
+    # plt.plot(cp.asnumpy(out[:, :1]))
+    # plt.plot(s1_expected[:, :1])
+    # plt.plot(s1_matlab[:, :1])
+
 
 def create_test_dataset():
     cp = np  # cpu mode only here
@@ -36,12 +38,11 @@ def create_test_dataset():
     
     dt = cp.arange(-tmax, tmax + 1)
     gauss = cp.exp(-dt ** 2 / (2 * sig ** 2))
-    gauss = gauss / cp.sum(gauss)
-    cNorm = lfilter_cpu(gauss, 1, np.r_[np.ones(s1.shape[0]), np.zeros(int(tmax))])
+    gauss = (gauss / cp.sum(gauss)).astype(np.float32)
 
+    cNorm = lfilter_cpu(gauss, 1., np.r_[np.ones(s1.shape[0]), np.zeros(int(tmax))])
     cNorm = cNorm[int(tmax):]
-    # plt.plot(cNorm), plt.show()
-
+    
     s1 = lfilter_cpu(gauss, 1, np.r_[s1, np.zeros((int(tmax), s1.shape[1]))], axis=0)
     s1 = s1[int(tmax):] / cNorm[:, np.newaxis]
 
@@ -50,3 +51,15 @@ def create_test_dataset():
     # plt.plot(s1)
     np.save(test_path.joinpath('my_conv2_input.npy'), s0)
     np.save(test_path.joinpath('my_conv2_output.npy'), s1)
+
+
+# import scipy.signal.windows as win
+# nwin = 500
+#
+#
+# taper_in = win.hamming(nwin * 2 + 1)[:nwin]
+# taper_out = win.hamming(nwin * 2 + 1)[nwin + 1 :]
+#
+#
+# 1 - taper_in - taper_out
+

@@ -139,13 +139,13 @@ def _gaus_lfilter(sig, axis=0, is_fortran=True, reverse=False):
     return _get_lfilter_fun(gaus, 1, is_fortran=is_fortran, axis=axis, reverse=reverse)
 
 
-def my_conv2(S1, sig, varargin=None):
-    # S1 is the matrix to be filtered along a choice of axes
+def my_conv2(x, sig, varargin=None):
+    # x is the matrix to be filtered along a choice of axes
     # sig is either a scalar or a sequence of scalars, one for each axis to be filtered
     # varargin can be the dimensions to do filtering, if len(sig) != x.shape
     # if sig is scalar and no axes are provided, the default axis is 2
     if sig <= .25:
-        return S1
+        return x
     idims = 1
     if varargin is not None:
         idims = varargin
@@ -156,24 +156,42 @@ def my_conv2(S1, sig, varargin=None):
         sigall = np.tile(sig, len(idims))
 
     for sig, idim in zip(sigall, idims):
-        Nd = S1.ndim
-        S1 = cp.transpose(S1, [idim] + list(range(0, idim)) + list(range(idim + 1, Nd)))
-        dsnew = S1.shape
-        S1 = cp.reshape(S1, (S1.shape[0], -1), order='F')
-        dsnew2 = S1.shape
+        Nd = x.ndim
+        x = cp.transpose(x, [idim] + list(range(0, idim)) + list(range(idim + 1, Nd)))
+        dsnew = x.shape
+        x = cp.reshape(x, (x.shape[0], -1), order='F')
 
         tmax = ceil(4 * sig)
         dt = cp.arange(-tmax, tmax + 1)
         gaus = cp.exp(-dt ** 2 / (2 * sig ** 2))
-        gaus = gaus[:, cp.newaxis] / cp.sum(gaus)
+        gaus = gaus / cp.sum(gaus)
 
-        
+        batchsize = 0
+        axis = 0
+        n = x.shape[axis]
 
-        S1 = S1.reshape(dsnew, order='F')
-        S1 = S1 / cNorm
+        if batchsize == 0:
+            ################################# convolution code that worked
+            xf = cp.fft.rfft(x, axis=axis, n=n)
+            if xf.shape[axis] > gaus.shape[0]:
+                b = cp.pad(gaus, (0, n - gaus.shape[0]), mode='constant')
+                b = cp.roll(b, - gaus.size // 2 + 1)
+            bf = cp.fft.rfft(b, n=n)
+            bf = bf[:, np.newaxis]
+            xbf = xf * bf
+            x = cp.fft.irfft(xbf, axis=axis, n=n)
+            #######################################################
+        else:
+            a = 1
+            pass
 
-        S1 = cp.transpose(S1, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
-    return S1
+        # ici on renormalise
+        cNorm = 1
+        x = x.reshape(dsnew, order='F')
+        x = x / cNorm
+
+        x = cp.transpose(x, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
+    return x
 
 
 def whiteningFromCovariance(CC):
