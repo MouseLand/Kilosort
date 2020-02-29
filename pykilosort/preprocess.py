@@ -182,11 +182,12 @@ def my_conv2(x, sig, varargin=None):
             y = cp.fft.irfft(xbf, axis=axis, n=n)
             #######################################################
         else:
-            gain = cp.asarray(np.zeros(n))
             # splits the signal into chunks of n samples
             # create the tapering fadin and fade out
             ntap = 500  # has to be even
+            overlap = ntap * 15  # has to be bigger than 2 NTAP
             y = cp.zeros_like(x)
+            gain = cp.asarray(np.zeros(n))
             taper_in = cp.asarray(- np.cos(np.linspace(0,1,ntap) * np.pi) / 2 + 0.5)[:, np.newaxis]
             taper_out = cp.asarray(np.flipud(taper_in))
             # this is the Gaussian with which we'll convolve
@@ -194,35 +195,47 @@ def my_conv2(x, sig, varargin=None):
             b = cp.pad(gaus, (0, nwin - gaus.shape[0]), mode='constant')
             b = cp.roll(b, - gaus.size // 2 + 1)
             b = cp.fft.rfft(b, n=nwin)[:, np.newaxis]
-            # loop over the signal by chunks and apply convolution in frequency domain
+            # this is used to splice windows together
+            # splice = cp.linspace(0, 1, overlap - 2 * ntap)[:, np.newaxis]
+            scale = np.minimum(np.maximum(0, np.linspace(-0.5, 1.5, overlap - 2 * ntap)), 1)
+            splice = cp.asarray(- np.cos(scale * np.pi) / 2 + 0.5)[:, np.newaxis]
+            ## loop over the signal by chunks and apply convolution in frequency domain
             first = 0
-            overlap = ntap * 4
-
-
             while True:
                 first = min(n - nwin, first)
                 last = min(first + nwin, n)
+                print(first, last)
+                # the convolution
                 x_ = cp.copy(x[first:last, :])
-
-                tt = cp.asarray(np.ones(nwin))
-                tt[:ntap] *= taper_in[:,0]
-                tt[-ntap:] *= taper_out[:,0]
-                gain[first:last] += tt
-
                 x_[:ntap] *= taper_in
                 x_[-ntap:] *= taper_out
-                xf = cp.fft.rfft(x_, axis=axis, n=nwin)
-                y[first:last, :] += cp.fft.irfft(xf * b, axis=axis, n=nwin)
+                x_ = cp.fft.irfft(cp.fft.rfft(x_, axis=axis, n=nwin) * b, axis=axis, n=nwin)
+                # this is to check the gain of summing the windows
+                tt = cp.asarray(np.ones(nwin))
+                tt[:ntap] *= taper_in[:, 0]
+                tt[-ntap:] *= taper_out[:, 0]
+                if first > 0:
+                    full_overlap_first = first + ntap
+                    full_overlap_last = first + overlap - ntap
+                    gain[full_overlap_first:full_overlap_last] *= (1. - splice[:, 0])
+                    gain[full_overlap_first:full_overlap_last] += tt[ntap:overlap - ntap] * splice[:, 0]
+                    gain[full_overlap_last:last] = tt[overlap - ntap:]
+                    y[full_overlap_first:full_overlap_last] *= (1. - splice)
+                    y[full_overlap_first:full_overlap_last] += x_[ntap:overlap - ntap] * splice
+                    y[full_overlap_last:last] = x_[overlap - ntap:]
+                else:
+                    y[first:last, :] = x_
+                    gain[first:last] = tt
                 if last == n:
                     break
-                first += nwin - ntap
+                first += nwin - overlap
 
-
-            import matplotlib.pyplot as plt
+            # import matplotlib.pyplot as plt
             # plt.plot(np.abs(cp.asnumpy(b)))
             # plt.plot(cp.asnumpy(x[:, 0]))
             # plt.plot(cp.asnumpy(y[:, 0]))
             # plt.plot(cp.asnumpy(gain))
+            ##
             # gain[gain < 1] = 1
             # y /= gain[:, np.newaxis]
             # https://stackoverflow.com/questions/15853140/fir-filter-in-cuda-as-a-1d-convolution

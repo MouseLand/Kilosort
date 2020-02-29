@@ -23,9 +23,14 @@ def test_convolve():
     # TODO test for several batchsizes especially the case where the last window is smaller than the tapers
     out = my_conv2(cp.asarray(s1), 250, 0)
 
-    assert np.all((cp.asnumpy(out[1000:-1000, :1]) - s1_expected[1000:-1000, :1]) < 1e-6)
     plt.plot(cp.asnumpy(out[:, :1]))
     plt.plot(s1_expected[:, :1])
+    diff = cp.asnumpy(out[:, :1]) - s1_expected[:, :1]
+    plt.plot(diff)
+    assert np.all((cp.asnumpy(out[1000:-1000, :1]) - s1_expected[1000:-1000, :1]) < 1e-6)
+
+
+    plt.plot(cp.asnumpy(out[1000:-1000, :1]))
     # plt.plot(s1_matlab[:, :1])
 
 
