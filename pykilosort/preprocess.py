@@ -166,11 +166,11 @@ def my_conv2(x, sig, varargin=None):
         gaus = cp.exp(-dt ** 2 / (2 * sig ** 2))
         gaus = gaus / cp.sum(gaus)
 
-        batchsize = 0
+        nwin = 10000  # batchsize number of samples in the 0 axis
         axis = 0
         n = x.shape[axis]
 
-        if batchsize == 0:
+        if n <= nwin or nwin == 0:
             ################################# convolution code that worked
             xf = cp.fft.rfft(x, axis=axis, n=n)
             if xf.shape[axis] > gaus.shape[0]:
@@ -179,19 +179,60 @@ def my_conv2(x, sig, varargin=None):
             bf = cp.fft.rfft(b, n=n)
             bf = bf[:, np.newaxis]
             xbf = xf * bf
-            x = cp.fft.irfft(xbf, axis=axis, n=n)
+            y = cp.fft.irfft(xbf, axis=axis, n=n)
             #######################################################
         else:
-            a = 1
-            pass
+            gain = cp.asarray(np.zeros(n))
+            # splits the signal into chunks of n samples
+            # create the tapering fadin and fade out
+            ntap = 500  # has to be even
+            y = cp.zeros_like(x)
+            taper_in = cp.asarray(- np.cos(np.linspace(0,1,ntap) * np.pi) / 2 + 0.5)[:, np.newaxis]
+            taper_out = cp.asarray(np.flipud(taper_in))
+            # this is the Gaussian with which we'll convolve
+            assert nwin > gaus.shape[0]
+            b = cp.pad(gaus, (0, nwin - gaus.shape[0]), mode='constant')
+            b = cp.roll(b, - gaus.size // 2 + 1)
+            b = cp.fft.rfft(b, n=nwin)[:, np.newaxis]
+            # loop over the signal by chunks and apply convolution in frequency domain
+            first = 0
+            overlap = ntap * 4
 
+
+            while True:
+                first = min(n - nwin, first)
+                last = min(first + nwin, n)
+                x_ = cp.copy(x[first:last, :])
+
+                tt = cp.asarray(np.ones(nwin))
+                tt[:ntap] *= taper_in[:,0]
+                tt[-ntap:] *= taper_out[:,0]
+                gain[first:last] += tt
+
+                x_[:ntap] *= taper_in
+                x_[-ntap:] *= taper_out
+                xf = cp.fft.rfft(x_, axis=axis, n=nwin)
+                y[first:last, :] += cp.fft.irfft(xf * b, axis=axis, n=nwin)
+                if last == n:
+                    break
+                first += nwin - ntap
+
+
+            import matplotlib.pyplot as plt
+            # plt.plot(np.abs(cp.asnumpy(b)))
+            # plt.plot(cp.asnumpy(x[:, 0]))
+            # plt.plot(cp.asnumpy(y[:, 0]))
+            # plt.plot(cp.asnumpy(gain))
+            # gain[gain < 1] = 1
+            # y /= gain[:, np.newaxis]
+            # https://stackoverflow.com/questions/15853140/fir-filter-in-cuda-as-a-1d-convolution
         # ici on renormalise
         cNorm = 1
-        x = x.reshape(dsnew, order='F')
-        x = x / cNorm
+        y = y.reshape(dsnew, order='F')
+        y = y / cNorm
 
-        x = cp.transpose(x, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
-    return x
+        y = cp.transpose(y, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
+    return y
 
 
 def whiteningFromCovariance(CC):

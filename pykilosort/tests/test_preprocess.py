@@ -20,12 +20,12 @@ def test_convolve():
     s1 = np.load(test_path.joinpath('my_conv2_input.npy'))
     s1_expected = np.load(test_path.joinpath('my_conv2_output.npy'))
     s1_matlab = np.load(test_path.joinpath('my_conv2_output_matlab.npy'))
-    
+    # TODO test for several batchsizes especially the case where the last window is smaller than the tapers
     out = my_conv2(cp.asarray(s1), 250, 0)
 
     assert np.all((cp.asnumpy(out[1000:-1000, :1]) - s1_expected[1000:-1000, :1]) < 1e-6)
-    # plt.plot(cp.asnumpy(out[:, :1]))
-    # plt.plot(s1_expected[:, :1])
+    plt.plot(cp.asnumpy(out[:, :1]))
+    plt.plot(s1_expected[:, :1])
     # plt.plot(s1_matlab[:, :1])
 
 
