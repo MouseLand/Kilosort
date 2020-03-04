@@ -8,10 +8,11 @@ from ..preprocess import my_conv2
 sig = 250
 tmax = 1000
 
+test_path = Path(__file__).parent
+
 
 def test_convolve_real_data():
 
-    test_path = Path(__file__).parent
     file_s1 = test_path.joinpath('my_conv2_input.npy')
     file_expected = test_path.joinpath('my_conv2_output.npy')
     if not file_s1.exists() and file_expected.exists():
