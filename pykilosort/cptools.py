@@ -129,30 +129,89 @@ def _clip(x, a, b):
     return max(a, min(b, x))
 
 
-def _convolve(x, b, axis=0):
-    b = b.ravel()
-    assert axis == 0
-    tmax = len(b) // 2
-    xshape = x.shape
-    x = cp.concatenate((x, cp.zeros((tmax, x.shape[1])))).astype(x.dtype)
+def _convolve(x, b, axis=0, nwin=0, ntap=500, overlap=2000):
+    """
+    memory controlled version that splits the signal into chunks of n samples
+    each chunk is tapered in and out, the overlap is designed to get clear of the taper
+    splicing of overlaping chunks is done in a cosine way
+    """
     n = x.shape[axis]
-    xf = cp.fft.rfft(x, axis=axis, n=n)
-    if xf.shape[axis] > b.shape[0]:
-        b = cp.pad(b, (1, n - b.shape[0] - 1), mode='constant')
-    bf = cp.fft.rfft(b, n=n)
-    bf = bf[:, np.newaxis]
-    xbf = xf * bf
-    y = cp.fft.irfft(xbf, axis=axis)
-    y = y[y.shape[axis] - xshape[axis]:, :]
-    assert y.shape == xshape
+    """
+    This is the straight convolution that fits in memory
+    """
+    if n <= nwin or nwin == 0:
+        xf = cp.fft.rfft(x, axis=axis, n=n)
+        if xf.shape[axis] > b.shape[0]:
+            bp = cp.pad(b, (0, n - b.shape[0]), mode='constant')
+            bp = cp.roll(bp, - b.size // 2 + 1)
+        bf = cp.fft.rfft(bp, n=n)[:, np.newaxis]
+        y = cp.fft.irfft(xf * bf, axis=axis, n=n)
+        return y
+    """
+    This is the memory controlled version that splits the signal in chunch and splices them
+    together
+    """
+    assert overlap >= 2 * ntap
+    # create variables, the gain is to control the splicing
+    y = cp.zeros_like(x)
+    gain = cp.asarray(np.zeros(n))
+    # compute tapers/constants outside of the loop
+    taper_in = cp.asarray(- np.cos(np.linspace(0, 1, ntap) * np.pi) / 2 + 0.5)[:, np.newaxis]
+    taper_out = cp.asarray(np.flipud(taper_in))
+    assert nwin > b.shape[0]
+    # this is the convolution wavelet that we shift to be 0 lag
+    bp = cp.pad(b, (0, nwin - b.shape[0]), mode='constant')
+    bp = cp.roll(bp, - b.size // 2 + 1)
+    bp = cp.fft.rfft(bp, n=nwin)[:, np.newaxis]
+    # this is used to splice windows together: cosine taper. The reversed taper is complementary
+    scale = np.minimum(np.maximum(0, np.linspace(-0.5, 1.5, overlap - 2 * ntap)), 1)
+    splice = cp.asarray(- np.cos(scale * np.pi) / 2 + 0.5)[:, np.newaxis]
+    # loop over the signal by chunks and apply convolution in frequency domain
+    first = 0
+    while True:
+        first = min(n - nwin, first)
+        last = min(first + nwin, n)
+        # print(first, last)
+        # the convolution
+        x_ = cp.copy(x[first:last, :])
+        x_[:ntap] *= taper_in
+        x_[-ntap:] *= taper_out
+        x_ = cp.fft.irfft(cp.fft.rfft(x_, axis=axis, n=nwin) * bp, axis=axis, n=nwin)
+        # this is to check the gain of summing the windows
+        tt = cp.asarray(np.ones(nwin))
+        tt[:ntap] *= taper_in[:, 0]
+        tt[-ntap:] *= taper_out[:, 0]
+        # the full overlap is outside of the tapers: we apply a cosine splicing to this part only
+        if first > 0:
+            full_overlap_first = first + ntap
+            full_overlap_last = first + overlap - ntap
+            gain[full_overlap_first:full_overlap_last] *= (1. - splice[:, 0])
+            gain[full_overlap_first:full_overlap_last] += tt[ntap:overlap - ntap] * splice[:, 0]
+            gain[full_overlap_last:last] = tt[overlap - ntap:]
+            y[full_overlap_first:full_overlap_last] *= (1. - splice)
+            y[full_overlap_first:full_overlap_last] += x_[ntap:overlap - ntap] * splice
+            y[full_overlap_last:last] = x_[overlap - ntap:]
+        else:
+            y[first:last, :] = x_
+            gain[first:last] = tt
+        if last == n:
+            break
+        first += nwin - overlap
+    # import matplotlib.pyplot as plt
+    # plt.plot(np.abs(cp.asnumpy(b)))
+    # plt.plot(cp.asnumpy(x[:, 0]))
+    # plt.plot(cp.asnumpy(y[:, 0]))
+    # plt.plot(cp.asnumpy(gain))
+    # gain[gain < 1] = 1
+    # y /= gain[:, np.newaxis]
     return y
 
 
-def convolve(x, b, axis=0):
+def convolve(x, b, axis=0, **kwargs):
     try:
         f = io.StringIO()
         with redirect_stderr(f):
-            return _convolve(x, b, axis=axis)
+            return _convolve(x, b, axis=axis, **kwargs)
     except Exception:
         logger.debug(
             "Out of memory during convolve on x %s and b %s, trying to split x.", x.shape, b.shape)

@@ -139,7 +139,7 @@ def _gaus_lfilter(sig, axis=0, is_fortran=True, reverse=False):
     return _get_lfilter_fun(gaus, 1, is_fortran=is_fortran, axis=axis, reverse=reverse)
 
 
-def my_conv2(x, sig, varargin=None):
+def my_conv2(x, sig, varargin=None, **kwargs):
     # x is the matrix to be filtered along a choice of axes
     # sig is either a scalar or a sequence of scalars, one for each axis to be filtered
     # varargin can be the dimensions to do filtering, if len(sig) != x.shape
@@ -166,84 +166,8 @@ def my_conv2(x, sig, varargin=None):
         gaus = cp.exp(-dt ** 2 / (2 * sig ** 2))
         gaus = gaus / cp.sum(gaus)
 
-        nwin = 10000  # batchsize number of samples in the 0 axis
-        axis = 0
-        n = x.shape[axis]
-
-        if n <= nwin or nwin == 0:
-            ################################# convolution code that worked
-            xf = cp.fft.rfft(x, axis=axis, n=n)
-            if xf.shape[axis] > gaus.shape[0]:
-                b = cp.pad(gaus, (0, n - gaus.shape[0]), mode='constant')
-                b = cp.roll(b, - gaus.size // 2 + 1)
-            bf = cp.fft.rfft(b, n=n)
-            bf = bf[:, np.newaxis]
-            xbf = xf * bf
-            y = cp.fft.irfft(xbf, axis=axis, n=n)
-            #######################################################
-        else:
-            # splits the signal into chunks of n samples
-            # create the tapering fadin and fade out
-            ntap = 500  # has to be even
-            overlap = ntap * 15  # has to be bigger than 2 NTAP
-            y = cp.zeros_like(x)
-            gain = cp.asarray(np.zeros(n))
-            taper_in = cp.asarray(- np.cos(np.linspace(0,1,ntap) * np.pi) / 2 + 0.5)[:, np.newaxis]
-            taper_out = cp.asarray(np.flipud(taper_in))
-            # this is the Gaussian with which we'll convolve
-            assert nwin > gaus.shape[0]
-            b = cp.pad(gaus, (0, nwin - gaus.shape[0]), mode='constant')
-            b = cp.roll(b, - gaus.size // 2 + 1)
-            b = cp.fft.rfft(b, n=nwin)[:, np.newaxis]
-            # this is used to splice windows together
-            # splice = cp.linspace(0, 1, overlap - 2 * ntap)[:, np.newaxis]
-            scale = np.minimum(np.maximum(0, np.linspace(-0.5, 1.5, overlap - 2 * ntap)), 1)
-            splice = cp.asarray(- np.cos(scale * np.pi) / 2 + 0.5)[:, np.newaxis]
-            ## loop over the signal by chunks and apply convolution in frequency domain
-            first = 0
-            while True:
-                first = min(n - nwin, first)
-                last = min(first + nwin, n)
-                print(first, last)
-                # the convolution
-                x_ = cp.copy(x[first:last, :])
-                x_[:ntap] *= taper_in
-                x_[-ntap:] *= taper_out
-                x_ = cp.fft.irfft(cp.fft.rfft(x_, axis=axis, n=nwin) * b, axis=axis, n=nwin)
-                # this is to check the gain of summing the windows
-                tt = cp.asarray(np.ones(nwin))
-                tt[:ntap] *= taper_in[:, 0]
-                tt[-ntap:] *= taper_out[:, 0]
-                if first > 0:
-                    full_overlap_first = first + ntap
-                    full_overlap_last = first + overlap - ntap
-                    gain[full_overlap_first:full_overlap_last] *= (1. - splice[:, 0])
-                    gain[full_overlap_first:full_overlap_last] += tt[ntap:overlap - ntap] * splice[:, 0]
-                    gain[full_overlap_last:last] = tt[overlap - ntap:]
-                    y[full_overlap_first:full_overlap_last] *= (1. - splice)
-                    y[full_overlap_first:full_overlap_last] += x_[ntap:overlap - ntap] * splice
-                    y[full_overlap_last:last] = x_[overlap - ntap:]
-                else:
-                    y[first:last, :] = x_
-                    gain[first:last] = tt
-                if last == n:
-                    break
-                first += nwin - overlap
-
-            # import matplotlib.pyplot as plt
-            # plt.plot(np.abs(cp.asnumpy(b)))
-            # plt.plot(cp.asnumpy(x[:, 0]))
-            # plt.plot(cp.asnumpy(y[:, 0]))
-            # plt.plot(cp.asnumpy(gain))
-            ##
-            # gain[gain < 1] = 1
-            # y /= gain[:, np.newaxis]
-            # https://stackoverflow.com/questions/15853140/fir-filter-in-cuda-as-a-1d-convolution
-        # ici on renormalise
-        cNorm = 1
+        y = convolve(x, gaus, **kwargs)
         y = y.reshape(dsnew, order='F')
-        y = y / cNorm
-
         y = cp.transpose(y, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
     return y
 
