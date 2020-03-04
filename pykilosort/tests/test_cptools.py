@@ -54,8 +54,22 @@ def test_convolve():
         free_gpu_memory()
         x = cp.random.randn(n, 96)
         b = cp.sin(-cp.linspace(0.0, 5.0, 100))
-        y = cp.asnumpy(convolve(x, b))
 
-        for k in (0, 50, 95):
-            y_cpu = convolve_cpu(cp.asnumpy(x)[:, k], cp.asnumpy(b), mode='same')
-            assert np.max(np.abs(y[:, k] - y_cpu)) < 1e-8
+        def check(y):
+            npad = b.shape[0] // 2
+
+            for k in (0, 50, 95):
+                y_cpu = convolve_cpu(cp.asnumpy(x)[:, k], cp.asnumpy(b), mode='same')
+                gpu = y[npad - 1:-npad, k]
+                cpu = y_cpu[npad - 1:-npad]
+                # import matplotlip.pyplot as plt
+                # plt.plot(cpu), plt.plot(gpu)
+                assert np.max(np.abs(cpu - gpu) < 1e-8)
+
+        if n == 1000:
+            check(cp.asnumpy(convolve(x, b, pad=None)))
+            check(cp.asnumpy(convolve(x, b, pad='zeros')))
+            check(cp.asnumpy(convolve(x, b, pad='flip')))
+            check(cp.asnumpy(convolve(x, b, pad='constant')))
+
+        check(cp.asnumpy(convolve(x, b, nwin=10000, pad=None)))

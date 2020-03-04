@@ -138,14 +138,12 @@ def pad(fcn_convolve):
             padd = cp.take(x, cp.arange(npad), axis=axis) * 0
             if kwargs['pad'] == 'zeros':
                 x = cp.concatenate((padd, x, padd), axis=axis)
-                print('zero padding')
             if kwargs['pad'] == 'constant':
                 x = cp.concatenate((padd * 0 + cp.mean(x[:npad]), x, padd + cp.mean(x[-npad:])),
                                    axis=axis)
-                print('constant padding')
             if kwargs['pad'] == 'flip':
                 pad_in = cp.flip(cp.take(x, cp.arange(1, npad + 1), axis=axis), axis=axis)
-                pad_out = cp.flip(cp.take(x, cp.arange(xsize - npad - 1, npad - 1),
+                pad_out = cp.flip(cp.take(x, cp.arange(xsize - npad - 1, xsize - 1),
                                           axis=axis), axis=axis)
                 x = cp.concatenate((pad_in, x, pad_out), axis=axis)
         # run the convolution
@@ -153,8 +151,8 @@ def pad(fcn_convolve):
         # remove padding from both arrays (necessary for x ?)
         if 'pad' in kwargs and kwargs['pad']:
             # remove the padding
-            x = cp.take(x, cp.arange(npad, x.shape[axis] - npad), axis=axis)
             y = cp.take(y, cp.arange(npad, x.shape[axis] - npad), axis=axis)
+            x = cp.take(x, cp.arange(npad, x.shape[axis] - npad), axis=axis)
             assert xsize == x.shape[axis]
             assert xsize == y.shape[axis]
         return y
@@ -256,7 +254,7 @@ def convolve(x, b, axis=0, **kwargs):
         free_gpu_memory()
         ys = []
         for j in range(n):
-            ys.append(convolve(x[:, j:j + 1], b))
+            ys.append(convolve(x[:, j:j + 1], b, **kwargs))
         y = cp.concatenate(ys, axis=1 - axis)
         assert y.shape == x.shape
         return y

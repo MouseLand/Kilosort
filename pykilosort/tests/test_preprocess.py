@@ -5,35 +5,39 @@ import cupy as cp
 
 from ..preprocess import my_conv2
 
-
 sig = 250
 tmax = 1000
-test_path = Path('/home/olivier/Documents/PYTHON/pykilosort/pykilosort/tests')
 
 
-def test_convolve():
+def test_convolve_real_data():
 
-    s1 = np.load(test_path.joinpath('my_conv2_input.npy'))
-    s1_expected = np.load(test_path.joinpath('my_conv2_output.npy'))
+    test_path = Path(__file__).parent
+    file_s1 = test_path.joinpath('my_conv2_input.npy')
+    file_expected = test_path.joinpath('my_conv2_output.npy')
+    if not file_s1.exists() and file_expected.exists():
+        return
+    s1 = np.load(file_s1)
+    s1_expected = np.load(file_expected)
 
-    def assert_sim(out):
-        assert np.all((cp.asnumpy(out[1000:-1000, :1]) - s1_expected[1000:-1000, :1]) < 1e-6)
+    def plot(out):
+        import matplotlib.pyplot as plt
+        plt.plot(cp.asnumpy(out))
+        plt.plot(s1_expected)
+
+    def diff(out):
+        return np.max(np.abs(cp.asnumpy(out[1000:-1000, :1]) - s1_expected[1000:-1000, :1]))
 
     x = cp.asarray(s1)
-    assert_sim(my_conv2(x, 250, 0, nwin=0, pad=None))
-    assert_sim(my_conv2(x, 250, 0, nwin=10000, pad='zeros'))
-    assert_sim(my_conv2(x, 250, 0, nwin=10000, pad='constant'))
-    assert_sim(my_conv2(x, 250, 0, nwin=10000, pad='flip'))
-    # TODO add a random array as well (seed)
-    # TODO make tapers for both full and swapped version
-    # TODO try VPN with Cyrille
-    # TODO how to compare spike sorters
-    # import matplotlib.pyplot as plt
-    # plt.plot(cp.asnumpy(out[:, :1]))
-    # plt.plot(cp.asnumpy(out[:, :1]))
-    # plt.plot(s1_expected[:, :1])
-    # diff = cp.asnumpy(out[:, :1]) - s1_expected[:, :1]
-    # plt.plot(diff)
+    assert diff(my_conv2(x, 250, 0, nwin=0, pad=None)) < 1e-6
+    assert diff(my_conv2(x, 250, 0, nwin=0, pad='zeros')) < 1e-6
+    assert diff(my_conv2(x, 250, 0, nwin=0, pad='constant')) < 1e-6
+
+    assert diff(my_conv2(x, 250, 0, nwin=10000, pad=None)) < 1e-3
+    assert diff(my_conv2(x, 250, 0, nwin=10000, pad='zeros')) < 1e-3
+    assert diff(my_conv2(x, 250, 0, nwin=10000, pad='constant')) < 1e-3
+
+    assert diff(my_conv2(x, 250, 0, nwin=0, pad='flip')) < 1e-6
+    assert diff(my_conv2(x, 250, 0, nwin=10000, pad='flip')) < 1e-3
 
 
 def create_test_dataset():
