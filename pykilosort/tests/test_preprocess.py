@@ -1,8 +1,5 @@
 from pathlib import Path
-
 import numpy as np
-
-import matplotlib.pyplot as plt
 from scipy.signal import lfilter as lfilter_cpu
 import cupy as cp
 
@@ -18,18 +15,25 @@ def test_convolve():
 
     s1 = np.load(test_path.joinpath('my_conv2_input.npy'))
     s1_expected = np.load(test_path.joinpath('my_conv2_output.npy'))
-    # s1_matlab = np.load(test_path.joinpath('my_conv2_output_matlab.npy'))
-    out = my_conv2(cp.asarray(s1), 250, 0, nwin=10000)
+
+    def assert_sim(out):
+        assert np.all((cp.asnumpy(out[1000:-1000, :1]) - s1_expected[1000:-1000, :1]) < 1e-6)
+
+    x = cp.asarray(s1)
+    assert_sim(my_conv2(x, 250, 0, nwin=0, pad=None))
+    assert_sim(my_conv2(x, 250, 0, nwin=10000, pad='zeros'))
+    assert_sim(my_conv2(x, 250, 0, nwin=10000, pad='constant'))
+    assert_sim(my_conv2(x, 250, 0, nwin=10000, pad='flip'))
     # TODO add a random array as well (seed)
     # TODO make tapers for both full and swapped version
     # TODO try VPN with Cyrille
     # TODO how to compare spike sorters
-    plt.plot(cp.asnumpy(out[:, :1]))
-    plt.plot(s1_expected[:, :1])
-    diff = cp.asnumpy(out[:, :1]) - s1_expected[:, :1]
-    plt.plot(diff)
-    assert np.all((cp.asnumpy(out[1000:-1000, :1]) - s1_expected[1000:-1000, :1]) < 1e-6)
-    plt.plot(cp.asnumpy(out[1000:-1000, :1]))
+    # import matplotlib.pyplot as plt
+    # plt.plot(cp.asnumpy(out[:, :1]))
+    # plt.plot(cp.asnumpy(out[:, :1]))
+    # plt.plot(s1_expected[:, :1])
+    # diff = cp.asnumpy(out[:, :1]) - s1_expected[:, :1]
+    # plt.plot(diff)
 
 
 def create_test_dataset():
@@ -52,13 +56,3 @@ def create_test_dataset():
     # plt.plot(s1)
     np.save(test_path.joinpath('my_conv2_input.npy'), s0)
     np.save(test_path.joinpath('my_conv2_output.npy'), s1)
-
-# import scipy.signal.windows as win
-# nwin = 500
-#
-#
-# taper_in = win.hamming(nwin * 2 + 1)[:nwin]
-# taper_out = win.hamming(nwin * 2 + 1)[nwin + 1 :]
-#
-#
-# 1 - taper_in - taper_out

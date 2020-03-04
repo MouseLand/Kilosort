@@ -129,11 +129,45 @@ def _clip(x, a, b):
     return max(a, min(b, x))
 
 
-def _convolve(x, b, axis=0, nwin=0, ntap=500, overlap=2000):
+def pad(fcn_convolve):
+    def function_wrapper(x, b, axis=0, **kwargs):
+        # add the padding to the array
+        xsize = x.shape[axis]
+        if 'pad' in kwargs and kwargs['pad']:
+            npad = b.shape[axis] // 2
+            padd = cp.take(x, cp.arange(npad), axis=axis) * 0
+            if kwargs['pad'] == 'zeros':
+                x = cp.concatenate((padd, x, padd), axis=axis)
+                print('zero padding')
+            if kwargs['pad'] == 'constant':
+                x = cp.concatenate((padd * 0 + cp.mean(x[:npad]), x, padd + cp.mean(x[-npad:])),
+                                   axis=axis)
+                print('constant padding')
+            if kwargs['pad'] == 'flip':
+                pad_in = cp.flip(cp.take(x, cp.arange(1, npad + 1), axis=axis), axis=axis)
+                pad_out = cp.flip(cp.take(x, cp.arange(xsize - npad - 1, npad - 1),
+                                          axis=axis), axis=axis)
+                x = cp.concatenate((pad_in, x, pad_out), axis=axis)
+        # run the convolution
+        y = fcn_convolve(x, b, **kwargs)
+        # remove padding from both arrays (necessary for x ?)
+        if 'pad' in kwargs and kwargs['pad']:
+            # remove the padding
+            x = cp.take(x, cp.arange(npad, x.shape[axis] - npad), axis=axis)
+            y = cp.take(y, cp.arange(npad, x.shape[axis] - npad), axis=axis)
+            assert xsize == x.shape[axis]
+            assert xsize == y.shape[axis]
+        return y
+    return function_wrapper
+
+
+@pad
+def _convolve(x, b, axis=0, pad=None, nwin=0, ntap=500, overlap=2000):
     """
     memory controlled version that splits the signal into chunks of n samples
     each chunk is tapered in and out, the overlap is designed to get clear of the taper
     splicing of overlaping chunks is done in a cosine way
+    param: pad None, 'zeros', 'constant', 'flip'
     """
     n = x.shape[axis]
     """
