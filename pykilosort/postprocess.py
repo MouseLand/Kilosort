@@ -811,6 +811,38 @@ def set_cutoff(ctx):
     )
 
 
+def checkClusters(ctx):
+    # Checks integrity of clusters. Removes clusters with 0 spikes.
+
+    # 1) List all cluster ids for spikes.
+    # 2) Find missing ids
+    # 3) Remove these indices from every variable that has n_clusters
+
+    ir = ctx.intermediate
+    max_id = int(np.max(ir.st3[:, 1])) + 1
+    ids = np.unique(ir.st3[:, 1]).astype(np.int)
+    # Check if the max cluster id is equal to the number of cluster ids assigned to spikes.
+    if max_id != len(ids):  # see which cluster ids are missing
+        good_units_mask = np.isin(np.arange(max_id), ids)
+        # Remove clusters from fields in `ir` based on `good_units_mask`
+        ir.dWU = ir.dWU[:, :, good_units_mask]
+        ir.iNeigh = ir.iNeigh[:, good_units_mask]
+        ir.iNeighPC = ir.iNeighPC[:, good_units_mask]
+        ir.mu = ir.mu[good_units_mask]
+        ir.simScore = ir.simScore[good_units_mask, good_units_mask]
+        ir.U = ir.U[:, good_units_mask, :]
+        ir.UA = ir.UA[:, good_units_mask, :, :]
+        ir.U_a = ir.U_a[:, :, good_units_mask]
+        ir.U_b = ir.U_b[:, :, good_units_mask]
+        ir.W = ir.W[:, good_units_mask, :]
+        ir.WA = ir.WA[:, good_units_mask, :, :]
+        ir.W_a = ir.W_a[:, :, good_units_mask]
+        ir.W_b = ir.W_b[:, :, good_units_mask]
+
+    ctx.ir = ir
+    return ctx
+
+
 def rezToPhy(ctx, dat_path=None, output_dir=None):
     # pull out results from kilosort's rez to either return to workspace or to
     # save in the appropriate format for the phy GUI to run on. If you provide
@@ -818,6 +850,8 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
 
     savePath = output_dir
     Path(savePath).mkdir(exist_ok=True, parents=True)
+
+    ctx = checkClusters(ctx)  # check clusters integrity
 
     probe = ctx.probe
     ir = ctx.intermediate
