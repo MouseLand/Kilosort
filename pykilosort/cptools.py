@@ -196,8 +196,11 @@ def convolve_gpu_direct(x, b, **kwargs):
     return y
 
 
+DEFAULT_CONV_CHUNK = 10_000
+
+
 @pad
-def convolve_gpu_chunked(x, b, pad='flip', nwin=100_000, ntap=500, overlap=2000):
+def convolve_gpu_chunked(x, b, pad='flip', nwin=DEFAULT_CONV_CHUNK, ntap=500, overlap=2000):
     """Chunked GPU FFT-based convolution for large arrays.
 
     This memory-controlled version splits the signal into chunks of n samples.
@@ -261,9 +264,9 @@ def convolve_gpu_chunked(x, b, pad='flip', nwin=100_000, ntap=500, overlap=2000)
 
 def convolve_gpu(x, b, **kwargs):
     n = x.shape[0]
-    # Default chunk size : 100,000 samples along the first axis, the one to be chunked and over
+    # Default chunk size : N samples along the first axis, the one to be chunked and over
     # which to compute the convolution.
-    nwin = kwargs.get('nwin', 100_000)
+    nwin = kwargs.get('nwin', DEFAULT_CONV_CHUNK)
     assert nwin >= 0
     if n <= nwin or nwin == 0:
         return convolve_gpu_direct(x, b)
