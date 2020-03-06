@@ -7,7 +7,7 @@ from scipy.signal import butter
 import cupy as cp
 from tqdm import tqdm
 
-from .cptools import lfilter, _get_lfilter_fun, median, convolve
+from .cptools import lfilter, _get_lfilter_fun, median, convolve_gpu
 from .utils import _make_fortran
 
 logger = logging.getLogger(__name__)
@@ -166,7 +166,7 @@ def my_conv2(x, sig, varargin=None, **kwargs):
         gaus = cp.exp(-dt ** 2 / (2 * sig ** 2))
         gaus = gaus / cp.sum(gaus)
 
-        y = convolve(x, gaus, **kwargs)
+        y = convolve_gpu(x, gaus, **kwargs)
         y = y.reshape(dsnew, order='F')
         y = cp.transpose(y, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
     return y

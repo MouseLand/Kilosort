@@ -15,7 +15,7 @@ def test_convolve_real_data():
 
     file_s1 = test_path.joinpath('my_conv2_input.npy')
     file_expected = test_path.joinpath('my_conv2_output.npy')
-    if not file_s1.exists() and file_expected.exists():
+    if not file_s1.exists() or not file_expected.exists():
         return
     s1 = np.load(file_s1)
     s1_expected = np.load(file_expected)
@@ -59,5 +59,5 @@ def create_test_dataset():
     # import matplotlib.pyplot as plt
     # plt.plot(s0)
     # plt.plot(s1)
-    np.save(test_path.joinpath('my_conv2_input.npy'), s0)
+    # np.save(test_path.joinpath('my_conv2_input.npy'), s0)
     np.save(test_path.joinpath('my_conv2_output.npy'), s1)
