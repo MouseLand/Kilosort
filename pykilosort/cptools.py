@@ -1,18 +1,20 @@
 from contextlib import redirect_stderr
 import ctypes
 import io
+from functools import wraps
 import logging
 from math import ceil
 from textwrap import dedent
 
 import numpy as np
+from scipy import signal as ss
 import cupy as cp
 
 logger = logging.getLogger(__name__)
 
 
-# LTI filter on GPU
-# -----------------------------------------------------------------------------
+# LTI filter on GPU (NOTE: inefficient and soon to be deprecated)
+# ---------------------------------------------------------------
 
 def make_kernel(kernel, name, **const_arrs):
     """Compile a kernel and pass optional constant ararys."""
@@ -125,11 +127,15 @@ def lfilter(b, a, arr, axis=0, reverse=False):
     return _apply_lfilter(lfilter_fun, arr)
 
 
+# GPU FFT-based convolution
+# -------------------------
+
 def _clip(x, a, b):
     return max(a, min(b, x))
 
 
 def pad(fcn_convolve):
+    @wraps(fcn_convolve)
     def function_wrapper(x, b, axis=0, **kwargs):
         # add the padding to the array
         xsize = x.shape[axis]
@@ -159,58 +165,79 @@ def pad(fcn_convolve):
     return function_wrapper
 
 
+def convolve_cpu(x, b):
+    """CPU convolution based on scipy.signal."""
+    x = np.asarray(x)
+    b = np.asarray(b)
+    if b.ndim == 1:
+        b = b[:, np.newaxis]
+    assert b.ndim == 2
+    y = ss.convolve(x, b, mode='same')
+    return y
+
+
 @pad
-def _convolve(x, b, axis=0, pad=None, nwin=0, ntap=500, overlap=2000):
-    """
-    memory controlled version that splits the signal into chunks of n samples
-    each chunk is tapered in and out, the overlap is designed to get clear of the taper
-    splicing of overlaping chunks is done in a cosine way
+def convolve_gpu_direct(x, b, **kwargs):
+    """Straight GPU FFT-based convolution that fits in memory."""
+    if not isinstance(x, cp.ndarray):
+        x = np.asarray(x)
+    if not isinstance(x, cp.ndarray):
+        b = np.asarray(b)
+    assert b.ndim == 1
+    n = x.shape[0]
+    xf = cp.fft.rfft(x, axis=0, n=n)
+    if xf.shape[0] > b.shape[0]:
+        bp = cp.pad(b, (0, n - b.shape[0]), mode='constant')
+        bp = cp.roll(bp, - b.size // 2 + 1)
+    else:
+        bp = b
+    bf = cp.fft.rfft(bp, n=n)[:, np.newaxis]
+    y = cp.fft.irfft(xf * bf, axis=0, n=n)
+    return y
+
+
+@pad
+def convolve_gpu_chunked(x, b, pad='flip', nwin=100_000, ntap=500, overlap=2000):
+    """Chunked GPU FFT-based convolution for large arrays.
+
+    This memory-controlled version splits the signal into chunks of n samples.
+    Each chunk is tapered in and out, the overlap is designed to get clear of the taper
+    splicing of overlaping chunks is done in a cosine way.
+
     param: pad None, 'zeros', 'constant', 'flip'
+
     """
-    n = x.shape[axis]
-    """
-    This is the straight convolution that fits in memory
-    """
-    if n <= nwin or nwin == 0:
-        xf = cp.fft.rfft(x, axis=axis, n=n)
-        if xf.shape[axis] > b.shape[0]:
-            bp = cp.pad(b, (0, n - b.shape[0]), mode='constant')
-            bp = cp.roll(bp, - b.size // 2 + 1)
-        bf = cp.fft.rfft(bp, n=n)[:, np.newaxis]
-        y = cp.fft.irfft(xf * bf, axis=axis, n=n)
-        return y
-    """
-    This is the memory controlled version that splits the signal in chunch and splices them
-    together
-    """
+    x = cp.asarray(x)
+    b = cp.asarray(b)
+    assert b.ndim == 1
+    n = x.shape[0]
     assert overlap >= 2 * ntap
     # create variables, the gain is to control the splicing
     y = cp.zeros_like(x)
-    gain = cp.asarray(np.zeros(n))
+    gain = cp.zeros(n)
     # compute tapers/constants outside of the loop
-    taper_in = cp.asarray(- np.cos(np.linspace(0, 1, ntap) * np.pi) / 2 + 0.5)[:, np.newaxis]
-    taper_out = cp.asarray(np.flipud(taper_in))
-    assert nwin > b.shape[0]
+    taper_in = (-cp.cos(cp.linspace(0, 1, ntap) * cp.pi) / 2 + 0.5)[:, cp.newaxis]
+    taper_out = cp.flipud(taper_in)
+    assert b.shape[0] < nwin < n
     # this is the convolution wavelet that we shift to be 0 lag
     bp = cp.pad(b, (0, nwin - b.shape[0]), mode='constant')
     bp = cp.roll(bp, - b.size // 2 + 1)
-    bp = cp.fft.rfft(bp, n=nwin)[:, np.newaxis]
+    bp = cp.fft.rfft(bp, n=nwin)[:, cp.newaxis]
     # this is used to splice windows together: cosine taper. The reversed taper is complementary
-    scale = np.minimum(np.maximum(0, np.linspace(-0.5, 1.5, overlap - 2 * ntap)), 1)
-    splice = cp.asarray(- np.cos(scale * np.pi) / 2 + 0.5)[:, np.newaxis]
+    scale = cp.minimum(cp.maximum(0, cp.linspace(-0.5, 1.5, overlap - 2 * ntap)), 1)
+    splice = (-cp.cos(scale * cp.pi) / 2 + 0.5)[:, cp.newaxis]
     # loop over the signal by chunks and apply convolution in frequency domain
     first = 0
     while True:
         first = min(n - nwin, first)
         last = min(first + nwin, n)
-        # print(first, last)
         # the convolution
         x_ = cp.copy(x[first:last, :])
         x_[:ntap] *= taper_in
         x_[-ntap:] *= taper_out
-        x_ = cp.fft.irfft(cp.fft.rfft(x_, axis=axis, n=nwin) * bp, axis=axis, n=nwin)
+        x_ = cp.fft.irfft(cp.fft.rfft(x_, axis=0, n=nwin) * bp, axis=0, n=nwin)
         # this is to check the gain of summing the windows
-        tt = cp.asarray(np.ones(nwin))
+        tt = cp.ones(nwin)
         tt[:ntap] *= taper_in[:, 0]
         tt[-ntap:] *= taper_out[:, 0]
         # the full overlap is outside of the tapers: we apply a cosine splicing to this part only
@@ -229,35 +256,20 @@ def _convolve(x, b, axis=0, pad=None, nwin=0, ntap=500, overlap=2000):
         if last == n:
             break
         first += nwin - overlap
-    # import matplotlib.pyplot as plt
-    # plt.plot(np.abs(cp.asnumpy(b)))
-    # plt.plot(cp.asnumpy(x[:, 0]))
-    # plt.plot(cp.asnumpy(y[:, 0]))
-    # plt.plot(cp.asnumpy(gain))
-    # gain[gain < 1] = 1
-    # y /= gain[:, np.newaxis]
     return y
 
 
-def convolve(x, b, axis=0, **kwargs):
-    try:
-        f = io.StringIO()
-        with redirect_stderr(f):
-            return _convolve(x, b, axis=axis, **kwargs)
-    except Exception:
-        logger.debug(
-            "Out of memory during convolve on x %s and b %s, trying to split x.", x.shape, b.shape)
-        assert x.ndim == 2
-        n = x.shape[1]
-        if n == 1:
-            raise ValueError("There is not enough GPU memory to run convolve().")
-        free_gpu_memory()
-        ys = []
-        for j in range(n):
-            ys.append(convolve(x[:, j:j + 1], b, **kwargs))
-        y = cp.concatenate(ys, axis=1 - axis)
-        assert y.shape == x.shape
-        return y
+def convolve_gpu(x, b, **kwargs):
+    n = x.shape[0]
+    # Default chunk size : 100,000 samples along the first axis, the one to be chunked and over
+    # which to compute the convolution.
+    nwin = kwargs.get('nwin', 100_000)
+    assert nwin >= 0
+    if n <= nwin or nwin == 0:
+        return convolve_gpu_direct(x, b)
+    else:
+        nwin = max(nwin, b.shape[0] + 1)
+        return convolve_gpu_chunked(x, b, **kwargs)
 
 
 def svdecon(X, nPC0=None):
