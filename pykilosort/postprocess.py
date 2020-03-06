@@ -839,6 +839,12 @@ def checkClusters(ctx):
         ir.W_a = ir.W_a[:, :, good_units_mask]
         ir.W_b = ir.W_b[:, :, good_units_mask]
 
+        # Find empty cluster ids, and for spikes with cluster ids above those indices, subtract 1.
+        empty_cl = np.where(good_units_mask == False)[0]
+        for cl in empty_cl:
+            mislabeled_cl = np.where(ir.st3_c[:, 1] > cl)[0]
+            ir.st3_c[mislabeled_cl, 1] -= 1
+
     ctx.ir = ir
     return ctx
 
