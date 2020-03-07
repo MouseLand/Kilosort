@@ -21,6 +21,7 @@ A good CPU and a large amount of RAM (minimum 32GB or 64GB) is also required.
 * click
 * pytest
 
+To create a conda environment with these dependencies, run the command: `conda env create -f pyks2.yml` inside your pykilosort directory.
 
 ## Usage example
 

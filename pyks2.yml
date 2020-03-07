@@ -1,0 +1,12 @@
+name: pyks2
+channels:
+  - defaults
+dependencies:
+ - python >=3.7
+ - scipy
+ - numpy
+ - cupy
+ - matplotlib
+ - tqdm
+ - click
+ - pytest
