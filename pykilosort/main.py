@@ -19,7 +19,7 @@ def default_probe(raw_data):
     return Bunch(Nchan=nc, xc=np.zeros(nc), yc=np.arange(nc))
 
 
-def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, stop_after=None):
+def run(raw_data=None, probe=None, params=None, dir_path=None, stop_after=None):
     """Launch KiloSort 2.
 
     probe has the following attributes:
@@ -34,18 +34,12 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
     if isinstance(probe, (str, Path)):
         probe = load_probe(probe)
 
-    # WARNING: F order, shape (n_channels, n_samples) given the layout of the file on disk,
-    # and for consistency with MATLAB.
-    if raw_data is None:
-        dat_path = Path(dat_path)
-        raw_data = memmap_binary_file(dat_path, n_channels=probe.NchanTOT, dtype=np.int16)
     assert raw_data.ndim == 2
-    name = dat_path.name if dat_path else 'default'
 
-    # Check order of raw data, should be FORTRAN and shape should be (n_channels, n_samples)
-    if not raw_data.shape[0] < raw_data.shape[1]:
-        raw_data = raw_data.T
-    n_channels, n_samples = raw_data.shape
+    # Now, the initial raw data must be in C order, it will be converted to Fortran order
+    # in the proc file step, so as to use the existing CUDA kernels from MATLAB.
+    assert raw_data.shape[0] > raw_data.shape[1]  # nsamples > nchannels
+    n_samples, n_channels = raw_data.shape
     logger.info("Loaded raw data with %d channels, %d samples.", n_channels, n_samples)
 
     # Get probe.
@@ -62,12 +56,12 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
     assert params
 
     # dir path
-    dir_path = dir_path or dat_path.parent
+    assert dir_path, "Please provide a dir_path"
     dir_path.mkdir(exist_ok=True, parents=True)
     assert dir_path.exists()
 
     # Create the context.
-    ctx_path = dir_path / '.kilosort' / name
+    ctx_path = dir_path / '.kilosort' / raw_data.name
     ctx = Context(ctx_path)
     ctx.params = params
     ctx.probe = probe
@@ -81,6 +75,8 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
 
     # -------------------------------------------------------------------------
     # Find good channels.
+    # NOTE: now we use C order from loading up to the creation of the proc file, which is
+    # in Fortran order.
     if params.minfr_goodchannels > 0:  # discard channels that have very few spikes
         if 'igood' not in ir:
             # determine bad channels
@@ -99,6 +95,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
         probe.yc = probe.yc[ir.igood]
         probe.kcoords = probe.kcoords[ir.igood]
     probe.Nchan = len(probe.chanMap)  # total number of good channels that we will spike sort
+    assert probe.Nchan > 0
 
     # upper bound on the number of templates we can have
     params.Nfilt = params.nfilt_factor * probe.Nchan
@@ -126,6 +123,7 @@ def run(dat_path=None, raw_data=None, probe=None, params=None, dir_path=None, st
         return ctx
 
     # Open the proc file.
+    # NOTE: now we are always in Fortran order.
     assert ir.proc_path.exists()
     ir.proc = np.memmap(ir.proc_path, dtype=raw_data.dtype, mode='r', order='F')
 
