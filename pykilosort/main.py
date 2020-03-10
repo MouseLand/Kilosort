@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from phylib.io.traces import get_ephys_reader
 
 from pprint import pprint
 import numpy as np
@@ -8,7 +9,7 @@ from .preprocess import preprocess, get_good_channels, get_whitening_matrix, get
 from .cluster import clusterSingleBatches
 from .learn import learnAndSolve8b
 from .postprocess import find_merges, splitAllClusters, set_cutoff, rezToPhy
-from .utils import Bunch, Context, memmap_binary_file, memmap_large_array, load_probe
+from .utils import Bunch, Context, memmap_large_array, load_probe
 from .default_params import default_params, set_dependent_params
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ def default_probe(raw_data):
     return Bunch(Nchan=nc, xc=np.zeros(nc), yc=np.arange(nc))
 
 
-def run(raw_data=None, probe=None, params=None, dir_path=None, stop_after=None):
+def run(dat_path=None, probe=None, params=None, dir_path=None, stop_after=None):
     """Launch KiloSort 2.
 
     probe has the following attributes:
@@ -34,6 +35,7 @@ def run(raw_data=None, probe=None, params=None, dir_path=None, stop_after=None):
     if isinstance(probe, (str, Path)):
         probe = load_probe(probe)
 
+    raw_data = get_ephys_reader(dat_path)
     assert raw_data.ndim == 2
 
     # Now, the initial raw data must be in C order, it will be converted to Fortran order
@@ -56,6 +58,7 @@ def run(raw_data=None, probe=None, params=None, dir_path=None, stop_after=None):
     assert params
 
     # dir path
+    dir_path = dir_path or Path(dat_path).parent
     assert dir_path, "Please provide a dir_path"
     dir_path.mkdir(exist_ok=True, parents=True)
     assert dir_path.exists()
@@ -235,8 +238,7 @@ def run(raw_data=None, probe=None, params=None, dir_path=None, stop_after=None):
     #
     # This function saves:
     #
-    #       st3_c
-    #       cProj_c, cProjPC_c
+    #       st3_c, spikes_to_remove,
     #       est_contam_rate, Ths, good
     #
     if 'st3_c' not in ir:

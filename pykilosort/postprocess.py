@@ -708,8 +708,8 @@ def set_cutoff(ctx):
     params = ctx.params
 
     st3 = cp.asarray(ir.st3_s0)  # st3_s0 is saved by the second splitting step
-    cProj = ir.cProj
-    cProjPC = ir.cProjPC
+    # cProj = ir.cProj
+    # cProjPC = ir.cProjPC
 
     dt = 1. / 1000  # step size for CCG binning
 
@@ -789,21 +789,25 @@ def set_cutoff(ctx):
     ix = st3[:, 1] == -1
     st3 = st3[~ix, :]
 
-    if len(cProj) > 0:
-        ix = cp.asnumpy(ix)
-        if len(ix) > cProj.shape[0]:
-            ix = ix[:cProj.shape[0]]
-        else:
-            ix = np.pad(ix, (0, cProj.shape[0] - len(ix)), mode='constant')
-        assert ix.shape[0] == cProj.shape[0] == cProjPC.shape[0]
-        cProj = cProj[~ix, :]  # remove their template projections too
-        cProjPC = cProjPC[~ix, :, :]  # and their PC projections
-        assert st3.shape[0] == cProj.shape[0] == cProjPC.shape[0]
+    # NOTE: to avoid loading everything into memory, we don't export cProj and cProjPC
+    # right now, we'll remove the spikes at the rezToPhy stage.
+
+    # if len(cProj) > 0:
+    #     ix = cp.asnumpy(ix)
+    #     if len(ix) > cProj.shape[0]:
+    #         ix = ix[:cProj.shape[0]]
+    #     else:
+    #         ix = np.pad(ix, (0, cProj.shape[0] - len(ix)), mode='constant')
+    #     assert ix.shape[0] == cProj.shape[0] == cProjPC.shape[0]
+    #     cProj = cProj[~ix, :]  # remove their template projections too
+    #     cProjPC = cProjPC[~ix, :, :]  # and their PC projections
+    #     assert st3.shape[0] == cProj.shape[0] == cProjPC.shape[0]
 
     return Bunch(
-        st3_c=st3,
-        cProj_c=cProj,
-        cProjPC_c=cProjPC,
+        st3_c=st3,  # the spikes assigned to -1 have been removed here
+        spikes_to_remove=cp.asnumpy(ix),
+        # cProj_c=cProj,
+        # cProjPC_c=cProjPC,
 
         est_contam_rate=est_contam_rate,
         Ths=Ths,
@@ -923,16 +927,44 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     tempAmps[tids] = ta  # because ta only has entries for templates that had at least one spike
     tempAmps = params.gain * tempAmps  # for consistency, make first dimension template number
 
-    tfw = NpyWriter(join(savePath, 'template_features.npy'), ir.cProj_c.shape, np.float32)
-    pcw = NpyWriter(join(savePath, 'pc_features.npy'), ir.cProjPC_c.shape, np.float32)
-    ss = cp.asnumpy(isort)
-    N = len(ss)
+    # PCs
+    ix = ir.spikes_to_remove  # length: number of spikes BEFORE -1 cluster removed
+
+    cProj_shape = ir.cProj.shape
+    cProj_shape = (st3.shape[0],) + cProj_shape[1:]
+
+    cProjPC_shape = ir.cProjPC.shape
+    cProjPC_shape = (st3.shape[0],) + cProjPC_shape[1:]
+
+    tfw = NpyWriter(join(savePath, 'template_features.npy'), cProj_shape, np.float32)
+    pcw = NpyWriter(join(savePath, 'pc_features.npy'), cProjPC_shape, np.float32)
+
+    isort = cp.asnumpy(isort)
+    N = len(ix)  # number of spikes including those assigned to -1
+    assert ir.cProj.shape[0] == N
+    assert ir.cProjPC.shape[0] == N
+
+    spikes_to_keep = np.nonzero(~ix)[0]  # indices of the spikes to keep in the cProj index space
+
+    # if len(ix) > ir.cProj.shape[0]:
+    #     ix = ix[:cProj.shape[0]]
+    # else:
+    #     ix = np.pad(ix, (0, ir.cProj.shape[0] - len(ix)), mode='constant')
+    # assert ix.shape[0] == ir.cProj.shape[0] == ir.cProjPC.shape[0]
+
     k = int(ceil(float(N) / 100))  # 100 chunks
     assert k >= 1
     for i in tqdm(range(0, N, k), desc="Saving template and PC features"):
-        idx = ss[i:i + k, ...]
-        tfw.append(ir.cProj_c[idx])
-        pcw.append(ir.cProjPC_c[idx])
+        # NOTE: cProj and cProjPC still have the spikes assigned to -1 that have yet to be removed
+
+        # spike indices in cProj that need to be kept in this chunk
+        ind = spikes_to_keep[isort[i:i + k]]
+
+        cProj = ir.cProj[ind]
+        cProjPC = ir.cProjPC[ind]
+
+        tfw.append(cProj)
+        pcw.append(cProjPC)
     tfw.close()
     pcw.close()
     # with open(, 'wb') as fp:
