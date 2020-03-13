@@ -845,7 +845,7 @@ def checkClusters(ctx):
 
         # Find empty cluster ids, and for spikes with cluster ids above those indices, subtract 1.
         empty_cl = np.nonzero(~good_units_mask)[0]
-        for cl in empty_cl:
+        for cl in empty_cl[::-1]:
             logger.debug("Removing empty cluster %d.", cl)
             mislabeled_cl = np.where(ir.st3_c[:, 1] > cl)[0]
             ir.st3_c[mislabeled_cl, 1] -= 1
