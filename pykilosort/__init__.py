@@ -5,7 +5,7 @@ from .utils import Bunch, memmap_binary_file, read_data, load_probe  # noqa
 from .main import run  # noqa
 
 
-__version__ = '3.0.0a0'
+__version__ = '2.0.0a0'
 
 
 # Set a null handler on the root logger
@@ -29,8 +29,11 @@ class _Formatter(logging.Formatter):
         return message
 
 
-def add_default_handler(level='INFO', logger=logger):
-    handler = logging.StreamHandler()
+def add_default_handler(level='INFO', logger=logger, filename=None):
+    if filename is None:
+        handler = logging.StreamHandler()
+    else:
+        handler = logging.FileHandler(filename)
     handler.setLevel(level)
     formatter = _Formatter(fmt=_logger_fmt, datefmt=_logger_date_fmt)
     handler.setFormatter(formatter)
