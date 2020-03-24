@@ -38,7 +38,7 @@ $ sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cu
 $ sudo apt-get update
 $ sudo apt-get install cuda-10-0
 ```
-5. Correct output should look like [this](https://github.com/GiocomoLab/labWiki/blob/master/cuda-10-0_install_output.txt): 
+5. Correct output should look like [this](https://github.com/mari-sosa/Kilosort2/blob/master/Docs/Ubuntu_installation/cuda-10-0_install_output.txt): 
 6. Reboot, then check that cuda has installed, and that you’re running the nvidia graphics driver now.
 ```
 $ ls -l /usr/local
