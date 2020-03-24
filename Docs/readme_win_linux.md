@@ -2,9 +2,7 @@ Assuming gpu functions have been correctly compiled (see below), a "master_file.
 
 The following are instructions for setting up mex compilation of CUDA files with direct Matlab inputs. Note you need Matlab with the parallel computing toolbox. Instructions below are for Linux and  Windows. Mac instructions are in a separate file (I haven't tested them though). If successful, you should be able to run mexGPUall. 
 
-You should be able to run the code on a CPU without compiling any files, but it will be much, much slower than even on 250$ GPUs. For up to 32 channels, the CPU code might be fast enough. 
-
-Windows
+### Windows
 
 Install Visual Studio Community (2012 or 2013)
 Install CUDA 8.0 in Matlab R2017a (and 7.5 in R2016 etc; if in doubt, best to update to latest Matlab and CUDA). If you get a warning of not finding the GPU at the beginning of installation, this might be fine, unless you cannot run mexGPUall, in which case you should try a different combination of Nvidia/CUDA drivers. 
@@ -28,9 +26,11 @@ In order to set the cache to 1GB use CUDA_CACHE_MAXSIZE 1073741824.
 
 
 
-Linux
+### Linux
 
-UPDATE: for recent video cards/drivers, please see Carl Schoonover's instructions here https://groups.google.com/forum/#!topic/phy-users/g0FSHRI0Nao.
+UPDATE (new): the instructions below are now quite old. If the CUDA install doesn't work, you might need to do a purge of any existing Nvidia drivers. Please follow the instructions from Mari Sosa in this separate [readme](https://github.com/MouseLand/Kilosort2/blob/master/Docs/Ubuntu_installation/Kilosort2-Installation-for-Linux.md).
+
+UPDATE (old): for recent video cards/drivers, please see Carl Schoonover's instructions [here](https://groups.google.com/forum/#!topic/phy-users/g0FSHRI0Nao).
 
 Install CUDA (should ask for a compatible recent version of gcc, will install Nvidia drivers if necessary).
 
