@@ -1,4 +1,4 @@
-### Tested system specs (Mari, March 2020):
+### Tested system specs (Mari Sosa, March 2020):
 * OS: Ubuntu 18.04.2
 * Graphics card: NVIDIA GeForce RTX 2070 Super, 8 GB
 * Graphics driver: started with none (see below); installed nvidia 440.64 with CUDA
@@ -51,32 +51,8 @@ $ cat /proc/driver/nvidia/version
 ```
   * should show that you’re running the nvidia driver version that installed with cuda
 
-## Matlab installation (Stanford specific)
-1. Install Cisco Any Connect client for Linux: https://uit.stanford.edu/service/vpn/linux
-2. Connect to Stanford VPN.
-3. Download Matlab R2019a from [cmgm](https://cmgm-new.stanford.edu/software/unix.html) for Linux (if you are off campus, this might take a really long time, ~8 hours).
-4. Email kozar@stanford.edu for the License Key File for R2019a.
-5. After you download the .iso file, create a directory called /media/mathworks. **Do NOT move the .iso file to /tmp, because if your computer restarts it will be gone!!**
-```
-$ cd /media
-$ sudo mkdir mathworks
-```
-6. Mount the .iso file to /media/mathworks as follows (this is like inserting an installation disk into your computer):
-```
-$ mount -t iso9660 -o loop ~/Downloads/R2019a_Linux.iso /media/mathworks
-```
-7. Run the installer:
-```
-$ cd ~
-$ /media/mathworks/install
-```
-8. Enter the license key you received via email and point the installer to the path of the license.dat file (can be anywhere, but after you install you should move it to /usr/local/MATLAB/R2019a/licenses/)
-9. Launch Matlab. If you want, make a symbolic link in your home directory to launch the executable from command line:
-```
-$ cd ~
-$ ln -s matlab2019a /usr/local/MATLAB/R2019a/bin/matlab
-$ ./matlab2019a
-```
+## Matlab installation
+1. Install Matlab if you haven't already and launch it.
 
 ## Kilosort setup 
 1. Check that the CUDA toolkit version is correctly recognized by Matlab:
@@ -84,11 +60,10 @@ $ ./matlab2019a
 >> gpuDevice
 ```
   * `ToolkitVersion` should say `10`.  It’s ok if `DriverVersion` says something different, like `10.1` or `10.2`.
-2. Clone the forked Kilosort2 repo from the Giocomo Lab github:
+2. Clone the Kilosort2 repo (or your own forked version) to your local source code directory:
 ```
-$ mkdir ~/Src
-$ cd Src
-$ git clone https://github.com/GiocomoLab/Kilosort2
+$ cd ~/Src
+$ git clone https://github.com/MouseLand/Kilosort2.git
 ```
 3. In Matlab, add the Kilosort2 directory to your path and go to the CUDA subdirectory. Run mexGPUall.m.
 ```
@@ -99,7 +74,7 @@ $ git clone https://github.com/GiocomoLab/Kilosort2
 ```
 $ git clone https://github.com/kwikteam/npy-matlab.git
 ```
-5. CUDA and Kilosort should be ready to use.  Proceed to the [Kilosort/Phy Instructions](https://github.com/GiocomoLab/labWiki/wiki/Kilosort-Phy-Post-Processing-Pipeline) to sort and curate. 
+5. CUDA and Kilosort should be ready to use.  
 
 ***
 
