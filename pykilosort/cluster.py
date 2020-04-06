@@ -318,7 +318,8 @@ def extractPCbatch2(proc, params, probe, wPCA, ibatch, iC, Nbatch):
 
     NchanNear = iC.shape[0]
 
-    batchstart = np.arange(0, NT * Nbatch + 1, NT).astype(np.int64)  # batches start at these timepoints
+    # batches start at these timepoints
+    batchstart = np.arange(0, NT * Nbatch + 1, NT).astype(np.int64)
 
     offset = Nchan * batchstart[ibatch]
     dat = proc.flat[offset:offset + NT * Nchan].reshape((-1, Nchan), order='F')

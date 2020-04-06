@@ -1,18 +1,20 @@
 from contextlib import redirect_stderr
 import ctypes
 import io
+from functools import wraps
 import logging
 from math import ceil
 from textwrap import dedent
 
 import numpy as np
+from scipy import signal as ss
 import cupy as cp
 
 logger = logging.getLogger(__name__)
 
 
-# LTI filter on GPU
-# -----------------------------------------------------------------------------
+# LTI filter on GPU (NOTE: inefficient and soon to be deprecated)
+# ---------------------------------------------------------------
 
 def make_kernel(kernel, name, **const_arrs):
     """Compile a kernel and pass optional constant ararys."""
@@ -125,48 +127,152 @@ def lfilter(b, a, arr, axis=0, reverse=False):
     return _apply_lfilter(lfilter_fun, arr)
 
 
+# GPU FFT-based convolution
+# -------------------------
+
 def _clip(x, a, b):
     return max(a, min(b, x))
 
 
-def _convolve(x, b, axis=0):
-    b = b.ravel()
-    assert axis == 0
-    tmax = len(b) // 2
-    xshape = x.shape
-    x = cp.concatenate((x, cp.zeros((tmax, x.shape[1])))).astype(x.dtype)
-    n = x.shape[axis]
-    xf = cp.fft.rfft(x, axis=axis, n=n)
-    if xf.shape[axis] > b.shape[0]:
-        b = cp.pad(b, (1, n - b.shape[0] - 1), mode='constant')
-    bf = cp.fft.rfft(b, n=n)
-    bf = bf[:, np.newaxis]
-    xbf = xf * bf
-    y = cp.fft.irfft(xbf, axis=axis)
-    y = y[y.shape[axis] - xshape[axis]:, :]
-    assert y.shape == xshape
+def pad(fcn_convolve):
+    @wraps(fcn_convolve)
+    def function_wrapper(x, b, axis=0, **kwargs):
+        # add the padding to the array
+        xsize = x.shape[axis]
+        if 'pad' in kwargs and kwargs['pad']:
+            npad = b.shape[axis] // 2
+            padd = cp.take(x, cp.arange(npad), axis=axis) * 0
+            if kwargs['pad'] == 'zeros':
+                x = cp.concatenate((padd, x, padd), axis=axis)
+            if kwargs['pad'] == 'constant':
+                x = cp.concatenate((padd * 0 + cp.mean(x[:npad]), x, padd + cp.mean(x[-npad:])),
+                                   axis=axis)
+            if kwargs['pad'] == 'flip':
+                pad_in = cp.flip(cp.take(x, cp.arange(1, npad + 1), axis=axis), axis=axis)
+                pad_out = cp.flip(cp.take(x, cp.arange(xsize - npad - 1, xsize - 1),
+                                          axis=axis), axis=axis)
+                x = cp.concatenate((pad_in, x, pad_out), axis=axis)
+        # run the convolution
+        y = fcn_convolve(x, b, **kwargs)
+        # remove padding from both arrays (necessary for x ?)
+        if 'pad' in kwargs and kwargs['pad']:
+            # remove the padding
+            y = cp.take(y, cp.arange(npad, x.shape[axis] - npad), axis=axis)
+            x = cp.take(x, cp.arange(npad, x.shape[axis] - npad), axis=axis)
+            assert xsize == x.shape[axis]
+            assert xsize == y.shape[axis]
+        return y
+    return function_wrapper
+
+
+def convolve_cpu(x, b):
+    """CPU convolution based on scipy.signal."""
+    x = np.asarray(x)
+    b = np.asarray(b)
+    if b.ndim == 1:
+        b = b[:, np.newaxis]
+    assert b.ndim == 2
+    y = ss.convolve(x, b, mode='same')
     return y
 
 
-def convolve(x, b, axis=0):
-    try:
-        f = io.StringIO()
-        with redirect_stderr(f):
-            return _convolve(x, b, axis=axis)
-    except Exception:
-        logger.debug(
-            "Out of memory during convolve on x %s and b %s, trying to split x.", x.shape, b.shape)
-        assert x.ndim == 2
-        n = x.shape[1]
-        if n == 1:
-            raise ValueError("There is not enough GPU memory to run convolve().")
-        free_gpu_memory()
-        ys = []
-        for j in range(n):
-            ys.append(convolve(x[:, j:j + 1], b))
-        y = cp.concatenate(ys, axis=1 - axis)
-        assert y.shape == x.shape
-        return y
+@pad
+def convolve_gpu_direct(x, b, **kwargs):
+    """Straight GPU FFT-based convolution that fits in memory."""
+    if not isinstance(x, cp.ndarray):
+        x = np.asarray(x)
+    if not isinstance(x, cp.ndarray):
+        b = np.asarray(b)
+    assert b.ndim == 1
+    n = x.shape[0]
+    xf = cp.fft.rfft(x, axis=0, n=n)
+    if xf.shape[0] > b.shape[0]:
+        bp = cp.pad(b, (0, n - b.shape[0]), mode='constant')
+        bp = cp.roll(bp, - b.size // 2 + 1)
+    else:
+        bp = b
+    bf = cp.fft.rfft(bp, n=n)[:, np.newaxis]
+    y = cp.fft.irfft(xf * bf, axis=0, n=n)
+    return y
+
+
+DEFAULT_CONV_CHUNK = 10_000
+
+
+@pad
+def convolve_gpu_chunked(x, b, pad='flip', nwin=DEFAULT_CONV_CHUNK, ntap=500, overlap=2000):
+    """Chunked GPU FFT-based convolution for large arrays.
+
+    This memory-controlled version splits the signal into chunks of n samples.
+    Each chunk is tapered in and out, the overlap is designed to get clear of the taper
+    splicing of overlaping chunks is done in a cosine way.
+
+    param: pad None, 'zeros', 'constant', 'flip'
+
+    """
+    x = cp.asarray(x)
+    b = cp.asarray(b)
+    assert b.ndim == 1
+    n = x.shape[0]
+    assert overlap >= 2 * ntap
+    # create variables, the gain is to control the splicing
+    y = cp.zeros_like(x)
+    gain = cp.zeros(n)
+    # compute tapers/constants outside of the loop
+    taper_in = (-cp.cos(cp.linspace(0, 1, ntap) * cp.pi) / 2 + 0.5)[:, cp.newaxis]
+    taper_out = cp.flipud(taper_in)
+    assert b.shape[0] < nwin < n
+    # this is the convolution wavelet that we shift to be 0 lag
+    bp = cp.pad(b, (0, nwin - b.shape[0]), mode='constant')
+    bp = cp.roll(bp, - b.size // 2 + 1)
+    bp = cp.fft.rfft(bp, n=nwin)[:, cp.newaxis]
+    # this is used to splice windows together: cosine taper. The reversed taper is complementary
+    scale = cp.minimum(cp.maximum(0, cp.linspace(-0.5, 1.5, overlap - 2 * ntap)), 1)
+    splice = (-cp.cos(scale * cp.pi) / 2 + 0.5)[:, cp.newaxis]
+    # loop over the signal by chunks and apply convolution in frequency domain
+    first = 0
+    while True:
+        first = min(n - nwin, first)
+        last = min(first + nwin, n)
+        # the convolution
+        x_ = cp.copy(x[first:last, :])
+        x_[:ntap] *= taper_in
+        x_[-ntap:] *= taper_out
+        x_ = cp.fft.irfft(cp.fft.rfft(x_, axis=0, n=nwin) * bp, axis=0, n=nwin)
+        # this is to check the gain of summing the windows
+        tt = cp.ones(nwin)
+        tt[:ntap] *= taper_in[:, 0]
+        tt[-ntap:] *= taper_out[:, 0]
+        # the full overlap is outside of the tapers: we apply a cosine splicing to this part only
+        if first > 0:
+            full_overlap_first = first + ntap
+            full_overlap_last = first + overlap - ntap
+            gain[full_overlap_first:full_overlap_last] *= (1. - splice[:, 0])
+            gain[full_overlap_first:full_overlap_last] += tt[ntap:overlap - ntap] * splice[:, 0]
+            gain[full_overlap_last:last] = tt[overlap - ntap:]
+            y[full_overlap_first:full_overlap_last] *= (1. - splice)
+            y[full_overlap_first:full_overlap_last] += x_[ntap:overlap - ntap] * splice
+            y[full_overlap_last:last] = x_[overlap - ntap:]
+        else:
+            y[first:last, :] = x_
+            gain[first:last] = tt
+        if last == n:
+            break
+        first += nwin - overlap
+    return y
+
+
+def convolve_gpu(x, b, **kwargs):
+    n = x.shape[0]
+    # Default chunk size : N samples along the first axis, the one to be chunked and over
+    # which to compute the convolution.
+    nwin = kwargs.get('nwin', DEFAULT_CONV_CHUNK)
+    assert nwin >= 0
+    if n <= nwin or nwin == 0:
+        return convolve_gpu_direct(x, b)
+    else:
+        nwin = max(nwin, b.shape[0] + 1)
+        return convolve_gpu_chunked(x, b, **kwargs)
 
 
 def svdecon(X, nPC0=None):

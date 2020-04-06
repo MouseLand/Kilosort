@@ -1,8 +1,13 @@
 import numpy as np
-from scipy.signal import lfilter as lfilter_cpu, convolve as convolve_cpu
+from numpy.testing import assert_allclose as ac
+from scipy.signal import lfilter as lfilter_cpu
 import cupy as cp
 
-from ..cptools import median, lfilter, svdecon, svdecon_cpu, convolve, free_gpu_memory
+from pytest import fixture
+
+from ..cptools import (
+    median, lfilter, svdecon, svdecon_cpu, free_gpu_memory,
+    convolve_cpu, convolve_gpu, convolve_gpu_direct, convolve_gpu_chunked)
 
 
 def test_median_1(dtype, axis):
@@ -49,13 +54,56 @@ def test_svdecon_1():
     assert np.allclose(S, Sn)
 
 
-def test_convolve():
-    for n in (1000, 10000, 100000, 250000, 450000):
-        free_gpu_memory()
-        x = cp.random.randn(n, 96)
-        b = cp.sin(-cp.linspace(0.0, 5.0, 100))
-        y = cp.asnumpy(convolve(x, b))
+@fixture(params=(100, 2_000, 10_000, 50_000, 250_000))
+def arr(request):
+    return np.random.randn(int(request.param), 100)
 
-        for k in (0, 50, 95):
-            y_cpu = convolve_cpu(cp.asnumpy(x)[:, k], cp.asnumpy(b), mode='same')
-            assert np.max(np.abs(y[:, k] - y_cpu)) < 1e-8
+
+@fixture
+def gaus():
+    dt = np.arange(-1000, 1000 + 1)
+    gaus = np.exp(-dt ** 2 / (2 * 250 ** 2))
+    return gaus / np.sum(gaus)
+
+
+@fixture(params=(None, 'zeros', 'flip', 'constant'))
+def pad(request):
+    return request.param
+
+
+@fixture
+def nwin():
+    return 2500
+
+
+def test_convolve(arr, gaus, pad, nwin):
+    free_gpu_memory()
+    npad = gaus.shape[0] // 2
+
+    # Upload the arrays to the GPU.
+    arr_gpu = cp.asarray(arr)
+    gaus_gpu = cp.asarray(gaus)
+
+    # Compute the convolution on the CPU.
+    conv_cpu = convolve_cpu(arr, gaus)
+
+    def check(y):
+        ac(cp.asnumpy(y)[npad:-npad, :], conv_cpu[npad:-npad, :], atol=1e-3)
+
+    # Check the GPU direct version with the CPU version.
+    check(convolve_gpu_direct(arr_gpu, gaus_gpu, pad=pad))
+
+    if arr.shape[0] > nwin:
+        # Check the GPU chunked version with the CPU version.
+        y = convolve_gpu_chunked(arr_gpu, gaus_gpu, pad=pad, nwin=nwin)
+        check(y)
+
+        # DEBUG
+        # import matplotlib.pyplot as plt
+        # plt.plot(cp.asnumpy(conv_cpu[npad:-npad, 0]))
+        # plt.plot(cp.asnumpy(y[npad:-npad, 0]))
+        # plt.show()
+
+    if pad is None:
+        # This function should automatically route to the correct GPU implementation.
+        check(convolve_gpu(arr_gpu, gaus_gpu))

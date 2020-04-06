@@ -7,7 +7,7 @@ from scipy.signal import butter
 import cupy as cp
 from tqdm import tqdm
 
-from .cptools import lfilter, _get_lfilter_fun, median, convolve
+from .cptools import lfilter, _get_lfilter_fun, median, convolve_gpu
 from .utils import _make_fortran
 
 logger = logging.getLogger(__name__)
@@ -33,14 +33,15 @@ def gpufilter(buff, chanMap=None, fs=None, fslow=None, fshigh=None, car=True):
     # set up the parameters of the filter
     b1, a1 = get_filter_params(fs, fshigh=fshigh, fslow=fslow)
 
-    dataRAW = buff.T
+    dataRAW = buff  # .T  # NOTE: we no longer use Fortran order upstream
+    assert dataRAW.flags.c_contiguous
     assert dataRAW.ndim == 2
-    if chanMap is not None:
+    assert dataRAW.shape[0] > dataRAW.shape[1]
+    if chanMap is not None and len(chanMap):
         dataRAW = dataRAW[:, chanMap]  # subsample only good channels
     assert dataRAW.ndim == 2
 
     # subtract the mean from each channel
-    assert dataRAW.ndim == 2
     dataRAW = dataRAW - cp.mean(dataRAW, axis=0)  # subtract mean of each channel
     assert dataRAW.ndim == 2
 
@@ -86,14 +87,14 @@ def my_min(S1, sig, varargin=None):
         Nd = S1.ndim
         S1 = cp.transpose(S1, [idim] + list(range(0, idim)) + list(range(idim + 1, Nd)))
         dsnew = S1.shape
-        S1 = cp.reshape(S1, (S1.shape[0], -1), order='F')
+        S1 = cp.reshape(S1, (S1.shape[0], -1), order='F' if S1.flags.f_contiguous else 'C')
         dsnew2 = S1.shape
         S1 = cp.concatenate(
             (cp.full((sig, dsnew2[1]), np.inf), S1, cp.full((sig, dsnew2[1]), np.inf)), axis=0)
         Smax = S1[:dsnew2[0], :]
         for j in range(1, 2 * sig + 1):
             Smax = cp.minimum(Smax, S1[j:j + dsnew2[0], :])
-        S1 = cp.reshape(Smax, dsnew, order='F')
+        S1 = cp.reshape(Smax, dsnew, order='F' if S1.flags.f_contiguous else 'C')
         S1 = cp.transpose(S1, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
     return S1
 
@@ -130,22 +131,13 @@ def my_sum(S1, sig, varargin=None):
     return S1
 
 
-@lru_cache(128)
-def _gaus_lfilter(sig, axis=0, is_fortran=True, reverse=False):
-    tmax = ceil(4 * sig)
-    dt = np.arange(-tmax, tmax + 1)
-    gaus = np.exp(-dt ** 2 / (2 * sig ** 2))
-    gaus = gaus[:, np.newaxis] / np.sum(gaus)
-    return _get_lfilter_fun(gaus, 1, is_fortran=is_fortran, axis=axis, reverse=reverse)
-
-
-def my_conv2(S1, sig, varargin=None):
-    # S1 is the matrix to be filtered along a choice of axes
+def my_conv2(x, sig, varargin=None, **kwargs):
+    # x is the matrix to be filtered along a choice of axes
     # sig is either a scalar or a sequence of scalars, one for each axis to be filtered
     # varargin can be the dimensions to do filtering, if len(sig) != x.shape
     # if sig is scalar and no axes are provided, the default axis is 2
     if sig <= .25:
-        return S1
+        return x
     idims = 1
     if varargin is not None:
         idims = varargin
@@ -156,36 +148,20 @@ def my_conv2(S1, sig, varargin=None):
         sigall = np.tile(sig, len(idims))
 
     for sig, idim in zip(sigall, idims):
-        Nd = S1.ndim
-        S1 = cp.transpose(S1, [idim] + list(range(0, idim)) + list(range(idim + 1, Nd)))
-        dsnew = S1.shape
-        S1 = cp.reshape(S1, (S1.shape[0], -1), order='F')
-        dsnew2 = S1.shape
+        Nd = x.ndim
+        x = cp.transpose(x, [idim] + list(range(0, idim)) + list(range(idim + 1, Nd)))
+        dsnew = x.shape
+        x = cp.reshape(x, (x.shape[0], -1), order='F')
 
         tmax = ceil(4 * sig)
         dt = cp.arange(-tmax, tmax + 1)
         gaus = cp.exp(-dt ** 2 / (2 * sig ** 2))
-        gaus = gaus[:, cp.newaxis] / cp.sum(gaus)
+        gaus = gaus / cp.sum(gaus)
 
-        # This GPU FFT-based convolution leads to a splitting step 3.5x faster than the
-        # custom GPU lfilter implementation below.
-        cNorm = convolve(cp.ones((dsnew2[0], 1)), gaus).ravel()[:, cp.newaxis]
-        S1 = convolve(S1, gaus)
-
-        # Slow Custom GPU lfilter implementation:
-        # cNorm = _apply_lfilter(
-        #     _gaus_lfilter(sig),
-        #     cp.concatenate((cp.ones(dsnew2[0]), cp.zeros(tmax)))[:, np.newaxis])
-        # cNorm = cNorm[tmax:, :]
-        # S1 = _apply_lfilter(_gaus_lfilter(sig), cp.asfortranarray(cp.concatenate(
-        #     (S1, cp.zeros((tmax, dsnew2[1]), order='F')), axis=0)))
-        # S1 = S1[tmax:, :]
-
-        S1 = S1.reshape(dsnew, order='F')
-        S1 = S1 / cNorm
-
-        S1 = cp.transpose(S1, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
-    return S1
+        y = convolve_gpu(x, gaus, **kwargs)
+        y = y.reshape(dsnew, order='F')
+        y = cp.transpose(y, list(range(1, idim + 1)) + [0] + list(range(idim + 1, Nd)))
+    return y
 
 
 def whiteningFromCovariance(CC):
@@ -248,22 +224,22 @@ def get_whitening_matrix(raw_data=None, probe=None, params=None):
     CC = cp.zeros((Nchan, Nchan))
 
     for ibatch in tqdm(range(0, Nbatch, nSkipCov), desc="Computing the whitening matrix"):
-        # WARNING: we use Fortran order, so raw_data is NchanTOT x nsamples
         i = max(0, (NT - ntbuff) * ibatch - 2 * ntbuff)
-        buff = raw_data[:, i:i + NT - ntbuff]
-        buff = _make_fortran(buff)
-        assert buff.shape[0] < buff.shape[1]
-        assert buff.flags.f_contiguous
+        # WARNING: we no longer use Fortran order, so raw_data is nsamples x NchanTOT
+        buff = raw_data[i:i + NT - ntbuff]
+        assert buff.shape[0] > buff.shape[1]
+        assert buff.flags.c_contiguous
 
-        nsampcurr = buff.shape[1]
+        nsampcurr = buff.shape[0]
         if nsampcurr < NTbuff:
             buff = np.concatenate(
-                (buff, np.tile(buff[:, nsampcurr - 1][:, np.newaxis], (1, NTbuff))), axis=1)
+                (buff, np.tile(buff[nsampcurr - 1], (NTbuff, 1))), axis=0)
 
         buff_g = cp.asarray(buff, dtype=np.float32)
 
         # apply filters and median subtraction
         datr = gpufilter(buff_g, fs=fs, fshigh=fshigh, chanMap=chanMap)
+        assert datr.flags.c_contiguous
 
         CC = CC + cp.dot(datr.T, datr) / NT  # sample covariance
 
@@ -315,17 +291,19 @@ def get_good_channels(raw_data=None, probe=None, params=None):
     # skip every 100 batches
     for ibatch in tqdm(range(0, Nbatch, int(ceil(Nbatch / 100))), desc="Finding good channels"):
         i = NT * ibatch
-        buff = raw_data[:, i:i + NT]
-        buff = _make_fortran(buff)
-        assert buff.shape[0] < buff.shape[1]
-        assert buff.flags.f_contiguous
+        buff = raw_data[i:i + NT]
+        # buff = _make_fortran(buff)
+        # NOTE: using C order now
+        assert buff.shape[0] > buff.shape[1]
+        assert buff.flags.c_contiguous
         if buff.size == 0:
             break
 
         # Put on GPU.
         buff = cp.asarray(buff, dtype=np.float32)
-        assert buff.flags.f_contiguous
+        assert buff.flags.c_contiguous
         datr = gpufilter(buff, chanMap=chanMap, fs=fs, fshigh=fshigh, fslow=fslow)
+        assert datr.shape[0] > datr.shape[1]
 
         # very basic threshold crossings calculation
         s = cp.std(datr, axis=0)
@@ -355,6 +333,9 @@ def get_good_channels(raw_data=None, probe=None, params=None):
 
     # keep only those channels above the preset mean firing rate
     igood = cp.asnumpy(nc >= minfr_goodchannels)
+
+    if len(igood) == 0:
+        raise RuntimeError("No good channels found! Verify your raw data and parameters.")
 
     logger.info('Found %d threshold crossings in %2.2f seconds of data.' % (k, ttime))
     logger.info('Found %d/%d bad channels.' % (np.sum(~igood), len(igood)))
@@ -410,23 +391,25 @@ def preprocess(ctx):
             else:
                 ioffset = params.ntbuff
 
-            buff = raw_data[:, i:i + NTbuff]
+            buff = raw_data[i:i + NTbuff]
             if buff.size == 0:
                 logger.error("Loaded buffer has an empty size!")
                 break  # this shouldn't really happen, unless we counted data batches wrong
 
-            nsampcurr = buff.shape[1]  # how many time samples the current batch has
+            nsampcurr = buff.shape[0]  # how many time samples the current batch has
             if nsampcurr < NTbuff:
                 buff = np.concatenate(
-                    (buff, np.tile(buff[:, nsampcurr - 1][:, np.newaxis], (1, NTbuff))), axis=1)
+                    (buff, np.tile(buff[nsampcurr - 1], (NTbuff, 1))), axis=0)
 
             # apply filters and median subtraction
             buff = cp.asarray(buff, dtype=np.float32)
 
             datr = gpufilter(buff, chanMap=probe.chanMap, fs=fs, fshigh=fshigh, fslow=fslow)
+            assert datr.flags.c_contiguous
 
             datr = datr[ioffset:ioffset + NT, :]  # remove timepoints used as buffers
             datr = cp.dot(datr, Wrot)  # whiten the data and scale by 200 for int16 range
+            assert datr.flags.c_contiguous
 
             # convert to int16, and gather on the CPU side
             # WARNING: transpose because "tofile" always writes in C order, whereas we want
