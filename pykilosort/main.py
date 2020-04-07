@@ -20,7 +20,7 @@ def default_probe(raw_data):
     return Bunch(Nchan=nc, xc=np.zeros(nc), yc=np.arange(nc))
 
 
-def run(dat_path=None, probe=None, params=None, dir_path=None, stop_after=None):
+def run(dat_path=None, probe=None, params=None, dir_path=None, stop_after=None, **kwargs):
     """Launch KiloSort 2.
 
     probe has the following attributes:
@@ -35,7 +35,7 @@ def run(dat_path=None, probe=None, params=None, dir_path=None, stop_after=None):
     if isinstance(probe, (str, Path)):
         probe = load_probe(probe)
 
-    raw_data = get_ephys_reader(dat_path)
+    raw_data = get_ephys_reader(dat_path, **kwargs)
     assert raw_data.ndim == 2
 
     # Now, the initial raw data must be in C order, it will be converted to Fortran order
