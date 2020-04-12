@@ -1,11 +1,19 @@
 function benchmark_drift_simulation(rez, GTfilepath, simRecfilepath, sortType, bAutoMerge, varargin)
 
+
+bOutFile = 0;
+
 %for testing outside a script. comment out for normal calling!
-% load('D:\drift_simulations\74U_norm_64site_20um_600sec_20min\ks2_master_060919\rezFinal.mat');
-% GTfilepath = 'D:\drift_simulations\74U_norm_64site_20um_600sec_20min\ks2_master_060919\eMouseGroundTruth.mat';
-% simRecfilepath = 'D:\drift_simulations\74U_norm_64site_20um_600sec_20min\ks2_master_060919\eMouseSimRecord.mat';
-% sortType = 2;
-% bAutoMerge = 0;
+%can leave out last 2 lines if output file not desired
+load('D:\KS2_determ_test\rez2.mat');
+GTfilepath = 'D:\KS2_determ_test\\eMouseGroundTruth.mat';
+simRecfilepath = 'D:\KS2_determ_test\\eMouseSimRecord.mat';
+% bOutFile = 1;
+% out_fid = fopen('D:\KS2_converter_test\simStream_10uV_rd2_g0_imec0\benchmark_output.txt','w');
+
+
+sortType = 2;
+bAutoMerge = 0;
 
 load(GTfilepath);
 
@@ -15,7 +23,7 @@ else
     testClu = rez.st3(:,2) ;
 end
 
-bOutFile = 0;
+
 %fprintf( 'length of vargin: %d\n', numel(varargin));
 if( numel(varargin) == 1)
     %path for output file
@@ -23,6 +31,7 @@ if( numel(varargin) == 1)
     fprintf( 'output filename: %s\n', varargin{1} );
     out_fid = fopen( varargin{1}, 'w' );
 end
+    
 
 testRes = rez.st3(:,1);
 

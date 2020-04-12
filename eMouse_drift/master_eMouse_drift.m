@@ -4,7 +4,7 @@ makeNewData = 1; % set this to 0 to just resort a previously created data set
 sortData = 1;
 runBenchmark = 1; %set to 1 to compare sorted data to ground truth for the simulation
 
-fpath    = 'D:\test_new_sim\SC_noise\'; % where on disk do you want the simulation? ideally an SSD...
+fpath    = 'D:\pipeline_verify\'; % where on disk do you want the simulation? ideally an SSD...
 if ~exist(fpath, 'dir'); mkdir(fpath); end
 
 %KS2 path -- also has the waveforms for the simulation
