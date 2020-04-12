@@ -22,7 +22,7 @@ ops.fig = getOr(ops, 'fig', 1); % whether to show plots every N batches
 
 NrankPC = 6; % this one is the rank of the PCs, used to detect spikes with threshold crossings
 Nrank   = 3; % this one is the rank of the templates
-rng('default'); rng(1);
+rng('default'); rng(1); % initializing random number generator
 
 % move these to the GPU
 wPCA = gpuArray(ops.wPCA);
