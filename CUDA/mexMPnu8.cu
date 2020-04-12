@@ -18,7 +18,7 @@
 using namespace std;
 
 //for sorting according to timestamps
-//#include "mexNvidia_quicksort.cu"
+#include "mexNvidia_quicksort.cu"
 
 
 
@@ -393,13 +393,61 @@ __global__ void	subtract_spikes(const double *Params,  const int *st,
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-__global__ void average_snips(const double *Params, const int *st, 
-        const int *id,  const float *x, const float *y,  const int *counter, const float *dataraw, 
+/// JIC threaded only over channels to avoid collisions at specific time points
+/// NChan/16 blocks, 16 threads
+__global__ void	subtract_spikes_v2(const double *Params,  const int *st, 
+        const int *id, const float *x, const int *counter, float *dataraw, 
+        const float *W, const float *U){
+  int nt0, k, NT, ind, Nchan, Nfilt, Nrank, currChan;
+  float X;
+
+  NT        = (int) Params[0];
+  nt0       = (int) Params[4];
+  Nchan     = (int) Params[9];
+  Nfilt    	=   (int) Params[1];
+  Nrank     = (int) Params[6];
+  
+          
+  //Note that the spike times st0 are the best position of the start of the 
+  //temporal temeplate; actual peak will be nt0min samples away nt0min = 20
+  //therefore, st(ind) has a possible range of 0 to NT - nt0 - 1
+  
+  // W dims = (nt0 x Nfilt x Nrank)
+  //Indexing into W, need to got to nt0*(index of this template) + nt0*Nfilt*index of pc
+          
+  // U dims = (NChan x Nfilt xNrank)
+          
+  //single thread       
+  //for ( currChan = 0; currChan < Nchan; ++currChan ) {
+          
+  //one block, Nchan threads
+  //currChan = threadIdx.x;
+  //if (currChan < Nchan) {
+          
+  //Nchan/Nthreads blocks, becomes Nchan threads for Nchan < Nthreads
+  currChan = threadIdx.x + blockIdx.x * blockDim.x;
+  while (currChan < Nchan) {
+      for ( ind = counter[1]; ind < counter[0]; ++ind ){ 
+        for( int timeInd = 0; timeInd < nt0; ++timeInd ) {      
+            X = 0.0f;          
+            for (k=0;k<Nrank;k++) {
+                X += W[timeInd + id[ind]* nt0 + nt0*Nfilt*k] * 
+                        U[currChan + id[ind] * Nchan + Nchan*Nfilt*k]; }                      
+            dataraw[st[ind] + timeInd + NT * currChan] -= x[ind] * X;          
+        }
+      }
+    currChan += blockDim.x * gridDim.x;
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+__global__ void average_snips(const double *Params, const int *st, const unsigned int *idx,
+        const int *id, const float *x, const float *y,  const int *counter, const float *dataraw, 
         const float *W, const float *U, double *WU, int *nsp, 
         const float *mu, const float *z){
     
   int nt0, tidx, tidy, bid, NT, Nchan,k, Nrank, Nfilt;
-  int currInd;  
+  int currInd, ind;  
   float Th;
   double  X, xsum;
   
@@ -421,7 +469,8 @@ __global__ void average_snips(const double *Params, const int *st,
   // of when threads complete in mexGetSpikes. Compilation of the sums for WU, sig, and dnextbest
   // in a fixed order makes the calculation deterministic.
   
-  for(currInd=0; currInd<counter[0];currInd++) {
+  for(ind=0; ind<counter[0]; ind++) {
+      currInd = idx[ind];
       // only do this if the spike is "GOOD"
       if (x[currInd]>Th){
           if (id[currInd]==bid){
@@ -679,8 +728,16 @@ void mexFunction(int nlhs, mxArray *plhs[],
          extractFEAT<<<64, tpF>>>(d_Params, d_st, d_id, d_counter, d_dout, d_iList, d_mu, d_feat);
       
       // subtract spikes from raw data here
-      subtract_spikes<<<Nfilt,tpS>>>(d_Params,  d_st, d_id, d_y, d_counter, d_draw, d_W, d_U);
+      //subtract_spikes<<<Nfilt,tpS>>>(d_Params,  d_st, d_id, d_y, d_counter, d_draw, d_W, d_U);
   
+      // subtract spikes from raw data here, using version without threading over time points
+      if (Nchan < Nthreads) {
+        subtract_spikes_v2<<<1, Nchan>>>(d_Params, d_st, d_id, d_y, d_counter, d_draw, d_W, d_U);
+      }
+      else {
+        subtract_spikes_v2<<<Nchan/Nthreads, Nthreads>>>(d_Params, d_st, d_id, d_y, d_counter, d_draw, d_W, d_U);
+      }
+
       // filter the data with the spatial templates
        spaceFilterUpdate<<<Nfilt, 2*nt0-1>>>(d_Params, d_draw, d_U, d_UtU, d_iC, d_iW, d_data,
              d_st, d_id, d_counter);
@@ -709,20 +766,20 @@ void mexFunction(int nlhs, mxArray *plhs[],
   //get a set of indices for the sorted timestamp array
   //make a copy of the timestamp array to sort, plus an array of indicies
 
-//   unsigned int *d_stSort, *d_idx;
-//   cudaMalloc(&d_stSort,  counter[0] * sizeof(int));
-//   cudaMemset(d_stSort, 0, counter[0] *sizeof(int));
-//   cudaMalloc(&d_idx,  counter[0] * sizeof(int));
-//   cudaMemset(d_idx, 0, counter[0] *sizeof(int));  
-//   cudaMemcpy( d_stSort, d_st, counter[0]*sizeof(int), cudaMemcpyDeviceToDevice );  
-//   set_idx<<< 1, 1 >>>(d_idx, counter[0]);
-//   int left = 0;
-//   int right = counter[0]-1;
-//   cdp_simple_quicksort<<< 1, 1 >>>(d_stSort, d_idx, left, right, 0);
+   unsigned int *d_stSort, *d_idx;
+   cudaMalloc(&d_stSort,  counter[0] * sizeof(int));
+   cudaMemset(d_stSort, 0, counter[0] *sizeof(int));
+   cudaMalloc(&d_idx,  counter[0] * sizeof(int));
+   cudaMemset(d_idx, 0, counter[0] *sizeof(int));  
+   cudaMemcpy( d_stSort, d_st, counter[0]*sizeof(int), cudaMemcpyDeviceToDevice );  
+   set_idx<<< 1, 1 >>>(d_idx, counter[0]);
+   int left = 0;
+   int right = counter[0]-1;
+   cdp_simple_quicksort<<< 1, 1 >>>(d_stSort, d_idx, left, right, 0);
 
   // update dWU here by adding back to subbed spikes.
   // additional parameter d_idx = array of time sorted indicies  
-  average_snips<<<Nfilt,tpS>>>(d_Params, d_st, d_id, d_x, d_y, d_counter, 
+  average_snips<<<Nfilt,tpS>>>(d_Params, d_st, d_idx, d_id, d_x, d_y, d_counter, 
           d_draw, d_W, d_U, d_dWU, d_nsp,d_mu, d_z);
   
   float *x, *feat, *featPC, *vexp;
