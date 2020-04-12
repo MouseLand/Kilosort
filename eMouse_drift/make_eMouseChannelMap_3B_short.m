@@ -55,4 +55,4 @@ fs = 30000;
 
 chanMapName = sprintf('chanMap_3B_%dsites.mat', NchanTOT);
 
-save(fullfile(fpath, chanMapName), 'chanMap', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs', 'NchanTOT' )
+save(fullfile(fpath, chanMapName), 'chanMap', 'connected', 'xcoords', 'ycoords', 'kcoords', 'fs' )
