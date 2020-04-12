@@ -6,6 +6,7 @@ function rez = clusterSingleBatches(rez)
 
 
 rng('default'); rng(1);
+gpurng('default'); gpurng(1);
 
 ops = rez.ops;
 
@@ -42,7 +43,14 @@ tic
 for ibatch = 1:nBatches
     [uproj, call] = extractPCbatch2(rez, wPCA, min(nBatches-1, ibatch), iC); % extract spikes using PCA waveforms
     % call contains the center channels for each spike
+    
+    % sort uprojDAT and call based on 1st projection-- the order is arbitrary but
+    % selection of which spikes are used to build W will be deterministic
 
+    [~,order] = sort(uproj(1,:));
+    uproj = uproj(:,order);
+    call = call(order);
+    
     if sum(isnan(uproj(:)))>0 %sum(mus(:,ibatch)<.1)>30
         break; % I am not sure what case this safeguards against....
     end
