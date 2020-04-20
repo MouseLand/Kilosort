@@ -35,11 +35,13 @@ ihalf = find(rez.iorig==istart);
 iorder_sorted = ihalf:-1:1;
 iorder = rez.iorig(iorder_sorted);
 [rez, st3_0, fW_0,fWpc_0] = trackAndSort(rez, iorder);
+
 st3_0(:,5) = iorder_sorted(st3_0(:,5));
 
 iorder_sorted = (ihalf+1):Nbatches;
 iorder = rez.iorig(iorder_sorted);
 [rez, st3_1, fW_1,fWpc_1] = trackAndSort(rez, iorder);
+
 st3_1(:,5) = iorder_sorted(st3_1(:,5));
 
 st3     = cat(1, st3_0, st3_1);

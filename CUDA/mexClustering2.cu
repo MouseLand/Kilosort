@@ -93,7 +93,16 @@ __global__ void bestFilter(const double *Params,  const bool *match,
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void average_snips(const double *Params, const int *iC, const int *call, 
         const int *id, const float *uproj, const float *cmax, float *WU){
-    
+  
+  //Nfilt blocks
+  //Thread grid = (NrankPC, NchanNear)
+  //This implementation does not work correctly for real data!
+  //Since this_chan is function of the spike -- spikes assigned to a given template
+  //will have max channels that span a 2-3 channel range -- different (tidx, tidy)
+  //pairs can wind up trying to add to the same element of dWU, resulting in 
+  //collisions and incorrect results. Use the single-threaded version
+  //average_snips_v2 instead. Speed hit is only ~ 5-6 seconds out of 360 sec for a 
+  //typical 2 hour Neuropixels 1.0 dataset.
   int my_chan, this_chan, tidx, tidy, bid, ind, Nspikes, NrankPC, NchanNear, Nchan;
   float xsum = 0.0f; 
   
@@ -106,14 +115,16 @@ __global__ void average_snips(const double *Params, const int *iC, const int *ca
   tidy 		= threadIdx.y;
   bid 		= blockIdx.x;
   
-  for(ind=0; ind<Nspikes;ind++)
+  for(ind=0; ind<Nspikes;ind++) {
       if (id[ind]==bid){          
           my_chan = call[ind];          
           this_chan = iC[tidy + NchanNear * my_chan];
           xsum = uproj[tidx + NrankPC*tidy +  NrankPC*NchanNear * ind];
-          WU[tidx + NrankPC*this_chan + NrankPC*Nchan * bid] +=  xsum;          
+          WU[tidx + NrankPC*this_chan + NrankPC*Nchan * bid] +=  xsum;             
       }  
-   }
+  }
+
+  }
 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void average_snips_v2(const double *Params, const int *iC, const int *call, 
@@ -122,7 +133,8 @@ __global__ void average_snips_v2(const double *Params, const int *iC, const int 
             
   // jic, version with no threading over features, to avoid 
   // collisions when summing WU 
-
+  // run
+          
   int my_chan, this_chan, bid, ind, Nspikes, NrankPC, NchanNear, Nchan;
   float xsum = 0.0f; 
   int chanIndex, pcIndex;
@@ -195,8 +207,8 @@ __global__ void sum_dWU(const double *Params, const float *bigArray, float *WU) 
   int tid,bid, ind, Nfilters, Nthreads, Nfeatures, Nblocks, NfeatW, nWU, nElem;
   float sum = 0.0f; 
   
-  Nfeatures             = (int) Params[1];
-  NfeatW                = (int) Params[4];
+  Nfeatures             = (int) Params[1];  //NrankPC, number of pcs
+  NfeatW                = (int) Params[4];  //Nchan*nPC
   Nfilters              = (int) Params[2];
   Nthreads              = blockDim.x;
   Nblocks               = gridDim.x;
@@ -352,8 +364,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   bestFilter<<<40, 256>>>(d_Params, d_iMatch, d_iC, d_call, d_cmax, d_id, d_x);
   
   // average all spikes for same template -- ORIGINAL
-  //dim3 thNN(NrankPC, NchanNear);
-  //average_snips<<<Nfilters, thNN>>>(d_Params, d_iC, d_call, d_id, d_uproj, d_cmax, d_dWU);
+//   dim3 thNN(NrankPC, NchanNear);
+//   average_snips<<<Nfilters, thNN>>>(d_Params, d_iC, d_call, d_id, d_uproj, d_cmax, d_dWU);
 
   // average all spikes for same template -- threaded over filters, but not features
   // avoid collision when adding to elements of d_dWU
@@ -363,6 +375,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   //jic for running average_snips_v3 with Nfeature threads  
 //   float *d_bigArray;
 //   int bSize;
+//   int NfeatW = (int) Params[4];
+//   int Nfeatures = (int) Params[1];
 //   bSize = Nfeatures*NfeatW*Nfilters;
 //   cudaMalloc(&d_bigArray, bSize*sizeof(float) );
 //   cudaMemset(d_bigArray, 0, bSize*sizeof(float) );
@@ -371,7 +385,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
 //       d_uproj, d_cmax, d_bigArray);
 //   sum_dWU<<<128,1024>>>( d_Params, d_bigArray, d_dWU );
 //   cudaFree(d_bigArray);
-//-------------------------------------------------
+ //-------------------------------------------------
 
 
   count_spikes<<<7, 256>>>(d_Params, d_id, d_nsp, d_x, d_V);

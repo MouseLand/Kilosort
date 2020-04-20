@@ -4,6 +4,9 @@ function rez = learnTemplates(rez, iorder)
 ops = rez.ops;
 ops.fig = getOr(ops, 'fig', 1); % whether to show plots every N batches
 
+% Turn on sorting of spikes before subtracting and averaging in mpnu8
+useSort = 1;
+
 NrankPC = 6; % this one is the rank of the PCs, used to detect spikes with threshold crossings
 Nrank = 3; % this one is the rank of the templates
 rng('default'); rng(1);
@@ -57,7 +60,7 @@ pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter));
 Nsum = min(Nchan,7); % how many channels to extend out the waveform in mexgetspikes
 % lots of parameters passed into the CUDA scripts
 Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
-    Nrank ops.lam pmi(1) Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1)]);
+    Nrank ops.lam pmi(1) Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1) useSort]);
 
 % W0 has to be ordered like this
 W0 = permute(double(wPCA), [1 3 2]);
@@ -246,6 +249,8 @@ rez.ops = ops; % update these (only rez comes out of this script)
 
  
 fprintf('memorized middle timepoint \n')
+fname = fullfile('rez_mid.mat');
+save(fname, 'rez', '-v7.3');
 fprintf('Finished learning templates \n')
 %%
 
