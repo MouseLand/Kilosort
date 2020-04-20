@@ -25,7 +25,13 @@ using namespace std;
 const int  Nthreads = 1024, maxFR = 100000, NrankMax = 3, nmaxiter = 500, NchanMax = 32;
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	spaceFilter(const double *Params, const float *data, const float *U, 
-        const int *iC, const int *iW, float *dprod){    
+        const int *iC, const int *iW, float *dprod){  
+            
+// <<<Nfilt, Nthreads>>>
+// blockIdx = current filter/template
+// blockDim = 1024 (max number of threads)
+// threadIdx = used both to index channel (in synchronized portion)
+// and time (in non-synchronized portion).
   volatile __shared__ float  sU[32*NrankMax];
   volatile __shared__ int iU[32]; 
   float x;
@@ -36,19 +42,26 @@ __global__ void	spaceFilter(const double *Params, const float *data, const float
   NT      	=   (int) Params[0];
   Nfilt    	=   (int) Params[1];
   Nrank     = (int) Params[6];
-  NchanU    = (int) Params[10];
+  NchanU    = (int) Params[10];     //NchanNear in learnTemplates = 32
   Nchan     = (int) Params[9];
   
   if (tid<NchanU)
-      iU[tid] = iC[tid + NchanU * iW[bid]];
+      iU[tid] = iC[tid + NchanU * iW[bid]];     //channels for this filter (given by iW)
   __syncthreads();  
   
+  //U is array of Nchan x Nfilt x Nrank, spatial PCs for each channel for each template
+  //Populate sU array with these pcs to calculate projection of data onto them 
   if(tid<NchanU*Nrank)
       sU[tid]= U[iU[tid%NchanU] + Nchan * bid + Nchan * Nfilt * (tid/NchanU)];
         
   //sU[tid]= U[tid%NchanU + NchanU * bid + NchanU * Nfilt * (tid/NchanU)];
   
   __syncthreads();  
+
+//with arrays populated, loop over timepoints in blocks of 1024.
+//__syncthreads ensures the iU and SU arrays are filled before starting this loop
+//dprod = NT x NFilt*Nrank, projections of each time point on 3 pcs of each
+//spatial filter
   
   while (tid<NT){
       for (k=0;k<Nrank;k++){
@@ -79,8 +92,11 @@ __global__ void	spaceFilterUpdate(const double *Params, const float *data, const
     nt0       = (int) Params[4];
     Nchan     = (int) Params[9];
     
+    //<<<Nfilt, 2*nt0-1>>>
     // just need to do this for all filters that have overlap with id[bid] and st[id]
-    // tidx still represents time, from -nt0 to nt0
+    // as in spaceFilter, tid = threadIdx.x is first used to index over channels and pcs
+    // then used to loop over time, now just from -nt0 to nt0 about the input spike time
+    // tidx represents time, from -nt0 to nt0
     // tidy loops through all filters that have overlap
     
     if (tid<NchanU)
@@ -93,6 +109,9 @@ __global__ void	spaceFilterUpdate(const double *Params, const float *data, const
 
     __syncthreads();
     
+    //each block corresponds to a filter
+    //loop over all new spikes checking for matches to current filter (bid)
+    //dprod = NT
     for(ind=counter[1];ind<counter[0];ind++)
         if (UtU[id[ind] + Nfilt *bid]){
             t = st[ind] + tid - nt0;
@@ -395,48 +414,47 @@ __global__ void	subtract_spikes(const double *Params,  const int *st,
 //////////////////////////////////////////////////////////////////////////////////////////
 /// JIC threaded only over channels to avoid collisions at specific time points
 /// NChan/16 blocks, 16 threads
-__global__ void	subtract_spikes_v2(const double *Params,  const int *st, 
+__global__ void	subtract_spikes_v2(const double *Params,  const int *st, const unsigned int *idx,
         const int *id, const float *x, const int *counter, float *dataraw, 
         const float *W, const float *U){
-  int nt0, k, NT, ind, Nchan, Nfilt, Nrank, currChan;
+  int nt0, k, NT, ind, Nchan, Nfilt, Nrank, currChan, currInd;
   float X;
 
   NT        = (int) Params[0];
   nt0       = (int) Params[4];
   Nchan     = (int) Params[9];
-  Nfilt    	=   (int) Params[1];
+  Nfilt    	= (int) Params[1];
   Nrank     = (int) Params[6];
   
           
   //Note that the spike times st0 are the best position of the start of the 
   //temporal temeplate; actual peak will be nt0min samples away nt0min = 20
   //therefore, st(ind) has a possible range of 0 to NT - nt0 - 1
+          
+  //spikes will be subtracted in the order given by idx. In the host code,
+  //this array is filled either with counter[1] to counter[0] or the
+  //time sorted indicies of the spikes.
   
   // W dims = (nt0 x Nfilt x Nrank)
   //Indexing into W, need to got to nt0*(index of this template) + nt0*Nfilt*index of pc
           
   // U dims = (NChan x Nfilt xNrank)
           
-  //single thread       
-  //for ( currChan = 0; currChan < Nchan; ++currChan ) {
-          
-  //one block, Nchan threads
-  //currChan = threadIdx.x;
-  //if (currChan < Nchan) {
-          
   //Nchan/Nthreads blocks, becomes Nchan threads for Nchan < Nthreads
   currChan = threadIdx.x + blockIdx.x * blockDim.x;
   while (currChan < Nchan) {
-      for ( ind = counter[1]; ind < counter[0]; ++ind ){ 
+      for ( ind = 0; ind < counter[0]-counter[1]; ++ind ){ 
+        currInd = idx[ind] + counter[1];
         for( int timeInd = 0; timeInd < nt0; ++timeInd ) {      
             X = 0.0f;          
             for (k=0;k<Nrank;k++) {
-                X += W[timeInd + id[ind]* nt0 + nt0*Nfilt*k] * 
-                        U[currChan + id[ind] * Nchan + Nchan*Nfilt*k]; }                      
-            dataraw[st[ind] + timeInd + NT * currChan] -= x[ind] * X;          
+                X += W[timeInd + id[currInd]* nt0 + nt0*Nfilt*k] * 
+                        U[currChan + id[currInd] * Nchan + Nchan*Nfilt*k];
+            }                      
+            dataraw[st[currInd] + timeInd + NT * currChan] -= x[currInd] * X;          
         }
       }
-    currChan += blockDim.x * gridDim.x;
+      currChan += blockDim.x * gridDim.x;
   }
 }
 
@@ -446,10 +464,13 @@ __global__ void average_snips(const double *Params, const int *st, const unsigne
         const float *W, const float *U, double *WU, int *nsp, 
         const float *mu, const float *z){
     
+  //threadIndex.x = 0-nt0-1
+  //threadIndex.y = 0-15
   int nt0, tidx, tidy, bid, NT, Nchan,k, Nrank, Nfilt;
   int currInd, ind;  
   float Th;
   double  X, xsum;
+  
   
   NT        = (int) Params[0];
   Nfilt    	=   (int) Params[1];
@@ -607,7 +628,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
 
   /* Declare input variables*/
   double *Params, *d_Params;
-  unsigned int nt0, Nchan, NT, Nfilt, Nnearest, Nrank, NchanU;
+  unsigned int nt0, Nchan, NT, Nfilt, Nnearest, Nrank, NchanU, useSort;
 
   
   /* read Params and copy to GPU */
@@ -619,6 +640,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   Nrank     = (unsigned int) Params[6];
   NchanU    = (unsigned int) Params[10];  
   Nchan     = (unsigned int) Params[9];
+  useSort   = (unsigned int) Params[16];
   
   cudaMalloc(&d_Params,      sizeof(double)*mxGetNumberOfElements(prhs[0]));
   cudaMemcpy(d_Params,Params,sizeof(double)*mxGetNumberOfElements(prhs[0]),cudaMemcpyHostToDevice);
@@ -698,6 +720,19 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemset(d_err,     0, NT * sizeof(float));
   cudaMemset(d_ftype,   0, NT * sizeof(int));
   cudaMemset(d_eloss,       0, NT *    sizeof(float));
+
+  //allocate memory for index array, to be filled with 0->N items if sorting
+  //is not selected, fill with time sorted spike indicies if selected
+  unsigned int *d_idx;
+  cudaMalloc(&d_idx,    maxFR * sizeof(int));
+  cudaMemset(d_idx, 0,  maxFR * sizeof(int));  
+
+  //allocate arrays for sorting timestamps prior to spike subtraction from
+  //the data and averaging. Set to Params[17] to 1 in matlab caller
+  unsigned int *d_stSort;
+  cudaMalloc(&d_stSort,    maxFR * sizeof(int));
+  cudaMemset(d_stSort, 0,  maxFR * sizeof(int)); 
+
   
   dim3 tpB(8, 2*nt0-1), tpF(16, Nnearest), tpS(nt0, 16), tpW(Nnearest, Nrank), tpPC(NchanU, Nrank);
   
@@ -711,48 +746,74 @@ void mexFunction(int nlhs, mxArray *plhs[],
   bestFilter<<<NT/Nthreads,Nthreads>>>(d_Params, d_dout, d_mu, d_err, d_eloss, d_ftype);
   
   // loop to find and subtract spikes
-  for(int k=0;k<(int) Params[3];k++){
+  for(int k=0;k<(int) Params[3];k++){    //Parms[3] = nInnerIter, set to 60 final pass
       // ignore peaks that are smaller than another nearby peak
       cleanup_spikes<<<NT/Nthreads,Nthreads>>>(d_Params, d_dout, d_mu, d_err, d_eloss,
               d_ftype, d_st, d_id, d_x, d_y, d_z, d_counter);
       
       // add new spikes to 2nd counter
       cudaMemcpy(counter, d_counter, 2*sizeof(int), cudaMemcpyDeviceToHost);
+      // limit number of spike to add to feature arrays AND subtract from drez
+      // to maxFR. maxFR = 100000, so this limit is likely not hit for "standard"
+      // batch size of 65000. However, could lead to duplicate template formation
+      // if the limit were hit in learning templates. Should we add a warning flag?
       if (counter[0]>maxFR){
           counter[0] = maxFR;
           cudaMemcpy(d_counter, counter, sizeof(int), cudaMemcpyHostToDevice);
       }
       
-      // extract template features before subtraction
+      // extract template features before subtraction, for counter[1] to counter[0]
+      // tpF(16, Nnearest), blocks are over spikes
       if (Params[12]>1)      
          extractFEAT<<<64, tpF>>>(d_Params, d_st, d_id, d_counter, d_dout, d_iList, d_mu, d_feat);
       
-      // subtract spikes from raw data here
-      //subtract_spikes<<<Nfilt,tpS>>>(d_Params,  d_st, d_id, d_y, d_counter, d_draw, d_W, d_U);
+      // subtract spikes from raw data here, using version without threading over time points
+      // 
+      // create set of indicies from 0 to counter[0] - counter[1] - 1
+      // if useSort = 0, this will be passed to subtract_spikes_v2 unaltered
+      // and spikes will be subtracted off in the order found
+      set_idx<<< 1, 1 >>>(d_idx, counter[0] - counter[1]);    
+
+      if (useSort) { 
+        //make a copy of the timestamp array to sort
+        cudaMemcpy( d_stSort, d_st+counter[1], (counter[0] - counter[1])*sizeof(int), cudaMemcpyDeviceToDevice );
+        int left = 0;
+        int right = counter[0] - counter[1] - 1;
+        cdp_simple_quicksort<<< 1, 1 >>>(d_stSort, d_idx, left, right, 0);
+      }
   
       // subtract spikes from raw data here, using version without threading over time points
+      // spikes subratcted = counter[1] up to counter[0].
       if (Nchan < Nthreads) {
-        subtract_spikes_v2<<<1, Nchan>>>(d_Params, d_st, d_id, d_y, d_counter, d_draw, d_W, d_U);
+        subtract_spikes_v2<<<1, Nchan>>>(d_Params, d_st, d_idx, d_id, d_y, d_counter, d_draw, d_W, d_U);
       }
       else {
-        subtract_spikes_v2<<<Nchan/Nthreads, Nthreads>>>(d_Params, d_st, d_id, d_y, d_counter, d_draw, d_W, d_U);
+        subtract_spikes_v2<<<Nchan/Nthreads, Nthreads>>>(d_Params, d_st, d_idx, d_id, d_y, d_counter, d_draw, d_W, d_U);
       }
 
-      // filter the data with the spatial templates
+      // filter the data with the spatial templates, checking only times where
+      // identified spikes were subtracted 
        spaceFilterUpdate<<<Nfilt, 2*nt0-1>>>(d_Params, d_draw, d_U, d_UtU, d_iC, d_iW, d_data,
              d_st, d_id, d_counter);
       
-       // filter the data with the temporal templates
+       // filter the data with the temporal templates, checking only times where
+       // identified spikes were subtracted 
        timeFilterUpdate<<<Nfilt, 2*nt0-1>>>(d_Params, d_data, d_W, d_UtU, d_dout,
                d_st, d_id, d_counter);
 
+       // shouldn't the space filter update and time filter update also only
+       // be done if counter[0] - counter[1] > 0?
        if (counter[0]-counter[1]>0)
            bestFilterUpdate<<<counter[0]-counter[1], 2*nt0-1>>>(d_Params, d_dout, d_mu, 
                    d_err, d_eloss, d_ftype, d_st, d_id, d_counter);
-       
+      
+      // d_count records the number of spikes (tracked in d_counter[0] in each 
+      // iteration, but is currently unused.
       cudaMemcpy(d_count+k+1, d_counter, sizeof(int), cudaMemcpyDeviceToDevice);
        
-      // update 1st counter from 2nd counter
+      // copy d_counter[0] to d_counter[1]. cleanup_spikes will look for new
+      // spikes in the data and increment d_counter[0]; features of these new 
+      // spikes will be added to d_featPC and then subracted out of d_out.
       cudaMemcpy(d_counter+1, d_counter, sizeof(int), cudaMemcpyDeviceToDevice);
   }
   
@@ -764,23 +825,22 @@ void mexFunction(int nlhs, mxArray *plhs[],
 
   //jic addition of time sorting prior to average_snips
   //get a set of indices for the sorted timestamp array
-  //make a copy of the timestamp array to sort, plus an array of indicies
+  //make an array of indicies; if useSort = 0, this will be passed
+  //to average_snips unaltered
+  set_idx<<< 1, 1 >>>(d_idx, counter[0]);
 
-   unsigned int *d_stSort, *d_idx;
-   cudaMalloc(&d_stSort,  counter[0] * sizeof(int));
-   cudaMemset(d_stSort, 0, counter[0] *sizeof(int));
-   cudaMalloc(&d_idx,  counter[0] * sizeof(int));
-   cudaMemset(d_idx, 0, counter[0] *sizeof(int));  
-   cudaMemcpy( d_stSort, d_st, counter[0]*sizeof(int), cudaMemcpyDeviceToDevice );  
-   set_idx<<< 1, 1 >>>(d_idx, counter[0]);
-   int left = 0;
-   int right = counter[0]-1;
-   cdp_simple_quicksort<<< 1, 1 >>>(d_stSort, d_idx, left, right, 0);
+  if (useSort) { 
+    //make a copy of the timestamp array to sort
+    cudaMemcpy( d_stSort, d_st, counter[0]*sizeof(int), cudaMemcpyDeviceToDevice );
+    int left = 0;
+    int right = counter[0]-1;
+    cdp_simple_quicksort<<< 1, 1 >>>(d_stSort, d_idx, left, right, 0);
+  }
 
   // update dWU here by adding back to subbed spikes.
   // additional parameter d_idx = array of time sorted indicies  
   average_snips<<<Nfilt,tpS>>>(d_Params, d_st, d_idx, d_id, d_x, d_y, d_counter, 
-          d_draw, d_W, d_U, d_dWU, d_nsp,d_mu, d_z);
+          d_draw, d_W, d_U, d_dWU, d_nsp, d_mu, d_z);
   
   float *x, *feat, *featPC, *vexp;
   int *st, *id;
@@ -818,6 +878,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemcpy(featPC,   d_featPC, minSize * NchanU*Nrank*sizeof(float), cudaMemcpyDeviceToHost);
   
   cudaFree(d_counter);
+  cudaFree(d_count);
   cudaFree(d_Params);
   cudaFree(d_ftype);
   cudaFree(d_err);
@@ -831,8 +892,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaFree(d_featPC);
   cudaFree(d_dout);
   cudaFree(d_data);
-//   cudaFree(d_idx);
-//   cudaFree(d_stSort);
+  cudaFree(d_idx);
+  cudaFree(d_stSort);
 
   mxGPUDestroyGPUArray(draw);  
   mxGPUDestroyGPUArray(wPCA);
