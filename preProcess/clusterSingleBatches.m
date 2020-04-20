@@ -70,7 +70,7 @@ for ibatch = 1:nBatches
             % get iclust and update W
             [dWU, iclust, dx, nsp, dV] = mexClustering2(Params, uproj, W, mu, ...
                 call-1, iMatch, iC-1); % CUDA script to efficiently compute distances for pairs in which iMatch is 1
-
+            
             dWU = dWU./(1e-5 + single(nsp')); % divide the cumulative waveform by the number of spikes
 
             mu = sum(dWU.^2,1).^.5; % norm of cluster template
@@ -109,9 +109,8 @@ for ibatch = 1:nBatches
     end
 end
 
-
 tic
-% anothr one of these Params variables transporting parameters to the C++ code
+% another one of these Params variables transporting parameters to the C++ code
 Params  = [1 NrankPC Nfilt 0 size(W,1) 0 NchanNear Nchan];
 Params(1) = size(Ws,3) * size(Ws,4); % the total number of templates is the number of templates per batch times the number of batches
 
