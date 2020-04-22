@@ -880,6 +880,7 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
     Wrot = ir.Wrot
     est_contam_rate = ir.est_contam_rate
     good = ir.good
+    Ths = ir.Ths
 
     st3 = cp.asarray(ir.st3_c)
 
@@ -1050,6 +1051,8 @@ def rezToPhy(ctx, dat_path=None, output_dir=None):
 
         _save('whitening_mat', whiteningMatrix)
         _save('whitening_mat_inv', whiteningMatrixInv)
+
+        _save('thresholds', Ths)
 
         if 'simScore' in ir:
             similarTemplates = simScore
