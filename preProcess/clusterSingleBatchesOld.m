@@ -1,4 +1,4 @@
-function rez = clusterSingleBatches(rez)
+function rez = clusterSingleBatchesOld(rez)
 % outputs an ordering of the batches according to drift
 % for each batch, it extracts spikes as threshold crossings and clusters them with kmeans
 % the resulting cluster means are then compared for all pairs of batches, and a dissimilarity score is assigned to each pair
@@ -100,13 +100,8 @@ for ibatch = 1:nBatches
         fprintf('time %2.2f, pre clustered %d / %d batches \n', toc, ibatch, nBatches)
     end
 end
-%%
-% find Z offsets
-imin = find_integer_shifts(Params, Whs,Ws,mus, ns, iC, Nchan, Nfilt);
-Whs = mod(Whs + 2 * int32(imin-3) - 1, Nchan) + 1;
 
-rez.row_shifts = imin - 3;
-%%
+
 tic
 % anothr one of these Params variables transporting parameters to the C++ code
 Params  = [1 NrankPC Nfilt 0 size(W,1) 0 NchanNear Nchan];
@@ -118,6 +113,7 @@ ccb = gpuArray.zeros(nBatches, 'single');
 for ibatch = 1:nBatches
     % for every batch, compute in parallel its dissimilarity to ALL other batches
     Wh0 = single(Whs(:, ibatch)); % this one is the primary batch
+    W0  = Ws(:, :, ibatch);
     mu = mus(:, ibatch);
 
     % embed the templates from the primary batch back into a full, sparse representation
@@ -146,7 +142,7 @@ end
 % some normalization steps are needed: zscoring, and symmetrizing ccb
 ccb0 = zscore(ccb, 1, 1);
 ccb0 = ccb0 + ccb0';
-%%
+
 rez.ccb = gather(ccb0);
 
 % sort by manifold embedding algorithm
@@ -173,7 +169,3 @@ rez.ccbsort = gather(ccbsort);
 
 fprintf('time %2.2f, Re-ordered %d batches. \n', toc, nBatches)
 %%
-for ibatch = 1:nBatches
-    shift_batch_on_disk(rez, ibatch, imin(ibatch) - 3);
-end
-fprintf('time %2.2f, Shifted up/down %d batches. \n', toc, nBatches)
