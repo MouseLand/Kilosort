@@ -4,7 +4,7 @@ nBatches = size(Whs, 2);
 nPCs = size(Ws, 1);
 NchanNear = size(Ws, 2);
 
-ibatch0 = int(min(300, nBatches/2));
+ibatch0 = min(300, floor(nBatches/2));
 
 iChan = 1:Nchan;
 iUp = mod(iChan + 2-1, Nchan)+1;
