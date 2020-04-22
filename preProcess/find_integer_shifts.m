@@ -59,7 +59,7 @@ for iter = 1:10
     for t = 1:Nfilt
         W0(:,:,t) = W0(:,:,t) / nn(t);
     end
-    nm = sum(sum(W0.^2,1),2);
+    nm = sum(sum(W0.^2,1),2).^.5;
     W0 = W0 ./ nm;
     mu0 = mu0 .* nm(:);
 end
