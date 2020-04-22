@@ -823,25 +823,31 @@ def checkClusters(ctx):
     # 3) Remove these indices from every variable that has n_clusters
 
     ir = ctx.intermediate
-    max_id = int(np.max(ir.st3[:, 1])) + 1
-    ids = np.unique(ir.st3[:, 1]).astype(np.int)
+    max_id = int(np.max(ir.st3_c[:, 1])) + 1
+    ids = cp.asnumpy(np.unique(ir.st3_c[:, 1]).astype(np.int))
     # Check if the max cluster id is equal to the number of cluster ids assigned to spikes.
     if max_id != len(ids):  # see which cluster ids are missing
         good_units_mask = np.isin(np.arange(max_id), ids)
         # Remove clusters from fields in `ir` based on `good_units_mask`
-        ir.dWU = ir.dWU[:, :, good_units_mask]
-        ir.iNeigh = ir.iNeigh[:, good_units_mask]
-        ir.iNeighPC = ir.iNeighPC[:, good_units_mask]
-        ir.mu = ir.mu[good_units_mask]
-        ir.simScore = ir.simScore[good_units_mask, good_units_mask]
-        ir.U = ir.U[:, good_units_mask, :]
-        ir.UA = ir.UA[:, good_units_mask, :, :]
-        ir.U_a = ir.U_a[:, :, good_units_mask]
-        ir.U_b = ir.U_b[:, :, good_units_mask]
-        ir.W = ir.W[:, good_units_mask, :]
-        ir.WA = ir.WA[:, good_units_mask, :, :]
-        ir.W_a = ir.W_a[:, :, good_units_mask]
-        ir.W_b = ir.W_b[:, :, good_units_mask]
+        # ir.dWU = ir.dWU[:, :, good_units_mask]
+        ir.iNeigh_s = ir.iNeigh_s[:, good_units_mask]
+        ir.iNeighPC_s = ir.iNeighPC_s[:, good_units_mask]
+        ir.mu_s = ir.mu_s[good_units_mask]
+        ir.simScore_s = ir.simScore_s[good_units_mask][:, good_units_mask]
+        ir.U_s = ir.U_s[:, good_units_mask, :]
+        # ir.UA = ir.UA[:, good_units_mask, :, :]
+        # ir.U_a = ir.U_a[:, :, good_units_mask]
+        # ir.U_b = ir.U_b[:, :, good_units_mask]
+        ir.W_s = ir.W_s[:, good_units_mask, :]
+        # ir.WA = ir.WA[:, good_units_mask, :, :]
+        # ir.W_a = ir.W_a[:, :, good_units_mask]
+        # ir.W_b = ir.W_b[:, :, good_units_mask]
+        ir.Wphy = ir.Wphy[:, good_units_mask, :]
+        ir.iList = ir.iList[:, good_units_mask]
+        ir.isplit = ir.isplit[good_units_mask][:, good_units_mask]
+        ir.est_contam_rate = ir.est_contam_rate[good_units_mask]
+        ir.Ths = ir.Ths[good_units_mask]
+        ir.good = ir.good[good_units_mask]
 
         # Find empty cluster ids, and for spikes with cluster ids above those indices, subtract 1.
         empty_cl = np.nonzero(~good_units_mask)[0]
