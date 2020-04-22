@@ -28,8 +28,8 @@ ops.Nbatch = Nbatch;
 [chanMap, xc, yc, kcoords, NchanTOTdefault] = loadChanMap(ops.chanMap); % function to load channel map file
 ops.NchanTOT = getOr(ops, 'NchanTOT', NchanTOTdefault); % if NchanTOT was left empty, then overwrite with the default
 
-if getOr(ops, 'minfr_goodchannels', .1)>0 % discard channels that have very few spikes
-    % determine bad channels
+if 0 %getOr(ops, 'minfr_goodchannels', .1)>0 % discard channels that have very few spikes
+    % determine bad channels, disabled in this branch
     fprintf('Time %3.0fs. Determining good channels.. \n', toc);
     igood = get_good_channels(ops, chanMap);
 
