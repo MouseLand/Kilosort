@@ -102,15 +102,16 @@ for ibatch = 1:nBatches
 end
 %%
 % find Z offsets
+% anothr one of these Params variables transporting parameters to the C++ code
+Params  = [1 NrankPC Nfilt 0 size(W,1) 0 NchanNear Nchan];
+Params(1) = size(Ws,3) * size(Ws,4); % the total number of templates is the number of templates per batch times the number of batches
+
 imin = find_integer_shifts(Params, Whs,Ws,mus, ns, iC, Nchan, Nfilt);
 Whs = mod(Whs + 2 * int32(imin-3) - 1, Nchan) + 1;
 
 rez.row_shifts = imin - 3;
 %%
 tic
-% anothr one of these Params variables transporting parameters to the C++ code
-Params  = [1 NrankPC Nfilt 0 size(W,1) 0 NchanNear Nchan];
-Params(1) = size(Ws,3) * size(Ws,4); % the total number of templates is the number of templates per batch times the number of batches
 
 % initialize dissimilarity matrix
 ccb = gpuArray.zeros(nBatches, 'single');
