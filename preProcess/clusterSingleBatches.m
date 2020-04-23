@@ -100,7 +100,7 @@ for ibatch = 1:nBatches
         fprintf('time %2.2f, pre clustered %d / %d batches \n', toc, ibatch, nBatches)
     end
 end
-%%
+
 % find Z offsets
 % anothr one of these Params variables transporting parameters to the C++ code
 Params  = [1 NrankPC Nfilt 0 size(W,1) 0 NchanNear Nchan];
