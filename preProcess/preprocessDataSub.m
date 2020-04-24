@@ -75,7 +75,6 @@ fprintf('Time %3.0fs. Loading raw data and applying filters... \n', toc);
 
 fid         = fopen(ops.fbinary, 'r'); % open for reading raw data
 fidW        = fopen(ops.fproc,   'w'); % open for writing processed data
-
 for ibatch = 1:Nbatch
     % we'll create a binary file of batches of NT samples, which overlap consecutively on ops.ntbuff samples
     % in addition to that, we'll read another ops.ntbuff samples from before and after, to have as buffers for filtering
@@ -105,11 +104,10 @@ for ibatch = 1:Nbatch
     datcpu  = gather(int16(datr)); % convert to int16, and gather on the CPU side
     fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
 end
-
-rez.Wrot    = gather(Wrot); % gather the whitening matrix as a CPU variable
-
 fclose(fidW); % close the files
 fclose(fid);
+
+rez.Wrot    = gather(Wrot); % gather the whitening matrix as a CPU variable
 
 fprintf('Time %3.0fs. Finished preprocessing %d batches. \n', toc, Nbatch);
 
