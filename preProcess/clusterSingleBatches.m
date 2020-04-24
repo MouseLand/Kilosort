@@ -104,13 +104,44 @@ end
 % find Z offsets
 % anothr one of these Params variables transporting parameters to the C++ code
 Params  = [1 NrankPC Nfilt 0 size(W,1) 0 NchanNear Nchan];
+% splits = [0, 1108, nBatches];
+ib = 1:nBatches;
+Params(1) = size(Ws,3) * length(ib); % the total number of templates is the number of templates per batch times the number of batches
+[imin, ww] = find_integer_shifts(Params, Whs(:, ib),Ws(:,:,:,ib),...
+    mus(:, ib), ns(:,ib), iC, Nchan, Nfilt);
+
+%%
+% iChan = 1:Nchan;
+% iUp = mod(iChan + 2-1, Nchan)+1;
+% iDown = mod(iChan - 2-1, Nchan)+1;
+% iMap = [iUp(iUp); iUp; iChan; iDown; iDown(iDown)];
+% 
+% 
+% mu1 = 1e-5 + sq(sum(sum(ww{1}.^2, 1),2));
+% mu2 = 1e-5 + sq(sum(sum(ww{2}.^2, 1),2));
+% 
+% CC = gpuArray.zeros(Nfilt, Nfilt, 5);
+% for k = 1:5
+%     W0 = ww{1};
+%     for t = 1:Nfilt
+%        W0(:,iMap(k,:),t) = W0(:,:,t); 
+%     end
+%     X1 = reshape(W0, [nPCs * Nchan, Nfilt]);
+%     X2 = reshape(ww{2}, [nPCs * Nchan, Nfilt]);
+%     CC(:,:, k) = X1' * X2 ./ (mu1 * mu2');
+% end
+% 
+% csum = sq(mean(max(CC, [], 1), 2)); 
+% [cmax, imax] = max(csum);
+% imin = cat(2, iminy{1}, iminy{2} + (imax-3));
+% imin = min(5, max(1, imin));
+
+%%
 Params(1) = size(Ws,3) * size(Ws,4); % the total number of templates is the number of templates per batch times the number of batches
 
-imin = find_integer_shifts(Params, Whs,Ws,mus, ns, iC, Nchan, Nfilt);
-Whs = mod(Whs + 2 * int32(imin-3) - 1, Nchan) + 1;
-
+Whs2 = mod(Whs + 2 * int32(imin-3) - 1, Nchan) + 1;
 rez.row_shifts = imin - 3;
-%%
+
 tic
 
 % initialize dissimilarity matrix
@@ -118,7 +149,7 @@ ccb = gpuArray.zeros(nBatches, 'single');
 
 for ibatch = 1:nBatches
     % for every batch, compute in parallel its dissimilarity to ALL other batches
-    Wh0 = single(Whs(:, ibatch)); % this one is the primary batch
+    Wh0 = single(Whs2(:, ibatch)); % this one is the primary batch
     mu = mus(:, ibatch);
 
     % embed the templates from the primary batch back into a full, sparse representation
@@ -132,7 +163,7 @@ for ibatch = 1:nBatches
 
 
     % compute dissimilarities for iMatch = 1
-    [iclust, ds] = mexDistances2(Params, Ws, W, iMatch, iC-1, Whs-1, mus, mu);
+    [iclust, ds] = mexDistances2(Params, Ws, W, iMatch, iC-1, Whs2-1, mus, mu);
 
     % ds are squared Euclidian distances
     ds = reshape(ds, Nfilt, []); % this should just be an Nfilt-long vector
@@ -147,7 +178,7 @@ end
 % some normalization steps are needed: zscoring, and symmetrizing ccb
 ccb0 = zscore(ccb, 1, 1);
 ccb0 = ccb0 + ccb0';
-%%
+
 rez.ccb = gather(ccb0);
 
 % sort by manifold embedding algorithm
@@ -155,7 +186,7 @@ rez.ccb = gather(ccb0);
 % ccbsort is the resorted matrix (useful for diagnosing drift)
 [ccbsort, iorig] = sortBatches2(ccb0);
 
-% some mandatory diagnostic plots to understand drift in this dataset
+%% some mandatory diagnostic plots to understand drift in this dataset
 figure;
 subplot(1,2,1)
 imagesc(ccb0, [-5 5]); drawnow
@@ -175,6 +206,8 @@ rez.ccbsort = gather(ccbsort);
 fprintf('time %2.2f, Re-ordered %d batches. \n', toc, nBatches)
 %%
 for ibatch = 1:nBatches
-    shift_batch_on_disk(rez, ibatch, imin(ibatch) - 3);
+    if abs(imin(ibatch) - 3) > 0
+        shift_batch_on_disk(rez, ibatch, imin(ibatch) - 3);
+    end
 end
 fprintf('time %2.2f, Shifted up/down %d batches. \n', toc, nBatches)
