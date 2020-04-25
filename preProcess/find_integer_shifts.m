@@ -1,4 +1,4 @@
-function [imin, W0] = find_integer_shifts(Params, Whs,Ws,mus, ns, iC, Nchan, Nfilt)
+function [imin, W0, Ns] = find_integer_shifts(Params, Whs,Ws,mus, ns, iC, Nchan, Nfilt)
 
 nBatches = size(Whs, 2);
 nPCs = size(Ws, 1);
@@ -35,7 +35,7 @@ for iter = 1:5
         iMatch = sq(min(abs(single(iC) - reshape(iMap(k, Wh0), 1, 1, [])), [], 1))<.1;
         
         % compute dissimilarities for iMatch = 1
-        [iclust, ds] = mexDistances2(Params, Ws, W, iMatch, iC-1, Whs-1, mus, mu0);
+        [iclust, ds] = mexDistances2(Params, Ws, W, iMatch, iC-1, Whs-1, mus, sq(mu0));
         
         % ds are squared Euclidian distances
         iclustall(:,:,k) = reshape(iclust, Nfilt, []) + 1;
@@ -53,6 +53,7 @@ for iter = 1:5
     
     W0  = gpuArray.zeros(nPCs , Nchan, Nfilt, 'single');
     nn = 1e-4 * ones(Nfilt,1);
+    Ns = zeros(Nfilt,1);
     for j = 1:length(irange)
         ibatch = irange(j);
         icl = iclustall(:, ibatch, medshift);
@@ -61,6 +62,7 @@ for iter = 1:5
                 W0(:,iC(:, Whs(t,ibatch)), icl(t)) =  W0(:,iC(:, Whs(t,ibatch)), icl(t)) + ...
                     mus(t, ibatch) * Ws(:,:,t,ibatch) ;
                 nn(icl(t)) = nn(icl(t)) + 1;
+                Ns(icl(t)) = Ns(icl(t)) + gather(ns(t, ibatch));
             end
         end
     end
@@ -69,7 +71,9 @@ for iter = 1:5
     end
     mu0 = 1e-3 + sum(sum(W0.^2,1),2).^.5;
     W0 = W0 ./ mu0;
-    mu0 = sq(mu0);
+    Ns = Ns./nn;
+%     mu0 = sq(mu0);
 end
 
+W0 = W0 .* mu0;
 
