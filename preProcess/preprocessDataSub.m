@@ -81,7 +81,35 @@ else
     [b1, a1] = butter(3, ops.fshigh/ops.fs*2, 'high');
 end
 
+if isfield(ops, 'driftT'); 
+    fprintf('applying drift correction!\n'); 
+    
+    fidShift        = fopen(fullfile(fileparts(ops.fproc), 'shifted.bin'),   'w');
+    
+    method = 'v5cubic'; % 'spline' not working on gpu?
+    nInterp = 205; 
+    ux = unique(xc);
+    for sg = 1:numel(ux)
+                
+        thisGroup = xc==ux(sg);
+        ycoords = yc(thisGroup);
+        gridSize = median(diff(ycoords)); % should be 20um for imec probes
+
+        numZeros{sg} = ceil(max(abs(ops.driftPos))/gridSize)+2;
+
+        % technically you only need to pad one side of the matrix, on the trailing
+        % end of the shift; this isn't implemented here but would save some time
+        % and memory
+        paddedX{sg} = single(gpuArray([ (-numZeros{sg}:1:-1)*gridSize+ycoords(1) ycoords' (1:numZeros{sg})*gridSize+ycoords(end) ]));        
+        paddedData{sg} = single(gpuArray(zeros(numel(ycoords)+2*numZeros{sg}, NT)));
+    end
+    
+end
+
 for ibatch = 1:Nbatch
+    if mod(ibatch, 20)==1
+        fprintf(1, '%d/%d...\n', ibatch, Nbatch); 
+    end
     offset = max(0, ops.twind + 2*NchanTOT*((NT - ops.ntbuff) * (ibatch-1) - 2*ops.ntbuff));
     if offset==0
         ioffset = 0;
@@ -125,6 +153,45 @@ for ibatch = 1:Nbatch
     
     datr    = datr * Wrot;
     
+    if isfield(ops, 'driftT') && isfield(ops, 'driftPos')
+        % determine the position at this batch (mean of position at all samples
+        % of the batch)
+        batchStartSamp = offset/2/NchanTOT;
+        batchPos = nanmean(interp1(ops.driftT, ops.driftPos, (batchStartSamp:(batchStartSamp+NTbuff))/ops.fs));
+        if batchPos~=0
+            
+            for sg = 1:numel(ux)
+                
+                thisGroup = xc==ux(sg);
+                
+                % shift aligned sets of chans by defined amount
+                %shiftedData = datShift(gather_try(datr(:,thisGroup)'), yc(thisGroup), batchPos);
+                %datr(:,thisGroup) = gpuArray(shiftedData'); % re-assemble data
+                
+                thisData = datr(:,thisGroup)';
+                paddedData{sg}(numZeros{sg}+1:end-numZeros{sg},:) = thisData;
+                px = paddedX{sg}'; pd = paddedData{sg}; newx = paddedX{sg}+gpuArray(batchPos);
+                shiftedPaddedData = zeros(size(pd), 'like', pd);
+                for q = 1:NT/nInterp
+                    qidx = (q-1)*nInterp+1:q*nInterp;
+                    shiftedPaddedData(:,qidx) = interp1(px,pd(:,qidx),newx,method);
+                end
+                shiftedData = shiftedPaddedData(numZeros{sg}+1:end-numZeros{sg},:);
+                datr(:,thisGroup) = shiftedData';
+               
+                
+            end
+        end
+
+        if ibatch==1
+            datOut = gather_try(int16(datr(1:(end-2*ops.ntbuff),:)'));
+        else
+            datOut = gather_try(int16(datr(1:(end-ops.ntbuff),:)')); 
+        end
+        fwrite(fidShift, datOut, 'int16'); 
+    end
+    
+    
     if ops.useRAM
         DATA(:,:,ibatch) = gather_try(datr);
     else
@@ -138,6 +205,7 @@ rez.Wrot    = Wrot;
 
 fclose(fidW);
 fclose(fid);
+if isfield(ops, 'driftT'); fclose(fidShift); end
 
 fprintf('Time %3.0fs. Finished preprocessing %d batches. \n', toc, Nbatch);
 

@@ -4,7 +4,8 @@ function cm = makeChanMapFromSGLMeta(m)
 
 shankMap = m.snsShankMap; 
 
-nCh = str2num(m.acqApLfSy);
+% nCh = str2num(m.acqApLfSy);
+nCh = m.nChans-1;
 
 chanMap = [1:nCh(1)]'; 
 chanMap0ind = chanMap-1;
