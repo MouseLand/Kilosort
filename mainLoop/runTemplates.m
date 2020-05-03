@@ -33,22 +33,32 @@ Nbatches = numel(rez.iorig);
 ihalf = find(rez.iorig==istart);
 
 iorder_sorted = ihalf:-1:1;
-iorder = rez.iorig(iorder_sorted);
+iorder = rez.iorig(iorder_sorted);  %batch number in full set
+
 [rez, st3_0, fW_0,fWpc_0] = trackAndSort(rez, iorder);
 
 st3_0(:,5) = iorder_sorted(st3_0(:,5));
 
 iorder_sorted = (ihalf+1):Nbatches;
 iorder = rez.iorig(iorder_sorted);
+
 [rez, st3_1, fW_1,fWpc_1] = trackAndSort(rez, iorder);
 
-st3_1(:,5) = iorder_sorted(st3_1(:,5));
+st3_1(:,5) = iorder_sorted(st3_1(:,5)); %batch number in full set
 
 st3     = cat(1, st3_0, st3_1);
 fW      = cat(2, fW_0, fW_1);
 fWpc    = cat(3, fWpc_0, fWpc_1);
 
-[~, isort] = sort(st3(:,1));
+% sort all spikes by time, to establish reproducible order
+[~, isort] = sort(st3(:,1)); 
+st3 = st3(isort, :);
+fW = fW(:, isort);
+fWpc = fWpc(:, :, isort);
+
+% Now sort by orderd batches, to keep most similar batches together
+% This avoids false splits in splitAllClusters
+[~, isort] = sort(st3(:,5)); 
 st3 = st3(isort, :);
 fW = fW(:, isort);
 fWpc = fWpc(:, :, isort);
