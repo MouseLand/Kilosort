@@ -63,7 +63,7 @@ __global__ void	Conv1D(const double *Params, const float *data, const float *W, 
 __global__ void  computeProjections(const double *Params, const float *dataraw,
         const int *iC, const int *st, const int *id, const float *W, float *feat){
             
-    //number of blocks = number of spikes to process minimum( number found, maxFR=10000)
+    //number of blocks = number of spikes to process minimum( number found, maxFR=100000)
     //Thread grid = (NchanNear, NrankPC)
             
     float x;
@@ -264,7 +264,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   
   // take max across nearby channels
   // return spike times in d-st, max channel index in d_id, #spikes in d_counter
-  // note that max channel and spike times are only saved for the firt maxFR spikes
+  // note that max channel and spike times are only saved for the first maxFR spikes
   maxChannels<<<NT/Nthreads,Nthreads>>>(d_Params, d_dout, d_dmax, d_iC, d_st, d_id, d_counter);
   
   cudaMemcpy(counter,     d_counter, sizeof(int), cudaMemcpyDeviceToHost);
