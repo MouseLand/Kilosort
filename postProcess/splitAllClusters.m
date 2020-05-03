@@ -7,6 +7,7 @@ function [rez, X] = splitAllClusters(rez, flag)
 % it only uses the PC features for each spike, stored in rez.cProjPC
 
 ops = rez.ops;
+
 wPCA = gather(ops.wPCA); % use PCA projections to reconstruct templates when we do splits
 
 ccsplit = rez.ops.AUCsplit; % this is the threshold for splits, and is one of the main parameters users can change
