@@ -9,7 +9,7 @@ norm_amp  = 16.7; % if 0, use amplitudes of input waveforms; if > 0, set all amp
 mu_mean   = 0.75; % mean of mean spike amplitudes. Incoming waveforms are in uV; make <1 to make sorting harder
 noise_model = 'gauss'; %'gauss' or 'fromData'; 'fromData' requires a noiseModel.mat built by make_noise_model
 rms_noise = 10; % rms noise in uV. Will be added to the spike signal. 15-20 uV an OK estimate from real data
-t_record  = 600; % duration in seconds of simulation. longer is better (and slower!) (1000)
+t_record  = 1200; % duration in seconds of simulation. longer is better (and slower!) (1000)
 fr_bounds = [1 10]; % min and max of firing rates ([1 10])
 tsmooth   = 0.5; % gaussian smooth the noise with sig = this many samples (increase to make it harder) (0.5)
 chsmooth  = 0.5; % smooth the noise across channels too, with this sig (increase to make it harder) (0.5)
@@ -18,7 +18,7 @@ fs_rec    = 30000; % sample rate for the for the recording. Waveforms must be sa
 nt        = 81; % number of timepoints expected. All waveforms must have this time window
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %drift params. See the comments in calcYPos_v2 for details
-drift.addDrift = 0;
+drift.addDrift = 1;
 drift.sType = 'rigid';  %'rigid' or 'point';
 drift.tType = 'sine';   %'exp' or 'sine'
 drift.y0 = 3800;        %in um, position along probe where motion is largest
@@ -84,7 +84,7 @@ end
 
 % Add a SYNC channel to the file
 % 16 bit word with a 1 Hz square wave in 7th bit
-addSYNC = true; 
+addSYNC = false; 
 syncOffset = 0.232; % must be between 0 and 0.5, offset to first on edge
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
