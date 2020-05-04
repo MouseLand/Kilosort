@@ -1,16 +1,14 @@
 function benchmark_drift_simulation(rez, GTfilepath, simRecfilepath, sortType, bAutoMerge, varargin)
 
-
 bOutFile = 0;
 
-%for testing outside a script. comment out for normal calling!
+%these definitions for testing outside a script. comment out for normal calling!
 %can leave out last 2 lines if output file not desired
-load('D:\KS2_determ_test\rez2.mat');
-GTfilepath = 'D:\KS2_determ_test\\eMouseGroundTruth.mat';
-simRecfilepath = 'D:\KS2_determ_test\\eMouseSimRecord.mat';
+% load('D:\test_new_sim\74U_20um_drift_standard\r28_KS2determ_r26rep\rez2.mat');
+% GTfilepath = 'D:\test_new_sim\74U_20um_drift_standard\eMouseGroundTruth.mat';
+% simRecfilepath = 'D:\test_new_sim\74U_20um_drift_standard\eMouseSimRecord.mat';
 % bOutFile = 1;
-% out_fid = fopen('D:\KS2_converter_test\simStream_10uV_rd2_g0_imec0\benchmark_output.txt','w');
-
+% out_fid = fopen('D:\test_new_sim\74U_20um_drift_standard\r28_benchmark_output.txt','w');
 
 sortType = 2;
 bAutoMerge = 0;
