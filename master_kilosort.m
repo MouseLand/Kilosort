@@ -64,6 +64,10 @@ rezToPhy(rez, rootZ);
 rez.cProj = [];
 rez.cProjPC = [];
 
+% final time sorting of spikes, for apps that use st3 directly
+[~, isort]   = sort(rez.st3(:,1), 'ascend');
+rez.st3      = rez.st3(isort, :);
+
 % save final results as rez2
 fprintf('Saving final results in rez2  \n')
 fname = fullfile(rootZ, 'rez2.mat');
