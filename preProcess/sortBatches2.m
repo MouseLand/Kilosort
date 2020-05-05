@@ -8,6 +8,7 @@ function [ccb1, isort] = sortBatches2(ccb0)
 ccb0 = gpuArray(ccb0);
 
 % compute its svd on the GPU (this might also be fast enough on CPU)
+% [u, s, v] = svd(ccb0);
 [u, s, v] = svdecon(ccb0);
 
 % initialize the positions xs of the batch embeddings to be very small but proportional to the first PC

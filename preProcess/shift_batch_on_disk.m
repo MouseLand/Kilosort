@@ -18,10 +18,25 @@ fid = fopen(ops.fproc, 'r+');
 fseek(fid, offset, 'bof');
 dat = fread(fid, [NT ops.Nchan], '*int16');
 
-iChan = 1:ops.Nchan;
-iChanS = mod(iChan + 2 * shift - 1, ops.Nchan) + 1;
-dat(:, iChanS) = dat;
+ishift = round(shift);
+shift = shift - ishift;
 
+dat = reshape(dat, [NT, 2, ops.Nchan/2]);
+dat = circshift(dat, ishift, 3);
+
+if shift > 0
+    alpha = shift;
+    datup = circshift(dat, 1, 3);
+    dat = dat * (1-alpha) + alpha * datup;
+else
+    alpha = -shift;
+    datup = circshift(dat, -1, 3);
+    dat = dat * (1-alpha) + alpha * datup;
+end
+
+if alpha<0 || alpha>1
+   disp(alpha)
+end
 fseek(fid, offset, 'bof');
 fwrite(fid, dat, 'int16'); % write this batch to binary file
 
