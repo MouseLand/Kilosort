@@ -1,12 +1,19 @@
 function rez = learnTemplates(rez, iorder)
 % This is the main optimization. Takes the longest time and uses the GPU heavily.  
 
-ops = rez.ops;
-ops.fig = getOr(ops, 'fig', 1); % whether to show plots every N batches
+rez.ops.fig = getOr(rez.ops, 'fig', 1); % whether to show plots every N batches
+
+% Turn on sorting of spikes before subtracting and averaging in mpnu8
+rez.ops.useStableMode = getOr(rez.ops, 'useStableMode', 1);
+useStableMode = rez.ops.useStableMode;
 
 NrankPC = 6; % this one is the rank of the PCs, used to detect spikes with threshold crossings
 Nrank = 3; % this one is the rank of the templates
-rng('default'); rng(1);
+
+rez.ops.LTseed = getOr(rez.ops, 'LTseed', 1);
+rng('default'); rng(rez.ops.LTseed);
+
+ops = rez.ops;
 
 % we need PC waveforms, as well as template waveforms
 [wTEMP, wPCA]    = extractTemplatesfromSnippets(rez, NrankPC);
@@ -57,7 +64,7 @@ pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter));
 Nsum = min(Nchan,7); % how many channels to extend out the waveform in mexgetspikes
 % lots of parameters passed into the CUDA scripts
 Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
-    Nrank ops.lam pmi(1) Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1)]);
+    Nrank ops.lam pmi(1) Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1) useStableMode]);
 
 % W0 has to be ordered like this
 W0 = permute(double(wPCA), [1 3 2]);
@@ -138,10 +145,19 @@ for ibatch = 1:niter
     % gets scores for the template fits to each spike (vexp), outputs the average of
     % waveforms assigned to each cluster (dWU0),
     % and probably a few more things I forget about
-    [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp] = ...
+    [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp, errmsg] = ...
         mexMPnu8(Params, dataRAW, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
         wPCA);
-
+    
+    % errmsg returns 1 if caller requested "stableMode" but mexMPnu8 was
+    % compiled without the sorter enabled (i.e. STABLEMODE_ENABLE = false
+    % in mexGPUAll). Send an error message to the console just once if this
+    % is the case:
+    if (ibatch == 1)
+        if( (useStableMode == 1) && (errmsg == 1) )
+            fprintf( 'useStableMode selected but STABLEMODE not enabled in compiled mexMPnu8.\n' );
+        end
+    end
     % Sometimes nsp can get transposed (think this has to do with it being
     % a single element in one iteration, to which elements are added
     % nsp, nsp0, and pm must all be row vectors (Nfilt x 1), so force nsp
@@ -244,8 +260,6 @@ rez.iNeigh   = gather(iList);
 rez = memorizeW(rez, W, dWU, U, mu); % memorize the state of the templates
 rez.ops = ops; % update these (only rez comes out of this script)
 
- 
-fprintf('memorized middle timepoint \n')
 fprintf('Finished learning templates \n')
 %%
 
