@@ -50,21 +50,15 @@ st3     = cat(1, st3_0, st3_1);
 fW      = cat(2, fW_0, fW_1);
 fWpc    = cat(3, fWpc_0, fWpc_1);
 
-% sort all spikes by time, to establish reproducible order
-[~, isort] = sort(st3(:,1)); 
-st3 = st3(isort, :);
-fW = fW(:, isort);
-fWpc = fWpc(:, :, isort);
-
-% Now sort by orderd batches, to keep most similar batches together
-% This avoids false splits in splitAllClusters
-[~, isort] = sort(st3(:,5)); 
+% sort all spikes by batch -- to keep similar batches together,
+% which avoids false splits in splitAllClusters. Break ties 
+[~, isort] = sortrows(st3,[5,1,2,3,4]); 
 st3 = st3(isort, :);
 fW = fW(:, isort);
 fWpc = fWpc(:, :, isort);
 
 % just display the total number of spikes
-size(st3,1)
+fprintf( 'Number of spikes before applying cutoff: %d\n', size(st3,1));
 
 rez.st3 = st3;
 rez.st2 = st3; % keep also an st2 copy, because st3 will be over-written by one of the post-processing steps
