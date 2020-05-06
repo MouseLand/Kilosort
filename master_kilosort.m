@@ -65,7 +65,7 @@ rez.cProj = [];
 rez.cProjPC = [];
 
 % final time sorting of spikes, for apps that use st3 directly
-[~, isort]   = sort(rez.st3(:,1), 'ascend');
+[~, isort]   = sortrows(rez.st3);
 rez.st3      = rez.st3(isort, :);
 
 % save final results as rez2

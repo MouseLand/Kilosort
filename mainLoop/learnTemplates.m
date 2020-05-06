@@ -260,6 +260,8 @@ rez.iNeigh   = gather(iList);
 rez = memorizeW(rez, W, dWU, U, mu); % memorize the state of the templates
 rez.ops = ops; % update these (only rez comes out of this script)
 
+save('rez_mid.mat', 'rez');
+
 fprintf('Finished learning templates \n')
 %%
 

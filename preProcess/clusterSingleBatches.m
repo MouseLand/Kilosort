@@ -1,4 +1,4 @@
-function rez = clusterSingleBatches(rez)
+function rez = clusterSingleBatches(rez, runInd)
 % outputs an ordering of the batches according to drift
 % for each batch, it extracts spikes as threshold crossings and clusters them with kmeans
 % the resulting cluster means are then compared for all pairs of batches, and a dissimilarity score is assigned to each pair
@@ -49,13 +49,15 @@ iC = getClosestChannels(rez, ops.sigmaMask, NchanNear); % return an array of clo
 
 tic
 for ibatch = 1:nBatches
+
     [uproj, call] = extractPCbatch2(rez, wPCA, min(nBatches-1, ibatch), iC); % extract spikes using PCA waveforms
     % call contains the center channels for each spike
     
     if (useStableMode) 
-        % sort uprojDAT and call based on 1st projection-- the order is arbitrary but
-        % selection of which spikes are used to build W will be deterministic
-        [~,order] = sort(uproj(1,:));
+        % sort rows of  uprojDAT (sorts on first component, breaks ties with 2nd, 3rd...)
+        % the order is arbitrary but ordering makes the k-means
+        % deterministic
+        [~,order] = sortrows(uproj');
         uproj = uproj(:,order);
         call = call(order);
     end
@@ -103,6 +105,9 @@ for ibatch = 1:nBatches
             W0(:, :, t) = W(:, iC(:, Wheights(t)), t);
         end
         W0 = W0 ./ (1e-5 + sum(sum(W0.^2,1),2).^.5); % I don't really know why this needs another normalization
+    else
+        % make a note when a batch has fewer than Nfilt spikes
+        fprintf( 'Batch %d has fewer than Nfilt spikes.\n', ibatch );
     end
 
     if exist('W0', 'var')
@@ -120,9 +125,8 @@ for ibatch = 1:nBatches
     if rem(ibatch, 500)==1
         fprintf('time %2.2f, pre clustered %d / %d batches \n', toc, ibatch, nBatches)
     end
+    
 end
-
-
 
 tic
 % another one of these Params variables transporting parameters to the C++ code
