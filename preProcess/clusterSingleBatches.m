@@ -1,4 +1,4 @@
-function rez = clusterSingleBatches(rez, runInd)
+function rez = clusterSingleBatches(rez)
 % outputs an ordering of the batches according to drift
 % for each batch, it extracts spikes as threshold crossings and clusters them with kmeans
 % the resulting cluster means are then compared for all pairs of batches, and a dissimilarity score is assigned to each pair
