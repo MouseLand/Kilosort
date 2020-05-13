@@ -17,7 +17,7 @@
 #include <iostream>
 using namespace std;
 
-const int  Nthreads = 1024, maxFR = 10000, NrankMax = 3, nt0max=81, NchanMax = 17;
+const int  Nthreads = 1024, maxFR = 100000, NrankMax = 3, nt0max=81, NchanMax = 17;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	Conv1D(const double *Params, const float *data, const float *W, float *conv_sig){    
@@ -62,7 +62,10 @@ __global__ void	Conv1D(const double *Params, const float *data, const float *W, 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void  computeProjections(const double *Params, const float *dataraw,
         const int *iC, const int *st, const int *id, const float *W, float *feat){
-    
+            
+    //number of blocks = number of spikes to process minimum( number found, maxFR=100000)
+    //Thread grid = (NchanNear, NrankPC)
+            
     float x;
     int tidx, nt0min, tidy, my_chan, this_chan, tid, bid, nt0, NchanNear, j, t, NT, NrankPC;
     volatile __shared__ float sW[nt0max*NrankMax], sD[nt0max*NchanMax];
@@ -73,9 +76,9 @@ __global__ void  computeProjections(const double *Params, const float *dataraw,
     NrankPC  = (int) Params[6];
     nt0min    = (int) Params[4];
     
-    tidx = threadIdx.x;
-    tidy = threadIdx.y;
-    bid = blockIdx.x;
+    tidx = threadIdx.x;        //PC index in W (column index)
+    tidy = threadIdx.y;        //channel index
+    bid = blockIdx.x;          //NchanNear*NrankPC; each spike gets NchanNear*NrankPC values in projection
     
     // move wPCA to shared memory
     while (tidx<nt0){
@@ -107,12 +110,16 @@ __global__ void  computeProjections(const double *Params, const float *dataraw,
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void  maxChannels(const double *Params, const float *dataraw, const float *data,
 	const int *iC, int *st, int *id, int *counter){
-    
+  
+  //NT/Nthreads blocks, Nthreads threads
+  //dataraw = data convolved with templates
+  //data = max1D output = each data point replaced by the max value within nt0 points
+
   int nt0, indx, tid, tid0, i, bid, NT, Nchan, NchanNear,j,iChan, nt0min;
   double Cf, d;
   float spkTh;
   bool flag;
- 
+
   NT 		= (int) Params[0];
   Nchan     = (int) Params[1];  
   NchanNear = (int) Params[2];      
@@ -240,11 +247,11 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMalloc(&d_id,     maxFR * sizeof(int));
   cudaMalloc(&d_counter,   2*sizeof(int));
 
-   cudaMemset(d_dout,   0, NT * Nchan* sizeof(float)); 
+  cudaMemset(d_dout,   0, NT * Nchan* sizeof(float)); 
   cudaMemset(d_dmax,   0, NT * Nchan * sizeof(float));
   cudaMemset(d_st,      0, maxFR *   sizeof(int));
   cudaMemset(d_id,      0, maxFR *   sizeof(int));
-   cudaMemset(d_counter, 0, 2*sizeof(int));
+  cudaMemset(d_counter, 0, 2*sizeof(int));
      
   int *counter;
   counter = (int*) calloc(1,sizeof(int));
@@ -256,11 +263,13 @@ void mexFunction(int nlhs, mxArray *plhs[],
   max1D<<<Nchan, Nthreads>>>(d_Params, d_dout, d_dmax);
   
   // take max across nearby channels
+  // return spike times in d-st, max channel index in d_id, #spikes in d_counter
+  // note that max channel and spike times are only saved for the first maxFR spikes
   maxChannels<<<NT/Nthreads,Nthreads>>>(d_Params, d_dout, d_dmax, d_iC, d_st, d_id, d_counter);
- 
+  
   cudaMemcpy(counter,     d_counter, sizeof(int), cudaMemcpyDeviceToHost);
   
-  // move d_x to the CPU
+  // calculate features for up to maxFR spikes 
   unsigned int minSize=1;
   minSize = min(maxFR, counter[0]);
 
@@ -278,12 +287,13 @@ void mexFunction(int nlhs, mxArray *plhs[],
       computeProjections<<<minSize, tpP>>>(d_Params, d_data, d_iC, d_st, d_id, d_W, d_featPC);  
   
   cudaMemcpy(d_id2, d_id, minSize * sizeof(int),   cudaMemcpyDeviceToDevice);
+
   
-  // dWU stays a GPU array
+  
+  // uproj and array of max channels will remain GPU arrays
   plhs[0] 	= mxGPUCreateMxArrayOnGPU(featPC);  
   plhs[1] 	= mxGPUCreateMxArrayOnGPU(id);  
 
-  
   cudaFree(d_st);
   cudaFree(d_id);  
   cudaFree(d_counter);

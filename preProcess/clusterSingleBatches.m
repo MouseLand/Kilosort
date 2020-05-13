@@ -4,10 +4,15 @@ function rez = clusterSingleBatches(rez)
 % the resulting cluster means are then compared for all pairs of batches, and a dissimilarity score is assigned to each pair
 % the matrix of similarity scores is then re-ordered so that low dissimilaity is along the diagonal
 
-
-rng('default'); rng(1);
-
 ops = rez.ops;
+
+% Turn on sorting of spikes before starting kmeans
+rez.ops.useStableMode = getOr(rez.ops, 'useStableMode', 1);
+useStableMode = rez.ops.useStableMode;
+
+rez.ops.CSBseed = getOr(rez.ops, 'CSBseed', 1);  %standard seed = 1;
+rng('default'); rng(rez.ops.CSBseed);
+fprintf('random seed for clusterSingleBatches: %d\n', rez.ops.CSBseed );
 
 if getOr(ops, 'reorder', 0)==0
     rez.iorig = 1:rez.temp.Nbatch; % if reordering is turned off, return consecutive order
@@ -18,6 +23,8 @@ nPCs    = getOr(rez.ops, 'nPCs', 3);
 Nfilt = ceil(rez.ops.Nchan/2);
 tic
 wPCA    = extractPCfromSnippets(rez, nPCs); % extract PCA waveforms pooled over channels
+%JIC -- in what sense is this 7 PC waveforms? A single set of basis PCs is
+%calculated from all spikes found in every 100th batch.
 fprintf('Obtained 7 PC waveforms in %2.2f seconds \n', toc) % 7 is the default, and I don't think it needs to be able to change
 
 Nchan = rez.ops.Nchan;
@@ -32,6 +39,8 @@ mus = gpuArray.zeros(Nfilt, nBatches, 'single'); % this holds the scalings
 ns = gpuArray.zeros(Nfilt, nBatches, 'single'); % this holds the number of spikes for that cluster
 Whs = gpuArray.ones(Nfilt, nBatches, 'int32'); % this holds the center channel for each template
 
+
+
 i0 = 0;
 
 NrankPC = 3; % I am not sure if this gets used, but it goes into the function
@@ -43,12 +52,22 @@ for ibatch = 1:nBatches
     [uproj, call] = extractPCbatch2(rez, wPCA, min(nBatches-1, ibatch), iC); % extract spikes using PCA waveforms
     % call contains the center channels for each spike
 
+    if (useStableMode)
+        % sort uprojDAT and call based on 1st projection-- the order is arbitrary but
+        % selection of which spikes are used to build W will be deterministic
+        [~,order] = sort(uproj(1,:));
+        uproj = uproj(:,order);
+        call = call(order);
+    end
+
     if sum(isnan(uproj(:)))>0 %sum(mus(:,ibatch)<.1)>30
         break; % I am not sure what case this safeguards against....
     end
 
     if size(uproj,2)>Nfilt
        % if a batch has at least as many spikes as templates we request, then cluster it
+       % uproj contains all spikes, W will hold the starting points for
+       % k-means.
         [W, mu, Wheights, irand] = initializeWdata2(call, uproj, Nchan, nPCs, Nfilt, iC); % this initialize the k-means
 
         % Params is a whole bunch of parameters sent to the C++ scripts inside a float64 vector
@@ -73,10 +92,12 @@ for ibatch = 1:nBatches
             W = reshape(W, Nchan * nPCs, Nfilt);
 
             [~, Wheights] = max(nW,[], 1); % the new best channel of each cluster template
+
         end
 
         % carefully keep track of cluster templates in dense format
         W = reshape(W, nPCs, Nchan, Nfilt);
+
         W0 = gpuArray.zeros(nPCs, NchanNear, Nfilt, 'single');
         for t = 1:Nfilt
             W0(:, :, t) = W(:, iC(:, Wheights(t)), t);
@@ -104,14 +125,19 @@ end
 %%
 Params(1) = size(Ws,3) * size(Ws,4); % the total number of templates is the number of templates per batch times the number of batches
 
+
 tic
+% another one of these Params variables transporting parameters to the C++ code
+Params  = [1 NrankPC Nfilt 0 size(W,1) 0 NchanNear Nchan];
+Params(1) = size(Ws,3) * size(Ws,4); % the total number of templates is the number of templates per batch times the number of batches
 
 % initialize dissimilarity matrix
 ccb = gpuArray.zeros(nBatches, 'single');
 
 for ibatch = 1:nBatches
     % for every batch, compute in parallel its dissimilarity to ALL other batches
-    Wh0 = single(Whs(:, ibatch)); % this one is the primary batch
+    Wh0 = single(Whs(:, ibatch)); % max channels of the primary batch
+    W0  = Ws(:, :, ibatch);
     mu = mus(:, ibatch);
 
     % embed the templates from the primary batch back into a full, sparse representation
@@ -121,6 +147,10 @@ for ibatch = 1:nBatches
     end
 
     % pairs of templates that live on the same channels are potential "matches"
+    % This calculateion finds all channels with at least one neighbor
+    % overlapping the max channel of the cluster.
+    % for probes where channel order does not reflect site position, does
+    % this need to change to a distance calculation?
     iMatch = sq(min(abs(single(iC) - reshape(Wh0, 1, 1, [])), [], 1))<.1;
 
     % compute dissimilarities for iMatch = 1
