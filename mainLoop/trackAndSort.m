@@ -2,6 +2,10 @@ function [rez, st3, fW, fWpc] = trackAndSort(rez, iorder)
 % This is the extraction phase of the optimization. 
 % iorder is the order in which to traverse the batches
 
+% Turn on sorting of spikes before subtracting and averaging in mpnu8
+rez.ops.useStableMode = getOr(rez.ops, 'useStableMode', 1);
+useStableMode = rez.ops.useStableMode;
+
 ops = rez.ops;
 
 % revert to the saved templates
@@ -18,11 +22,12 @@ for j = 1:Nfilt
     dWU(:,:,j) = mu(j) * squeeze(W(:, j, :)) * squeeze(U(:, j, :))';
 end
 
+
 ops.fig = getOr(ops, 'fig', 1); % whether to show plots every N batches
 
 NrankPC = 6; % this one is the rank of the PCs, used to detect spikes with threshold crossings
 Nrank   = 3; % this one is the rank of the templates
-rng('default'); rng(1);
+rng('default'); rng(1); % initializing random number generator
 
 % move these to the GPU
 wPCA = gpuArray(ops.wPCA);
@@ -64,7 +69,7 @@ pm = exp(-1/ops.momentum(2));
 Nsum = min(Nchan,7); % how many channels to extend out the waveform in mexgetspikes
 % lots of parameters passed into the CUDA scripts
 Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
-    Nrank ops.lam pm Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1)]);
+    Nrank ops.lam pm Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1) useStableMode]);
 
 % initialize average number of spikes per batch for each template
 nsp = gpuArray.zeros(Nfilt,1, 'double');
@@ -116,7 +121,9 @@ for ibatch = 1:niter
     dataRAW = single(gpuArray(dat))/ ops.scaleproc;
     
     % decompose dWU by svd of time and space (via covariance matrix of 61 by 61 samples)
-    % this uses a "warm start" by remembering the W from the previous iteration
+    % this uses a "warm start" by remembering the W from the previous
+    % iteration
+     
     [W, U, mu] = mexSVDsmall2(Params, dWU, W, iC-1, iW-1, Ka, Kb);
     
     % UtU is the gram matrix of the spatial components of the low-rank SVDs
@@ -134,7 +141,7 @@ for ibatch = 1:niter
     % waveforms assigned to each cluster (dWU0),
     % and probably a few more things I forget about
     
-    [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp] = ...
+    [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp, errmsg] = ...
         mexMPnu8(Params, dataRAW, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
         wPCA);
     
@@ -171,7 +178,7 @@ for ibatch = 1:niter
     rez.WA(:,:,:,k) = gather(W);
     rez.UA(:,:,:,k) = gather(U);
     rez.muA(:,k) = gather(mu);
-    
+        
     % we carefully assign the correct absolute times to spikes found in this batch
     ioffset         = ops.ntbuff;
     if k==1

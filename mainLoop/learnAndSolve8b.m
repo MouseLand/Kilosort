@@ -8,10 +8,14 @@ if ~isfield(rez, 'W') || isempty(rez.W)
     
     % we learn the templates by going back and forth through some of the data,
     % in the order specified by iorig (determined by batch reordering).
+    % standard order -- learn templates from first half of data starting
+    % from midpoint, counting down to 1, and then returning.
     iorder0 = rez.iorig([ihalf:-1:1 1:ihalf]); % these are absolute batch ids
+    
     rez     = learnTemplates(rez, iorder0);
     
     rez.istart  = rez.iorig(ihalf); % this is the absolute batch id where we start sorting
+
 else
     rez.WA = [];
 end

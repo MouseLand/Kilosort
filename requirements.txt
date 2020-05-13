@@ -1,0 +1,8 @@
+click
+cupy-cuda91
+matplotlib
+numba
+numpy
+pytest
+scipy
+tqdm

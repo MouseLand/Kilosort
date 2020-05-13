@@ -26,7 +26,7 @@ __global__ void computeCost(const double *Params, const float *Ws, const float *
   int j, tid, bid, Nspikes, my_chan, this_chan, Nchan, NrankPC, NchanNear, Nthreads, k;
   float xsum = 0.0f, Ci; 
   
-  Nspikes               = (int) Params[0];
+  Nspikes               = (int) Params[0];  //more accurately, number of comparisons, Nfilt*Nbatch
   Nchan                 = (int) Params[7];
   NrankPC                 = (int) Params[1];
   NchanNear                 = (int) Params[6];
