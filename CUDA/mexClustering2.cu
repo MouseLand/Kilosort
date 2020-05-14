@@ -293,7 +293,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
 {
     /* Declare input variables*/
   double *Params, *d_Params;
-  unsigned int Nchan, NrankPC, Nspikes, Nfilters, NchanNear;
+  unsigned int Nchan, NrankPC, Nspikes, Nfilters;
 
   
   /* Initialize the MathWorks GPU API. */
@@ -304,7 +304,6 @@ void mexFunction(int nlhs, mxArray *plhs[],
   Nspikes               = (unsigned int) Params[0];  
   Nfilters              = (unsigned int) Params[2];  
   NrankPC             = (unsigned int) Params[1];  
-  NchanNear             = (unsigned int) Params[6];
   Nchan                 = (unsigned int) Params[7];
   
   // copy Params to GPU

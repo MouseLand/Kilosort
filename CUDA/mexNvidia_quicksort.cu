@@ -164,6 +164,15 @@ __global__ void copy_sort_int( const int *orig, const unsigned int *sort_idx,
     }
 }
 
+// copy values from an array of single precision
+// floating point numbers to a new array in sort order given by sort_idx
+// call with no threads, i.e. <<1, 1>>
+__global__ void copy_sort_int( const float *orig, const unsigned int *sort_idx, 
+        const unsigned int nitems, float *sorted ) {
+    for( int i = 0; i < nitems; ++ i ) {
+        sorted[sort_idx[i]] = orig[i];
+    }
+}
 
 ///////////////////////////////////////////////////////////////////
 // Host code
