@@ -53,14 +53,14 @@ for ibatch = 1:nBatches
     [uproj, call] = extractPCbatch2(rez, wPCA, min(nBatches-1, ibatch), iC); % extract spikes using PCA waveforms
     % call contains the center channels for each spike
     
-    if (useStableMode) 
-        % sort rows of  uprojDAT (sorts on first component, breaks ties with 2nd, 3rd...)
-        % the order is arbitrary but ordering makes the k-means
-        % deterministic
-        [~,order] = sortrows(uproj');
-        uproj = uproj(:,order);
-        call = call(order);
-    end
+
+    % sort rows of  uprojDAT (sorts on first component, breaks ties with 2nd, 3rd...)
+    % the order is arbitrary but ordering makes the k-means
+    % deterministic
+    [~,order] = sortrows(uproj');
+    uproj = uproj(:,order);
+    call = call(order);
+
     
     if sum(isnan(uproj(:)))>0 %sum(mus(:,ibatch)<.1)>30
         break; % I am not sure what case this safeguards against....
