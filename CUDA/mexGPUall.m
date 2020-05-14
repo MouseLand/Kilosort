@@ -8,6 +8,11 @@
     mexcuda -largeArrayDims mexGetSpikes2.cu
     
     if enableStableMode
+        % For algorithm development purposes which require guaranteed
+        % deterministic calculations, add -DENSURE_DETERM swtich to
+        % compile line for mexMPnu8.cu. -DENABLE_STABLEMODE must also
+        % be specified. This version will run ~2X slower than the
+        % non deterministic version.
         mexcuda -largeArrayDims -dynamic -DENABLE_STABLEMODE mexMPnu8.cu
     else
         mexcuda -largeArrayDims mexMPnu8.cu
