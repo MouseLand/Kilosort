@@ -175,10 +175,13 @@ for ibatch = 1:niter
     % we memorize the spatio-temporal decomposition of the waveforms at this batch
     % this is currently only used in the GUI to provide an accurate reconstruction
     % of the raw data at this time
-    rez.WA(:,:,:,k) = gather(W);
-    rez.UA(:,:,:,k) = gather(U);
-    rez.muA(:,k) = gather(mu);
-        
+    
+    if 0
+        rez.WA(:,:,:,k) = gather(W);
+        rez.UA(:,:,:,k) = gather(U);
+        rez.muA(:,k) = gather(mu);
+    end
+    
     % we carefully assign the correct absolute times to spikes found in this batch
     ioffset         = ops.ntbuff;
     if k==1

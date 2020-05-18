@@ -96,7 +96,39 @@ gain = getOr(rez.ops, 'gain', 1);
 tempAmps = gain*tempAmps'; % for consistency, make first dimension template number
 
 if ~isempty(savePath)
-
+    fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
+    fprintf(fileID, 'cluster_id%sKSLabel', char(9));
+    fprintf(fileID, char([13 10]));
+    
+    fileIDCP = fopen(fullfile(savePath, 'cluster_ContamPct.tsv'),'w');
+    fprintf(fileIDCP, 'cluster_id%sContamPct', char(9));
+    fprintf(fileIDCP, char([13 10]));
+    
+    fileIDA = fopen(fullfile(savePath, 'cluster_Amplitude.tsv'),'w');
+    fprintf(fileIDA, 'cluster_id%sAmplitude', char(9));
+    fprintf(fileIDA, char([13 10]));
+    
+    rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
+    for j = 1:length(rez.good)
+        if rez.good(j)
+            fprintf(fileID, '%d%sgood', j-1, char(9));
+        else
+            fprintf(fileID, '%d%smua', j-1, char(9));
+        end
+        fprintf(fileID, char([13 10]));
+        
+        fprintf(fileIDCP, '%d%s%.1f', j-1, char(9), rez.est_contam_rate(j)*100);
+        fprintf(fileIDCP, char([13 10]));
+        
+        fprintf(fileIDA, '%d%s%.1f', j-1, char(9), tempAmps(j));
+        fprintf(fileIDA, char([13 10]));
+        
+    end
+    fclose(fileID);
+    fclose(fileIDCP);
+    fclose(fileIDA);
+    
+    
     writeNPY(spikeTimes, fullfile(savePath, 'spike_times.npy'));
     writeNPY(uint32(spikeTemplates-1), fullfile(savePath, 'spike_templates.npy')); % -1 for zero indexing
     if size(rez.st3,2)>4
@@ -136,37 +168,7 @@ if ~isempty(savePath)
 %     end
 %     fclose(fileID);
 
-    fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
-    fprintf(fileID, 'cluster_id%sKSLabel', char(9));
-    fprintf(fileID, char([13 10]));
-
-    fileIDCP = fopen(fullfile(savePath, 'cluster_ContamPct.tsv'),'w');
-    fprintf(fileIDCP, 'cluster_id%sContamPct', char(9));
-    fprintf(fileIDCP, char([13 10]));
-
-    fileIDA = fopen(fullfile(savePath, 'cluster_Amplitude.tsv'),'w');
-    fprintf(fileIDA, 'cluster_id%sAmplitude', char(9));
-    fprintf(fileIDA, char([13 10]));
-
-    rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
-    for j = 1:length(rez.good)
-        if rez.good(j)
-            fprintf(fileID, '%d%sgood', j-1, char(9));
-        else
-            fprintf(fileID, '%d%smua', j-1, char(9));
-        end
-        fprintf(fileID, char([13 10]));
-
-        fprintf(fileIDCP, '%d%s%.1f', j-1, char(9), rez.est_contam_rate(j)*100);
-        fprintf(fileIDCP, char([13 10]));
-
-        fprintf(fileIDA, '%d%s%.1f', j-1, char(9), tempAmps(j));
-        fprintf(fileIDA, char([13 10]));
-
-    end
-    fclose(fileID);
-    fclose(fileIDCP);
-    fclose(fileIDA);
+    
 
      %make params file
     if ~exist(fullfile(savePath,'params.py'),'file')
