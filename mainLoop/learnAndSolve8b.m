@@ -14,9 +14,9 @@ if ~isfield(rez, 'W') || isempty(rez.W)
     % from midpoint, counting down to 1, and then returning.
     
     iorder0 = rez.iorig([1:Nbatches Nbatches:-1:ihalf]);
-%     if rem(iseed,2)==0
-%         iorder0 = rez.iorig([Nbatches:-1:1 1:ihalf]); % these are absolute batch ids
-%     end
+    if rem(iseed,2)==0
+        iorder0 = rez.iorig([Nbatches:-1:1 1:ihalf]); % these are absolute batch ids
+    end
     rez     = learnTemplates(rez, iorder0);
     
     rez.istart  = rez.iorig(ihalf); % this is the absolute batch id where we start sorting
