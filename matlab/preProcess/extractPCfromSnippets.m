@@ -37,3 +37,4 @@ fclose(fid);
 wPCA = U(:, 1:nPCs); % take as many as needed
 
 wPCA(:,1) = - wPCA(:,1) * sign(wPCA(21,1)); % adjust the arbitrary sign of the first PC so its negativity is downward
+

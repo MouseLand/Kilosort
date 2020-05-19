@@ -5,16 +5,16 @@ function make_eMouseData_drift(fpath, KS2path, chanMapName, useGPU, useParPool)
 % probe sites.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % you can play with the parameters just below here to achieve a signal more similar to your own data!!! 
-norm_amp  = 20; % if 0, use amplitudes of input waveforms; if > 0, set all amplitudes to norm_amp*rms_noise
+norm_amp  = 16.7; % if 0, use amplitudes of input waveforms; if > 0, set all amplitudes to norm_amp*rms_noise
 mu_mean   = 0.75; % mean of mean spike amplitudes. Incoming waveforms are in uV; make <1 to make sorting harder
-noise_model = 'fromData'; %'gauss' or 'fromData'; 'fromData' requires a noiseModel.mat built by make_noise_model
-rms_noise = 12; % rms noise in uV. Will be added to the spike signal. 15-20 uV an OK estimate from real data
+noise_model = 'gauss'; %'gauss' or 'fromData'; 'fromData' requires a noiseModel.mat built by make_noise_model
+rms_noise = 10; % rms noise in uV. Will be added to the spike signal. 15-20 uV an OK estimate from real data
 t_record  = 1200; % duration in seconds of simulation. longer is better (and slower!) (1000)
 fr_bounds = [1 10]; % min and max of firing rates ([1 10])
 tsmooth   = 0.5; % gaussian smooth the noise with sig = this many samples (increase to make it harder) (0.5)
 chsmooth  = 0.5; % smooth the noise across channels too, with this sig (increase to make it harder) (0.5)
 amp_std   = .1; % standard deviation of single spike amplitude variability (increase to make it harder, technically std of gamma random variable of mean 1) (.25)
-fs        = 30000; % sample rate for the simulation. Incoming waveforms must be sampled at this freq.
+fs_rec    = 30000; % sample rate for the for the recording. Waveforms must be sampled at a rate w/in .01% of this rate
 nt        = 81; % number of timepoints expected. All waveforms must have this time window
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %drift params. See the comments in calcYPos_v2 for details
@@ -81,12 +81,37 @@ if ( strcmp(noise_model,'fromData') )
     end
     noiseFromData = load(nmPath);
 end
+
+% Add a SYNC channel to the file
+% 16 bit word with a 1 Hz square wave in 7th bit
+addSYNC = false; 
+syncOffset = 0.232; % must be between 0 and 0.5, offset to first on edge
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 rng('default');
-rng(101);  % set the seed of the random number generator; default = 101
 
-bitPerUV = 0.42667; %imec 3A or 3B, gain = 500
+% There are 3 seeds for the randome number generator, so some parts of the
+% simulation can be fixed while others vary from run to run
+
+% For unit placment, average amplitude, and spike times
+
+unit_seed = 101;
+
+% For individual spike amplitudes, but still based on the same average
+% Meant to simulate the same spikes showing up in different streams
+
+amp_seed = 101;
+
+% For noise generation
+
+noise_seed = 101;
+
+
+% set the seed of the random number generator used for unit definition
+rng(unit_seed);  
+
+%bitPerUV = 0.42667; %imec 3A or 3B, gain = 500
+bitPerUV = 1.3107; %for NP 2.0, fixed gain of 80
 
 %  load channel map file built with make_eMouseChannelMap_3A_short.m
 
@@ -95,7 +120,7 @@ load(chanMapFile);
 
 zeroSites = find(connected == 0);
 
-Nchan = NchanTOT; %physical sites on the probe
+Nchan = numel(chanMap); %physical sites on the probe
 %invChanMap(chanMap) = [1:Nchan]; % invert the  channel map here--create the order in which to write output
 
 % range of y positions to place units
@@ -133,7 +158,8 @@ origLabel = []; %array of original labels
 for fileIndex = 1:nFile
     % generate waveforms for the simulation
     uData = load(filePath{fileIndex});
-    if (uData.fs ~= fs)
+    fs_diff = 100*(abs(uData.fs - fs_rec)/fs_rec);
+    if (fs_diff > 0.01)
         fprintf( 'Waveform file %d has wrong sample rate.\n', fileIndex );
         fprintf( 'Skipping to next file.');
         continue
@@ -369,8 +395,12 @@ end
 
 bContinue = 1;
 
+% set the sample rate to that specified in the hard coded params in this
+% file (independent of fs read in through channel map)
+% allows simulation of multiple streams with slightly different clock rates
 
-
+fs = fs_rec;
+fs_std = 30000; %used to generate spike times
 
 %same for range of firing rates (note that we haven't included any info
 %about the original firign rates of the units
@@ -392,12 +422,16 @@ for j = 1:length(fr)      %loop over neurons
     %before a success (neuron firing)
     %second two params for geornd are size of the array, here 2*firing
     %rate*total time of the simulation. 
-    dspks = int64(geornd(1/(fs/fr(j)), ceil(2*fr(j)*t_record),1));
-    dspks(dspks<ceil(fs * 2/1000)) = [];  % remove ISIs below the refractory period
+    
+    dspks = int64(geornd(1/(fs_std/fr(j)), ceil(2*fr(j)*t_record),1));
+    dspks(dspks<ceil(fs_std * 2/1000)) = [];  % remove ISIs below the refractory period
     res = cumsum(dspks);
     spk_times = cat(1, spk_times, res);
     clu = cat(1, clu, j*ones(numel(res), 1));
 end
+% convert spike times to the requested rate
+spk_times = int64( double(spk_times)*(fs/fs_std));
+
 [spk_times, isort] = sort(spk_times);
 clu = clu(isort);
 clu       = clu(spk_times<t_record*fs);
@@ -406,6 +440,9 @@ nspikes = numel(spk_times);
 
 % this generates single spike amplitude with mean = 1 and std deviation
 % ~amp_std, while ensuring all values are positive
+% re-seed the random number generator to allow variable amplitudes
+% while holding positions of units constant
+rng(amp_seed);
 amps = gamrnd(1/amp_std^2,amp_std^2, nspikes,1); 
 
 %
@@ -419,9 +456,13 @@ t_all    = 0;
 if useGPU
     %set up the random number generators for run to run reproducibility 
     gpurng('default'); % start with a default set
-    gpurng(101); % set the seed
+    gpurng(noise_seed); % set the seed
     %gpurng('shuffle'); uncomment to have the seed set using the clock
 end
+
+
+% reset random number generator for noise
+rng(noise_seed);  
 
 %record a y position for each spike time
 yDriftRec = zeros( length(spk_times), 5, 'double' );
@@ -474,6 +515,17 @@ while t_all<t_record
             enoise(1:buff, :) = enoise_old(NT-buff + [1:buff], :);
         end
         dat = enoise;
+    end
+    
+    if addSYNC 
+        sync = zeros(NT,1,'int16');
+        hilo = zeros(NT,1,'logical');
+        % for each time point, calculate where it is in the 1Hz cycle
+        currTime = zeros(NT,1,'single');
+        currTime(:,1) = (0:NT-1) + t_all*fs;
+        currTime(:,1) = currTime(:,1)/fs - syncOffset;  %time in seconds, relative to offset
+        hilo(:,1) = currTime(:,1) - floor(currTime(:,1)) < 0.5;
+        sync(hilo,1) = 64;
     end
     
     if t_all>0
@@ -559,6 +611,10 @@ while t_all<t_record
     dat_old    =  dat;
     %convert to 16 bit integers; waveforms are in uV
     dat = int16(bitPerUV * dat);
+    if addSYNC
+        %add the column of sync data
+        dat = horzcat(dat, sync);
+    end
     fwrite(fidW, dat(1:(NT-buff),:)', 'int16');
   
     t_all = t_all + (NT-buff)/fs;
@@ -859,4 +915,6 @@ f(end:-1:end-Np+1,:)=conj(f(2:Np+1,:));
 noise=real(ifft(f,[],1)); 
 
 end
+
+
 
