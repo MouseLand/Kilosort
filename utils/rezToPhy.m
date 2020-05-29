@@ -91,6 +91,7 @@ spikeAmps = tempAmpsUnscaled(spikeTemplates).*amplitudes;
 % tempScalingAmps are equal mean for all templates)
 ta = clusterAverage(spikeTemplates, spikeAmps);
 tids = unique(spikeTemplates);
+tempAmps = zeros(numel(rez.mu),1);
 tempAmps(tids) = ta; % because ta only has entries for templates that had at least one spike
 gain = getOr(rez.ops, 'gain', 1);
 tempAmps = gain*tempAmps'; % for consistency, make first dimension template number
