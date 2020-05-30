@@ -1,4 +1,4 @@
-function shift_batch_on_disk(rez, ibatch, shift, sig)
+function shift_batch_on_disk2(rez, ibatch, shift, ysamp, sig)
 % this function finds threshold crossings in the data using
 % projections onto the pre-determined principal components
 % wPCA is number of time samples by number of PCs
@@ -19,6 +19,8 @@ batchstart = 0:NT:NT*Nbatch; % batches start at these timepoints
 offset = 2 * ops.Nchan*batchstart(ibatch); % binary file offset in bytes
 
 
+shifts = interp1(ysamp, shift, rez.yc, 'makima', 'extrap');
+
 fclose all;
 fid = fopen(ops.fproc, 'r+');
 fseek(fid, offset, 'bof');
@@ -29,7 +31,7 @@ xp = cat(2, rez.xc, rez.yc);
 
 Kxx = kernel2D(xp, xp, sig);
 yp = xp;
-yp(:, 2) = yp(:, 2) - shift; % * sig;
+yp(:, 2) = yp(:, 2) - shifts; % * sig;
 
 Kyx = kernel2D(yp, xp, sig);
 
