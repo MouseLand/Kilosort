@@ -5,7 +5,7 @@ ops.chanMap             = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilos
 ops.fs = 30000;  
 
 % frequency for high pass filtering (150)
-ops.fshigh = 150;   
+ops.fshigh = 300;   
 
 % minimum firing rate on a "good" channel (0 to skip)
 ops.minfr_goodchannels = 0.1; 

@@ -161,10 +161,11 @@ for ibatch = 1:niter
     % since some clusters have different number of spikes, we need to apply the
     % exp(pm) factor several times, and fexp is the resulting update factor
     % for each template
-    fexp = exp(double(nsp0).*log(pm));
-    fexp = reshape(fexp, 1,1,[]);
-    dWU = dWU .* fexp + (1-fexp) .* (dWU0./reshape(max(1, double(nsp0)), 1,1, []));
-    
+    if getOr(rez.ops, 'trackfinal', 1)
+        fexp = exp(double(nsp0).*log(pm));
+        fexp = reshape(fexp, 1,1,[]);    
+        dWU = dWU .* fexp + (1-fexp) .* (dWU0./reshape(max(1, double(nsp0)), 1,1, []));
+    end
     % nsp just gets updated according to the fixed factor p1
     nsp = nsp * p1 + (1-p1) * double(nsp0);
     
