@@ -941,13 +941,15 @@ void mexFunction(int nlhs, mxArray *plhs[],
   
   // loop to find and subtract spikes
   
-  double *d_draw64;        
+  double *d_draw64;    
+#ifndef ENSURE_DETERM
   if (useStableMode) {
       // create copy of the dataraw, d_dout, d_data as doubles for arithmetic
       // number of consecutive points to convert = Params(17) (Params(18) in matlab)         
       cudaMalloc(&d_draw64, NT*Nchan * sizeof(double));
       convToDouble<<<100,Nthreads>>>(d_Params, d_draw, d_draw64);  
   }
+#endif
 
   for(int k=0;k<(int) Params[3];k++){    //Parms[3] = nInnerIter, set to 60 final pass
       // ignore peaks that are smaller than another nearby peak
@@ -1046,11 +1048,13 @@ void mexFunction(int nlhs, mxArray *plhs[],
       // spikes will be added to d_featPC and then subracted out of d_out.
       cudaMemcpy(d_counter+1, d_counter, sizeof(int), cudaMemcpyDeviceToDevice);
   }
-  
+
+#ifndef ENSURE_DETERM
   if (useStableMode) {
     //convert arrays back to singles for the rest of the process
     convToSingle<<<100,Nthreads>>>(d_Params, d_draw64, d_draw);
   }
+#endif
 
   // compute PC features from reziduals + subtractions
   if (Params[12]>0)

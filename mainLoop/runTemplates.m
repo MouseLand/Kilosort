@@ -79,7 +79,7 @@ Nfilt = size(rez.W,2);
 Nchan = rez.ops.Nchan;
 nt0 = rez.ops.nt0;
 
-nKeep = min(Nchan*3,20); % how many PCs to keep
+nKeep = min([Nchan*3,Nbatches,20]); % how many PCs to keep
 rez.W_a = zeros(nt0 * Nrank, nKeep, Nfilt, 'single');
 rez.W_b = zeros(Nbatches, nKeep, Nfilt, 'single');
 rez.U_a = zeros(Nchan* Nrank, nKeep, Nfilt, 'single');
