@@ -656,7 +656,10 @@ classdef ksGUI < handle
             conn = obj.P.chanMap.connected;
             chanMap.chanMap = obj.P.chanMap.chanMap(conn); 
             chanMap.xcoords = obj.P.chanMap.xcoords(conn); 
-            chanMap.ycoords = obj.P.chanMap.ycoords(conn); 
+            chanMap.ycoords = obj.P.chanMap.ycoords(conn);
+            if isfield(obj.P.chanMap, 'kcoords')
+                chanMap.kcoords = obj.P.chanMap.kcoords(conn);
+            end
             obj.ops.chanMap = chanMap;
             
             % sanitize options set in the gui
