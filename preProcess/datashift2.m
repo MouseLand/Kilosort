@@ -45,9 +45,9 @@ if isfield(ops, 'midpoint')
     imin = [imin1 imin2 + d0];
     
 else
-%     ysamp = dmin + dd * [1:dmax] - dd/2;
-%     [imin,yblk, F0] = align_block2(F, ysamp);
-    [imin, F0] = align_block(F);
+    ysamp = dmin + dd * [1:dmax] - dd/2;
+    [imin,yblk, F0] = align_block2(F, ysamp);
+%     [imin, F0] = align_block(F);
 end
 
 figure(193)
@@ -67,8 +67,8 @@ dshift = imin * dd;
 
 if 1
     for ibatch = 1:Nbatches
-%         shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig);
-        shift_batch_on_disk(rez, ibatch, dshift(ibatch), sig);        
+        shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig);
+%         shift_batch_on_disk(rez, ibatch, dshift(ibatch), sig);        
     end
     fprintf('time %2.2f, Shifted up/down %d batches. \n', toc, Nbatches)
 end
