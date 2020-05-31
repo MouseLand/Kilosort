@@ -1,5 +1,9 @@
 function rez = datashift2(rez)
 
+if  getOr(rez.ops, 'datashift', 1)==0
+    return;
+end
+
 sig = rez.ops.sig;
 
 ops = rez.ops;
@@ -45,9 +49,13 @@ if isfield(ops, 'midpoint')
     imin = [imin1 imin2 + d0];
     
 else
-    ysamp = dmin + dd * [1:dmax] - dd/2;
-    [imin,yblk, F0] = align_block2(F, ysamp);
-%     [imin, F0] = align_block(F);
+    switch getOr(ops, 'datashift', 1)
+        case 2
+            ysamp = dmin + dd * [1:dmax] - dd/2;
+            [imin,yblk, F0] = align_block2(F, ysamp);
+        case 1
+            [imin, F0] = align_block(F);
+    end
 end
 
 figure(193)
@@ -65,13 +73,16 @@ axis tight
 
 dshift = imin * dd;
 
-if 1
-    for ibatch = 1:Nbatches
-        shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig);
-%         shift_batch_on_disk(rez, ibatch, dshift(ibatch), sig);        
+for ibatch = 1:Nbatches
+    switch getOr(ops, 'datashift', 1)
+        case 2
+            shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig);
+        case 1
+            shift_batch_on_disk(rez, ibatch, dshift(ibatch), sig);
     end
-    fprintf('time %2.2f, Shifted up/down %d batches. \n', toc, Nbatches)
 end
+fprintf('time %2.2f, Shifted up/down %d batches. \n', toc, Nbatches)
+
 
 rez.dshift = dshift;
 rez.st0 = st3;
