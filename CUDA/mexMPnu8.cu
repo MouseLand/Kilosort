@@ -254,11 +254,14 @@ __global__ void  bestFilter(const double *Params, const float *data,
       Cnextbest = 0.0f;
 
       for (i=0; i<Nfilt;i++){
-
           a = 1+ lam;
           b = max(0.0f, data[tid0 + NT * i]) + lam * mu[i];
           Cf =  b*b/a - lam * mu[i]*mu[i];
-
+          
+          //a = lam * lam + mu[i] * mu[i];
+          //b = max(0.0f, data[tid0 + NT * i]);
+          //Cf = -mu[i]*mu[i] + 2 * mu[i] * b + mu[i]*mu[i] * (b - mu[i])*(b - mu[i]) / a;
+          
           if (Cf > Cbest + 1e-6){
               Cnextbest = Cbest;
               Cbest 	= Cf;
@@ -289,10 +292,10 @@ __global__ void  bestFilterUpdate(const double *Params, const float *data,
   Nfilt 	= (int) Params[1];
   lam 	    = (float) Params[7];
   nt0       = (int) Params[4];
-
+  
   // we only need to compute this at updated locations
   ind = counter[1] + blockIdx.x;
-
+  
   if (ind<counter[0]){
       t = st[ind]-nt0 + tid;
       if (t>=0 && t<NT){
@@ -300,10 +303,13 @@ __global__ void  bestFilterUpdate(const double *Params, const float *data,
           for (i=0; i<Nfilt;i++){
               a = 1+ lam;
               b = max(0.0f, data[t + NT * i]) + lam * mu[i];
-
               Cf =  b*b/a - lam * mu[i]*mu[i];
-
-               if (Cf > Cbest + 1e-6){
+              
+              //a = lam * lam + mu[i] * mu[i];
+              //b = max(0.0f, data[t + NT * i]);              
+              //Cf = -mu[i]*mu[i] + 2 * mu[i] * b + mu[i]*mu[i] * (b - mu[i])*(b - mu[i]) / a;
+              
+              if (Cf > Cbest + 1e-6){
                   Cnextbest = Cbest;
                   Cbest 	= Cf;
                   ibest 	= i;
