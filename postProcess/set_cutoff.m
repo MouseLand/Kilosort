@@ -44,6 +44,7 @@ for j = 1:Nk
               % if it does, then we put much stricter criteria for isolation
               % to make sure we don't settle for a relatively high contamination unit
                 fcontamination = min(.05, max(.01, Q*2));
+%                 fcontamination = .05;
 
                 % if the unit starts out contaminated, we will settle with the higher contamination rate
             end

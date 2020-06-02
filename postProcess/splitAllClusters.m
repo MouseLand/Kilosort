@@ -51,7 +51,9 @@ while ik<Nfilt
     clp0 = gpuArray(clp0(:,:));
     clp = clp0 - mean(clp0,1); % mean center them
 
-    clp = clp - my_conv2(clp, 250, 1); % subtract a running average, because the projections are NOT drift corrected
+    if ~rez.ops.datashift
+        clp = clp - my_conv2(clp, 250, 1); % subtract a running average, because the projections are NOT drift corrected
+    end
 
     % now use two different ways to initialize the bimodal direction
     % the main script calls this function twice, and does both initializations

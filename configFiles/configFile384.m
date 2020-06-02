@@ -34,7 +34,7 @@ ops.ThPre = 8;
 % spatial scale for datashift kernel
 ops.sig = 20;
 
-% type of data shifting (0 = none, 1 = uniform, 2 = nonrigid)
+% type of data shifting (0 = none, 1 = rigid, 2 = nonrigid)
 ops.datashift = 1;
 
 
