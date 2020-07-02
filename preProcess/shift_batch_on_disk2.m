@@ -1,4 +1,4 @@
-function shift_batch_on_disk2(rez, ibatch, shift, ysamp, sig)
+function [dat_cpu, dat, shifts] = shift_batch_on_disk2(rez, ibatch, shift, ysamp, sig)
 % this function finds threshold crossings in the data using
 % projections onto the pre-determined principal components
 % wPCA is number of time samples by number of PCs
@@ -36,7 +36,7 @@ yp(:, 2) = yp(:, 2) - shifts; % * sig;
 Kyx = kernel2D(yp, xp, sig);
 
 M = Kyx /(Kxx + .01 * eye(size(Kxx,1)));
-% M = (rez.Wrot * M) / rez.Wrot;
+% M = (rez.Wrot' * M) / rez.Wrot';
 
 dati = gpuArray(single(dat)) * gpuArray(M)';
 
@@ -62,7 +62,22 @@ dati = gpuArray(single(dat)) * gpuArray(M)';
 % end
 
 dat_cpu = gather(int16(dati));
-fseek(fid, offset, 'bof');
-fwrite(fid, dat_cpu, 'int16'); % write this batch to binary file
 
+if ~isempty(getOr(ops, 'fbinaryproc', []))
+    fid2 = fopen(ops.fbinaryproc, 'a');
+    ifirst = ops.ntbuff+1;
+    ilast = ops.NT;
+    if ibatch==1
+        ifirst = 1;
+        ilast = ops.NT-ops.ntbuff;
+    end
+    fwrite(fid2, dat_cpu(ifirst:ilast, :)', 'int16');
+    fclose(fid2);
+end
+
+if nargout==0
+    fseek(fid, offset, 'bof');
+    fwrite(fid, dat_cpu, 'int16'); % write this batch to binary file
+end
 fclose(fid);
+    

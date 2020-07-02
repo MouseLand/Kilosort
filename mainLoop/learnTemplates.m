@@ -92,7 +92,7 @@ ndrop = zeros(1,3); % this keeps track of dropped templates for debugging purpos
 m0 = ops.minFR * ops.NT/ops.fs; % this is the minimum firing rate that all templates must maintain, or be dropped
 
 if getOr(ops, 'new_spk', 0)
-    detset = setup_detector(rez, 12);
+    detset = setup_detector(rez, ops.Th(1));
 end
 %%
 for ibatch = 1:niter        
@@ -204,8 +204,8 @@ for ibatch = 1:niter
         flag = 0;
         if new_spk
             if rem(ibatch, 5) ==2 %==1
-%                 dWU0 = newSpikes(detset, drez, wTEMP, nt0, Nchan);
-                 dWU0 = newSpikes2(detset, dataRAW, wTEMP, nt0, Nchan, st0, id0, U, rez);                 
+                dWU0 = newSpikes2(detset, drez, wTEMP, nt0, Nchan, []);
+%                  dWU0 = newSpikes2(detset, dataRAW, wTEMP, nt0, Nchan, st0, id0, U, rez);                 
                flag = 1;
             end
         else

@@ -64,3 +64,15 @@ fseek(fid, offset, 'bof');
 fwrite(fid, dat_cpu, 'int16'); % write this batch to binary file
 
 fclose(fid);
+
+if ~isempty(getOr(ops, 'fbinaryproc', []))
+    fid2 = fopen(ops.fbinaryproc, 'a');
+    ifirst = ops.ntbuff+1;
+    ilast = ops.NT;
+    if ibatch==1
+        ifirst = 1;
+        ilast = ops.NT-ops.ntbuff;
+    end
+    fwrite(fid2, dat_cpu(ifirst:ilast, :)', 'int16');
+    fclose(fid2);
+end
