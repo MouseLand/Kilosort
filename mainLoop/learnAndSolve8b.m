@@ -8,7 +8,7 @@ if ~isfield(rez, 'W') || isempty(rez.W)
     if getOr(rez.ops, 'datashift', 0)
         rng(iseed);
         rez.iorig = randperm(Nbatches);
-        iorder0 = rez.iorig;
+        iorder0 = rez.iorig; %, randperm(Nbatches), randperm(Nbatches)];
         rez.istart = ceil(Nbatches/2); % this doesn't really matter anymore
     else
         starts = [.5, .475, .525, .45, .55];        

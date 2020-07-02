@@ -17,10 +17,10 @@ rez.ops.yup = ymin:dmin/2:ymax; % centers of the upsampled y positions
 rez.ops.xup = xmin + [0 16 32 48]; % centers of the upsampled x positions
 
 
-spkTh = 8; % same as "template amplitude" with generic templates
+spkTh = 10; % same as "template amplitude" with generic templates
 
 st3 = standalone_detector(rez, spkTh);
-%
+
 dd = 5;
 dep = st3(:,2);
 dmin = ymin - 1;
@@ -41,17 +41,17 @@ for t = 1:Nbatches
     M = sparse(ceil(dep/dd), ceil(1e-5 + amp * 20), ones(numel(ix), 1), dmax, 20);    
     F(:, :, t) = log2(1+M);
 end
-%%
+
 if isfield(ops, 'midpoint')
     [imin1, F1] = align_block(F(:, :, 1:ops.midpoint));
     [imin2, F2] = align_block(F(:, :, ops.midpoint+1:end));
     d0 = align_pairs(F1, F2);
     imin = [imin1 imin2 + d0];
-    
+    imin = imin - mean(imin);
+    ops.datashift = 1;    
 else
     switch getOr(ops, 'datashift', 1)
         case 2
-            disp(ops.datashift)
             ysamp = dmin + dd * [1:dmax] - dd/2;
             [imin,yblk, F0] = align_block2(F, ysamp);
         case 1
@@ -59,23 +59,29 @@ else
     end
 end
 
-
-%%
-figure(193)
-plot(imin * dd)
-drawnow
-
-figure;
-st_shift = st3(:,2); %+ imin(batch_id)' * dd;
-for j = spkTh:100
-   ix = st3(:, 3)==j; % the amplitudes are rounded to integers
-   plot(st3(ix, 1), st_shift(ix), '.', 'color', [1 1 1] * max(0, 1-j/40)) %, 'markersize', j)    
-   hold on
+if getOr(ops, 'fig', 1)
+    
+    figure(193)
+    plot(imin * dd)
+    drawnow
+    
+    figure;
+    st_shift = st3(:,2); %+ imin(batch_id)' * dd;
+    for j = spkTh:100
+        ix = st3(:, 3)==j; % the amplitudes are rounded to integers
+        plot(st3(ix, 1), st_shift(ix), '.', 'color', [1 1 1] * max(0, 1-j/40)) %, 'markersize', j)
+        hold on
+    end
+    axis tight
 end
-axis tight
+
+if ~isempty(getOr(ops, 'fbinaryproc', []))
+    fid2 = fopen(ops.fbinaryproc, 'w');
+    fclose(fid2);
+end
 
 dshift = imin * dd;
-
+%%
 for ibatch = 1:Nbatches
     switch getOr(ops, 'datashift', 1)
         case 2
