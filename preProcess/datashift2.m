@@ -81,6 +81,8 @@ if ~isempty(getOr(ops, 'fbinaryproc', []))
 end
 
 dshift = imin * dd;
+[~, rez.iorig] = sort(dshift);
+
 %%
 for ibatch = 1:Nbatches
     switch getOr(ops, 'datashift', 1)
