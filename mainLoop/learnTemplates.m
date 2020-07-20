@@ -11,6 +11,8 @@ NrankPC = 6; % this one is the rank of the PCs, used to detect spikes with thres
 Nrank = 3; % this one is the rank of the templates
 
 rez.ops.LTseed = getOr(rez.ops, 'LTseed', 1);
+rez.ops.nNeighbors = getOr( rez.ops, 'nNeighbors', 32);
+
 rng('default'); rng(rez.ops.LTseed);
 
 ops = rez.ops;
@@ -33,8 +35,8 @@ Nfilt 	= ops.Nfilt;
 Nchan 	= ops.Nchan;
 
 % two variables for the same thing? number of nearest channels to each primary channel
-NchanNear   = min(ops.Nchan, 32);
-Nnearest    = min(ops.Nchan, 32);
+NchanNear   = min(ops.Nchan, rez.ops.nNeighbors);
+Nnearest    = min(ops.Nchan, rez.ops.nNeighbors);
 
 % decay of gaussian spatial mask centered on a channel
 sigmaMask  = ops.sigmaMask;
