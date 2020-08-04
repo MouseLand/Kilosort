@@ -4,24 +4,29 @@ if  getOr(rez.ops, 'datashift', 1)==0
     return;
 end
 
-sig = rez.ops.sig;
-
 ops = rez.ops;
+
+% The min and max of the y and x ranges of the channels
 ymin = min(rez.yc);
 ymax = max(rez.yc);
 xmin = min(rez.xc);
 xmax = max(rez.xc);
 
+% Determine the average vertical spacing between channels. 
+% Usually all the vertical spacings are the same, i.e. on Neuropixels probes. 
 dmin = median(diff(unique(rez.yc)));
 fprintf('pitch is %d um\n', dmin)
 rez.ops.yup = ymin:dmin/2:ymax; % centers of the upsampled y positions
 
+% Determine the template spacings along the x dimension
 xrange = xmax - xmin;
-npt = floor(xrange/16);
+npt = floor(xrange/16); % this would come out as 16um for Neuropixels probes, which aligns with the geometry. 
 rez.ops.xup = linspace(xmin, xmax, npt+1); % centers of the upsampled x positions
 
-spkTh = 10; % same as "template amplitude" with generic templates
+spkTh = 10; % same as the usual "template amplitude", but for the generic templates
 
+% Extract all the spikes across the recording that are captured by the
+% generic templates. Very few real spikes are missed in this way. 
 st3 = standalone_detector(rez, spkTh);
 
 dd = 5;
@@ -87,6 +92,8 @@ dshift = imin * dd;
 [~, rez.iorig] = sort(dshift);
 
 %%
+sig = rez.ops.sig;
+
 for ibatch = 1:Nbatches
     switch getOr(ops, 'datashift', 1)
         case 2
