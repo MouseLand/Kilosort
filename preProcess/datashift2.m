@@ -10,12 +10,15 @@ ops = rez.ops;
 ymin = min(rez.yc);
 ymax = max(rez.yc);
 xmin = min(rez.xc);
+xmax = max(rez.xc);
 
 dmin = median(diff(unique(rez.yc)));
 fprintf('pitch is %d um\n', dmin)
 rez.ops.yup = ymin:dmin/2:ymax; % centers of the upsampled y positions
-rez.ops.xup = xmin + [0 16 32 48]; % centers of the upsampled x positions
 
+xrange = xmax - xmin;
+npt = floor(xrange/16);
+rez.ops.xup = linspace(xmin, xmax, npt+1); % centers of the upsampled x positions
 
 spkTh = 10; % same as "template amplitude" with generic templates
 
