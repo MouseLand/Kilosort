@@ -12,8 +12,8 @@ wPCA = gather(ops.wPCA); % use PCA projections to reconstruct templates when we 
 
 ccsplit = rez.ops.AUCsplit; % this is the threshold for splits, and is one of the main parameters users can change
 
-NchanNear   = min(ops.Nchan, 32);
-Nnearest    = min(ops.Nchan, 32);
+NchanNear   = min(ops.Nchan, rez.ops.nNeighbors);
+Nnearest    = min(ops.Nchan, rez.ops.nNeighbors);
 sigmaMask   = ops.sigmaMask;
 
 ik = 0;
