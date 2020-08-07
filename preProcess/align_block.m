@@ -1,5 +1,8 @@
 function [imin, F0] = align_block(F)
 
+% this function is really just mostly the first part of align_block2, so
+% they could be merged
+
 Nbatches = size(F,3);
 n = 15;
 dc = zeros(2*n+1, Nbatches);
@@ -33,6 +36,9 @@ for iter = 1:niter
 end
 
 %%
+
+% this part is unique to this function, because the upsampling is done
+% assuming the entire probe is one big block
 dtup = linspace(-n, n, (2*n*10)+1);
 
 K = kernelD(dt,dtup,1);

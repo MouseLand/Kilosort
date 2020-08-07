@@ -38,27 +38,6 @@ M = Kyx /(Kxx + .01 * eye(size(Kxx,1)));
 
 dati = gpuArray(single(dat)) * gpuArray(M)';
 
-% ishift = round(shift);
-% shift = shift - ishift;
-
-% dat = reshape(dat, [NT, 2, ops.Nchan/2]);
-% dat = circshift(dat, ishift, 3);
-% 
-% if shift > 0
-%     alpha = shift;
-%     datup = circshift(dat, 1, 3);
-%     dat = dat * (1-alpha) + alpha * datup;
-% else
-%     alpha = -shift;
-%     datup = circshift(dat, -1, 3);
-%     dat = dat * (1-alpha) + alpha * datup;
-% end
-% 
-% 
-% if alpha<0 || alpha>1
-%    disp(alpha)
-% end
-
 dat_cpu = gather(int16(dati));
 fseek(fid, offset, 'bof');
 fwrite(fid, dat_cpu, 'int16'); % write this batch to binary file
