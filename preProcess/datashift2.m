@@ -118,7 +118,8 @@ end
 % convert to um 
 dshift = imin * dd;
 % sort in case we still want to do "tracking"
-[~, rez.iorig] = sort(dshift);
+
+[~, rez.iorig] = sort(mean(dshift, 2));
 
 % sigma for the Gaussian process smoothing
 sig = rez.ops.sig;
