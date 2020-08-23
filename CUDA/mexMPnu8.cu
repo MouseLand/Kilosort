@@ -22,7 +22,7 @@ using namespace std;
     #include "mexNvidia_quicksort.cu"
 #endif
             
-const int  Nthreads = 1024, maxFR = 100000, NrankMax = 3, nmaxiter = 500, NchanMax = 96;
+const int  Nthreads = 1024, maxFR = 100000, NrankMax = 3, nmaxiter = 500, NchanMax = 256;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 __global__ void	spaceFilter(const double *Params, const float *data, const float *U, 
@@ -96,21 +96,38 @@ __global__ void	spaceFilterUpdate(const double *Params, const float *data, const
     Nchan     = (int) Params[9];
     
     //<<<Nfilt, 2*nt0-1>>>
+    // Original version, applying space filter to data stored as floats
     // just need to do this for all filters that have overlap with id[bid] and st[id]
-    // as in spaceFilter, tid = threadIdx.x is first used to index over channels and pcs
-    // then used to loop over time, now just from -nt0 to nt0 about the input spike time
+    // tid = threadIdx.x used to loop over time, now just from -nt0 to nt0 about the input spike time
     // tidx represents time, from -nt0 to nt0
-    // tidy loops through all filters that have overlap
     
-    if (tid<NchanU)
-        iU[tid] = iC[tid + NchanU * iW[bid]];
-    __syncthreads();
-    
-    if (tid<NchanU) {
-        for (k=0;k<Nrank;k++)
-            sU[tid + k * NchanU] = U[iU[tid] + Nchan*(bid + Nfilt * k)];
+    // Earlier versions used the thread index for channels, as in spaceFilter.
+    // However, since the number of threads in this case is just 2*nt0, that runs
+    // into problems for NchanU > 2*nt0.
+    // precalculate arrays in first thread. Less efficienct, fixes issues that arise
+    // when the number of threads < NchanU
+            
+    if (tid<1) {
+        for (i=0;i<NchanU;++i) {
+            iU[i] = iC[i + NchanU * iW[bid]];
+            for (k=0;k<Nrank;k++) {
+                sU[i + k * NchanU] = U[iU[i] + Nchan*(bid + Nfilt * k)];
+            }
+        }        
     }
     __syncthreads();
+    
+// older code using the thread index for channels, then for time points
+// will fail for NchanU > 2*nt0    
+//     if (tid<NchanU)
+//         iU[tid] = iC[tid + NchanU * iW[bid]];
+//     __syncthreads();
+//     
+//     if (tid<NchanU) {
+//         for (k=0;k<Nrank;k++)
+//             sU[tid + k * NchanU] = U[iU[tid] + Nchan*(bid + Nfilt * k)];
+//     }
+//     __syncthreads();
     
     //each block corresponds to a filter
     //loop over all new spikes checking for matches to current filter (bid)
@@ -151,21 +168,37 @@ __global__ void	spaceFilterUpdate_v2(const double *Params, const double *data, c
     Nchan     = (int) Params[9];
     
     //<<<Nfilt, 2*nt0-1>>>
+    // Newer version, applied to data stored as doubles (for stableMode = 1)
     // just need to do this for all filters that have overlap with id[bid] and st[id]
-    // as in spaceFilter, tid = threadIdx.x is first used to index over channels and pcs
-    // then used to loop over time, now just from -nt0 to nt0 about the input spike time
+    // tid = threadIdx.x used to loop over time, now just from -nt0 to nt0 about the input spike time
     // tidx represents time, from -nt0 to nt0
-    // tidy loops through all filters that have overlap
     
-    if (tid<NchanU)
-        iU[tid] = iC[tid + NchanU * iW[bid]];
-    __syncthreads();
-    
-    if (tid<NchanU) {
-        for (k=0;k<Nrank;k++)
-            sU[tid + k * NchanU] = U[iU[tid] + Nchan*(bid + Nfilt * k)];
+    // Earlier versions used the thread index for channels, as in spaceFilter.
+    // However, since the number of threads in this case is just 2*nt0, that runs
+    // into problems for NchanU > 2*nt0.
+    // precalculate arrays in first thread. Less efficienct, fixes issues that arise
+    // when the number of threads < NchanU
+    if (tid<1) {
+        for (i=0;i<NchanU;++i) {
+            iU[i] = iC[i + NchanU * iW[bid]];
+            for (k=0;k<Nrank;k++) {
+                sU[i + k * NchanU] = U[iU[i] + Nchan*(bid + Nfilt * k)];
+            }
+        }        
     }
     __syncthreads();
+
+// older code using the thread index for channels, then for time points
+// will fail for NchanU > 2*nt0
+//     if (tid<NchanU)
+//         iU[tid] = iC[tid + NchanU * iW[bid]];
+//     __syncthreads();
+//     
+//     if (tid<NchanU) {
+//         for (k=0;k<Nrank;k++)
+//             sU[tid + k * NchanU] = U[iU[tid] + Nchan*(bid + Nfilt * k)];
+//     }
+//     __syncthreads();
     
     //each block corresponds to a filter
     //loop over all new spikes checking for matches to current filter (bid)
@@ -891,8 +924,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   
   cudaMalloc(&d_counter,   2*sizeof(int));
   cudaMalloc(&d_count,   nmaxiter*sizeof(int));
-  cudaMalloc(&d_feat,     maxFR * Nnearest * sizeof(float));
-  cudaMalloc(&d_featPC,     maxFR * NchanU*Nrank * sizeof(float));
+
   
   cudaMemset(d_nsp,    0, Nfilt * sizeof(int));  
   cudaMemset(d_dWU,    0, Nfilt * nt0 * Nchan* sizeof(double));
@@ -905,8 +937,12 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemset(d_x,       0, maxFR *    sizeof(float));
   cudaMemset(d_y,       0, maxFR *    sizeof(float));
   cudaMemset(d_z,       0, maxFR *    sizeof(float));
+
+  cudaMalloc(&d_feat,     maxFR * Nnearest * sizeof(float));
+  cudaMalloc(&d_featPC,     maxFR * NchanU*Nrank * sizeof(float));
   cudaMemset(d_feat,    0, maxFR * Nnearest *   sizeof(float));
   cudaMemset(d_featPC,    0, maxFR * NchanU*Nrank *   sizeof(float));
+
   
   int *counter;
   counter = (int*) calloc(1,2 * sizeof(int));
@@ -928,7 +964,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemset(d_stSort, 0,  maxFR * sizeof(int)); 
 
   
-  dim3 tpB(8, 2*nt0-1), tpF(16, Nnearest), tpS(nt0, 16), tpW(Nnearest, Nrank), tpPC(NchanU, Nrank);
+  dim3 tpB(8, 2*nt0-1), tpF(4, Nnearest), tpS(nt0, 16), tpW(Nnearest, Nrank), tpPC(NchanU, Nrank);
   
   // filter the data with the spatial templates
   spaceFilter<<<Nfilt, Nthreads>>>(d_Params, d_draw, d_U, d_iC, d_iW, d_data);
@@ -968,7 +1004,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
       }
       
       // extract template features before subtraction, for counter[1] to counter[0]
-      // tpF(16, Nnearest), blocks are over spikes
+      // tpF(4, Nnearest) => Nnearest must be <= 256 for threads <= 1024, blocks are over spikes
       if (Params[12]>1)      
          extractFEAT<<<64, tpF>>>(d_Params, d_st, d_id, d_counter, d_dout, d_iList, d_mu, d_feat);
       
@@ -1090,6 +1126,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   if (counter[0]<maxFR)  minSize = counter[0];
   else                   minSize = maxFR;
   const mwSize dimst[] 	= {minSize,1}; 
+
   plhs[0] = mxCreateNumericArray(2, dimst, mxINT32_CLASS, mxREAL);
   st = (int*) mxGetData(plhs[0]);
   plhs[1] = mxCreateNumericArray(2, dimst, mxINT32_CLASS, mxREAL);
@@ -1116,8 +1153,10 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemcpy(id, d_id, minSize * sizeof(int),   cudaMemcpyDeviceToHost);
   cudaMemcpy(x,    d_y, minSize * sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(vexp, d_x, minSize * sizeof(float), cudaMemcpyDeviceToHost);
+
   cudaMemcpy(feat, d_feat, minSize * Nnearest*sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(featPC,   d_featPC, minSize * NchanU*Nrank*sizeof(float), cudaMemcpyDeviceToHost);
+
 
   // send back an error message if useStableMode was selected but couldn't be used
   
@@ -1142,10 +1181,10 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemcpy(errmsg, d_errmsg, 1 * sizeof(int),   cudaMemcpyDeviceToHost);
   cudaFree(d_errmsg);
 
-  if (useStableMode) {
+
     //only free the memory if it was allocated
     cudaFree(d_draw64);
-  }
+
 
   cudaFree(d_counter);
   cudaFree(d_count);

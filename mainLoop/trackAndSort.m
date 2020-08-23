@@ -76,7 +76,7 @@ Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
 nsp = gpuArray.zeros(Nfilt,1, 'double');
 
 % extract ALL features on the last pass
-Params(13) = 2; % this is a flag to output features (PC and template features)
+Params(13) = 2; % 0=> neither, 1 => PC features only; 2 => template and PC features
 
 % different threshold on last pass?
 Params(3) = ops.Th(end); % usually the threshold is much lower on the last pass
@@ -112,6 +112,7 @@ fW  = zeros(Nnearest, 1e7, 'single'); % Nnearest is the number of nearest templa
 fWpc = zeros(NchanNear, Nrank, 1e7, 'single'); % NchanNear is the number of nearest channels to take PC features from
 
 
+
 for ibatch = 1:niter    
     k = iorder(ibatch); % k is the index of the batch in absolute terms
     
@@ -132,7 +133,7 @@ for ibatch = 1:niter
     % such as when we subtract off a template
     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan); % this needs to change (but I don't know why!)
     
-    
+
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     
