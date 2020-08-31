@@ -137,7 +137,8 @@ if ~isempty(savePath)
 %     end
 %     fclose(fileID);
 
-    fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
+    KSLabelFilename = fullfile(savePath, 'cluster_KSLabel.tsv');
+    fileID = fopen(KSLabelFilename,'w');
     fprintf(fileID, 'cluster_id%sKSLabel', char(9));
     fprintf(fileID, char([13 10]));
 
@@ -168,6 +169,10 @@ if ~isempty(savePath)
     fclose(fileID);
     fclose(fileIDCP);
     fclose(fileIDA);
+
+    % Duplicate "KSLabel" as "group", a special metadata ID for Phy, so that
+    % filtering works as expected in the cluster view
+    copyfile(KSLabelFilename, fullfile(savePath, 'cluster_group.tsv'));
 
      %make params file
     if ~exist(fullfile(savePath,'params.py'),'file')
