@@ -117,7 +117,7 @@ function rez = remove_ks2_duplicate_spikes(rez, varargin)
         n_duplicates = length(first_duplicate);
         if ~isempty(first_duplicate)
             fprintf('On iteration %g, %g duplicate spike pairs were identified.\n',diff_order,n_duplicates);
-            amps_to_compare=tempAmpsUnscaled(spike_primary([first_duplicate first_duplicate(:)+diff_order]));
+            amps_to_compare=tempAmpsUnscaled(spike_templates([first_duplicate first_duplicate(:)+diff_order]));
             if length(first_duplicate)==1
                 amps_to_compare = amps_to_compare(:)'; % special case requiring a dimension change
             end
