@@ -68,6 +68,15 @@ rez.cProjPC = [];
 [~, isort]   = sortrows(rez.st3);
 rez.st3      = rez.st3(isort, :);
 
+% Ensure all GPU arrays are transferred to CPU side before saving to .mat
+rez_fields = fieldnames(rez);
+for i = 1:numel(rez_fields)
+    field_name = rez_fields{i};
+    if(isa(rez.(field_name), 'gpuArray'))
+        rez.(field_name) = gather(rez.(field_name));
+    end
+end
+
 % save final results as rez2
 fprintf('Saving final results in rez2  \n')
 fname = fullfile(rootZ, 'rez2.mat');
