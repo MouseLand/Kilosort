@@ -6,7 +6,7 @@
 % spikes that are close together in time and space. The temporal threshold
 % is give by the parameter OVERLAP_S which is 0.5ms by default and
 % the spatial threshold (applied to the template primary sites) is given by
-% CHANNEL_SEPARATION_UM and is 75 by default.
+% CHANNEL_SEPARATION_UM and is 100 by default.
 %
 % From these spike pairs, it identifies the pair with the larger template as
 % being the "main" or "reference" cluster and the duplicate spikes from the
@@ -37,7 +37,7 @@
 function rez = remove_ks2_duplicate_spikes(rez, varargin)
     input_parser = inputParser;
     addParameter(input_parser, 'overlap_s', 5e-4, @(x) (isnumeric(x))) % the temporal window within which pairs of spikes will be considered duplicates (if they are also within the spatial window)
-    addParameter(input_parser, 'channel_separation_um', 75, @(x) (ischar(x))) % the spatial window within which pairs of spikes will be considered duplicates (if they are also within the temporal window)
+    addParameter(input_parser, 'channel_separation_um', 100, @(x) (ischar(x))) % the spatial window within which pairs of spikes will be considered duplicates (if they are also within the temporal window)
     parse(input_parser, varargin{:});
     P = input_parser.Results;
 
