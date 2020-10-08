@@ -33,8 +33,6 @@ if ~isfield(rez, 'W') || isempty(rez.W)
 %     end
     
     rez     = learnTemplates(rez, rez.iorig);
-else
-    rez.WA = [];
 end
 
 rez.ops.fig = 0;
