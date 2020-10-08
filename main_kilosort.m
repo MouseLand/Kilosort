@@ -2,14 +2,13 @@
 
 addpath(genpath('D:\GitHub\KiloSort2')) % path to kilosort folder
 addpath('D:\GitHub\npy-matlab') % for converting to Phy
-rootZ = 'G:\drift_simulations\test'; % the raw data binary file is in this folder
+rootZ = 'G:\Spikes\Sample'; % the raw data binary file is in this folder
 rootH = 'H:\'; % path to temporary binary file (same size as data, should be on fast SSD)
 pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github folder and put it somewhere else (together with the master_file)
 chanMapFile = 'neuropixPhase3A_kilosortChanMap.mat';
 
-
 ops.trange = [0 Inf]; % time range to sort
-ops.NchanTOT    = 384; % total number of channels in your recording
+ops.NchanTOT    = 385; % total number of channels in your recording
 
 run(fullfile(pathToYourConfigFile, 'configFile384.m'))
 ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
@@ -17,6 +16,12 @@ ops.chanMap = fullfile(pathToYourConfigFile, chanMapFile);
 
 %% this block runs all the steps of the algorithm
 fprintf('Looking for data inside %s \n', rootZ)
+
+ops.minfr_goodchannels = 0.0; % do not exclude any channels so that registration works
+ops.sig        = 20;  % spatial smoothness constant for registration
+ops.fshigh     = 300; % high-pass more aggresively
+ops.nblocks = 5; % blocks for registration. 0 turns it off, 1 does rigid registration. Replaces "datashift" option. 
+%ops.datashift  = 2;   % whether to shift the data (2 = nonrigid, 1 = rigid)
 
 % is there a channel map file in this folder?
 fs = dir(fullfile(rootZ, 'chan*.mat'));
@@ -31,14 +36,14 @@ ops.fbinary = fullfile(rootZ, fs(1).name);
 % preprocess data to create temp_wh.dat
 rez = preprocessDataSub(ops);
 
-% time-reordering as a function of drift
-rez = clusterSingleBatches(rez);
+% NEW STEP TO DO DATA REGISTRATION
+rez = datashift2(rez);
 
-% saving here is a good idea, because the rest can be resumed after loading rez
-save(fullfile(rootZ, 'rez.mat'), 'rez', '-v7.3');
-
+% ORDER OF BATCHES IS NOW RANDOM, controlled by random number generator
+iseed = 1;
+                  
 % main tracking and template matching algorithm
-rez = learnAndSolve8b(rez);
+rez = learnAndSolve8b(rez, iseed);
 
 % final merges
 rez = find_merges(rez, 1);
@@ -46,13 +51,11 @@ rez = find_merges(rez, 1);
 % final splits by SVD
 rez = splitAllClusters(rez, 1);
 
-% final splits by amplitudes
-rez = splitAllClusters(rez, 0);
-
 % decide on cutoff
 rez = set_cutoff(rez);
+rez.good2 = get_good_units(rez);
 
-fprintf('found %d good units \n', sum(rez.good>0))
+fprintf('found %d good units \n', sum(rez.good2>0))
 
 % write to Phy
 fprintf('Saving results to Phy  \n')
@@ -65,7 +68,7 @@ rez.cProj = [];
 rez.cProjPC = [];
 
 % final time sorting of spikes, for apps that use st3 directly
-[~, isort]   = sort(rez.st3(:,1), 'ascend');
+[~, isort]   = sortrows(rez.st3);
 rez.st3      = rez.st3(isort, :);
 
 % save final results as rez2
