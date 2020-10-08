@@ -99,12 +99,6 @@ fid = fopen(ops.fproc, 'r');
 st3 = zeros(1e7, 5); % this holds spike times, clusters and other info per spike
 ntot = 0;
 
-% these next three store the low-d template decompositions
-if ~isfield(rez, 'WA') || isempty(rez.WA)
-    rez.WA = zeros(nt0, Nfilt, Nrank,nBatches,  'single');
-    rez.UA = zeros(Nchan, Nfilt, Nrank,nBatches,  'single');
-    rez.muA = zeros(Nfilt, nBatches,  'single');
-end
 
 % these ones store features per spike
 fW  = zeros(Nnearest, 1e7, 'single'); % Nnearest is the number of nearest templates to store features for
@@ -176,12 +170,6 @@ for ibatch = 1:niter
     % we memorize the spatio-temporal decomposition of the waveforms at this batch
     % this is currently only used in the GUI to provide an accurate reconstruction
     % of the raw data at this time
-    
-    if 0
-        rez.WA(:,:,:,k) = gather(W);
-        rez.UA(:,:,:,k) = gather(U);
-        rez.muA(:,k) = gather(mu);
-    end
     
     % we carefully assign the correct absolute times to spikes found in this batch
     ioffset         = ops.ntbuff;

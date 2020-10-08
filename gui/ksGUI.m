@@ -724,7 +724,8 @@ classdef ksGUI < handle
             try
                 obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
-                
+                obj.rez = datashift2(obj.rez);
+
                 % update connected channels
                 igood = obj.rez.ops.igood;
                 previousGood = find(obj.P.chanMap.connected);
@@ -778,12 +779,12 @@ classdef ksGUI < handle
             % fit templates
             try
                 % pre-clustering to re-order batches by depth
-                obj.log('Pre-clustering to re-order batches by depth')
-                obj.rez = clusterSingleBatches(obj.rez);
+%                 obj.log('Pre-clustering to re-order batches by depth')
+%                 obj.rez = clusterSingleBatches(obj.rez);
                 
                 % main optimization
                 obj.log('Main optimization')
-                obj.rez = learnAndSolve8b(obj.rez);
+                obj.rez = learnAndSolve8b(obj.rez, 1);
                 
                 % final splits and merges
                 if 1
@@ -794,13 +795,12 @@ classdef ksGUI < handle
                     obj.log('Splits part 1/2...')
                     obj.rez = splitAllClusters(obj.rez, 1);
                     
-                    % final splits by amplitudes
-                    obj.log('Splits part 2/2...')
-                    obj.rez = splitAllClusters(obj.rez, 0);
-                    
                     % decide on cutoff
                     obj.log('Last step. Setting cutoff...')
                     obj.rez = set_cutoff(obj.rez);
+                    
+                    obj.rez.good2 = get_good_units(obj.rez);
+                    obj.log(sprintf('found %d good units \n', sum(obj.rez.good2>0)))
                 end
                                                                 
                 obj.P.ksDone = true;

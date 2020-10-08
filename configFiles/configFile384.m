@@ -8,7 +8,7 @@ ops.fs = 30000;
 ops.fshigh = 300;   
 
 % minimum firing rate on a "good" channel (0 to skip)
-ops.minfr_goodchannels = 0.1; 
+ops.minfr_goodchannels = 0.0; 
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 4])
 ops.Th = [10 4];  
@@ -35,8 +35,9 @@ ops.ThPre = 8;
 ops.sig = 20;
 
 % type of data shifting (0 = none, 1 = rigid, 2 = nonrigid)
-ops.datashift = 1;
-
+ops.nblocks = 5;
+ops.sig = 20;
+ops.trackfinal = 0;
 
 %% danger, changing these settings can lead to fatal errors
 % options for determining PCs
