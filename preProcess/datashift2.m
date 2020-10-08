@@ -92,21 +92,32 @@ end
 %%
 if getOr(ops, 'fig', 1)  
     figure(193)
+    set(gcf, 'Color', 'w')
+    
     % plot the shift trace in um
     plot(imin * dd)
+    xlabel('batch number')
+    ylabel('drift (um)')
+    title('Estimated drift traces')
     drawnow
     
-    figure;
+    figure(194);
+    set(gcf, 'Color', 'w')
     % raster plot of all spikes at their original depths
     st_shift = st3(:,2); %+ imin(batch_id)' * dd;
     for j = spkTh:100
         % for each amplitude bin, plot all the spikes of that size in the
         % same shade of gray
         ix = st3(:, 3)==j; % the amplitudes are rounded to integers
-        plot(st3(ix, 1), st_shift(ix), '.', 'color', [1 1 1] * max(0, 1-j/40)) % the marker color here has been carefully tuned
+        plot(st3(ix, 1)/ops.fs, st_shift(ix), '.', 'color', [1 1 1] * max(0, 1-j/40)) % the marker color here has been carefully tuned
         hold on
     end
     axis tight
+
+    xlabel('time (sec)')
+    ylabel('spike position (um)')
+    title('Drift map')
+    
 end
 
 % if we're creating a registered binary file for visualization in Phy

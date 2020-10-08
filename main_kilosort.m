@@ -17,11 +17,9 @@ ops.chanMap = fullfile(pathToYourConfigFile, chanMapFile);
 %% this block runs all the steps of the algorithm
 fprintf('Looking for data inside %s \n', rootZ)
 
-ops.minfr_goodchannels = 0.0; % do not exclude any channels so that registration works
 ops.sig        = 20;  % spatial smoothness constant for registration
 ops.fshigh     = 300; % high-pass more aggresively
 ops.nblocks = 5; % blocks for registration. 0 turns it off, 1 does rigid registration. Replaces "datashift" option. 
-%ops.datashift  = 2;   % whether to shift the data (2 = nonrigid, 1 = rigid)
 
 % is there a channel map file in this folder?
 fs = dir(fullfile(rootZ, 'chan*.mat'));

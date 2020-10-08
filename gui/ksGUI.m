@@ -221,7 +221,7 @@ classdef ksGUI < handle
             obj.H.settings.setMinfrTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'Min. firing rate per chan (0=include all chans)');
+                'String', {'N blocks for registration', '(0=none, 1=rigid, N=nonrigid)'});
             
             % choose threshold
             obj.H.settings.setThTxt = uicontrol(...
@@ -673,16 +673,12 @@ classdef ksGUI < handle
             
             obj.ops.NchanTOT = str2double(obj.H.settings.setnChanEdt.String);
             
-            obj.ops.minfr_goodchannels = str2double(obj.H.settings.setMinfrEdt.String);
-            if isempty(obj.ops.minfr_goodchannels)||isnan(obj.ops.minfr_goodchannels)
-                obj.ops.minfr_goodchannels = 0.1;
+            obj.ops.nblocks = str2double(obj.H.settings.setMinfrEdt.String);
+            if isempty(obj.ops.nblocks)||isnan(obj.ops.nblocks)
+                obj.ops.nblocks = 5;
             end
-            if obj.ops.minfr_goodchannels==0
-                obj.ops.throw_out_channels = false;
-            else
-                obj.ops.throw_out_channels = true;
-            end
-            obj.H.settings.setMinfrEdt.String = num2str(obj.ops.minfr_goodchannels);
+            obj.ops.throw_out_channels = false;
+            obj.H.settings.setMinfrEdt.String = num2str(obj.ops.nblocks);
 
             obj.ops.fs = str2num(obj.H.settings.setFsEdt.String);
             if isempty(obj.ops.fs)||isnan(obj.ops.fs)
