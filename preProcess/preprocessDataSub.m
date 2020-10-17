@@ -44,7 +44,7 @@ rez.ops.chanMap = chanMap;
 rez.ops.kcoords = kcoords;
 
 
-NTbuff      = NT + 4*ops.ntbuff; % we need buffers on both sides for filtering
+NTbuff      = NT + 3*ops.ntbuff; % we need buffers on both sides for filtering
 
 rez.ops.Nbatch = Nbatch;
 rez.ops.NTbuff = NTbuff;
@@ -62,15 +62,17 @@ fprintf('Time %3.0fs. Loading raw data and applying filters... \n', toc);
 
 fid         = fopen(ops.fbinary, 'r'); % open for reading raw data
 fidW        = fopen(ops.fproc,   'w'); % open for writing processed data
+
+% weights to combine batches at the edge
+w_edge = linspace(0, 1, ops.ntbuff)';
+ntb = ops.ntbuff;
+datr_prev = gpuArray.zeros(ntb, ops.Nchan, 'single');
+
 for ibatch = 1:Nbatch
     % we'll create a binary file of batches of NT samples, which overlap consecutively on ops.ntbuff samples
     % in addition to that, we'll read another ops.ntbuff samples from before and after, to have as buffers for filtering
-    offset = max(0, ops.twind + 2*NchanTOT*((NT - ops.ntbuff) * (ibatch-1) - 2*ops.ntbuff)); % number of samples to start reading at.
-    if offset==0
-        ioffset = 0; % The very first batch has no pre-buffer, and has to be treated separately
-    else
-        ioffset = ops.ntbuff;
-    end
+    offset = max(0, ops.twind + 2*NchanTOT*(NT * (ibatch-1) - ntb)); % number of samples to start reading at.
+    
     fseek(fid, offset, 'bof'); % fseek to batch start in raw file
 
     buff = fread(fid, [NchanTOT NTbuff], '*int16'); % read and reshape. Assumes int16 data (which should perhaps change to an option)
@@ -81,14 +83,23 @@ for ibatch = 1:Nbatch
     if nsampcurr<NTbuff
         buff(:, nsampcurr+1:NTbuff) = repmat(buff(:,nsampcurr), 1, NTbuff-nsampcurr); % pad with zeros, if this is the last batch
     end
-
+    if offset==0
+        bpad = repmat(buff(:,1), 1, ntb);
+        buff = cat(2, bpad, buff(:, 1:NTbuff-ntb)); % The very first batch has no pre-buffer, and has to be treated separately
+    end
+    
     datr    = gpufilter(buff, ops, chanMap); % apply filters and median subtraction
-
-    datr    = datr(ioffset + (1:NT),:); % remove timepoints used as buffers
-
+    
+%     datr(ntb + [1:ntb], :) = datr_prev;
+    datr(ntb + [1:ntb], :) = w_edge .* datr(ntb + [1:ntb], :) +...
+        (1 - w_edge) .* datr_prev;
+   
+    datr_prev = datr(ntb +NT + [1:ops.ntbuff], :);
+    datr    = datr(ntb + (1:NT),:); % remove timepoints used as buffers
+   
     datr    = datr * Wrot; % whiten the data and scale by 200 for int16 range
 
-    datcpu  = gather(int16(datr)); % convert to int16, and gather on the CPU side
+    datcpu  = gather(int16(datr')); % convert to int16, and gather on the CPU side
     fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
 end
 fclose(fidW); % close the files

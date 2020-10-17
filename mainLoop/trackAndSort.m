@@ -111,8 +111,10 @@ for ibatch = 1:niter
     % loading a single batch (same as everywhere)
     offset = 2 * ops.Nchan*batchstart(k);
     fseek(fid, offset, 'bof');
-    dat = fread(fid, [NT ops.Nchan], '*int16');
+    dat = fread(fid, [ops.Nchan NT + ops.ntbuff], '*int16');
+    dat = dat';
     dataRAW = single(gpuArray(dat))/ ops.scaleproc;
+    Params(1) = size(dataRAW,1);
     
     % decompose dWU by svd of time and space (via covariance matrix of 61 by 61 samples)
     % this uses a "warm start" by remembering the W from the previous
@@ -172,11 +174,7 @@ for ibatch = 1:niter
     % of the raw data at this time
     
     % we carefully assign the correct absolute times to spikes found in this batch
-    ioffset         = ops.ntbuff;
-    if k==1
-        ioffset         = 0; % the first batch is special (no pre-buffer)
-    end
-    toff = nt0min + t0 -ioffset + (NT-ops.ntbuff)*(k-1);
+    toff = nt0min + t0 + NT*(k-1);
     st = toff + double(st0);
     
     irange = ntot + [1:numel(x0)]; % spikes and features go into these indices

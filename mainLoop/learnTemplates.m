@@ -105,9 +105,11 @@ for ibatch = 1:niter
     % loading a single batch (same as everywhere)
     offset = 2 * ops.Nchan*batchstart(k);
     fseek(fid, offset, 'bof');
-    dat = fread(fid, [NT ops.Nchan], '*int16');
+    dat = fread(fid, [ops.Nchan NT+ops.ntbuff], '*int16');
+    dat = dat';
     dataRAW = single(gpuArray(dat))/ ops.scaleproc;
-
+    Params(1) = size(dataRAW,1);
+    
     if ibatch==1
        % only on the first batch, we first get a new set of spikes from the residuals,
        % which in this case is the unmodified data because we start with no templates       

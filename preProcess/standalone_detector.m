@@ -46,18 +46,19 @@ end
 
 % build up Params
 NchanUp = size(iC,2);
-Params = [ops.NT ops.Nchan ops.nt0 NchanNear NrankPC ops.nt0min spkTh NchanUp NchanNearUp sig];
 
 % preallocate the results
 st3 = zeros(1000000, 5);
 t0 = 0; %ceil(rez.ops.trange(1) * ops.fs); % I think this should be 0 all the time. 
 nsp = 0; % counter for total number of spikes
-
+%%
 tic
 for k = 1:ops.Nbatch
     % get a batch of whitened and filtered data
     dataRAW = get_batch(rez.ops, k);
-    
+
+    Params = [size(dataRAW,1) ops.Nchan ops.nt0 NchanNear NrankPC ops.nt0min spkTh NchanUp NchanNearUp sig];
+
     % run the CUDA function on this batch
     [dat, kkmax, st, cF] = spikedetector3(Params, dataRAW, wTEMP, iC-1, dist, v2, iC2-1, dist2);
     
@@ -73,11 +74,7 @@ for k = 1:ops.Nbatch
     st = double(gather(st));
     st(2,:) = gather(yct);
     
-    ioffset         = ops.ntbuff;
-    if k==1
-        ioffset         = 0; % the first batch is special (no pre-buffer)
-    end
-    toff = ops.nt0min + t0 -ioffset + (ops.NT-ops.ntbuff)*(k-1);
+    toff = ops.nt0min + t0 + ops.NT*(k-1);
     st(1,:) = st(1,:) + toff; % these offsets ensure the times are computed correctly
     
     st(5,:) = k; % batch number

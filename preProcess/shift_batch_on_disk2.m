@@ -1,4 +1,4 @@
-function [dat_cpu, dat, shifts] = shift_batch_on_disk2(rez, ibatch, shifts, ysamp, sig)
+function [dprev, dat_cpu, dat, shifts] = shift_batch_on_disk2(rez, ibatch, shifts, ysamp, sig, dprev)
 % register one batch of a whitened binary file
 
 ops = rez.ops;
@@ -14,9 +14,10 @@ if length(ysamp)>1
 end
 % load the batch
 fclose all;
+ntb = ops.ntbuff;
 fid = fopen(ops.fproc, 'r+');
 fseek(fid, offset, 'bof');
-dat = fread(fid, [NT ops.Nchan], '*int16');
+dat = fread(fid, [ops.Nchan NT+ntb], '*int16')';
 
 % 2D coordinates for interpolation 
 xp = cat(2, rez.xc, rez.yc);
@@ -34,10 +35,20 @@ M = Kyx /(Kxx + .01 * eye(size(Kxx,1)));
 % the multiplication has to be done on the GPU
 dati = gpuArray(single(dat)) * gpuArray(M)';
 
+w_edge = linspace(0, 1, ntb)';
+dati(1:ntb, :) = w_edge .* dati(1:ntb, :) + (1 - w_edge) .* dprev;
+
+if size(dati,1)==NT+ntb
+    dprev = dati(NT+[1:ntb], :);
+else
+    dprev = [];
+end
+dati = dati(1:NT, :);
+
 dat_cpu = gather(int16(dati));
 
 if ~isempty(getOr(ops, 'fbinaryproc', []))
-    % if the user wants to have a registered version of the binary file 
+    % if the user wants to have a registered version of the binary file
     % this one is not split into batches
     fid2 = fopen(ops.fbinaryproc, 'a');
     ifirst = ops.ntbuff+1;
@@ -53,7 +64,7 @@ end
 if nargout==0
     % normally we want to write the aligned data back to the same file
     fseek(fid, offset, 'bof');
-    fwrite(fid, dat_cpu, 'int16'); % write this batch to binary file
+    fwrite(fid, dat_cpu', 'int16'); % write this batch to binary file
 end
 fclose(fid);
     

@@ -108,7 +108,7 @@ while ik<Nfilt
     end
 
     ilow = rs(:,1)>rs(:,2); % these spikes are assigned to cluster 1
-%     ps = mean(rs(:,1));
+    %    ps = mean(rs(:,1));
     plow = mean(rs(ilow,1)); % the mean probability of spikes assigned to cluster 1
     phigh = mean(rs(~ilow,2)); % same for cluster 2
     nremove = min(mean(ilow), mean(~ilow)); % the smallest cluster has this proportion of all spikes
@@ -117,7 +117,7 @@ while ik<Nfilt
     % did this split fix the autocorrelograms?
     [K, Qi, Q00, Q01, rir] = ccg(ss(ilow), ss(~ilow), 500, dt); % compute the cross-correlogram between spikes in the putative new clusters
     Q12 = min(Qi/max(Q00, Q01)); % refractoriness metric 1
-    R = min(rir); % refractoriness metric 2
+    R = min(rir);                % refractoriness metric 2
 
     % if the CCG has a dip, don't do the split.
     % These thresholds are consistent with the ones from merges.
