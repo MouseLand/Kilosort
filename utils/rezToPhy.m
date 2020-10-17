@@ -66,7 +66,8 @@ templateFeatureInds = uint32(rez.iNeigh);
 pcFeatures = rez.cProjPC;
 pcFeatureInds = uint32(rez.iNeighPC);
 
-whiteningMatrix = rez.Wrot/rez.ops.scaleproc;
+% whiteningMatrix = rez.Wrot/rez.ops.scaleproc;
+whiteningMatrix = eye(size(rez.Wrot)) / rez.ops.scaleproc;
 whiteningMatrixInv = whiteningMatrix^-1;
 
 % here we compute the amplitude of every template...
@@ -141,7 +142,7 @@ if ~isempty(savePath)
     writeNPY(templatesInds, fullfile(savePath, 'templates_ind.npy'));
 
     chanMap0ind = int32(chanMap0ind);
-
+    chanMap0ind = int32([1:rez.ops.Nchan]-1);
     writeNPY(chanMap0ind, fullfile(savePath, 'channel_map.npy'));
     writeNPY([xcoords ycoords], fullfile(savePath, 'channel_positions.npy'));
 
@@ -174,10 +175,15 @@ if ~isempty(savePath)
     if ~exist(fullfile(savePath,'params.py'),'file')
         fid = fopen(fullfile(savePath,'params.py'), 'w');
 
-        [~, fname, ext] = fileparts(rez.ops.fbinary);
-
-        fprintf(fid,['dat_path = ''',fname ext '''\n']);
-        fprintf(fid,'n_channels_dat = %i\n',rez.ops.NchanTOT);
+%        [~, fname, ext] = fileparts(rez.ops.fbinary);
+%         fprintf(fid,['dat_path = ''',fname ext '''\n']);
+%         fprintf(fid,'n_channels_dat = %i\n',rez.ops.NchanTOT);
+        [root, fname, ext] = fileparts(rez.ops.fproc);
+%         fprintf(fid,['dat_path = ''',fname ext '''\n']);
+        fprintf(fid,['dat_path = ''', strrep(rez.ops.fproc, '\', '/') '''\n']);
+        
+        fprintf(fid,'n_channels_dat = %i\n',rez.ops.Nchan);
+        
         fprintf(fid,'dtype = ''int16''\n');
         fprintf(fid,'offset = 0\n');
         if mod(rez.ops.fs,1)
@@ -185,7 +191,9 @@ if ~isempty(savePath)
         else
             fprintf(fid,'sample_rate = %i.\n',rez.ops.fs);
         end
-        fprintf(fid,'hp_filtered = False');
+%         fprintf(fid,'hp_filtered = False');
+        fprintf(fid,'hp_filtered = True');
+        
         fclose(fid);
     end
 end

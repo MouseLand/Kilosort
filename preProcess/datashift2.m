@@ -28,7 +28,7 @@ spkTh = 10; % same as the usual "template amplitude", but for the generic templa
 % Extract all the spikes across the recording that are captured by the
 % generic templates. Very few real spikes are missed in this way. 
 st3 = standalone_detector(rez, spkTh);
-
+%%
 % binning width across Y (um)
 dd = 5;
 
@@ -119,7 +119,7 @@ if getOr(ops, 'fig', 1)
     title('Drift map')
     
 end
-
+%%
 % if we're creating a registered binary file for visualization in Phy
 if ~isempty(getOr(ops, 'fbinaryproc', []))
     fid2 = fopen(ops.fbinaryproc, 'w');
@@ -135,8 +135,9 @@ dshift = imin * dd;
 % sigma for the Gaussian process smoothing
 sig = rez.ops.sig;
 % register the data batch by batch
+dprev = gpuArray.zeros(ops.ntbuff,ops.Nchan, 'single');
 for ibatch = 1:Nbatches
-    shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig);
+    dprev = shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig, dprev);
 end
 fprintf('time %2.2f, Shifted up/down %d batches. \n', toc, Nbatches)
 
