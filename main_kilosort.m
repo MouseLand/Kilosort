@@ -36,7 +36,7 @@ ops.fbinary = fullfile(rootZ, fs(1).name);
 rez = preprocessDataSub(ops);
 %
 % NEW STEP TO DO DATA REGISTRATION
-rez = datashift2(rez);
+rez = datashift2(rez, 1); % last input is for shifting data
 
 % ORDER OF BATCHES IS NOW RANDOM, controlled by random number generator
 iseed = 1;
