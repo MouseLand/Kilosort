@@ -10,10 +10,7 @@ Nk = size(Xsim,1);
 Xsim = Xsim - diag(diag(Xsim)); % remove the diagonal of ones
 
 % sort by firing rate first
-nspk = zeros(Nk, 1);
-for j = 1:Nk
-    nspk(j) = sum(rez.st3(:,2)==j); % determine total number of spikes in each neuron
-end
+nspk = accumarray(rez.st3(:,2), 1, [Nk, 1], @sum);
 [~, isort] = sort(nspk); % we traverse the set of neurons in ascending order of firing rates
 
 fprintf('initialized spike counts\n')
