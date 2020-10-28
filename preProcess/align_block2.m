@@ -1,4 +1,4 @@
-function [imin,yblk, F0] = align_block2(F, ysamp, nblocks)
+function [imin,yblk, F0, F0m] = align_block2(F, ysamp, nblocks)
 
 % F is y bins by amp bins by batches
 % ysamp are the coordinates of the y bins in um
@@ -46,6 +46,10 @@ for iter = 1:niter
         F0 = mean(Fg, 3);
     end
 end
+
+
+% new target frame based on our current best alignment
+F0 = mean(Fg, 3);
 
 % now we figure out how to split the probe into nblocks pieces
 % if nblocks = 1, then we're doing rigid registration
@@ -101,3 +105,15 @@ for j = 1:nblocks
     % the sum of all the shifts equals the final shifts for this block
     imin(:,j) = sum(dall,1);
 end
+
+
+%%
+Fg = gpuArray(single(F));
+imax = sq(sum(dall(1:niter-1,:),1));
+for t = 1:length(dt)
+    ib = imax==dt(t);
+    Fg(:, :, ib) = circshift(Fg(:, :, ib), dt(t), 1);
+end
+F0m = mean(Fg,3);
+
+

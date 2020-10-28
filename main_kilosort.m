@@ -33,7 +33,7 @@ ops.fbinary = fullfile(rootZ, fs(1).name);
 
 % preprocess data to create temp_wh.dat
 rez = preprocessDataSub(ops);
-%%
+%
 % NEW STEP TO DO DATA REGISTRATION
 rez = datashift2(rez);
 
@@ -43,7 +43,7 @@ iseed = 1;
 % main tracking and template matching algorithm
 rez = learnAndSolve8b(rez, iseed);
 
-%% final merges
+% final merges
 rez = find_merges(rez, 1);
 
 % final splits by SVD
