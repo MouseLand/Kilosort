@@ -40,6 +40,10 @@ save(fullfile(rootZ, 'rez.mat'), 'rez', '-v7.3');
 % main tracking and template matching algorithm
 rez = learnAndSolve8b(rez);
 
+% OPTIONAL: remove double-counted spikes - solves issue in which individual spikes are assigned to multiple templates.
+% See issue 29: https://github.com/MouseLand/Kilosort2/issues/29
+%rez = remove_ks2_duplicate_spikes(rez);
+
 % final merges
 rez = find_merges(rez, 1);
 

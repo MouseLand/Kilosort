@@ -178,24 +178,33 @@ rez.ccb = gather(ccb0);
 % sort by manifold embedding algorithm
 % iorig is the sorting of the batches
 % ccbsort is the resorted matrix (useful for diagnosing drift)
-[ccbsort, iorig] = sortBatches2(ccb0);
+[ccbsort, iorig, xs] = sortBatches2(rez.ccb);
+rez.iorig = gather(iorig);
+rez.ccbsort = gather(ccbsort);
 
 % some mandatory diagnostic plots to understand drift in this dataset
 figure;
-subplot(1,2,1)
-imagesc(ccb0, [-5 5]); drawnow
-xlabel('batches')
-ylabel('batches')
-title('batch to batch distance')
-
-subplot(1,2,2)
-imagesc(ccbsort, [-5 5]); drawnow
-xlabel('sorted batches')
-ylabel('sorted batches')
-title('AFTER sorting')
-
-rez.iorig = gather(iorig);
-rez.ccbsort = gather(ccbsort);
+% distance matrices
+subplot(2,2,1)
+imagesc(rez.ccb, [-5 5]); axis tight
+xlabel('Batches')
+ylabel('Batches')
+title('Distance Matrix, before sorting')
+subplot(2,2,2)
+imagesc(rez.ccbsort, [-5 5]); axis tight
+xlabel('Sorted Batches')
+ylabel('Sorted Batches')
+title('Distance Matrix, after sorting')
+% drift plots (in a 1D embedding)
+subplot(2,2,3);
+plot(xs);set(gca,'ytick',[]);xlabel('Batches');
+title('Drift Plot, before sorting');axis tight
+ylabel({'Manifold Position'});
+subplot(2,2,4);
+plot(xs(iorig));set(gca,'ytick',[]);xlabel('Sorted batches');
+title('Drift Plot, after sorting');axis tight
+ylabel({'Manifold Position'});
+drawnow;
 
 fprintf('time %2.2f, Re-ordered %d batches. \n', toc, nBatches)
 %%

@@ -66,10 +66,5 @@ end
 % we sometimes get NaNs, why? replace with full contamination
 rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
 
-% remove spikes assigned to the 0 cluster
-ix = rez.st3(:,2)==0;
-rez.st3(ix, :) = [];
-if ~isempty(rez.cProj)
-    rez.cProj(ix, :) = []; % remove their template projections too
-    rez.cProjPC(ix, :,:) = []; % and their PC projections
-end
+% remove spikes from the 0th cluster
+rez = remove_spikes(rez,rez.st3(:,2)==0,'below_cutoff');
