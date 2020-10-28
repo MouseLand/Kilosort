@@ -52,6 +52,8 @@ rez = splitAllClusters(rez, 1);
 
 % decide on cutoff
 rez = set_cutoff(rez);
+% eliminate widely spread waveforms (likely noise)
+rez.good = get_good_units(rez);
 
 fprintf('found %d good units \n', sum(rez.good>0))
 
