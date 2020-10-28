@@ -22,27 +22,13 @@ ops.tend    = min(nTimepoints, ceil(ops.trange(2) * ops.fs)); % ending timepoint
 ops.sampsToRead = ops.tend-ops.tstart; % total number of samples to read
 ops.twind = ops.tstart * NchanTOT*2; % skip this many bytes at the start
 
-Nbatch      = ceil(ops.sampsToRead /(NT-ops.ntbuff)); % number of data batches
+Nbatch      = ceil(ops.sampsToRead /NT); % number of data batches
 ops.Nbatch = Nbatch;
 
 [chanMap, xc, yc, kcoords, NchanTOTdefault] = loadChanMap(ops.chanMap); % function to load channel map file
 ops.NchanTOT = getOr(ops, 'NchanTOT', NchanTOTdefault); % if NchanTOT was left empty, then overwrite with the default
 
-if getOr(ops, 'minfr_goodchannels', .1)>0 % discard channels that have very few spikes
-    % determine bad channels
-    fprintf('Time %3.0fs. Determining good channels.. \n', toc);
-    igood = get_good_channels(ops, chanMap);
-
-    chanMap = chanMap(igood); %it's enough to remove bad channels from the channel map, which treats them as if they are dead
-
-    xc = xc(igood); % removes coordinates of bad channels
-    yc = yc(igood);
-    kcoords = kcoords(igood);
-
-    ops.igood = igood;
-else
-    ops.igood = true(size(chanMap));
-end
+ops.igood = true(size(chanMap));
 
 ops.Nchan = numel(chanMap); % total number of good channels that we will spike sort
 ops.Nfilt = getOr(ops, 'nfilt_factor', 4) * ops.Nchan; % upper bound on the number of templates we can have
@@ -58,7 +44,7 @@ rez.ops.chanMap = chanMap;
 rez.ops.kcoords = kcoords;
 
 
-NTbuff      = NT + 4*ops.ntbuff; % we need buffers on both sides for filtering
+NTbuff      = NT + 3*ops.ntbuff; % we need buffers on both sides for filtering
 
 rez.ops.Nbatch = Nbatch;
 rez.ops.NTbuff = NTbuff;
@@ -69,7 +55,8 @@ fprintf('Time %3.0fs. Computing whitening matrix.. \n', toc);
 
 % this requires removing bad channels first
 Wrot = get_whitening_matrix(rez); % outputs a rotation matrix (Nchan by Nchan) which whitens the zero-timelag covariance of the data
-
+% Wrot = gpuArray.eye(size(Wrot,1), 'single');
+% Wrot = diag(Wrot);
 
 fprintf('Time %3.0fs. Loading raw data and applying filters... \n', toc);
 
@@ -82,15 +69,16 @@ if fidW<3
     error('Could not open %s for writing.',ops.fproc);    
 end
 
+% weights to combine batches at the edge
+w_edge = linspace(0, 1, ops.ntbuff)';
+ntb = ops.ntbuff;
+datr_prev = gpuArray.zeros(ntb, ops.Nchan, 'single');
+
 for ibatch = 1:Nbatch
     % we'll create a binary file of batches of NT samples, which overlap consecutively on ops.ntbuff samples
     % in addition to that, we'll read another ops.ntbuff samples from before and after, to have as buffers for filtering
-    offset = max(0, ops.twind + 2*NchanTOT*((NT - ops.ntbuff) * (ibatch-1) - 2*ops.ntbuff)); % number of samples to start reading at.
-    if offset==0
-        ioffset = 0; % The very first batch has no pre-buffer, and has to be treated separately
-    else
-        ioffset = ops.ntbuff;
-    end
+    offset = max(0, ops.twind + 2*NchanTOT*(NT * (ibatch-1) - ntb)); % number of samples to start reading at.
+    
     fseek(fid, offset, 'bof'); % fseek to batch start in raw file
 
     buff = fread(fid, [NchanTOT NTbuff], '*int16'); % read and reshape. Assumes int16 data (which should perhaps change to an option)
@@ -101,24 +89,32 @@ for ibatch = 1:Nbatch
     if nsampcurr<NTbuff
         buff(:, nsampcurr+1:NTbuff) = repmat(buff(:,nsampcurr), 1, NTbuff-nsampcurr); % pad with zeros, if this is the last batch
     end
-
+    if offset==0
+        bpad = repmat(buff(:,1), 1, ntb);
+        buff = cat(2, bpad, buff(:, 1:NTbuff-ntb)); % The very first batch has no pre-buffer, and has to be treated separately
+    end
+    
     datr    = gpufilter(buff, ops, chanMap); % apply filters and median subtraction
-
-    datr    = datr(ioffset + (1:NT),:); % remove timepoints used as buffers
-
+    
+%     datr(ntb + [1:ntb], :) = datr_prev;
+    datr(ntb + [1:ntb], :) = w_edge .* datr(ntb + [1:ntb], :) +...
+        (1 - w_edge) .* datr_prev;
+   
+    datr_prev = datr(ntb +NT + [1:ops.ntbuff], :);
+    datr    = datr(ntb + (1:NT),:); % remove timepoints used as buffers
+   
     datr    = datr * Wrot; % whiten the data and scale by 200 for int16 range
 
-    datcpu  = gather(int16(datr)); % convert to int16, and gather on the CPU side
+    datcpu  = gather(int16(datr')); % convert to int16, and gather on the CPU side
     count = fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
     if count~=numel(datcpu)
         error('Error writing batch %g to %s. Check available disk space.',ibatch,ops.fproc);
     end
 end
-
-rez.Wrot    = gather(Wrot); % gather the whitening matrix as a CPU variable
-
 fclose(fidW); % close the files
 fclose(fid);
+
+rez.Wrot    = gather(Wrot); % gather the whitening matrix as a CPU variable
 
 fprintf('Time %3.0fs. Finished preprocessing %d batches. \n', toc, Nbatch);
 
