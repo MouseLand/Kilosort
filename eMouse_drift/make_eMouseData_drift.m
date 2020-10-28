@@ -50,9 +50,9 @@ useDefault = 1;     %use waveforms from eMouse folder in KS2
 
 if useDefault
     %get waveforms from eMouse folder in KS2
-     filePath{1} = [KS2path,'\eMouse_drift\','kampff_St_unit_waves_allNeg_2X.mat'];
+     filePath{1} = fullfile(KS2path,'eMouse_drift','kampff_St_unit_waves_allNeg_2X.mat');
      fileCopies(1) = 2;
-     filePath{2} = [KS2path,'\eMouse_drift\','121817_SU_waves_allNeg_gridEst.mat'];
+     filePath{2} = fullfile(KS2path,'eMouse_drift','121817_SU_waves_allNeg_gridEst.mat');
      fileCopies(2) = 2;
 else
     %fill in paths to waveform files 
