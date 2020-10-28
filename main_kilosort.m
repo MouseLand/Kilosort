@@ -17,6 +17,7 @@ ops.chanMap = fullfile(pathToYourConfigFile, chanMapFile);
 %% this block runs all the steps of the algorithm
 fprintf('Looking for data inside %s \n', rootZ)
 
+% main parameter changes from Kilosort2 to v2.5
 ops.sig        = 20;  % spatial smoothness constant for registration
 ops.fshigh     = 300; % high-pass more aggresively
 ops.nblocks = 5; % blocks for registration. 0 turns it off, 1 does rigid registration. Replaces "datashift" option. 
@@ -39,7 +40,7 @@ rez = datashift2(rez);
 
 % ORDER OF BATCHES IS NOW RANDOM, controlled by random number generator
 iseed = 1;
-                  
+                 
 % main tracking and template matching algorithm
 rez = learnAndSolve8b(rez, iseed);
 

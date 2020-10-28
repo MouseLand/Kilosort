@@ -105,6 +105,8 @@ fW  = zeros(Nnearest, 1e7, 'single'); % Nnearest is the number of nearest templa
 fWpc = zeros(NchanNear, Nrank, 1e7, 'single'); % NchanNear is the number of nearest channels to take PC features from
 
 
+dWU1 = dWU;
+
 for ibatch = 1:niter    
     k = iorder(ibatch); % k is the index of the batch in absolute terms
     
@@ -157,13 +159,11 @@ for ibatch = 1:niter
     % since some clusters have different number of spikes, we need to apply the
     % exp(pm) factor several times, and fexp is the resulting update factor
     % for each template
-    if getOr(rez.ops, 'trackfinal', 1)
-        fexp = exp(double(nsp0).*log(pm));
-        fexp = reshape(fexp, 1,1,[]);    
-        dWU = dWU .* fexp + (1-fexp) .* (dWU0./reshape(max(1, double(nsp0)), 1,1, []));
-    end
+
+    dWU1 = dWU1  + dWU0;
+    nsp = nsp + double(nsp0);
+    
     % nsp just gets updated according to the fixed factor p1
-    nsp = nsp * p1 + (1-p1) * double(nsp0);
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     
@@ -223,6 +223,7 @@ st3 = st3(1:ntot, :);
 fW = fW(:, 1:ntot);
 fWpc = fWpc(:,:, 1:ntot);
 
+rez.dWU = dWU1 ./ reshape(nsp, [1,1,Nfilt]);
 rez.nsp = nsp;
 
 %%
