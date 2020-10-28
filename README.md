@@ -1,12 +1,18 @@
-# Kilosort2: automated spike sorting with drift tracking and template matching on GPUs #
+# Kilosort2.5: automated spike sorting with drift correction and template matching on GPUs #
+
+*updated from Kilosort2 on Oct 28, 2020. The repository name has changed to just "Kilosort", and we'll keep track of versions via Github releases.* 
 
 ![](https://github.com/MouseLand/Kilosort2/blob/master/Docs/img/templates.png)
 
-Welcome to Kilosort2, a MATLAB package for spike sorting electrophysiological data up to 1024 channels. In many cases, and especially for Neuropixels probes, the automated output of Kilosort2 requires minimal manual curation.
+Welcome to Kilosort2.5, a MATLAB package for spike sorting electrophysiological data up to 1024 channels. In many cases, and especially for Neuropixels probes, the automated output of Kilosort2.5 requires minimal manual curation.
 
-There is currently no preprint or paper for Kilosort2, so please read the wiki to find out [how it works](https://github.com/MouseLand/Kilosort2/wiki), and especially the [drift correction](https://github.com/MouseLand/Kilosort2/wiki/3.-More-on-drift-correction) section. Kilosort2 improves on Kilosort primarily by employing drift correction, which changes the templates continuously as a function of drift. Drift correction does not depend on a particular probe geometry, but denser spacing of sites generally helps to better track neurons, especially if the probe movement is large. Kilosort2 has been primarily developed on awake, head-fixed recordings from Neuropixels 1.0 data, but has also been tested in a few other configurations. To get a sense of how probe drift affects spike sorting, check out our "eMouse" simulation [here](https://github.com/MouseLand/Kilosort2/tree/master/eMouse_drift) and [its wiki page](https://github.com/MouseLand/Kilosort2/wiki/4.-eMouse-simulator-with-drift).
+To learn about Kilosort2.5, the primary reference is the Neuropixels 2.0 [paper](https://www.biorxiv.org/content/10.1101/2020.10.27.358291v1). The Github wiki still refers to Kilosort2, and it will be updated. 
 
-To aid in setting up a Kilosort2 run on your own probe configuration, we have developed a [graphical user interface](https://github.com/MouseLand/Kilosort2/wiki/1.-The-GUI) where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2 sees it correctly. The picture above is another GUI visualization: it shows the templates detected by Kilosort2 over a 60ms interval from a Neuropixels recording. The final output of Kilosort2 can be visualized and curated in the [Phy GUI](https://github.com/kwikteam/phy), which must be installed separately (we recommend the development version). Since Phy is in Python, you will also need the [npy-matlab ](https://github.com/kwikteam/npy-matlab) package. 
+Kilosort2.5 improves on Kilosort2 primarily in the type of drift correction it uses. Where Kilosort2 modified templates as a function of time/drift (a drift **tracking** approach), Kilosort2.5 corrects the raw data directly via a sub-pixel registration process (a drift **correction** approach). Kilosort2.5 has not been as broadly tested as Kilosort2, but is expected to work out of the box on Neuropixels 1.0 and 2.0 probes, as well as other probes with vertical pitch <40um. For other recording methods, like tetrodes or single-channel recordings, you should test empirically if v2.5 or v2.0 works better for you and let us know (use the "releases" on the github page to download older versions). 
+
+Kilosort2 improves on Kilosort primarily by employing drift correction, which changes the templates continuously as a function of drift. Drift correction does not depend on a particular probe geometry, but denser spacing of sites generally helps to better track neurons, especially if the probe movement is large. Kilosort2 has been primarily developed on awake, head-fixed recordings from Neuropixels 1.0 data, but has also been tested in a few other configurations. To get a sense of how probe drift affects spike sorting, check out our "eMouse" simulation [here](https://github.com/MouseLand/Kilosort2/tree/master/eMouse_drift) and [its wiki page](https://github.com/MouseLand/Kilosort2/wiki/4.-eMouse-simulator-with-drift).
+
+To aid in setting up a Kilosort2.5 run on your own probe configuration, we have developed a [graphical user interface](https://github.com/MouseLand/Kilosort2/wiki/1.-The-GUI) where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2.5 sees it correctly. The picture above is another GUI visualization: it shows the templates detected by Kilosort2.5 over a 60ms interval from a Neuropixels recording. The final output of Kilosort2 can be visualized and curated in the [Phy GUI](https://github.com/kwikteam/phy), which must be installed separately (we recommend the development version). Since Phy is in Python, you will also need the [npy-matlab ](https://github.com/kwikteam/npy-matlab) package. 
 
 ### Installation ###
 
@@ -18,19 +24,19 @@ You must run and complete successfully `mexGPUall.m` in the `CUDA` folder. This 
 
 #### Option 1: Using the GUI
 
-Navigate to the `Kilosort2` directory and run `kilosort`:
+Navigate to the `Kilosort` directory and run `kilosort`:
 ```
->> cd \my\kilosort2\directory\
+>> cd \my\kilosort\directory\
 >> kilosort
 ```
-See the [GUI documentation](https://github.com/MouseLand/Kilosort2/wiki/1.-The-GUI) for more details.
+See the [GUI documentation](https://github.com/MouseLand/Kilosort/wiki/1.-The-GUI) for more details.
 
 #### Option 2: Using scripts (classic method)
 
-1. Make a copy of `main_kilosort.m` and `\configFiles\StandardConfig_MOVEME.m` and put them in a different directory. These files will contain your own settings, and you don't want them to be overwritten when you update Kilosort2.  
+1. Make a copy of `main_kilosort.m` and `\configFiles\StandardConfig_MOVEME.m` and put them in a different directory. These files will contain your own settings, and you don't want them to be overwritten when you update Kilosort.  
 2. Generate a channel map file for your probe using `\configFiles\createChannelMap.m` as a starting point.
 3. Edit the config file with desired parameters. You should at least set the file paths `ops.fbinary`, `ops.root` and `ops.fproc` (this file will not exist yet - `kilosort` will create it), the sampling frequency `ops.fs`, the number of channels in the file `ops.NchanTOT` and the location of your channel map file `ops.chanMap`.
-4. Edit `main_kilosort.m` so that the paths at the top ([lines 3–4](https://github.com/MouseLand/Kilosort2/blob/master/master_kilosort.m#L3-L4)) point to your local copies of those GitHub repositories, and so that the configuration file is correctly specified ([lines 6–7](https://github.com/MouseLand/Kilosort2/blob/2fba667359dbddbb0e52e67fa848f197e44cf5ef/master_kilosort.m#L6-L7)).
+4. Edit `main_kilosort.m` so that the paths at the top ([lines 3–4](https://github.com/MouseLand/Kilosort/blob/main/main_kilosort.m#L3-L4)) point to your local copies of those GitHub repositories, and so that the configuration file is correctly specified ([lines 6–7](https://github.com/MouseLand/Kilosort/blob/2fba667359dbddbb0e52e67fa848f197e44cf5ef/main_kilosort.m#L6-L7)).
 
 ### Parameters ###
 
