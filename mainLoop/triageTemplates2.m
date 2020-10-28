@@ -22,6 +22,7 @@ cc = getMeWtW2(W, U);
 cc = cc -diag(diag(cc)); % exclude the diagonal
 
 sd = sqrt(10); % this is hard-coded here
+% sd = sqrt(mu); % this is hard-coded here
 
 % compute a score for the separation of the means
 r0 = 2*(sd(:) + sd(:)') ./ abs(mu(:) - mu(:)');

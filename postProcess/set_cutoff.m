@@ -46,6 +46,7 @@ for j = 1:Nk
               % if it does, then we put much stricter criteria for isolation
               % to make sure we don't settle for a relatively high contamination unit
                 fcontamination = min(.05, max(.01, Q*2));
+%                 fcontamination = .05;
 
                 % if the unit starts out contaminated, we will settle with the higher contamination rate
             end
@@ -55,9 +56,13 @@ for j = 1:Nk
     end
     Th = Th + .5; % we exited the loop because the contamination was too high. We revert to the higher threshold
     st = ss(vexp>Th); % take spikes above the current threshold
-    [K, Qi, Q00, Q01, rir] = ccg(st, st, 500, dt); % % compute the auto-correlogram with 500 bins at 1ms bins
-    Q = min(Qi/(max(Q00, Q01))); % this is a measure of refractoriness
-    rez.est_contam_rate(j) = Q; % this score will be displayed in Phy
+    if isempty(st)
+        rez.est_contam_rate(j) = 1;
+    else
+        [K, Qi, Q00, Q01, rir] = ccg(st, st, 500, dt); % % compute the auto-correlogram with 500 bins at 1ms bins
+        Q = min(Qi/(max(Q00, Q01))); % this is a measure of refractoriness
+        rez.est_contam_rate(j) = Q; % this score will be displayed in Phy       
+    end
 
     rez.Ths(j) = Th; % store the threshold for potential debugging
     rez.st3(ix(vexp<=Th), 2) = 0; % any spikes below the threshold get discarded into a 0-th cluster.

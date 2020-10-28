@@ -5,10 +5,7 @@ ops.chanMap             = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilos
 ops.fs = 30000;  
 
 % frequency for high pass filtering (150)
-ops.fshigh = 150;   
-
-% minimum firing rate on a "good" channel (0 to skip)
-ops.minfr_goodchannels = 0.1; 
+ops.fshigh = 300;   
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 4])
 ops.Th = [10 4];  
@@ -30,6 +27,15 @@ ops.sigmaMask = 30;
 
 % threshold crossings for pre-clustering (in PCA projection space)
 ops.ThPre = 8; 
+
+% spatial scale for datashift kernel
+ops.sig = 20;
+
+% type of data shifting (0 = none, 1 = rigid, 2 = nonrigid)
+ops.nblocks = 5;
+ops.sig = 20;
+ops.trackfinal = 0;
+
 %% danger, changing these settings can lead to fatal errors
 % options for determining PCs
 ops.spkTh           = -6;      % spike threshold in standard deviations (-6)

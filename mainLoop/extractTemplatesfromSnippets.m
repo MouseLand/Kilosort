@@ -19,7 +19,8 @@ dd = gpuArray.zeros(ops.nt0, 5e4, 'single'); % preallocate matrix to hold 1D spi
 for ibatch = 1:nskip:Nbatch
     offset = 2 * ops.Nchan*batchstart(ibatch);
     fseek(fid, offset, 'bof');
-    dat = fread(fid, [NT ops.Nchan], '*int16');
+    dat = fread(fid, [ops.Nchan NT], '*int16');
+    dat = dat';
 
     % move data to GPU and scale it back to unit variance
     dataRAW = gpuArray(dat);
@@ -51,7 +52,8 @@ fclose(fid);
 dd = dd(:, 1:k);
 
 % initialize the template clustering with random waveforms
-wTEMP = dd(:, randperm(size(dd,2), nPCs));
+% wTEMP = dd(:, randperm(size(dd,2), nPCs));
+wTEMP = dd(:, round(linspace(1, size(dd,2), nPCs)));
 wTEMP = wTEMP ./ sum(wTEMP.^2,1).^.5; % normalize them
 
 for i = 1:10
