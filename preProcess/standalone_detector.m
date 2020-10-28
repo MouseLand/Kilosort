@@ -1,4 +1,4 @@
-function [st3] = standalone_detector(rez, spkTh)
+function [st3, rez] = standalone_detector(rez, spkTh)
 % Detects spikes across the entire recording using generic templates.
 % Each generic template has rank one (in space-time).
 % In time, we use the 1D template prototypes found in wTEMP. 
@@ -19,6 +19,8 @@ sig = 10;
 % determine prototypical timecourses by clustering of simple threshold crossings. 
 NrankPC = 6;
 [wTEMP, wPCA]    = extractTemplatesfromSnippets(rez, NrankPC);
+rez.wTEMP = gather(wTEMP);
+rez.wPCA  = gather(wPCA);
 
 % Get nearest channels for every template center. 
 % Template products will only be computed on these channels. 
@@ -39,7 +41,7 @@ NchanNearUp =  10*NchanNear;
 
 % pregenerate the Gaussian weights used for spatial components 
 nsizes = 5;
-v2 = gpuArray.zeros(5, size(dist,2), 'single');
+v2 = gpuArray.zeros(nsizes, size(dist,2), 'single');
 for k = 1:nsizes
     v2(k, :) = sum(exp( - 2 * dist.^2 / (sig * k)^2), 1);
 end
@@ -48,7 +50,7 @@ end
 NchanUp = size(iC,2);
 
 % preallocate the results
-st3 = zeros(1000000, 5);
+st3 = zeros(1000000, 6);
 t0 = 0; %ceil(rez.ops.trange(1) * ops.fs); % I think this should be 0 all the time. 
 nsp = 0; % counter for total number of spikes
 %%
@@ -72,6 +74,7 @@ for k = 1:ops.Nbatch
     
     % build st for the current batch
     st = double(gather(st));
+    st(6, :) = st(2,:);
     st(2,:) = gather(yct);
     
     toff = ops.nt0min + t0 + ops.NT*(k-1);
@@ -91,4 +94,10 @@ for k = 1:ops.Nbatch
         fprintf('%2.2f sec, %d batches, %d spikes \n', toc, k, nsp)
     end
 end
+
+st3 = st3(1:nsp, :);
+%%
+
+rez.iC = gather(iC);
+rez.dist =  gather(dist);
 

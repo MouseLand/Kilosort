@@ -27,7 +27,7 @@ spkTh = 10; % same as the usual "template amplitude", but for the generic templa
 
 % Extract all the spikes across the recording that are captured by the
 % generic templates. Very few real spikes are missed in this way. 
-st3 = standalone_detector(rez, spkTh);
+[st3, rez] = standalone_detector(rez, spkTh);
 %%
 % binning width across Y (um)
 dd = 5;
@@ -86,7 +86,7 @@ if isfield(ops, 'midpoint')
 else
     % determine registration offsets 
     ysamp = dmin + dd * [1:dmax] - dd/2;
-    [imin,yblk, F0] = align_block2(F, ysamp, ops.nblocks);
+    [imin,yblk, F0, F0m] = align_block2(F, ysamp, ops.nblocks);
 end
 
 %%
@@ -136,9 +136,9 @@ dshift = imin * dd;
 sig = rez.ops.sig;
 % register the data batch by batch
 dprev = gpuArray.zeros(ops.ntbuff,ops.Nchan, 'single');
-for ibatch = 1:Nbatches
-    dprev = shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig, dprev);
-end
+% for ibatch = 1:Nbatches
+%     dprev = shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig, dprev);
+% end
 fprintf('time %2.2f, Shifted up/down %d batches. \n', toc, Nbatches)
 
 % keep track of dshift 
@@ -146,6 +146,9 @@ rez.dshift = dshift;
 % keep track of original spikes
 rez.st0 = st3;
 
+rez.F = F;
+rez.F0 = F0;
+rez.F0m = F0m;
 
 % next, we can just run a normal spike sorter, like Kilosort1, and forget about the transformation that has happened in here 
 

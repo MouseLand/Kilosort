@@ -22,7 +22,7 @@ ops.tend    = min(nTimepoints, ceil(ops.trange(2) * ops.fs)); % ending timepoint
 ops.sampsToRead = ops.tend-ops.tstart; % total number of samples to read
 ops.twind = ops.tstart * NchanTOT*2; % skip this many bytes at the start
 
-Nbatch      = ceil(ops.sampsToRead /(NT-ops.ntbuff)); % number of data batches
+Nbatch      = ceil(ops.sampsToRead /NT); % number of data batches
 ops.Nbatch = Nbatch;
 
 [chanMap, xc, yc, kcoords, NchanTOTdefault] = loadChanMap(ops.chanMap); % function to load channel map file
