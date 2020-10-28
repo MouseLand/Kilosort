@@ -5,7 +5,7 @@ function rez = remove_spikes(rez,remove_idx,label,varargin)
     if ~any(remove_idx)
         return
     end
-    fprintf('Removing %g spikes from rez structure.\n',sum(remove_idx));            
+    fprintf('Removing %g spikes below cutoff from rez.\n',sum(remove_idx));            
     if ~isfield(rez,'removed')
         [rez.removed.cProj,rez.removed.cProjPC,rez.removed.st2,rez.removed.st3] = deal([]);
         rez.removed.label={};

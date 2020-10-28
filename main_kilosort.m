@@ -50,9 +50,6 @@ rez = find_merges(rez, 1);
 % final splits by SVD
 rez = splitAllClusters(rez, 1);
 
-% final splits by amplitudes
-rez = splitAllClusters(rez, 0);
-
 % decide on cutoff
 rez = set_cutoff(rez);
 
