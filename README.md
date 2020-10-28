@@ -2,7 +2,7 @@
 
 *updated from Kilosort2 on Oct 28, 2020. The repository name has changed to just "Kilosort", and we'll keep track of versions via Github releases.* 
 
-![](https://github.com/MouseLand/Kilosort2/blob/master/Docs/img/templates.png)
+![](https://github.com/MouseLand/Kilosort/blob/main/Docs/img/templates.png)
 
 Welcome to Kilosort2.5, a MATLAB package for spike sorting electrophysiological data up to 1024 channels. In many cases, and especially for Neuropixels probes, the automated output of Kilosort2.5 requires minimal manual curation.
 
