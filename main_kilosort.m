@@ -45,7 +45,7 @@ iseed = 1;
 rez = learnAndSolve8b(rez, iseed);
 
 % OPTIONAL: remove double-counted spikes - solves issue in which individual spikes are assigned to multiple templates.
-% See issue 29: https://github.com/MouseLand/Kilosort2/issues/29
+% See issue 29: https://github.com/MouseLand/Kilosort/issues/29
 %rez = remove_ks2_duplicate_spikes(rez);
 
 % final merges
