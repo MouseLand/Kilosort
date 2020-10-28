@@ -61,7 +61,13 @@ Wrot = get_whitening_matrix(rez); % outputs a rotation matrix (Nchan by Nchan) w
 fprintf('Time %3.0fs. Loading raw data and applying filters... \n', toc);
 
 fid         = fopen(ops.fbinary, 'r'); % open for reading raw data
+if fid<3
+    error('Could not open %s for reading.',ops.fbinary);
+end
 fidW        = fopen(ops.fproc,   'w'); % open for writing processed data
+if fidW<3
+    error('Could not open %s for writing.',ops.fproc);    
+end
 
 % weights to combine batches at the edge
 w_edge = linspace(0, 1, ops.ntbuff)';
@@ -100,7 +106,10 @@ for ibatch = 1:Nbatch
     datr    = datr * Wrot; % whiten the data and scale by 200 for int16 range
 
     datcpu  = gather(int16(datr')); % convert to int16, and gather on the CPU side
-    fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
+    count = fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
+    if count~=numel(datcpu)
+        error('Error writing batch %g to %s. Check available disk space.',ibatch,ops.fproc);
+    end
 end
 fclose(fidW); % close the files
 fclose(fid);

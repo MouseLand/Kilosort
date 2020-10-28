@@ -1,4 +1,4 @@
-function [uS, idchan, st] = extractPCbatch2(rez, wPCA, ibatch, iC)
+function [uS, idchan] = extractPCbatch2(rez, wPCA, ibatch, iC)
 % this function finds threshold crossings in the data using
 % projections onto the pre-determined principal components
 % wPCA is number of time samples by number of PCs

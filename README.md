@@ -27,10 +27,10 @@ See the [GUI documentation](https://github.com/MouseLand/Kilosort2/wiki/1.-The-G
 
 #### Option 2: Using scripts (classic method)
 
-1. Make a copy of `master_kilosort.m` and `\configFiles\StandardConfig_MOVEME.m` and put them in a different directory. These files will contain your own settings, and you don't want them to be overwritten when you update Kilosort2.  
+1. Make a copy of `main_kilosort.m` and `\configFiles\StandardConfig_MOVEME.m` and put them in a different directory. These files will contain your own settings, and you don't want them to be overwritten when you update Kilosort2.  
 2. Generate a channel map file for your probe using `\configFiles\createChannelMap.m` as a starting point.
 3. Edit the config file with desired parameters. You should at least set the file paths `ops.fbinary`, `ops.root` and `ops.fproc` (this file will not exist yet - `kilosort` will create it), the sampling frequency `ops.fs`, the number of channels in the file `ops.NchanTOT` and the location of your channel map file `ops.chanMap`.
-4. Edit `master_kilosort.m` so that the paths at the top ([lines 3–4](https://github.com/MouseLand/Kilosort2/blob/master/master_kilosort.m#L3-L4)) point to your local copies of those GitHub repositories, and so that the configuration file is correctly specified ([lines 6–7](https://github.com/MouseLand/Kilosort2/blob/2fba667359dbddbb0e52e67fa848f197e44cf5ef/master_kilosort.m#L6-L7)).
+4. Edit `main_kilosort.m` so that the paths at the top ([lines 3–4](https://github.com/MouseLand/Kilosort2/blob/master/master_kilosort.m#L3-L4)) point to your local copies of those GitHub repositories, and so that the configuration file is correctly specified ([lines 6–7](https://github.com/MouseLand/Kilosort2/blob/2fba667359dbddbb0e52e67fa848f197e44cf5ef/master_kilosort.m#L6-L7)).
 
 ### Parameters ###
 
@@ -40,7 +40,7 @@ If you are unhappy with the quality of the automated sorting, try changing one o
 
 `ops.AUCsplit = 0.9` (default). Threshold on the area under the curve (AUC) criterion for performing a split in the final step. If the AUC of the split is higher than this, that split is considered good. However, a good split only goes through if, additionally, the cross-correlogram of the split units does not contain a big dip at time 0.
 
-`ops.lam = 10` (default).  The individual spike amplitudes are biased towards the mean of the cluster by this factor; 50 is a lot, 0 is no bias.
+`ops.lam = 10` (default). The individual spike amplitudes are biased towards the mean of the cluster by this factor; 50 is a lot, 0 is no bias.
 
 A list of all the adjustable parameters is in the example configuration file.
 

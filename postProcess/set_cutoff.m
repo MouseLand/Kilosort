@@ -8,10 +8,12 @@ function rez = set_cutoff(rez)
 ops = rez.ops;
 dt = 1/1000; % step size for CCG binning
 
-Nk = max(rez.st3(:,2)); % number of templates
+Nk = numel(rez.mu); % number of templates
 
 % sort by firing rate first
 rez.good = zeros(Nk, 1);
+rez.est_contam_rate = ones(Nk, 1);
+
 for j = 1:Nk
     ix = find(rez.st3(:,2)==j); % find all spikes from this neuron
     ss = rez.st3(ix,1)/ops.fs; % convert to seconds
@@ -69,10 +71,5 @@ end
 % we sometimes get NaNs, why? replace with full contamination
 rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
 
-% remove spikes assigned to the 0 cluster
-ix = rez.st3(:,2)==0;
-rez.st3(ix, :) = [];
-if ~isempty(rez.cProj)
-    rez.cProj(ix, :) = []; % remove their template projections too
-    rez.cProjPC(ix, :,:) = []; % and their PC projections
-end
+% remove spikes from the 0th cluster
+rez = remove_spikes(rez,rez.st3(:,2)==0,'below_cutoff');

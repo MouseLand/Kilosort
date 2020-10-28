@@ -43,6 +43,10 @@ iseed = 1;
 % main tracking and template matching algorithm
 rez = learnAndSolve8b(rez, iseed);
 
+% OPTIONAL: remove double-counted spikes - solves issue in which individual spikes are assigned to multiple templates.
+% See issue 29: https://github.com/MouseLand/Kilosort2/issues/29
+%rez = remove_ks2_duplicate_spikes(rez);
+
 % final merges
 rez = find_merges(rez, 1);
 
@@ -51,9 +55,9 @@ rez = splitAllClusters(rez, 1);
 
 % decide on cutoff
 rez = set_cutoff(rez);
-rez.good2 = get_good_units(rez);
+rez.good = get_good_units(rez);
 
-fprintf('found %d good units \n', sum(rez.good2>0))
+fprintf('found %d good units \n', sum(rez.good>0))
 
 % write to Phy
 fprintf('Saving results to Phy  \n')
@@ -68,6 +72,15 @@ rez.cProjPC = [];
 % final time sorting of spikes, for apps that use st3 directly
 [~, isort]   = sortrows(rez.st3);
 rez.st3      = rez.st3(isort, :);
+
+% Ensure all GPU arrays are transferred to CPU side before saving to .mat
+rez_fields = fieldnames(rez);
+for i = 1:numel(rez_fields)
+    field_name = rez_fields{i};
+    if(isa(rez.(field_name), 'gpuArray'))
+        rez.(field_name) = gather(rez.(field_name));
+    end
+end
 
 % save final results as rez2
 fprintf('Saving final results in rez2  \n')

@@ -92,6 +92,7 @@ spikeAmps = tempAmpsUnscaled(spikeTemplates).*amplitudes;
 % tempScalingAmps are equal mean for all templates)
 ta = clusterAverage(spikeTemplates, spikeAmps);
 tids = unique(spikeTemplates);
+tempAmps = zeros(numel(rez.mu),1);
 tempAmps(tids) = ta; % because ta only has entries for templates that had at least one spike
 gain = getOr(rez.ops, 'gain', 1);
 tempAmps = gain*tempAmps'; % for consistency, make first dimension template number
@@ -169,7 +170,10 @@ if ~isempty(savePath)
 %     end
 %     fclose(fileID);
 
-    
+    % Duplicate "KSLabel" as "group", a special metadata ID for Phy, so that
+    % filtering works as expected in the cluster view
+    KSLabelFilename = fullfile(savePath, 'cluster_KSLabel.tsv');
+    copyfile(KSLabelFilename, fullfile(savePath, 'cluster_group.tsv'));
 
      %make params file
     if ~exist(fullfile(savePath,'params.py'),'file')
