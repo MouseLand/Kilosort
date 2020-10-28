@@ -126,15 +126,18 @@ dshift = imin * dd;
 % this is not really used any more, should get taken out eventually
 [~, rez.iorig] = sort(mean(dshift, 2));
 
-% sigma for the Gaussian process smoothing
-sig = rez.ops.sig;
-% register the data batch by batch
-dprev = gpuArray.zeros(ops.ntbuff,ops.Nchan, 'single');
-for ibatch = 1:Nbatches
-    dprev = shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig, dprev);
+if do_correction
+    % sigma for the Gaussian process smoothing
+    sig = rez.ops.sig;
+    % register the data batch by batch
+    dprev = gpuArray.zeros(ops.ntbuff,ops.Nchan, 'single');
+    for ibatch = 1:Nbatches
+        dprev = shift_batch_on_disk2(rez, ibatch, dshift(ibatch, :), yblk, sig, dprev);
+    end
+    fprintf('time %2.2f, Shifted up/down %d batches. \n', toc, Nbatches)
+else
+    fprintf('time %2.2f, Skipped shifting %d batches. \n', toc, Nbatches)
 end
-fprintf('time %2.2f, Shifted up/down %d batches. \n', toc, Nbatches)
-
 % keep track of dshift 
 rez.dshift = dshift;
 % keep track of original spikes

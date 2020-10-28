@@ -1,4 +1,5 @@
-function [dprev, dat_cpu, dat, shifts] = shift_batch_on_disk2(rez, ibatch, shifts, ysamp, sig, dprev)
+function [dprev, dat_cpu, dat, shifts] = ...
+    shift_batch_on_disk2(rez, ibatch, shifts, ysamp, sig, dprev)
 % register one batch of a whitened binary file
 
 ops = rez.ops;
@@ -47,24 +48,10 @@ dati = dati(1:NT, :);
 
 dat_cpu = gather(int16(dati));
 
-if ~isempty(getOr(ops, 'fbinaryproc', []))
-    % if the user wants to have a registered version of the binary file
-    % this one is not split into batches
-    fid2 = fopen(ops.fbinaryproc, 'a');
-    ifirst = ops.ntbuff+1;
-    ilast = ops.NT;
-    if ibatch==1
-        ifirst = 1;
-        ilast = ops.NT-ops.ntbuff;
-    end
-    fwrite(fid2, dat_cpu(ifirst:ilast, :)', 'int16');
-    fclose(fid2);
-end
 
-if nargout==0
-    % normally we want to write the aligned data back to the same file
-    fseek(fid, offset, 'bof');
-    fwrite(fid, dat_cpu', 'int16'); % write this batch to binary file
-end
+% we want to write the aligned data back to the same file
+fseek(fid, offset, 'bof');
+fwrite(fid, dat_cpu', 'int16'); % write this batch to binary file
+
 fclose(fid);
-    
+
