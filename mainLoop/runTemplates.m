@@ -27,35 +27,18 @@ if sum(isfield(rez, {'W', 'U', 'mu'}))<3
     error('missing at least one field: W, U, mu');
 end
 
-istart = rez.istart;
-Nbatches = numel(rez.iorig);
+Nbatches = rez.ops.Nbatch;
 
-ihalf = find(rez.iorig==istart);
+iorder = 1:Nbatches;
 
-iorder_sorted = ihalf:-1:1;
-iorder = rez.iorig(iorder_sorted);  %batch number in full set
-
-[rez, st3_0, fW_0,fWpc_0] = trackAndSort(rez, iorder);
-
-st3_0(:,5) = iorder_sorted(st3_0(:,5));
-
-iorder_sorted = (ihalf+1):Nbatches;
-iorder = rez.iorig(iorder_sorted);
-
-[rez, st3_1, fW_1,fWpc_1] = trackAndSort(rez, iorder);
-
-st3_1(:,5) = iorder_sorted(st3_1(:,5)); %batch number in full set
-
-st3     = cat(1, st3_0, st3_1);
-fW      = cat(2, fW_0, fW_1);
-fWpc    = cat(3, fWpc_0, fWpc_1);
+[rez, st3, fW,fWpc] = trackAndSort(rez, iorder);
 
 % sort all spikes by batch -- to keep similar batches together,
 % which avoids false splits in splitAllClusters. Break ties 
-[~, isort] = sortrows(st3,[5,1,2,3,4]); 
-st3 = st3(isort, :);
-fW = fW(:, isort);
-fWpc = fWpc(:, :, isort);
+% [~, isort] = sortrows(st3,[5,1,2,3,4]); 
+% st3 = st3(isort, :);
+% fW = fW(:, isort);
+% fWpc = fWpc(:, :, isort);
 
 % just display the total number of spikes
 fprintf( 'Number of spikes before applying cutoff: %d\n', size(st3,1));
