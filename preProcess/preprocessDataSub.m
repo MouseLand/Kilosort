@@ -64,7 +64,7 @@ fid         = fopen(ops.fbinary, 'r'); % open for reading raw data
 if fid<3
     error('Could not open %s for reading.',ops.fbinary);
 end
-fidW        = fopen(ops.fproc,   'w'); % open for writing processed data
+fidW        = fopen(ops.fproc,   'w+'); % open for writing processed data
 if fidW<3
     error('Could not open %s for writing.',ops.fproc);    
 end
