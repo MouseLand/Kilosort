@@ -23,7 +23,7 @@ xrange = xmax - xmin;
 npt = floor(xrange/16); % this would come out as 16um for Neuropixels probes, which aligns with the geometry. 
 rez.ops.xup = linspace(xmin, xmax, npt+1); % centers of the upsampled x positions
 
-spkTh = 10; % same as the usual "template amplitude", but for the generic templates
+spkTh = 8; % same as the usual "template amplitude", but for the generic templates
 
 % Extract all the spikes across the recording that are captured by the
 % generic templates. Very few real spikes are missed in this way. 
