@@ -4,18 +4,18 @@ makeNewData = 1; % set this to 0 to just resort a previously created data set
 sortData = 1;
 runBenchmark = 1; %set to 1 to compare sorted data to ground truth for the simulation
 
-fpath    = 'C:\Users\labadmin\Documents\jic\050320_sim_test\'; % where on disk do you want the simulation? ideally an SSD...
+fpath    = 'G:\Spikes\eMouse\'; % where on disk do you want the simulation? ideally an SSD...
 if ~exist(fpath, 'dir'); mkdir(fpath); end
 
 %KS2 path -- also has the waveforms for the simulation
-KS2path = 'C:\Users\labadmin\Documents\jic\KS2_040920\Kilosort2\';
+KS2path = 'D:\GitHub\KiloSort2\';
 
 % add paths to the matlab path
-addpath(genpath('C:\Users\labadmin\Documents\jic\KS2_040920\Kilosort2\')); % path to kilosort2 folder
-addpath(genpath('C:\Users\labadmin\Documents\jic\npy-matlab-master\'));
+addpath(genpath('D:\GitHub\KiloSort2')) % path to kilosort folder
+addpath('D:\GitHub\npy-matlab') % for converting to Phy
 
 % path to whitened, filtered proc file (on a fast SSD)
-rootH = 'D:\kilosort_datatemp\';
+rootH = 'G:\Spikes\eMouse\';
 
 % path to config file; if running the default config, no need to change.
 pathToYourConfigFile = [KS2path,'eMouse_drift\']; % path to config file
@@ -42,7 +42,7 @@ if( makeNewData )
 end
 %
 % Run kilosort2 on the simulated data
-
+%%
 if( sortData ) 
    
         % common options for every probe
@@ -50,6 +50,10 @@ if( sortData )
         ops.sorting     = 1; % type of sorting, 2 is by rastermap, 1 is old
         ops.NchanTOT    = NchanTOT; % total number of channels in your recording
         ops.trange      = [0 Inf]; % TIME RANGE IN SECONDS TO PROCESS
+
+        ops.sig        = 20;  % spatial smoothness constant for registration
+        ops.fshigh     = 300; % high-pass more aggresively
+        ops.nblocks = 5; % blocks for registration. 0 turns it off, 1 does rigid registration. Replaces "datashift" option.
 
 
         ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
@@ -64,14 +68,14 @@ if( sortData )
         % preprocess data to create temp_wh.dat
         rez = preprocessDataSub(ops);
 
-        % pre-clustering to re-order batches by depth
-        rez = clusterSingleBatches(rez);
+        % NEW STEP TO DO DATA REGISTRATION
+        rez = datashift2(rez, 1); % last input is for shifting data
+%         rez2 = datashift2(rez, 0); % last input is for shifting data
+
         
         % main optimization
-        % learnAndSolve8;
-        rez = learnAndSolve8b(rez);
+        rez = learnAndSolve8b(rez, 1);
         
-
         % final splits
         rez = find_merges(rez, 1);
         
@@ -79,12 +83,10 @@ if( sortData )
         % final splits by SVD
         rez    = splitAllClusters(rez, 1);
         
-        % final splits by amplitudes
-        rez = splitAllClusters(rez, 0);
-    
         % decide on cutoff
         rez = set_cutoff(rez);
-         
+        rez.good = get_good_units(rez);
+
         % this saves to Phy
         rezToPhy(rez, rootZ);
 
@@ -108,7 +110,7 @@ if( sortData )
         fclose(fileID);
         
         % remove temporary file
-        delete(ops.fproc);
+%         delete(ops.fproc);
 end
 
 
