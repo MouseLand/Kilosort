@@ -723,7 +723,7 @@ classdef ksGUI < handle
             try
                 obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
-                obj.rez = datashift2(obj.rez);
+                obj.rez = datashift2(obj.rez, 1);
 
                 % update connected channels
                 igood = obj.rez.ops.igood;
@@ -797,9 +797,9 @@ classdef ksGUI < handle
                     % decide on cutoff
                     obj.log('Last step. Setting cutoff...')
                     obj.rez = set_cutoff(obj.rez);
+                    obj.rez.good = get_good_units(obj.rez);
                     
-                    obj.rez.good2 = get_good_units(obj.rez);
-                    obj.log(sprintf('found %d good units \n', sum(obj.rez.good2>0)))
+                    obj.log(sprintf('found %d good units \n', sum(obj.rez.good>0)))
                 end
                                                                 
                 obj.P.ksDone = true;
