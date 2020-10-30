@@ -34,7 +34,6 @@ ops.sig = 20;
 % type of data shifting (0 = none, 1 = rigid, 2 = nonrigid)
 ops.nblocks = 5;
 ops.sig = 20;
-ops.trackfinal = 0;
 
 %% danger, changing these settings can lead to fatal errors
 % options for determining PCs

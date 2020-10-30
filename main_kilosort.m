@@ -7,11 +7,11 @@ rootH = 'H:\'; % path to temporary binary file (same size as data, should be on 
 pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github folder and put it somewhere else (together with the master_file)
 chanMapFile = 'neuropixPhase3A_kilosortChanMap.mat';
 
-ops.trange = [0 Inf]; % time range to sort
-ops.NchanTOT    = 385; % total number of channels in your recording
+ops.trange    = [0 Inf]; % time range to sort
+ops.NchanTOT  = 385; % total number of channels in your recording
 
 run(fullfile(pathToYourConfigFile, 'configFile384.m'))
-ops.fproc       = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
+ops.fproc   = fullfile(rootH, 'temp_wh.dat'); % proc file on a fast SSD
 ops.chanMap = fullfile(pathToYourConfigFile, chanMapFile);
 
 %% this block runs all the steps of the algorithm
@@ -20,7 +20,7 @@ fprintf('Looking for data inside %s \n', rootZ)
 % main parameter changes from Kilosort2 to v2.5
 ops.sig        = 20;  % spatial smoothness constant for registration
 ops.fshigh     = 300; % high-pass more aggresively
-ops.nblocks = 5; % blocks for registration. 0 turns it off, 1 does rigid registration. Replaces "datashift" option. 
+ops.nblocks    = 5; % blocks for registration. 0 turns it off, 1 does rigid registration. Replaces "datashift" option. 
 
 % is there a channel map file in this folder?
 fs = dir(fullfile(rootZ, 'chan*.mat'));
