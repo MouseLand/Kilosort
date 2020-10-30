@@ -1,6 +1,7 @@
 function rez = datashift2(rez, do_correction)
 
 if  getOr(rez.ops, 'nblocks', 1)==0
+    rez.iorig = 1:rez.temp.Nbatch;
     return;
 end
 
