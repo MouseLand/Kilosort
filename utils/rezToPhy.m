@@ -143,7 +143,7 @@ if ~isempty(savePath)
     writeNPY(templatesInds, fullfile(savePath, 'templates_ind.npy'));
 
     chanMap0ind = int32(chanMap0ind);
-    chanMap0ind = int32([1:rez.ops.Nchan]-1);
+    %chanMap0ind = int32([1:rez.ops.Nchan]-1);
     writeNPY(chanMap0ind, fullfile(savePath, 'channel_map.npy'));
     writeNPY([xcoords ycoords], fullfile(savePath, 'channel_positions.npy'));
 
