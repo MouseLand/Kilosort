@@ -990,7 +990,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
       #ifdef ENABLE_STABLEMODE  
           if (useStableMode) {
               //make a copy of the timestamp array to sort
-              cudaMemcpy( d_stSort, d_st, (counter[0] - counter[1])*sizeof(int), cudaMemcpyDeviceToDevice );
+              cudaMemcpy( d_stSort, d_st+counter[1], (counter[0] - counter[1])*sizeof(int), cudaMemcpyDeviceToDevice );
               int left = 0;
               int right = counter[0] - counter[1] - 1;
               cdp_simple_quicksort<<< 1, 1 >>>(d_stSort, d_idx, left, right, 0);
