@@ -61,6 +61,12 @@ rez.good = get_good_units(rez);
 
 fprintf('found %d good units \n', sum(rez.good>0))
 
+% correct times for the deleted batches
+rez=correct_time(rez);
+
+% rewrite temp_wh to the original length
+rewrite_temp_wh(ops)
+
 % write to Phy
 fprintf('Saving results to Phy  \n')
 rezToPhy(rez, rootZ);

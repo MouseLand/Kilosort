@@ -1,6 +1,6 @@
-function rez = preprocessDataSub(ops)
+function rewrite_temp_wh(ops)
 % this function takes an ops struct, which contains all the Kilosort2 settings and file paths
-% and creates a new binary file of preprocessed data, logging new variables into rez.
+% and creates a new binary file of preprocessed data.
 % The following steps are applied:
 % 1) conversion to float32;
 % 2) common median subtraction;
@@ -78,9 +78,10 @@ h = waitbar(0,'Starting');
 
 new_Nbatch=Nbatch;
 deleted_batches=[];
-
 for ibatch = 1:Nbatch
+    
     waitbar(ibatch / Nbatch, h,sprintf('Progress: %d %%', floor(ibatch/Nbatch*100)))
+    
     % we'll create a binary file of batches of NT samples, which overlap consecutively on ops.ntbuff samples
     % in addition to that, we'll read another ops.ntbuff samples from before and after, to have as buffers for filtering
     offset = max(0, ops.twind + 2*NchanTOT*(NT * (ibatch-1) - ntb)); % number of samples to start reading at.
@@ -113,14 +114,8 @@ for ibatch = 1:Nbatch
     
     datcpu  = gather(int16(datr')); % convert to int16, and gather on the CPU side
     
-    % find the batches with zero padding, we exclude first and last batch
-    if sum(std(double(diff(buff'))')==0)>0 & ibatch~=1 & ibatch~=Nbatch 
-        new_Nbatch=new_Nbatch-1;
-        deleted_batches=vertcat(deleted_batches,ibatch);
-    else
-        count = fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
-    end
-    
+    count = fwrite(fidW, datcpu, 'int16'); % write this batch to binary file
+        
     if count~=numel(datcpu)
         error('Error writing batch %g to %s. Check available disk space.',ibatch,ops.fproc);
     end
@@ -129,13 +124,4 @@ close(h)
 fclose(fidW); % close the files
 fclose(fid);
 
-rez.Wrot    = gather(Wrot); % gather the whitening matrix as a CPU variable
-
-fprintf('Time %3.0fs. Finished preprocessing %d/%d batches. \n', toc, new_Nbatch, Nbatch);
-fprintf('%d batches disc.arded \n', Nbatch - new_Nbatch);
-
-
-
-rez.ops.deleted_batches=deleted_batches;
-rez.ops.Nbatch = new_Nbatch;
-rez.temp.Nbatch = new_Nbatch;
+fprintf('Time %3.0fs. Finished preprocessing %d batches. \n', toc, Nbatch);
