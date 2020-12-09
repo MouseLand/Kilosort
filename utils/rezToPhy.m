@@ -1,10 +1,13 @@
 
-function rezToPhy(rez, savePath)
+function rezToPhy(rez, savePath, varargin)
 % pull out results from kilosort's rez to either return to workspace or to
 % save in the appropriate format for the phy GUI to run on. If you provide
 % a savePath it should be a folder, and you will need to have npy-matlab
 % available (https://github.com/kwikteam/npy-matlab)
 
+
+[~, Nfilt, Nrank] = size(rez.W);
+rez.Wphy = cat(1, zeros(1+rez.ops.nt0min, Nfilt, Nrank), rez.W); % for Phy, we need to pad the spikes with zeros so the spikes are aligned to the center of the window
 
 % spikeTimes will be in samples, not seconds
 rez.W = gather(single(rez.Wphy));
@@ -17,8 +20,10 @@ end
 
 [~, isort]   = sort(rez.st3(:,1), 'ascend');
 rez.st3      = rez.st3(isort, :);
-rez.cProj    = rez.cProj(isort, :);
-rez.cProjPC  = rez.cProjPC(isort, :, :);
+if ~isempty(rez.cProj)
+    rez.cProj    = rez.cProj(isort, :);
+    rez.cProjPC  = rez.cProjPC(isort, :, :);
+end
 
 % ix = rez.st3(:,4)>12;
 % rez.st3 = rez.st3(ix, :);
@@ -147,11 +152,12 @@ if ~isempty(savePath)
     writeNPY(chanMap0ind, fullfile(savePath, 'channel_map.npy'));
     writeNPY([xcoords ycoords], fullfile(savePath, 'channel_positions.npy'));
 
-    writeNPY(templateFeatures, fullfile(savePath, 'template_features.npy'));
-    writeNPY(templateFeatureInds'-1, fullfile(savePath, 'template_feature_ind.npy'));% -1 for zero indexing
-    writeNPY(pcFeatures, fullfile(savePath, 'pc_features.npy'));
-    writeNPY(pcFeatureInds'-1, fullfile(savePath, 'pc_feature_ind.npy'));% -1 for zero indexing
-
+    if ~isempty(templateFeatures)
+        writeNPY(templateFeatures, fullfile(savePath, 'template_features.npy'));
+        writeNPY(templateFeatureInds'-1, fullfile(savePath, 'template_feature_ind.npy'));% -1 for zero indexing
+        writeNPY(pcFeatures, fullfile(savePath, 'pc_features.npy'));
+        writeNPY(pcFeatureInds'-1, fullfile(savePath, 'pc_feature_ind.npy'));% -1 for zero indexing
+    end
 
     writeNPY(whiteningMatrix, fullfile(savePath, 'whitening_mat.npy'));
     writeNPY(whiteningMatrixInv, fullfile(savePath, 'whitening_mat_inv.npy'));
@@ -182,7 +188,11 @@ if ~isempty(savePath)
 %        [~, fname, ext] = fileparts(rez.ops.fbinary);
 %         fprintf(fid,['dat_path = ''',fname ext '''\n']);
 %         fprintf(fid,'n_channels_dat = %i\n',rez.ops.NchanTOT);
-        [root, fname, ext] = fileparts(rez.ops.fproc);
+        if ~isempty(varargin)
+            [root, fname, ext] = fileparts(rez.ops.fbinary);
+        else
+            [root, fname, ext] = fileparts(rez.ops.fproc);
+        end
 %         fprintf(fid,['dat_path = ''',fname ext '''\n']);
         fprintf(fid,['dat_path = ''', strrep(rez.ops.fproc, '\', '/') '''\n']);
         

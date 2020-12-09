@@ -73,3 +73,5 @@ rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
 
 % remove spikes from the 0th cluster
 rez = remove_spikes(rez,rez.st3(:,2)==0,'below_cutoff');
+
+
