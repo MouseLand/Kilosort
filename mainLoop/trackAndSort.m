@@ -91,7 +91,7 @@ p1 = .95; % decay of nsp estimate in each batch
 iW = int32(squeeze(iW));
 [WtW, iList] = getMeWtW(single(W), single(U), Nnearest);
 
-fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
+fprintf('Time %3.0fs. Final spike extraction ...\n', toc)
 
 fid = fopen(ops.fproc, 'r');
 
