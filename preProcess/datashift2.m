@@ -22,8 +22,8 @@ rez.ops.yup = ymin:dmin/2:ymax; % centers of the upsampled y positions
 % Determine the template spacings along the x dimension
 xrange = xmax - xmin;
 npt = floor(xrange/16); % this would come out as 16um for Neuropixels probes, which aligns with the geometry. 
-rez.ops.xup = linspace(xmin-16, xmax+16, npt+3); % centers of the upsampled x positions
-
+% rez.ops.xup = linspace(xmin-16, xmax+16, npt+3); % centers of the upsampled x positions
+rez.ops.xup = xmin + [0 16 32 48];
 
 % binning width across Y (um)
 dd = 5;
@@ -33,7 +33,7 @@ dmax  = 1 + ceil((ymax-dmin)/dd);
 disp(dmax)
 
 
-spkTh = 8; % same as the usual "template amplitude", but for the generic templates
+spkTh = 12; % same as the usual "template amplitude", but for the generic templates
 
 % Extract all the spikes across the recording that are captured by the
 % generic templates. Very few real spikes are missed in this way. 

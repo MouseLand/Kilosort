@@ -10,14 +10,14 @@ buff = size(W,1); % width of a spike in samples
 
 predData = zeros(size(U,1),numel(samps)+buff*4);
 
-spikeTimes = rez.st2(:,1); % use the original spikes st2, not the merged and split
+spikeTimes = rez.st3(:,1); % use the original spikes st2, not the merged and split
 
 
 inclSpikes = spikeTimes>samps(1)-buff/2 & spikeTimes<samps(end)+buff/2;
 st = spikeTimes(inclSpikes); % in samples
 
-inclTemps = uint32(rez.st2(inclSpikes,2)); % use the original spikes st2, not the merged and split
-amplitudes = rez.st2(inclSpikes,3);
+inclTemps = uint32(rez.st3(inclSpikes,2)); % use the original spikes st2, not the merged and split
+amplitudes = rez.st3(inclSpikes,3);
 
 for s = 1:sum(inclSpikes)
     ampi = amplitudes(s);
