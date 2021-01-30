@@ -1,5 +1,5 @@
 
-function rezToPhy(rez, savePath, varargin)
+function rezToPhy2(rez, savePath, varargin)
 % pull out results from kilosort's rez to either return to workspace or to
 % save in the appropriate format for the phy GUI to run on. If you provide
 % a savePath it should be a folder, and you will need to have npy-matlab
@@ -61,7 +61,7 @@ Nfilt = size(W,2);
 
 templates = zeros(Nchan, nt0, Nfilt, 'single');
 for iNN = 1:size(templates,3)
-   templates(:,:,iNN) = rez.mu(iNN,1) * squeeze(U(:,iNN,:)) * squeeze(W(:,iNN,:))';
+   templates(:,:,iNN) = squeeze(U(:,iNN,:)) * squeeze(W(:,iNN,:))';
 end
 templates = permute(templates, [3 2 1]); % now it's nTemplates x nSamples x nChannels
 templatesInds = repmat([0:size(templates,3)-1], size(templates,1), 1); % we include all channels so this is trivial
@@ -102,8 +102,6 @@ tempAmps(tids) = ta; % because ta only has entries for templates that had at lea
 gain = getOr(rez.ops, 'gain', 1);
 tempAmps = gain*tempAmps'; % for consistency, make first dimension template number
 
-
-templateFeatures = [];
 if ~isempty(savePath)
     fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
     fprintf(fileID, 'cluster_id%sKSLabel', char(9));

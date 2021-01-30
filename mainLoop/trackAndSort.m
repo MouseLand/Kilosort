@@ -1,6 +1,14 @@
-function [rez, st3, fW, fWpc] = trackAndSort(rez, iorder)
+function [rez, st3, fWpc] = trackAndSort(rez, varargin)
+
+if ~isempty(varargin)
+   iorder = varargin{1};
+else
+    iorder = 1:rez.ops.Nbatch;
+end
 % This is the extraction phase of the optimization. 
 % iorder is the order in which to traverse the batches
+
+% iorder = 1:rez.ops.Nbatch;
 
 % Turn on sorting of spikes before subtracting and averaging in mpnu8
 rez.ops.useStableMode = getOr(rez.ops, 'useStableMode', 1);
@@ -39,7 +47,7 @@ NT  	= ops.NT;
 
 
 % two variables for the same thing? number of nearest channels to each primary channel
-NchanNear   = min(ops.Nchan, 32);
+NchanNear   = min(ops.Nchan, 16);
 Nnearest    = min(ops.Nchan, 32);
 
 % decay of gaussian spatial mask centered on a channel
@@ -64,7 +72,7 @@ nInnerIter  = 60; % this is for SVD for the power iteration
 % schedule of learning rates for the model fitting part
 % starts small and goes high, it corresponds approximately to the number of spikes
 % from the past that were averaged to give rise to the current template
-pm = exp(-1/ops.momentum(2));
+pm = exp(-1/400);
 
 Nsum = min(Nchan,7); % how many channels to extend out the waveform in mexgetspikes
 % lots of parameters passed into the CUDA scripts
@@ -72,7 +80,7 @@ Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
     Nrank ops.lam pm Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1) useStableMode]);
 
 % initialize average number of spikes per batch for each template
-nsp = gpuArray.zeros(Nfilt,1, 'double');
+nsp = gpuArray.zeros(Nfilt,1, 'int32');
 
 % extract ALL features on the last pass
 Params(13) = 2; % this is a flag to output features (PC and template features)
@@ -91,7 +99,7 @@ p1 = .95; % decay of nsp estimate in each batch
 iW = int32(squeeze(iW));
 [WtW, iList] = getMeWtW(single(W), single(U), Nnearest);
 
-fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
+fprintf('Time %3.0fs. Final spike extraction ...\n', toc)
 
 fid = fopen(ops.fproc, 'r');
 
@@ -102,11 +110,13 @@ ntot = 0;
 
 % these ones store features per spike
 fW  = zeros(Nnearest, 1e7, 'single'); % Nnearest is the number of nearest templates to store features for
-fWpc = zeros(NchanNear, Nrank, 1e7, 'single'); % NchanNear is the number of nearest channels to take PC features from
+fWpc = zeros(NchanNear, 2*Nrank, 1e7, 'single'); % NchanNear is the number of nearest channels to take PC features from
 
 
 dWU1 = dWU;
 
+[UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan); % this needs to change (but I don't know why!)
+    
 for ibatch = 1:niter    
     k = iorder(ibatch); % k is the index of the batch in absolute terms
     
@@ -122,13 +132,13 @@ for ibatch = 1:niter
     % this uses a "warm start" by remembering the W from the previous
     % iteration
      
-    [W, U, mu] = mexSVDsmall2(Params, dWU, W, iC-1, iW-1, Ka, Kb);
+    % we don't need to update this anymore on every iteraton....
+%     [W, U, mu] = mexSVDsmall2(Params, dWU, W, iC-1, iW-1, Ka, Kb);
     
     % UtU is the gram matrix of the spatial components of the low-rank SVDs
     % it tells us which pairs of templates are likely to "interfere" with each other
     % such as when we subtract off a template
-    [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan); % this needs to change (but I don't know why!)
-    
+%     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan); % this needs to change (but I don't know why!)%     
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -161,7 +171,7 @@ for ibatch = 1:niter
     % for each template
 
     dWU1 = dWU1  + dWU0;
-    nsp = nsp + double(nsp0);
+    nsp = nsp + nsp0;
     
     % nsp just gets updated according to the fixed factor p1
     
@@ -200,8 +210,8 @@ for ibatch = 1:niter
     
     if (rem(ibatch, 100)==1)
         % this is some of the relevant diagnostic information to be printed during training
-        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, nst0: %d \n', ...
-            toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0))
+        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %d, mu: %2.4f, nst0: %d \n', ...
+            toc, ibatch, niter, Nfilt, ntot, median(mu), numel(st0))
         
         % these diagnostic figures should be mostly self-explanatory
         if ops.fig
@@ -223,7 +233,11 @@ st3 = st3(1:ntot, :);
 fW = fW(:, 1:ntot);
 fWpc = fWpc(:,:, 1:ntot);
 
-rez.dWU = dWU1 ./ reshape(nsp, [1,1,Nfilt]);
+rez.dWU = dWU1 ./ single(reshape(nsp, [1,1,Nfilt]));
 rez.nsp = nsp;
+
+rez.iC = iC;
+
+fWpc = permute(fWpc, [3, 2, 1]);
 
 %%
