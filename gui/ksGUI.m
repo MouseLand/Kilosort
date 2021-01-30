@@ -233,13 +233,13 @@ classdef ksGUI < handle
             obj.H.settings.setLambdaTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'Lambda');
+                'String', 'Lambda (no longer very important)');
             
             % ccsplit
             obj.H.settings.setCcsplitTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'AUC for splits');            
+                'String', 'AUC for splits (not used)');            
             
             % advanced options
             obj.H.settings.setAdvancedTxt = uicontrol(...
@@ -690,7 +690,7 @@ classdef ksGUI < handle
                         
             obj.ops.Th = str2num(obj.H.settings.setThEdt.String);
             if isempty(obj.ops.Th)||any(isnan(obj.ops.Th))
-                obj.ops.Th = [10 4];
+                obj.ops.Th = [9 9];
             end
             obj.H.settings.setThEdt.String = num2str(obj.ops.Th);
             
@@ -782,25 +782,23 @@ classdef ksGUI < handle
 %                 obj.rez = clusterSingleBatches(obj.rez);
                 
                 % main optimization
-                obj.log('Main optimization')
-                obj.rez = learnAndSolve8b(obj.rez, 1);
+                obj.log('Extracting spikes for clustering')
+                [obj.rez, st3, tF]     = extract_spikes(obj.rez);
                 
-                % final splits and merges
-                if 1
-                    obj.log('Merges...')
-                    obj.rez = find_merges(obj.rez, 1);
-                    
-                    % final splits by SVD
-                    obj.log('Splits part 1/2...')
-                    obj.rez = splitAllClusters(obj.rez, 1);
-                    
-                    % decide on cutoff
-                    obj.log('Last step. Setting cutoff...')
-                    obj.rez = set_cutoff(obj.rez);
-                    obj.rez.good = get_good_units(obj.rez);
-                    
-                    obj.log(sprintf('found %d good units \n', sum(obj.rez.good>0)))
-                end
+                obj.log('First clustering')
+                obj.rez                = template_learning(obj.rez, tF, st3);
+                
+                obj.log('Template matching on binary file')                
+                [obj.rez, st3, tF]     = trackAndSort(obj.rez);
+
+                obj.log('Second clustering')
+                obj.rez                = final_clustering(obj.rez, tF, st3);
+                
+                obj.log('Merges...')                
+                obj.rez                = find_merges(obj.rez, 1);
+
+                
+                obj.log(sprintf('found %d good units \n', sum(obj.rez.good>0)))
                                                                 
                 obj.P.ksDone = true;
                 
@@ -827,7 +825,7 @@ classdef ksGUI < handle
             save(fname, 'rez', '-v7.3');
             
             try
-                rezToPhy(obj.rez, obj.ops.saveDir);
+                rezToPhy2(obj.rez, fullfile(obj.ops.saveDir, 'kilosort3'));
             catch ex
                 obj.log(sprintf('Error saving data for phy! %s', ex.message));
             end            

@@ -717,7 +717,7 @@ __global__ void	computePCfeatures(const double *Params, const int *counter,
         const float *W, const float *U, const float *mu, const int *iW, const int *iC,
         const float *wPCA, float *featPC){
 
-  volatile __shared__ float  sPCA[81 * NrankMax], sW[81 * NrankMax], sU[NchanMax * NrankMax];
+  volatile __shared__ float  sPCA[2*81 * NrankMax], sW[81 * NrankMax], sU[NchanMax * NrankMax];
   volatile __shared__ int iU[NchanMax];
 
   float X = 0.0f, Y = 0.0f;
@@ -738,12 +738,14 @@ __global__ void	computePCfeatures(const double *Params, const int *counter,
       iU[tidx] = iC[tidx + NchanU * iW[bid]];
   __syncthreads();
 
-  sU[tidx + tidy*NchanU]= U[iU[tidx] + Nchan * bid + Nchan * Nfilt * tidy];
+  if (tidy<Nrank)
+    sU[tidx + tidy*NchanU]= U[iU[tidx] + Nchan * bid + Nchan * Nfilt * tidy];
 
   while (tidx<nt0){
-     sW[tidx + tidy*nt0]  = W[tidx + bid*nt0 + Nfilt * nt0 * tidy];
-      sPCA[tidx + tidy*nt0]  = wPCA[tidx + nt0 * tidy];
-      tidx += blockDim.x;
+     if (tidy<Nrank)
+        sW[tidx + tidy*nt0]  = W[tidx + bid*nt0 + Nfilt * nt0 * tidy];
+     sPCA[tidx + tidy*nt0]  = wPCA[tidx + nt0 * tidy];
+     tidx += blockDim.x;
   }
 
   tidx 		= threadIdx.x;
@@ -764,7 +766,7 @@ __global__ void	computePCfeatures(const double *Params, const int *counter,
           X = Y * x[ind]; // - mu[bid]);
           for (t=0;t<nt0; t++)
               X  += dataraw[st[ind] + t + NT * iU[tidx]] * sPCA[t + nt0*tidy];
-          featPC[tidx + tidy*NchanU + ind * NchanU*Nrank] = X;
+          featPC[tidx + tidy*NchanU + 2 * ind * NchanU*Nrank] = X;
       }
 }
 
@@ -897,7 +899,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMalloc(&d_counter,   2*sizeof(int));
   cudaMalloc(&d_count,   nmaxiter*sizeof(int));
   cudaMalloc(&d_feat,     maxFR * Nnearest * sizeof(float));
-  cudaMalloc(&d_featPC,     maxFR * NchanU*Nrank * sizeof(float));
+  cudaMalloc(&d_featPC,     2*maxFR * NchanU*Nrank * sizeof(float));
 
   cudaMemset(d_nsp,    0, Nfilt * sizeof(int));
   cudaMemset(d_dWU,    0, Nfilt * nt0 * Nchan* sizeof(double));
@@ -911,7 +913,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemset(d_y,       0, maxFR *    sizeof(float));
   cudaMemset(d_z,       0, maxFR *    sizeof(float));
   cudaMemset(d_feat,    0, maxFR * Nnearest *   sizeof(float));
-  cudaMemset(d_featPC,    0, maxFR * NchanU*Nrank *   sizeof(float));
+  cudaMemset(d_featPC,    0, 2*maxFR * NchanU*Nrank *   sizeof(float));
 
   int *counter;
   counter = (int*) calloc(1,2 * sizeof(int));
@@ -933,7 +935,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemset(d_stSort, 0,  maxFR * sizeof(int));
 
 
-  dim3 tpB(8, 2*nt0-1), tpF(16, Nnearest), tpS(nt0, 16), tpW(Nnearest, Nrank), tpPC(NchanU, Nrank);
+  dim3 tpB(8, 2*nt0-1), tpF(16, Nnearest), tpS(nt0, 16), tpW(Nnearest, Nrank), tpPC(NchanU, 2*Nrank);
 
   // filter the data with the spatial templates
   spaceFilter<<<Nfilt, Nthreads>>>(d_Params, d_draw, d_U, d_iC, d_iW, d_data);
@@ -1109,7 +1111,7 @@ void mexFunction(int nlhs, mxArray *plhs[],
   plhs[5] 	= mxGPUCreateMxArrayOnGPU(draw);
   plhs[6] 	= mxGPUCreateMxArrayOnGPU(nsp);
 
-  const mwSize dimsfPC[] 	= {NchanU, Nrank, minSize};
+  const mwSize dimsfPC[] 	= {NchanU, 2*Nrank, minSize};
   plhs[7] = mxCreateNumericArray(3, dimsfPC, mxSINGLE_CLASS, mxREAL);
   featPC =  (float*) mxGetData(plhs[7]);
 
@@ -1117,8 +1119,8 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemcpy(id, d_id, minSize * sizeof(int),   cudaMemcpyDeviceToHost);
   cudaMemcpy(x,    d_y, minSize * sizeof(float), cudaMemcpyDeviceToHost);
   cudaMemcpy(vexp, d_x, minSize * sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(feat, d_feat, minSize * Nnearest*sizeof(float), cudaMemcpyDeviceToHost);
-  cudaMemcpy(featPC,   d_featPC, minSize * NchanU*Nrank*sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(feat,     d_feat,  minSize * Nnearest*sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(featPC,   d_featPC, 2*minSize * NchanU*Nrank*sizeof(float), cudaMemcpyDeviceToHost);
 
   // send back an error message if useStableMode was selected but couldn't be used
 
