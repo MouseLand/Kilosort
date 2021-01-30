@@ -196,8 +196,6 @@ rez.simScore(isplit) = 1; % 1 means they come from the same parent
 rez.iNeigh   = gather(iList(:, 1:Nfilt)); % get the new neighbor templates
 rez.iNeighPC    = gather(iC(:, iW(1:Nfilt))); % get the new neighbor channels
 
-rez.Wphy = cat(1, zeros(1+ops.nt0min, Nfilt, Nrank), rez.W); % for Phy, we need to pad the spikes with zeros so the spikes are aligned to the center of the window
-
 rez.isplit = isplit; % keep track of origins for each cluster
 
 

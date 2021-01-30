@@ -8,19 +8,16 @@ ops.fs = 30000;
 ops.fshigh = 300;   
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 4])
-ops.Th = [10 4];  
+ops.Th = [9 9];  
 
 % how important is the amplitude penalty (like in Kilosort1, 0 means not used, 10 is average, 50 is a lot) 
-ops.lam = 10;  
+ops.lam = 20;  
 
 % splitting a cluster at the end requires at least this much isolation for each sub-cluster (max = 1)
-ops.AUCsplit = 0.9; 
+ops.AUCsplit = 0.8; 
 
 % minimum spike rate (Hz), if a cluster falls below this for too long it gets removed
 ops.minFR = 1/50; 
-
-% number of samples to average over (annealed from first to second value) 
-ops.momentum = [20 400]; 
 
 % spatial constant in um for computing residual variance of spike
 ops.sigmaMask = 30; 

@@ -17,7 +17,7 @@ Fg = gpuArray(single(F));
 % mean subtraction to compute covariance
 Fg = Fg - mean(Fg, 1);
 
-% initialize the target "frame" for alignment with a single sample
+% initialize the target "frame" with a single sample
 F0 = Fg(:,:, min(300, floor(size(Fg,3)/2)));
 
 % first we do rigid registration by integer shifts
