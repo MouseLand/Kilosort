@@ -1,7 +1,10 @@
 # Kilosort3: automated spike sorting with drift correction, template matching and fancy clustering on GPUs #
 
-*updated from Kilosort2.5 on Jan 30, 2021.* This is the best time to post feedback (good or bad) so please use Github issues freely!   
-*updated from Kilosort2 on Oct 28, 2020.* The repository name has changed to just "Kilosort", and we'll keep track of versions via Github releases. 
+Now is the best time to post feedback (good or bad) so please use Github issues freely! 
+
+For older versions, please see Github releases:   
+*updated from Kilosort2.5 on Jan 30, 2021.*  
+*updated from Kilosort2 on Oct 28, 2020.* 
 
 ![](https://github.com/MouseLand/Kilosort/blob/main/Docs/img/frame_full.png)
 
