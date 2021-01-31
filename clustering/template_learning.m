@@ -101,7 +101,7 @@ for  t = 1:n0
     wsign = -sign(w(21,1));
     rez.W(:,t,:) = gather(wsign * w(:,1:3));
     rez.U(:,t,:) = gather(wsign * u(:,1:3) * s(1:3,1:3));
-    rez.mu(t) = sum(sum(rez.U(:,t,:).^2))^.5;
+    rez.mu(t) = gather(sum(sum(rez.U(:,t,:).^2))^.5);
     rez.U(:,t,:) = rez.U(:,t,:) / rez.mu(t);
 end
 
