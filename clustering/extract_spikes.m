@@ -3,11 +3,29 @@ function [rez, st3, tF] = extract_spikes(rez)
 ymin = min(rez.yc);
 ymax = max(rez.yc);
 xmin = min(rez.xc);
+xmax = max(rez.xc);
 
 dmin = median(diff(unique(rez.yc)));
-disp(dmin)
+fprintf('vertical pitch size is %d \n', dmin)
+rez.ops.dmin = dmin;
 rez.ops.yup = ymin:dmin/2:ymax; % centers of the upsampled y positions
-rez.ops.xup = xmin + [0 16 32 48]; % centers of the upsampled x positions
+
+% dminx = median(diff(unique(rez.xc)));
+yunq = unique(rez.yc);
+mxc = zeros(numel(yunq), 1);
+for j = 1:numel(yunq)
+    xc = rez.xc(rez.yc==yunq(j));
+    if numel(xc)>1
+       mxc(j) = median(diff(sort(xc))); 
+    end
+end
+dminx = median(mxc);
+fprintf('horizontal pitch size is %d \n', dminx)
+
+rez.ops.dminx = dminx;
+nx = round((xmax-xmin) / (dminx/2)) + 1;
+rez.ops.xup = linspace(xmin, xmax, nx); % centers of the upsampled x positions
+disp(rez.ops.xup) 
 
 % rez.ops.yup = ymin:10:ymax; % centers of the upsampled y positions
 % rez.ops.xup = xmin +  [-16 0 16 32 48 64]; % centers of the upsampled x positions
