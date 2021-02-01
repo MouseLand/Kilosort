@@ -33,7 +33,7 @@ dist = dist(:, igood);
 ycup = ycup(igood);
 xcup = xcup(igood);
 
-NchanNearUp =  10*NchanNear;
+NchanNearUp =  min([10*NchanNear, ops.NchanTOT]);
 [iC2, dist2] = getClosestChannels2(ycup, xcup, ycup, xcup, NchanNearUp);
 
 nsizes = 5;

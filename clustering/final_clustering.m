@@ -107,14 +107,15 @@ rez.xy = xy;
 clust_good = check_clusters(hid, ss);
 sum(clust_good)
 
-
-rez.W = zeros(61,0, 3, 'single');
+% waveform length was hardcoded at 61. Should be parametric, and needs an index for zero crossing too
+w_crossingIndex = ceil(ops.nt0/3);
+rez.W = zeros(ops.nt0,0, 3, 'single');
 rez.U = zeros(ops.Nchan,0,3, 'single');
 rez.mu = zeros(1,0, 'single');
 for  t = 1:n0
     dWU = wPCA * gpuArray(Wpca(:,:,t));
     [w,s,u] = svdecon(dWU);
-    wsign = -sign(w(21,1));
+    wsign = -sign(w(w_crossingIndex,1));
     rez.W(:,t,:) = wsign * w(:,1:3);
     rez.U(:,t,:) = wsign * u(:,1:3) * s(1:3,1:3);
     rez.mu(t) = sum(sum(rez.U(:,t,:).^2))^.5;
@@ -144,7 +145,7 @@ rez1.mu = sum(sum(rez1.U.^2, 1),3).^.5;
 rez1.U = rez1.U ./ rez1.mu;
 rez1.mu = rez1.mu(:);
 
-rez1.W = reshape(rez.wPCA, [61, 1, 6]);
+rez1.W = reshape(rez.wPCA, [ops.nt0, 1, 6]);
 rez1.W = repmat(rez1.W, [1, n0, 1]);
 rez1.est_contam_rate = ones(n0,1);
 

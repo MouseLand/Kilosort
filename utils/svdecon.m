@@ -51,6 +51,6 @@ else
     U = X*V; % convert evecs from X'*X to X*X'. the evals are the same.
     %s = sqrt(sum(U.^2,1))';
     s = sqrt(d);
-    U = bsxfun(@(x,c)x./c, U, s');
+    U = bsxfun(@(x,c)x./c, gather(U), s');
     S = diag(s);
 end
