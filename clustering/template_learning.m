@@ -28,7 +28,7 @@ ktid = int32(st3(:,2)) + 1;
 tmp_chan = iC(1, :);
 ss = double(st3(:,1)) / ops.fs;
 
-dmin = median(diff(unique(rez.yc)));
+dmin = rez.ops.dmin;
 ycenter = (min(rez.yc) + dmin-5):(2*dmin):(max(rez.yc)+dmin+5);
 
 Wpca = zeros(6, Nchan, 1000, 'single');
@@ -48,7 +48,7 @@ for j = 1:numel(ycenter)
 %     xchan = abs(rez.yc - y0) < 20;
 %     itemp = find(xchan(tmp_chan));
     
-    xchan = abs(ycup - y0) < 20;
+    xchan = abs(ycup - y0) < dmin;
     itemp = find(xchan);
         
     if isempty(itemp)
