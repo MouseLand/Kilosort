@@ -26,7 +26,7 @@ NchanNear = 10;
 [iC, dist] = getClosestChannels2(ycup, xcup, rez.yc, rez.xc, NchanNear);
 
 % Templates with centers that are far from an active site are discarded
-dNearActiveSite = rez.ops.dmin; 
+dNearActiveSite = median(diff(unique(rez.yc)));
 igood = dist(1,:)<dNearActiveSite;
 iC = iC(:, igood);
 dist = dist(:, igood);
