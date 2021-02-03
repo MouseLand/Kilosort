@@ -49,7 +49,7 @@ iC = gather(iC(:,iW));
 %%
 ss = double(st3(:,1)) / ops.fs;
 
-dmin = median(diff(unique(rez.yc)));
+dmin = rez.ops.dmin;
 ycenter = (min(rez.yc) + dmin-5):(2*dmin):(max(rez.yc)+dmin+5);
 
 Wpca = zeros(6, Nchan, 1000, 'single');
@@ -65,7 +65,7 @@ for j = 1:numel(ycenter)
     end
     y0 = ycenter(j);
     
-    xchan = abs(ycup - y0) < dmin; % formerly:  < 20;
+    xchan = abs(ycup - y0) < dmin;
     itemp = find(xchan);
         
     if isempty(itemp)

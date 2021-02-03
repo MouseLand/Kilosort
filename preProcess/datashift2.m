@@ -1,5 +1,10 @@
 function rez = datashift2(rez, do_correction)
 
+NrankPC = 6;
+[wTEMP, wPCA]    = extractTemplatesfromSnippets(rez, NrankPC);
+rez.wTEMP = gather(wTEMP);
+rez.wPCA  = gather(wPCA);
+
 if  getOr(rez.ops, 'nblocks', 1)==0
     rez.iorig = 1:rez.temp.Nbatch;
     return;
@@ -33,7 +38,7 @@ dmax  = 1 + ceil((ymax-dmin)/dd);
 disp(dmax)
 
 
-spkTh = 12; % same as the usual "template amplitude", but for the generic templates
+spkTh = 10; % same as the usual "template amplitude", but for the generic templates
 
 % Extract all the spikes across the recording that are captured by the
 % generic templates. Very few real spikes are missed in this way. 

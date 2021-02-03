@@ -33,7 +33,7 @@ end
 % find the binary file
 fs          = [dir(fullfile(rootZ, '*.bin')) dir(fullfile(rootZ, '*.dat'))];
 ops.fbinary = fullfile(rootZ, fs(1).name);
-%%
+
 rez                = preprocessDataSub(ops);
 rez                = datashift2(rez, 1);
 
