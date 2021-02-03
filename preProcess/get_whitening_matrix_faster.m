@@ -1,4 +1,4 @@
-function [Wrot, CC] = get_whitening_matrix(rez)
+function [Wrot, CC] = get_whitening_matrix_faster(rez)
 % based on a subset of the data, compute a channel whitening matrix
 % this requires temporal filtering first (gpufilter)
 

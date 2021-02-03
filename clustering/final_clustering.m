@@ -65,7 +65,7 @@ for j = 1:numel(ycenter)
     end
     y0 = ycenter(j);
     
-    xchan = abs(ycup - y0) < 20;
+    xchan = abs(ycup - y0) < dmin; % formerly:  < 20;
     itemp = find(xchan);
         
     if isempty(itemp)
@@ -107,15 +107,14 @@ rez.xy = xy;
 clust_good = check_clusters(hid, ss);
 sum(clust_good)
 
-% waveform length was hardcoded at 61. Should be parametric, and needs an index for zero crossing too
-w_crossingIndex = ceil(ops.nt0/3);
-rez.W = zeros(ops.nt0,0, 3, 'single');
-rez.U = zeros(ops.Nchan,0,3, 'single');
+% waveform length was hardcoded at 61. Should be parametric, w/min index for consistent trough polarity
+rez.W = zeros(ops.nt0,   0,3, 'single');
+rez.U = zeros(ops.Nchan, 0,3, 'single');
 rez.mu = zeros(1,0, 'single');
 for  t = 1:n0
     dWU = wPCA * gpuArray(Wpca(:,:,t));
     [w,s,u] = svdecon(dWU);
-    wsign = -sign(w(w_crossingIndex,1));
+    wsign = -sign(w(ops.nt0min+1, 1));
     rez.W(:,t,:) = wsign * w(:,1:3);
     rez.U(:,t,:) = wsign * u(:,1:3) * s(1:3,1:3);
     rez.mu(t) = sum(sum(rez.U(:,t,:).^2))^.5;

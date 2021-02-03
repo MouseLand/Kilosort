@@ -15,8 +15,8 @@ rez.ops.xup = xmin + [0 16 32 48]; % centers of the upsampled x positions
 ops = rez.ops;
 
 spkTh = ops.Th(1);
-sig = 10;
-dNearActiveSite = 30;
+sig = ops.sig;  %10;
+dNearActiveSite = 2*sig;    %30;
 
 [ycup, xcup] = meshgrid(ops.yup, ops.xup);
 

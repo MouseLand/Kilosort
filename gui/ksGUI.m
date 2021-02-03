@@ -833,11 +833,11 @@ classdef ksGUI < handle
             fname = fullfile(obj.ops.saveDir, 'rez.mat');
             save(fname, 'rez', '-v7.3');
             
-            try
-                rezToPhy2(obj.rez, fullfile(obj.ops.saveDir, 'kilosort3'));
-            catch ex
-                obj.log(sprintf('Error saving data for phy! %s', ex.message));
-            end            
+%             try
+                rezToPhy2(obj.rez, fullfile(obj.ops.saveDir));
+%             catch ex
+%                 obj.log(sprintf('Error saving data for phy! %s', ex.message));
+%             end            
             obj.log('Done');
         end
             
