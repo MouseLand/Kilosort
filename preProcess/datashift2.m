@@ -5,11 +5,6 @@ NrankPC = 6;
 rez.wTEMP = gather(wTEMP);
 rez.wPCA  = gather(wPCA);
 
-if  getOr(rez.ops, 'nblocks', 1)==0
-    rez.iorig = 1:rez.temp.Nbatch;
-    return;
-end
-
 ops = rez.ops;
 
 % The min and max of the y and x ranges of the channels
@@ -18,17 +13,35 @@ ymax = max(rez.yc);
 xmin = min(rez.xc);
 xmax = max(rez.xc);
 
-% Determine the average vertical spacing between channels. 
-% Usually all the vertical spacings are the same, i.e. on Neuropixels probes. 
 dmin = median(diff(unique(rez.yc)));
-fprintf('pitch is %d um\n', dmin)
+fprintf('vertical pitch size is %d \n', dmin)
+rez.ops.dmin = dmin;
 rez.ops.yup = ymin:dmin/2:ymax; % centers of the upsampled y positions
 
-% Determine the template spacings along the x dimension
-xrange = xmax - xmin;
-npt = floor(xrange/16); % this would come out as 16um for Neuropixels probes, which aligns with the geometry. 
-% rez.ops.xup = linspace(xmin-16, xmax+16, npt+3); % centers of the upsampled x positions
-rez.ops.xup = xmin + [0 16 32 48];
+% dminx = median(diff(unique(rez.xc)));
+yunq = unique(rez.yc);
+mxc = zeros(numel(yunq), 1);
+for j = 1:numel(yunq)
+    xc = rez.xc(rez.yc==yunq(j));
+    if numel(xc)>1
+       mxc(j) = median(diff(sort(xc))); 
+    end
+end
+dminx = median(mxc);
+fprintf('horizontal pitch size is %d \n', dminx)
+
+rez.ops.dminx = dminx;
+nx = round((xmax-xmin) / (dminx/2)) + 1;
+rez.ops.xup = linspace(xmin, xmax, nx); % centers of the upsampled x positions
+disp(rez.ops.xup) 
+
+
+if  getOr(rez.ops, 'nblocks', 1)==0
+    rez.iorig = 1:rez.temp.Nbatch;
+    return;
+end
+
+
 
 % binning width across Y (um)
 dd = 5;
