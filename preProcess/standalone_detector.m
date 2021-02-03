@@ -7,7 +7,7 @@ function [st3, rez] = standalone_detector(rez, spkTh)
 % entire probe (pre-specified in the calling function). 
 % In total, there ~100x more generic templates than channels. 
 
-
+NrankPC = size(rez.wPCA, 2);
 ops = rez.ops;
 
 % minimum/base sigma for the Gaussian. 
@@ -17,10 +17,8 @@ sig = 10;
 [ycup, xcup] = meshgrid(ops.yup, ops.xup);
 
 % determine prototypical timecourses by clustering of simple threshold crossings. 
-NrankPC = 6;
-[wTEMP, wPCA]    = extractTemplatesfromSnippets(rez, NrankPC);
-rez.wTEMP = gather(wTEMP);
-rez.wPCA  = gather(wPCA);
+wTEMP = gpuArray(rez.wTEMP);
+wPCA = gpuArray(rez.wPCA);
 
 % Get nearest channels for every template center. 
 % Template products will only be computed on these channels. 
@@ -36,7 +34,7 @@ ycup = ycup(igood);
 xcup = xcup(igood);
 
 % number of nearby templates to compare for local template maximum
-NchanNearUp =  10*NchanNear;
+NchanNearUp =  min(numel(xcup), 10*NchanNear);
 [iC2, dist2] = getClosestChannels2(ycup, xcup, ycup, xcup, NchanNearUp);
 
 % pregenerate the Gaussian weights used for spatial components 
