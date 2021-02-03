@@ -1,5 +1,10 @@
 function rez = datashift2(rez, do_correction)
 
+NrankPC = 6;
+[wTEMP, wPCA]    = extractTemplatesfromSnippets(rez, NrankPC);
+rez.wTEMP = gather(wTEMP);
+rez.wPCA  = gather(wPCA);
+
 if  getOr(rez.ops, 'nblocks', 1)==0
     rez.iorig = 1:rez.temp.Nbatch;
     return;
