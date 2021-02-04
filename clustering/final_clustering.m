@@ -68,13 +68,14 @@ for j = 1:numel(ycenter)
     xchan = abs(ycup - y0) < dmin;
     itemp = find(xchan);
         
-    if isempty(itemp)
+    tin = ismember(ktid, itemp);
+    
+    if sum(tin)<1
         continue;
     end
-    tin = ismember(ktid, itemp);
+    
     pid = ktid(tin);
     data = tF(tin, :, :);
-    
     
     ich = unique(iC(:, itemp));
     ch_min = ich(1)-1;
@@ -90,6 +91,7 @@ for j = 1:numel(ycenter)
 
     kid = run_pursuit(dd, nlow, rmin, n0, wroll, ss(tin), use_CCG);
     
+    [~, ~, kid] = unique(kid);
     nmax = max(kid);
     for t = 1:nmax
         Wpca(:, ch_min+1:ch_max, t + n0) = gather(sq(mean(dd(kid==t,:,:),1)));
