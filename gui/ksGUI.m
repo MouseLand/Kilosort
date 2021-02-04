@@ -720,7 +720,7 @@ classdef ksGUI < handle
             
             % do preprocessing
             obj.ops.gui = obj; % for kilosort to access, e.g. calling "log"
-            try
+%             try
                 obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
                 obj.rez = datashift2(obj.rez, 1);
@@ -749,10 +749,10 @@ classdef ksGUI < handle
                 % update gui with results of preprocessing
                 obj.updateDataView();
                 obj.log('Done preprocessing.'); 
-            catch ex
-                obj.log(sprintf('Error preprocessing! %s', ex.message));
-                keyboard
-            end
+%             catch ex
+%                 obj.log(sprintf('Error preprocessing! %s', ex.message));
+%                 keyboard
+%             end
             
         end
         
@@ -776,7 +776,7 @@ classdef ksGUI < handle
         
         function runSpikesort(obj)
             % fit templates
-            try
+%             try
                 % pre-clustering to re-order batches by depth
 %                 obj.log('Pre-clustering to re-order batches by depth')
 %                 obj.rez = clusterSingleBatches(obj.rez);
@@ -805,10 +805,10 @@ classdef ksGUI < handle
                 obj.log('Kilosort finished!');
                 set(obj.H.settings.runSaveBtn, 'enable', 'on');
                 obj.updateDataView();
-            catch ex
-                obj.log(sprintf('Error running kilosort! %s', ex.message));
-            end   
-                        
+%             catch ex
+%                 obj.log(sprintf('Error running kilosort! %s', ex.message));
+%             end   
+%                         
         end
         
         function runSaveToPhy(obj)            
@@ -824,12 +824,12 @@ classdef ksGUI < handle
             fname = fullfile(obj.ops.saveDir, 'rez.mat');
             save(fname, 'rez', '-v7.3');
             
-            try
+%             try
                 mkdir(fullfile(obj.ops.saveDir, 'kilosort3'));
                 rezToPhy2(obj.rez, fullfile(obj.ops.saveDir, 'kilosort3'));
-            catch ex
-                obj.log(sprintf('Error saving data for phy! %s', ex.message));
-            end            
+%             catch ex
+%                 obj.log(sprintf('Error saving data for phy! %s', ex.message));
+%             end            
             obj.log('Done');
         end
             
