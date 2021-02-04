@@ -108,12 +108,13 @@ if getOr(ops, 'fig', 1)
     
     % plot the shift trace in um
     plot(imin * dd)
+    box off
     xlabel('batch number')
     ylabel('drift (um)')
     title('Estimated drift traces')
     drawnow
     
-    figure(194);
+    figure;
     set(gcf, 'Color', 'w')
     % raster plot of all spikes at their original depths
     st_shift = st3(:,2); %+ imin(batch_id)' * dd;
@@ -125,6 +126,7 @@ if getOr(ops, 'fig', 1)
         hold on
     end
     axis tight
+    box off
 
     xlabel('time (sec)')
     ylabel('spike position (um)')
