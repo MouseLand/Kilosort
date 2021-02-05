@@ -1,10 +1,13 @@
 
-function rezToPhy(rez, savePath)
+function rezToPhy(rez, savePath, varargin)
 % pull out results from kilosort's rez to either return to workspace or to
 % save in the appropriate format for the phy GUI to run on. If you provide
 % a savePath it should be a folder, and you will need to have npy-matlab
 % available (https://github.com/kwikteam/npy-matlab)
 
+
+[~, Nfilt, Nrank] = size(rez.W);
+rez.Wphy = cat(1, zeros(1+rez.ops.nt0min, Nfilt, Nrank), rez.W); % for Phy, we need to pad the spikes with zeros so the spikes are aligned to the center of the window
 
 % spikeTimes will be in samples, not seconds
 rez.W = gather(single(rez.Wphy));
@@ -17,8 +20,10 @@ end
 
 [~, isort]   = sort(rez.st3(:,1), 'ascend');
 rez.st3      = rez.st3(isort, :);
-rez.cProj    = rez.cProj(isort, :);
-rez.cProjPC  = rez.cProjPC(isort, :, :);
+if ~isempty(rez.cProj)
+    rez.cProj    = rez.cProj(isort, :);
+    rez.cProjPC  = rez.cProjPC(isort, :, :);
+end
 
 % ix = rez.st3(:,4)>12;
 % rez.st3 = rez.st3(ix, :);
@@ -56,7 +61,7 @@ Nfilt = size(W,2);
 
 templates = zeros(Nchan, nt0, Nfilt, 'single');
 for iNN = 1:size(templates,3)
-   templates(:,:,iNN) = squeeze(U(:,iNN,:)) * squeeze(W(:,iNN,:))';
+   templates(:,:,iNN) = rez.mu(iNN,1) * squeeze(U(:,iNN,:)) * squeeze(W(:,iNN,:))';
 end
 templates = permute(templates, [3 2 1]); % now it's nTemplates x nSamples x nChannels
 templatesInds = repmat([0:size(templates,3)-1], size(templates,1), 1); % we include all channels so this is trivial
@@ -66,7 +71,8 @@ templateFeatureInds = uint32(rez.iNeigh);
 pcFeatures = rez.cProjPC;
 pcFeatureInds = uint32(rez.iNeighPC);
 
-whiteningMatrix = rez.Wrot/rez.ops.scaleproc;
+% whiteningMatrix = rez.Wrot/rez.ops.scaleproc;
+whiteningMatrix = eye(size(rez.Wrot)) / rez.ops.scaleproc;
 whiteningMatrixInv = whiteningMatrix^-1;
 
 % here we compute the amplitude of every template...
@@ -96,8 +102,42 @@ tempAmps(tids) = ta; % because ta only has entries for templates that had at lea
 gain = getOr(rez.ops, 'gain', 1);
 tempAmps = gain*tempAmps'; % for consistency, make first dimension template number
 
-if ~isempty(savePath)
 
+templateFeatures = [];
+if ~isempty(savePath)
+    fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
+    fprintf(fileID, 'cluster_id%sKSLabel', char(9));
+    fprintf(fileID, char([13 10]));
+    
+    fileIDCP = fopen(fullfile(savePath, 'cluster_ContamPct.tsv'),'w');
+    fprintf(fileIDCP, 'cluster_id%sContamPct', char(9));
+    fprintf(fileIDCP, char([13 10]));
+    
+    fileIDA = fopen(fullfile(savePath, 'cluster_Amplitude.tsv'),'w');
+    fprintf(fileIDA, 'cluster_id%sAmplitude', char(9));
+    fprintf(fileIDA, char([13 10]));
+    
+    rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
+    for j = 1:length(rez.good)
+        if rez.good(j)
+            fprintf(fileID, '%d%sgood', j-1, char(9));
+        else
+            fprintf(fileID, '%d%smua', j-1, char(9));
+        end
+        fprintf(fileID, char([13 10]));
+        
+        fprintf(fileIDCP, '%d%s%.1f', j-1, char(9), rez.est_contam_rate(j)*100);
+        fprintf(fileIDCP, char([13 10]));
+        
+        fprintf(fileIDA, '%d%s%.1f', j-1, char(9), tempAmps(j));
+        fprintf(fileIDA, char([13 10]));
+        
+    end
+    fclose(fileID);
+    fclose(fileIDCP);
+    fclose(fileIDA);
+    
+    
     writeNPY(spikeTimes, fullfile(savePath, 'spike_times.npy'));
     writeNPY(uint32(spikeTemplates-1), fullfile(savePath, 'spike_templates.npy')); % -1 for zero indexing
     if size(rez.st3,2)>4
@@ -109,16 +149,17 @@ if ~isempty(savePath)
     writeNPY(templates, fullfile(savePath, 'templates.npy'));
     writeNPY(templatesInds, fullfile(savePath, 'templates_ind.npy'));
 
-    chanMap0ind = int32(chanMap0ind);
-
+    %chanMap0ind = int32(chanMap0ind);
+    chanMap0ind = int32([1:rez.ops.Nchan]-1);
     writeNPY(chanMap0ind, fullfile(savePath, 'channel_map.npy'));
     writeNPY([xcoords ycoords], fullfile(savePath, 'channel_positions.npy'));
 
-    writeNPY(templateFeatures, fullfile(savePath, 'template_features.npy'));
-    writeNPY(templateFeatureInds'-1, fullfile(savePath, 'template_feature_ind.npy'));% -1 for zero indexing
-    writeNPY(pcFeatures, fullfile(savePath, 'pc_features.npy'));
-    writeNPY(pcFeatureInds'-1, fullfile(savePath, 'pc_feature_ind.npy'));% -1 for zero indexing
-
+    if ~isempty(templateFeatures)
+        writeNPY(templateFeatures, fullfile(savePath, 'template_features.npy'));
+        writeNPY(templateFeatureInds'-1, fullfile(savePath, 'template_feature_ind.npy'));% -1 for zero indexing
+        writeNPY(pcFeatures, fullfile(savePath, 'pc_features.npy'));
+        writeNPY(pcFeatureInds'-1, fullfile(savePath, 'pc_feature_ind.npy'));% -1 for zero indexing
+    end
 
     writeNPY(whiteningMatrix, fullfile(savePath, 'whitening_mat.npy'));
     writeNPY(whiteningMatrixInv, fullfile(savePath, 'whitening_mat_inv.npy'));
@@ -137,46 +178,28 @@ if ~isempty(savePath)
 %     end
 %     fclose(fileID);
 
-    fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
-    fprintf(fileID, 'cluster_id%sKSLabel', char(9));
-    fprintf(fileID, char([13 10]));
-
-    fileIDCP = fopen(fullfile(savePath, 'cluster_ContamPct.tsv'),'w');
-    fprintf(fileIDCP, 'cluster_id%sContamPct', char(9));
-    fprintf(fileIDCP, char([13 10]));
-
-    fileIDA = fopen(fullfile(savePath, 'cluster_Amplitude.tsv'),'w');
-    fprintf(fileIDA, 'cluster_id%sAmplitude', char(9));
-    fprintf(fileIDA, char([13 10]));
-
-    rez.est_contam_rate(isnan(rez.est_contam_rate)) = 1;
-    for j = 1:length(rez.good)
-        if rez.good(j)
-            fprintf(fileID, '%d%sgood', j-1, char(9));
-        else
-            fprintf(fileID, '%d%smua', j-1, char(9));
-        end
-        fprintf(fileID, char([13 10]));
-
-        fprintf(fileIDCP, '%d%s%.1f', j-1, char(9), rez.est_contam_rate(j)*100);
-        fprintf(fileIDCP, char([13 10]));
-
-        fprintf(fileIDA, '%d%s%.1f', j-1, char(9), tempAmps(j));
-        fprintf(fileIDA, char([13 10]));
-
-    end
-    fclose(fileID);
-    fclose(fileIDCP);
-    fclose(fileIDA);
+    % Duplicate "KSLabel" as "group", a special metadata ID for Phy, so that
+    % filtering works as expected in the cluster view
+    KSLabelFilename = fullfile(savePath, 'cluster_KSLabel.tsv');
+    copyfile(KSLabelFilename, fullfile(savePath, 'cluster_group.tsv'));
 
      %make params file
     if ~exist(fullfile(savePath,'params.py'),'file')
         fid = fopen(fullfile(savePath,'params.py'), 'w');
 
-        [~, fname, ext] = fileparts(rez.ops.fbinary);
-
-        fprintf(fid,['dat_path = ''',fname ext '''\n']);
-        fprintf(fid,'n_channels_dat = %i\n',rez.ops.NchanTOT);
+%        [~, fname, ext] = fileparts(rez.ops.fbinary);
+%         fprintf(fid,['dat_path = ''',fname ext '''\n']);
+%         fprintf(fid,'n_channels_dat = %i\n',rez.ops.NchanTOT);
+        if ~isempty(varargin)
+            [root, fname, ext] = fileparts(rez.ops.fbinary);
+        else
+            [root, fname, ext] = fileparts(rez.ops.fproc);
+        end
+%         fprintf(fid,['dat_path = ''',fname ext '''\n']);
+        fprintf(fid,['dat_path = ''', strrep(rez.ops.fproc, '\', '/') '''\n']);
+        
+        fprintf(fid,'n_channels_dat = %i\n',rez.ops.Nchan);
+        
         fprintf(fid,'dtype = ''int16''\n');
         fprintf(fid,'offset = 0\n');
         if mod(rez.ops.fs,1)
@@ -184,7 +207,9 @@ if ~isempty(savePath)
         else
             fprintf(fid,'sample_rate = %i.\n',rez.ops.fs);
         end
-        fprintf(fid,'hp_filtered = False');
+%         fprintf(fid,'hp_filtered = False');
+        fprintf(fid,'hp_filtered = True');
+        
         fclose(fid);
     end
 end

@@ -21,7 +21,7 @@ ops = rez.ops;
 [wTEMP, wPCA]    = extractTemplatesfromSnippets(rez, NrankPC);
 
 % move these to the GPU
-wPCA = gpuArray(wPCA(:, 1:Nrank));
+wPCA = gpuArray(wPCA(:, 1:2*Nrank));
 wTEMP = gpuArray(wTEMP);
 wPCAd = double(wPCA); % convert to double for extra precision
 ops.wPCA = gather(wPCA);
@@ -62,15 +62,19 @@ nInnerIter  = 60; % this is for SVD for the power iteration
 % schedule of learning rates for the model fitting part
 % starts small and goes high, it corresponds approximately to the number of spikes
 % from the past that were averaged to give rise to the current template
-pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter));
 
+if ~getOr(ops, 'flag_warm_start', 0)
+    pmi = exp(-1./linspace(ops.momentum(1), ops.momentum(2), niter));
+else
+     pmi = exp(-1./linspace(ops.momentum(2), ops.momentum(2), niter));
+end
 Nsum = min(Nchan,7); % how many channels to extend out the waveform in mexgetspikes
 % lots of parameters passed into the CUDA scripts
 Params     = double([NT Nfilt ops.Th(1) nInnerIter nt0 Nnearest ...
     Nrank ops.lam pmi(1) Nchan NchanNear ops.nt0min 1 Nsum NrankPC ops.Th(1) useStableMode]);
 
 % W0 has to be ordered like this
-W0 = permute(double(wPCA), [1 3 2]);
+W0 = permute(double(wPCA(:,1:Nrank)), [1 3 2]);
 
 % initialize the list of channels each template lives on
 iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
@@ -78,8 +82,17 @@ iList = int32(gpuArray(zeros(Nnearest, Nfilt)));
 % initialize average number of spikes per batch for each template
 nsp = gpuArray.zeros(0,1, 'double');
 
-% this flag starts 0, is set to 1 later
-Params(13) = 0;
+if ~getOr(ops, 'flag_warm_start', 0)
+   W = [];
+else
+    dWU = gpuArray(rez.dWU);
+    W = gpuArray(rez.W);
+    Params(13) = 0;
+    Nfilt = size(W,2); % update the number of filters/templates
+    % this flag starts 0, is set to 1 later
+    Params(2) = Nfilt;
+    nsp = gpuArray.zeros(Nfilt,1, 'double');
+end
 
 % kernels for subsample alignment
 [Ka, Kb] = getKernels(ops, 10, 1);
@@ -90,11 +103,15 @@ fprintf('Time %3.0fs. Optimizing templates ...\n', toc)
 
 fid = fopen(ops.fproc, 'r');
 
-ndrop = zeros(1,2); % this keeps track of dropped templates for debugging purposes
+ndrop = zeros(1,3); % this keeps track of dropped templates for debugging purposes
 
 m0 = ops.minFR * ops.NT/ops.fs; % this is the minimum firing rate that all templates must maintain, or be dropped
 
-for ibatch = 1:niter    
+if getOr(ops, 'new_spk', 0)
+    detset = setup_detector(rez, ops.Th(1));
+end
+%%
+for ibatch = 1:niter        
     k = iorder(ibatch); % k is the index of the batch in absolute terms
 
     % obtained pm for this batch
@@ -104,14 +121,19 @@ for ibatch = 1:niter
     % loading a single batch (same as everywhere)
     offset = 2 * ops.Nchan*batchstart(k);
     fseek(fid, offset, 'bof');
-    dat = fread(fid, [NT ops.Nchan], '*int16');
+    dat = fread(fid, [ops.Nchan NT+ops.ntbuff], '*int16');
+    dat = dat';
     dataRAW = single(gpuArray(dat))/ ops.scaleproc;
-
-
-    if ibatch==1
+    Params(1) = size(dataRAW,1);
+    
+    if ibatch==1 && ~getOr(ops, 'flag_warm_start', 0)
        % only on the first batch, we first get a new set of spikes from the residuals,
-       % which in this case is the unmodified data because we start with no templates
-        [dWU, cmap] = mexGetSpikes2(Params, dataRAW, wTEMP, iC-1); % CUDA function to get spatiotemporal clips from spike detections
+       % which in this case is the unmodified data because we start with no templates       
+       if getOr(ops, 'new_spk', 0)
+           dWU = newSpikes2(detset, dataRAW, wTEMP, nt0, Nchan, [], [], [], []);
+       else
+           [dWU, cmap] = mexGetSpikes2(Params, dataRAW, wTEMP, iC-1); % CUDA function to get spatiotemporal clips from spike detections
+       end
         dWU = double(dWU);
         dWU = reshape(wPCAd * (wPCAd' * dWU(:,:)), size(dWU)); % project these into the wPCA waveforms
 
@@ -120,18 +142,18 @@ for ibatch = 1:niter
         nsp(1:Nfilt) = m0; % initialize the number of spikes for new templates with the minimum allowed value, so it doesn't get thrown back out right away
         Params(2) = Nfilt; % update in the CUDA parameters
     end
-
     
     % resort the order of the templates according to best peak channel
     % this is important in order to have cohesive memory requests from the GPU RAM
     [~, iW] = max(abs(dWU(nt0min, :, :)), [], 2); % max channel (either positive or negative peak)
     iW = int32(squeeze(iW));
     
-    [iW, isort] = sort(iW); % sort by max abs channel
-    W = W(:,isort, :); % user ordering to resort all the other template variables
-    dWU = dWU(:,:,isort);
-    nsp = nsp(isort);
-    
+    if ~getOr(ops, 'flag_warm_start', 0)
+        [iW, isort] = sort(iW); % sort by max abs channel
+        W = W(:,isort, :); % user ordering to resort all the other template variables
+        dWU = dWU(:,:,isort);
+        nsp = nsp(isort);
+    end
 
     % decompose dWU by svd of time and space (via covariance matrix of 61 by 61 samples)
     % this uses a "warm start" by remembering the W from the previous iteration
@@ -182,9 +204,11 @@ for ibatch = 1:niter
     % nsp just gets updated according to the fixed factor p1
     nsp = nsp * p1 + (1-p1) * double(nsp0);
 
+    
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-    if ibatch<niter
+    if ibatch<niter && ~getOr(ops, 'flag_warm_start', 0)
+       
         % during the main "learning" phase of fitting a model
         if rem(ibatch, 5)==1
             % this drops templates based on spike rates and/or similarities to other templates
@@ -194,34 +218,49 @@ for ibatch = 1:niter
         Nfilt = size(W,2); % update the number of filters
         Params(2) = Nfilt;
         
-        % this adds new templates if they are detected in the residual
-        [dWU0,cmap] = mexGetSpikes2(Params, drez, wTEMP, iC-1);
+        new_spk = getOr(ops, 'new_spk', 0);
+        flag = 0;
+        if new_spk
+            if rem(ibatch, 5) ==2 %==1
+                dWU0 = newSpikes2(detset, drez, wTEMP, nt0, Nchan, []);
+%                  dWU0 = newSpikes2(detset, dataRAW, wTEMP, nt0, Nchan, st0, id0, U, rez);                 
+               flag = 1;
+            end
+        else
+            [dWU0,cmap] = mexGetSpikes2(Params, drez, wTEMP, iC-1);
+            flag = 1;
+        end
         
-        if size(dWU0,3)>0
-            % new templates need to be integrated into the same format as all templates
-            dWU0 = double(dWU0);
-            dWU0 = reshape(wPCAd * (wPCAd' * dWU0(:,:)), size(dWU0)); % apply PCA for smoothing purposes
-            dWU = cat(3, dWU, dWU0);
-            
-            W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:); % initialize temporal components of waveforms
-            
-            nsp(Nfilt + [1:size(dWU0,3)]) = ops.minFR * NT/ops.fs; % initialize the number of spikes with the minimum allowed
-            mu(Nfilt + [1:size(dWU0,3)])  = 10; % initialize the amplitude of this spike with a lowish number
-            
-            Nfilt = min(ops.Nfilt, size(W,2)); % if the number of filters exceed the maximum allowed, clip it
-            Params(2) = Nfilt;
-            
-            W   = W(:, 1:Nfilt, :); % remove any new filters over the maximum allowed
-            dWU = dWU(:, :, 1:Nfilt); % remove any new filters over the maximum allowed
-            nsp = nsp(1:Nfilt); % remove any new filters over the maximum allowed
-            mu  = mu(1:Nfilt); % remove any new filters over the maximum allowed
+        
+        if flag
+            if size(dWU0,3)>0
+                ndrop(3) = .9 * ndrop(3) + .1 * size(dWU0,3);
+                
+                % new templates need to be integrated into the same format as all templates
+                dWU0 = double(dWU0);
+                dWU0 = reshape(wPCAd * (wPCAd' * dWU0(:,:)), size(dWU0)); % apply PCA for smoothing purposes
+                dWU = cat(3, dWU, dWU0);
+                
+                W(:,Nfilt + [1:size(dWU0,3)],:) = W0(:,ones(1,size(dWU0,3)),:); % initialize temporal components of waveforms
+                
+                nsp(Nfilt + [1:size(dWU0,3)]) = ops.minFR * NT/ops.fs; % initialize the number of spikes with the minimum allowed
+                mu(Nfilt + [1:size(dWU0,3)])  = 10; % initialize the amplitude of this spike with a lowish number
+                
+                Nfilt = min(ops.Nfilt, size(W,2)); % if the number of filters exceed the maximum allowed, clip it
+                Params(2) = Nfilt;
+                
+                W   = W(:, 1:Nfilt, :); % remove any new filters over the maximum allowed
+                dWU = dWU(:, :, 1:Nfilt); % remove any new filters over the maximum allowed
+                nsp = nsp(1:Nfilt); % remove any new filters over the maximum allowed
+                mu  = mu(1:Nfilt); % remove any new filters over the maximum allowed
+            end
         end
     end
 
         
     if (rem(ibatch, 100)==1)
         % this is some of the relevant diagnostic information to be printed during training
-        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, nst0: %d, merges: %2.4f, %2.4f \n', ...
+        fprintf('%2.2f sec, %d / %d batches, %d units, nspks: %2.4f, mu: %2.4f, nst0: %d, merges: %2.4f, %2.4f, %2.4f \n', ...
             toc, ibatch, niter, Nfilt, sum(nsp), median(mu), numel(st0), ndrop)
 
         % these diagnostic figures should be mostly self-explanatory
@@ -241,11 +280,13 @@ for ibatch = 1:niter
 end
 fclose(fid);
 toc
-
+%%
 % We need to memorize the state of the templates at this timepoint.
 % final clean up, triage templates one last time
-[W, U, dWU, mu, nsp, ndrop] = ...
-    triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, ndrop);
+if ~getOr(ops, 'flag_warm_start', 0)
+    [W, U, dWU, mu, nsp, ndrop] = ...
+        triageTemplates2(ops, iW, C2C, W, U, dWU, mu, nsp, ndrop);
+end
 % final covariance matrix between all templates
 [WtW, iList] = getMeWtW(single(W), single(U), Nnearest);
 % iW is the final channel assigned to each template
@@ -262,6 +303,7 @@ rez.iNeigh   = gather(iList);
 
 rez = memorizeW(rez, W, dWU, U, mu); % memorize the state of the templates
 rez.ops = ops; % update these (only rez comes out of this script)
+rez.nsp = nsp;
 
 % save('rez_mid.mat', 'rez');
 

@@ -5,31 +5,33 @@ ops.chanMap             = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3A_kilos
 ops.fs = 30000;  
 
 % frequency for high pass filtering (150)
-ops.fshigh = 150;   
-
-% minimum firing rate on a "good" channel (0 to skip)
-ops.minfr_goodchannels = 0.1; 
+ops.fshigh = 300;   
 
 % threshold on projections (like in Kilosort1, can be different for last pass like [10 4])
-ops.Th = [10 4];  
+ops.Th = [9 9];  
 
 % how important is the amplitude penalty (like in Kilosort1, 0 means not used, 10 is average, 50 is a lot) 
-ops.lam = 10;  
+ops.lam = 20;  
 
 % splitting a cluster at the end requires at least this much isolation for each sub-cluster (max = 1)
-ops.AUCsplit = 0.9; 
+ops.AUCsplit = 0.8; 
 
 % minimum spike rate (Hz), if a cluster falls below this for too long it gets removed
 ops.minFR = 1/50; 
-
-% number of samples to average over (annealed from first to second value) 
-ops.momentum = [20 400]; 
 
 % spatial constant in um for computing residual variance of spike
 ops.sigmaMask = 30; 
 
 % threshold crossings for pre-clustering (in PCA projection space)
 ops.ThPre = 8; 
+
+% spatial scale for datashift kernel
+ops.sig = 20;
+
+% type of data shifting (0 = none, 1 = rigid, 2 = nonrigid)
+ops.nblocks = 5;
+
+
 %% danger, changing these settings can lead to fatal errors
 % options for determining PCs
 ops.spkTh           = -6;      % spike threshold in standard deviations (-6)

@@ -5,8 +5,8 @@ function make_eMouseData_drift(fpath, KS2path, chanMapName, useGPU, useParPool)
 % probe sites.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % you can play with the parameters just below here to achieve a signal more similar to your own data!!! 
-norm_amp  = 16.7; % if 0, use amplitudes of input waveforms; if > 0, set all amplitudes to norm_amp*rms_noise
-mu_mean   = 0.75; % mean of mean spike amplitudes. Incoming waveforms are in uV; make <1 to make sorting harder
+norm_amp  = 1.5 * 16.7; % if 0, use amplitudes of input waveforms; if > 0, set all amplitudes to norm_amp*rms_noise
+mu_mean   = .75; %0.75; % mean of mean spike amplitudes. Incoming waveforms are in uV; make <1 to make sorting harder
 noise_model = 'gauss'; %'gauss' or 'fromData'; 'fromData' requires a noiseModel.mat built by make_noise_model
 rms_noise = 10; % rms noise in uV. Will be added to the spike signal. 15-20 uV an OK estimate from real data
 t_record  = 1200; % duration in seconds of simulation. longer is better (and slower!) (1000)
@@ -24,7 +24,7 @@ drift.tType = 'sine';   %'exp' or 'sine'
 drift.y0 = 3800;        %in um, position along probe where motion is largest
                         %y = 0 is the tip of the probe                        
 drift.halfDistance = 1000;   %in um, distance along probe over which the motion decays
-drift.amplitude = 10;        %in um for a sine wave
+drift.amplitude = 5;        %in um for a sine wave
 %                             peak variation is 2Xdrift.amplitude
 drift.halfLife = 2;     %in seconds
 drift.period = 600;      %in seconds
@@ -50,9 +50,9 @@ useDefault = 1;     %use waveforms from eMouse folder in KS2
 
 if useDefault
     %get waveforms from eMouse folder in KS2
-     filePath{1} = [KS2path,'\eMouse_drift\','kampff_St_unit_waves_allNeg_2X.mat'];
+     filePath{1} = fullfile(KS2path,'eMouse_drift','kampff_St_unit_waves_allNeg_2X.mat');
      fileCopies(1) = 2;
-     filePath{2} = [KS2path,'\eMouse_drift\','121817_SU_waves_allNeg_gridEst.mat'];
+     filePath{2} = fullfile(KS2path,'eMouse_drift','121817_SU_waves_allNeg_gridEst.mat');
      fileCopies(2) = 2;
 else
     %fill in paths to waveform files 

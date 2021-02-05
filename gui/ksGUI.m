@@ -221,7 +221,7 @@ classdef ksGUI < handle
             obj.H.settings.setMinfrTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'Min. firing rate per chan (0=include all chans)');
+                'String', {'N blocks for registration', '(0=none, 1=rigid, N=nonrigid)'});
             
             % choose threshold
             obj.H.settings.setThTxt = uicontrol(...
@@ -233,13 +233,13 @@ classdef ksGUI < handle
             obj.H.settings.setLambdaTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'Lambda');
+                'String', 'Lambda (no longer very important)');
             
             % ccsplit
             obj.H.settings.setCcsplitTxt = uicontrol(...
                 'Parent', obj.H.settingsGrid,...
                 'Style', 'text', 'HorizontalAlignment', 'right', ...
-                'String', 'AUC for splits');            
+                'String', 'AUC for splits (not used)');            
             
             % advanced options
             obj.H.settings.setAdvancedTxt = uicontrol(...
@@ -676,16 +676,12 @@ classdef ksGUI < handle
             
             obj.ops.NchanTOT = str2double(obj.H.settings.setnChanEdt.String);
             
-            obj.ops.minfr_goodchannels = str2double(obj.H.settings.setMinfrEdt.String);
-            if isempty(obj.ops.minfr_goodchannels)||isnan(obj.ops.minfr_goodchannels)
-                obj.ops.minfr_goodchannels = 0.1;
+            obj.ops.nblocks = str2double(obj.H.settings.setMinfrEdt.String);
+            if isempty(obj.ops.nblocks)||isnan(obj.ops.nblocks)
+                obj.ops.nblocks = 5;
             end
-            if obj.ops.minfr_goodchannels==0
-                obj.ops.throw_out_channels = false;
-            else
-                obj.ops.throw_out_channels = true;
-            end
-            obj.H.settings.setMinfrEdt.String = num2str(obj.ops.minfr_goodchannels);
+            obj.ops.throw_out_channels = false;
+            obj.H.settings.setMinfrEdt.String = num2str(obj.ops.nblocks);
 
             obj.ops.fs = str2num(obj.H.settings.setFsEdt.String);
             if isempty(obj.ops.fs)||isnan(obj.ops.fs)
@@ -694,7 +690,7 @@ classdef ksGUI < handle
                         
             obj.ops.Th = str2num(obj.H.settings.setThEdt.String);
             if isempty(obj.ops.Th)||any(isnan(obj.ops.Th))
-                obj.ops.Th = [10 4];
+                obj.ops.Th = [9 9];
             end
             obj.H.settings.setThEdt.String = num2str(obj.ops.Th);
             
@@ -724,10 +720,11 @@ classdef ksGUI < handle
             
             % do preprocessing
             obj.ops.gui = obj; % for kilosort to access, e.g. calling "log"
-            try
+%             try
                 obj.log('Preprocessing...'); 
                 obj.rez = preprocessDataSub(obj.ops);
-                
+                obj.rez = datashift2(obj.rez, 1);
+
                 % update connected channels
                 igood = obj.rez.ops.igood;
                 previousGood = find(obj.P.chanMap.connected);
@@ -752,10 +749,10 @@ classdef ksGUI < handle
                 % update gui with results of preprocessing
                 obj.updateDataView();
                 obj.log('Done preprocessing.'); 
-            catch ex
-                obj.log(sprintf('Error preprocessing! %s', ex.message));
-                keyboard
-            end
+%             catch ex
+%                 obj.log(sprintf('Error preprocessing! %s', ex.message));
+%                 keyboard
+%             end
             
         end
         
@@ -779,42 +776,39 @@ classdef ksGUI < handle
         
         function runSpikesort(obj)
             % fit templates
-            try
+%             try
                 % pre-clustering to re-order batches by depth
-                obj.log('Pre-clustering to re-order batches by depth')
-                obj.rez = clusterSingleBatches(obj.rez);
+%                 obj.log('Pre-clustering to re-order batches by depth')
+%                 obj.rez = clusterSingleBatches(obj.rez);
                 
                 % main optimization
-                obj.log('Main optimization')
-                obj.rez = learnAndSolve8b(obj.rez);
+                obj.log('Extracting spikes for clustering')
+                [obj.rez, st3, tF]     = extract_spikes(obj.rez);
                 
-                % final splits and merges
-                if 1
-                    obj.log('Merges...')
-                    obj.rez = find_merges(obj.rez, 1);
-                    
-                    % final splits by SVD
-                    obj.log('Splits part 1/2...')
-                    obj.rez = splitAllClusters(obj.rez, 1);
-                    
-                    % final splits by amplitudes
-                    obj.log('Splits part 2/2...')
-                    obj.rez = splitAllClusters(obj.rez, 0);
-                    
-                    % decide on cutoff
-                    obj.log('Last step. Setting cutoff...')
-                    obj.rez = set_cutoff(obj.rez);
-                end
+                obj.log('First clustering')
+                obj.rez                = template_learning(obj.rez, tF, st3);
+                
+                obj.log('Template matching on binary file')                
+                [obj.rez, st3, tF]     = trackAndSort(obj.rez);
+
+                obj.log('Second clustering')
+                obj.rez                = final_clustering(obj.rez, tF, st3);
+                
+                obj.log('Merges...')                
+                obj.rez                = find_merges(obj.rez, 1);
+
+                
+                obj.log(sprintf('found %d good units \n', sum(obj.rez.good>0)))
                                                                 
                 obj.P.ksDone = true;
                 
                 obj.log('Kilosort finished!');
                 set(obj.H.settings.runSaveBtn, 'enable', 'on');
                 obj.updateDataView();
-            catch ex
-                obj.log(sprintf('Error running kilosort! %s', ex.message));
-            end   
-                        
+%             catch ex
+%                 obj.log(sprintf('Error running kilosort! %s', ex.message));
+%             end   
+%                         
         end
         
         function runSaveToPhy(obj)            
@@ -830,11 +824,12 @@ classdef ksGUI < handle
             fname = fullfile(obj.ops.saveDir, 'rez.mat');
             save(fname, 'rez', '-v7.3');
             
-            try
-                rezToPhy(obj.rez, obj.ops.saveDir);
-            catch ex
-                obj.log(sprintf('Error saving data for phy! %s', ex.message));
-            end            
+%             try
+                mkdir(fullfile(obj.ops.saveDir, 'kilosort3'));
+                rezToPhy2(obj.rez, fullfile(obj.ops.saveDir, 'kilosort3'));
+%             catch ex
+%                 obj.log(sprintf('Error saving data for phy! %s', ex.message));
+%             end            
             obj.log('Done');
         end
             

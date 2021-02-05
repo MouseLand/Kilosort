@@ -1,4 +1,4 @@
-function Wrot = get_whitening_matrix(rez)
+function [Wrot, CC] = get_whitening_matrix(rez)
 % based on a subset of the data, compute a channel whitening matrix
 % this requires temporal filtering first (gpufilter)
 
@@ -46,8 +46,18 @@ while ibatch<=Nbatch
     ibatch = ibatch + ops.nSkipCov; % skip this many batches
 end
 CC = CC / ceil((Nbatch-1)/ops.nSkipCov); % normalize by number of batches
-
 fclose(fid);
+
+% CC = diag(diag(CC));
+% mu = mean(diag(CC));
+
+% CC = gpuArray(eye(size(CC), 'single'));
+% CC = CC * mu;
+
+% xp = cat(2, rez.xc, rez.yc);
+% CC = mu * (.05 + .95 * kernel2D(xp, xp, 30));
+
+% plot(diag(CC))
 
 if ops.whiteningRange<Inf
     % if there are too many channels, a finite whiteningRange is more robust to noise in the estimation of the covariance
