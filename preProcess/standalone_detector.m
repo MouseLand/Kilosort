@@ -20,9 +20,10 @@ sig = 10;
 wTEMP = gpuArray(rez.wTEMP);
 wPCA = gpuArray(rez.wPCA);
 
-% Get nearest channels for every template center. 
-% Template products will only be computed on these channels. 
-NchanNear = 10;
+% Get nearest channels for every putative template center, that is, 
+% every point on upsampled grid
+% Template products will only be computed on these channels.
+NchanNear = getOr(ops,'detectorNchanNear', 10);
 [iC, dist] = getClosestChannels2(ycup, xcup, rez.yc, rez.xc, NchanNear);
 
 % Templates with centers that are far from an active site are discarded
@@ -34,10 +35,14 @@ ycup = ycup(igood);
 xcup = xcup(igood);
 
 % number of nearby templates to compare for local template maximum
+% note that iC2 is now indicies of nearest upsampled point, dist2 = distance
+% to nearest upsampled point
 NchanNearUp =  min(numel(xcup), 10*NchanNear);
 [iC2, dist2] = getClosestChannels2(ycup, xcup, ycup, xcup, NchanNearUp);
 
+
 % pregenerate the Gaussian weights used for spatial components 
+% Note that dist and sig are in um
 nsizes = 5;
 v2 = gpuArray.zeros(nsizes, size(dist,2), 'single');
 for k = 1:nsizes
@@ -45,7 +50,7 @@ for k = 1:nsizes
 end
 
 % build up Params
-NchanUp = size(iC,2);
+NchanUp = size(iC,2); % number of "Good" templatss, well centered on sites
 
 % preallocate the results
 st3 = zeros(1000000, 6);

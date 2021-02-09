@@ -75,8 +75,18 @@ ntb = ops.ntbuff;
 datr_prev = gpuArray.zeros(ntb, ops.Nchan, 'single');
 
 for ibatch = 1:Nbatch
-    % we'll create a binary file of batches of NT samples, which overlap consecutively on ops.ntbuff samples
-    % in addition to that, we'll read another ops.ntbuff samples from before and after, to have as buffers for filtering
+    % From the original binary, get batches of data of size NTbuff = NT + 3*ops.ntbuff
+    % Points from ntbuff to NT+ntbuff will be those saved to the processed file.
+    % For first and last batches, pad the beginning/end to get NTbuff samples
+    % For batches 2:Nbatch, the first ntbuff samples = last ntbuff samples of last batch
+    % Filter the data with the buffers
+    % "Blend" points from 1:ntb of the data to be saved with those data points as saved from the last batch (datr_prev)
+    % This will prevent "edges" in the data. In previous versions of Kilosort, these sections of data were kept with 
+    % the batch, but spikes found there were ignored.
+    % Data is transposed before saving to the processed file, so that it is a continuous
+    % Nchan x Ntimepoints file, the same as the format of the starting binary.
+    % Note that only sorted channels appear in this new binary file.
+
     offset = max(0, ops.twind + 2*NchanTOT*(NT * (ibatch-1) - ntb)); % number of samples to start reading at.
     
     fseek(fid, offset, 'bof'); % fseek to batch start in raw file

@@ -1,5 +1,5 @@
 function rez1 = final_clustering(rez, tF, st3)
-
+% tF contains the pc features, and has dimensions ( nspikes x nPCs x channels in template)
 wPCA  = rez.wPCA;
 wTEMP  = rez.wTEMP;
 
@@ -37,7 +37,7 @@ end
 
 
 ops = rez.ops;
-NchanNear   = min(ops.Nchan, 16);
+NchanNear   = getOr(ops, 'NtemplateChan', 32);
 
 [iC, mask, C2C] = getClosestChannels(rez, ops.sigmaMask, NchanNear);
 

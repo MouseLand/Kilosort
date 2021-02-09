@@ -46,10 +46,12 @@ nBatches  = rez.temp.Nbatch;
 NT  	= ops.NT;
 
 
-% two variables for the same thing? number of nearest channels to each primary channel
-
-NchanNear   = min(ops.Nchan, rez.ops.nNeighbors);
-Nnearest    = min(ops.Nchan, rez.ops.nNeighbors);
+% Nnearest is the number of nearest templates to store features for
+% NchanNear is the number of nearest channels to take PC features from; this is also the size of template in channels
+NtemplateChan = getOr(ops,'NtemplateChan', 16);
+NtempFeatChan = getOr(ops,'NtempFeatChan', 32);
+Nnearest   = min(ops.Nchan, NtempFeatChan);      % param[5], Nnearest in CUDA, number of channels for which template features are stored
+NchanNear    = min(ops.Nchan, NtemplateChan);  % param[10], NchanU in CUDA, PCs are calculated on each channel in the template
 
 
 % decay of gaussian spatial mask centered on a channel
@@ -99,7 +101,7 @@ p1 = .95; % decay of nsp estimate in each batch
 % also, covariance matrix between templates
 [~, iW] = max(abs(dWU(nt0min, :, :)), [], 2);
 iW = int32(squeeze(iW));
-[WtW, iList] = getMeWtW(single(W), single(U), Nnearest);
+[WtW, iList] = getMeWtW(single(W), single(U), NchanNear);
 
 fprintf('Time %3.0fs. Final spike extraction ...\n', toc)
 
@@ -112,17 +114,18 @@ ntot = 0;
 
 % these ones store features per spike
 fW  = zeros(Nnearest, 1e7, 'single'); % Nnearest is the number of nearest templates to store features for
-fWpc = zeros(NchanNear, 2*Nrank, 1e7, 'single'); % NchanNear is the number of nearest channels to take PC features from
+fWpc = zeros(NchanNear, 2*Nrank, 1e7, 'single'); % NchanNear is the number of nearest channels to take PC features from, also the size of the template
 
+% UtU is the gram matrix of the spatial components of the low-rank SVDs
+% it tells us which pairs of templates are likely to "interfere" with each other
+% such as when we subtract off a template
+% this happens before the start of the loop because the templates are
+% already defined.
 
-<<<<<<< HEAD
-
-=======
 dWU1 = dWU;
 
 [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan); % this needs to change (but I don't know why!)
     
->>>>>>> upstream/main
 for ibatch = 1:niter    
     k = iorder(ibatch); % k is the index of the batch in absolute terms
     
@@ -144,14 +147,9 @@ for ibatch = 1:niter
     % UtU is the gram matrix of the spatial components of the low-rank SVDs
     % it tells us which pairs of templates are likely to "interfere" with each other
     % such as when we subtract off a template
-<<<<<<< HEAD
-    [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan); % this needs to change (but I don't know why!)
-    
-
-=======
 %     [UtU, maskU] = getMeUtU(iW, iC, mask, Nnearest, Nchan); % this needs to change (but I don't know why!)%     
     
->>>>>>> upstream/main
+
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     
@@ -251,5 +249,5 @@ rez.nsp = nsp;
 rez.iC = iC;
 
 fWpc = permute(fWpc, [3, 2, 1]);
-
+disp(size(fWpc))
 %%

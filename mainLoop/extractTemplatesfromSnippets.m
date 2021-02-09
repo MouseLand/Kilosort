@@ -51,8 +51,10 @@ fclose(fid);
 % discard empty samples
 dd = dd(:, 1:k);
 
+
 % initialize the template clustering with random waveforms
 % wTEMP = dd(:, randperm(size(dd,2), nPCs));
+% initialize with a set spikes evenly space in index
 wTEMP = dd(:, round(linspace(1, size(dd,2), nPCs)));
 wTEMP = wTEMP ./ sum(wTEMP.^2,1).^.5; % normalize them
 

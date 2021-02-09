@@ -31,7 +31,7 @@ end
 
 
 ops = rez.ops;
-NchanNear   = min(ops.Nchan, 16);
+NchanNear   = ops.nNeighbors;
 
 [iC, mask, C2C] = getClosestChannels(rez, ops.sigmaMask, NchanNear);
 

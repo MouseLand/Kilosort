@@ -60,6 +60,7 @@ W = rez.W;
 Nfilt = size(W,2);
 
 templates = zeros(Nchan, nt0, Nfilt, 'single');
+% change from v1: remove scaling by mu
 for iNN = 1:size(templates,3)
    templates(:,:,iNN) = squeeze(U(:,iNN,:)) * squeeze(W(:,iNN,:))';
 end
@@ -101,7 +102,7 @@ tempAmps = zeros(numel(rez.mu),1);
 tempAmps(tids) = ta; % because ta only has entries for templates that had at least one spike
 gain = getOr(rez.ops, 'gain', 1);
 tempAmps = gain*tempAmps'; % for consistency, make first dimension template number
-
+% change from v1: don't intialize array of template features
 if ~isempty(savePath)
     fileID = fopen(fullfile(savePath, 'cluster_KSLabel.tsv'),'w');
     fprintf(fileID, 'cluster_id%sKSLabel', char(9));

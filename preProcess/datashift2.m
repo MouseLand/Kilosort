@@ -5,6 +5,9 @@ NrankPC = 6;
 rez.wTEMP = gather(wTEMP);
 rez.wPCA  = gather(wPCA);
 
+disp(size(wTEMP))
+disp(size(wPCA))
+
 ops = rez.ops;
 
 % The min and max of the y and x ranges of the channels
@@ -13,23 +16,26 @@ ymax = max(rez.yc);
 xmin = min(rez.xc);
 xmax = max(rez.xc);
 
-dmin = median(diff(unique(rez.yc)));
+dmin = median(diff(unique(rez.yc))); %estimate of vertical pitch allowing for some skiped sites
 fprintf('vertical pitch size is %d \n', dmin)
 rez.ops.dmin = dmin;
 rez.ops.yup = ymin:dmin/2:ymax; % centers of the upsampled y positions
 
 % dminx = median(diff(unique(rez.xc)));
-yunq = unique(rez.yc);
+yunq = unique(rez.yc); %number of rows
 mxc = zeros(numel(yunq), 1);
+% for each row, get teh median pitch on that row
 for j = 1:numel(yunq)
     xc = rez.xc(rez.yc==yunq(j));
     if numel(xc)>1
        mxc(j) = median(diff(sort(xc))); 
     end
 end
+% get median of those medians to get a value for the horizontal pitch
 dminx = median(mxc);
 fprintf('horizontal pitch size is %d \n', dminx)
 
+% upsample by a factor of 2
 rez.ops.dminx = dminx;
 nx = round((xmax-xmin) / (dminx/2)) + 1;
 rez.ops.xup = linspace(xmin, xmax, nx); % centers of the upsampled x positions
