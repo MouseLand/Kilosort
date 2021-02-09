@@ -28,6 +28,7 @@ ktid = int32(st3(:,2));
 uweigh = abs(rez.U(:,:,1));
 uweigh = uweigh ./ sum(uweigh,1);
 ycup = sum(uweigh .* rez.yc, 1);
+xcup = sum(uweigh .* rez.xc, 1);
 
 Nfilt =  size(rez.W,2);
 dWU = gpuArray.zeros(ops.nt0, ops.Nchan, Nfilt, 'double');
@@ -50,7 +51,12 @@ iC = gather(iC(:,iW));
 ss = double(st3(:,1)) / ops.fs;
 
 dmin = rez.ops.dmin;
-ycenter = (min(rez.yc) + dmin-5):(2*dmin):(max(rez.yc)+dmin+5);
+ycenter = (min(rez.yc) + dmin-1):(2*dmin):(max(rez.yc)+dmin+1);
+dminx = rez.ops.dminx;
+xcenter = (min(rez.xc) + dminx-1):(2*dminx):(max(rez.xc)+dminx+1);
+[xcenter, ycenter] = meshgrid(xcenter, ycenter);
+xcenter = xcenter(:);
+ycenter = ycenter(:);
 
 Wpca = zeros(6, Nchan, 1000, 'single');
 nst = numel(ktid);
@@ -64,8 +70,9 @@ for j = 1:numel(ycenter)
         fprintf('time %2.2f, GROUP %d/%d, units %d \n', toc, j, numel(ycenter), n0)    
     end
     y0 = ycenter(j);
+    x0 = xcenter(j);    
+    xchan = (abs(ycup - y0) < dmin) & (abs(xcup - x0) < dminx);
     
-    xchan = abs(ycup - y0) < dmin;
     itemp = find(xchan);
         
     tin = ismember(ktid, itemp);
@@ -78,23 +85,24 @@ for j = 1:numel(ycenter)
     data = tF(tin, :, :);
     
     ich = unique(iC(:, itemp));
-    ch_min = ich(1)-1;
-    ch_max = ich(end);
+%     ch_min = ich(1)-1;
+%     ch_max = ich(end);
     
     nsp = size(data,1);
-    dd = zeros(nsp, 6, ch_max-ch_min, 'single');
+    dd = zeros(nsp, 6,  numel(ich),  'single');
     for k = 1:length(itemp)
         ix = pid==itemp(k);
-        dd(ix, :, iC(:,itemp(k))-ch_min) = data(ix,:,:);
+        [~,ia,ib] = intersect(iC(:,itemp(k)), ich);
+        dd(ix, :, ib) = data(ix,:,ia);
     end
-    xy(tin, :) =  spike_position(dd, wPCA, wTEMP, rez.xc(ch_min+1:ch_max), rez.yc(ch_min+1:ch_max));
+    xy(tin, :) =  spike_position(dd, wPCA, wTEMP, rez.xc(ich), rez.yc(ich));
 
     kid = run_pursuit(dd, nlow, rmin, n0, wroll, ss(tin), use_CCG);
     
     [~, ~, kid] = unique(kid);
     nmax = max(kid);
     for t = 1:nmax
-        Wpca(:, ch_min+1:ch_max, t + n0) = gather(sq(mean(dd(kid==t,:,:),1)));
+        Wpca(:, ich, t + n0) = gather(sq(mean(dd(kid==t,:,:),1)));
     end
     
     hid(tin) = gather(kid + n0);
