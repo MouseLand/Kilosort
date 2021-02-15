@@ -91,12 +91,12 @@ if flag==1
        wav = wroll(:,:,j) * reshape(wav2, [6, numel(wav2)/6]);
        wav = wav(:)';
        if r0 > mean((wav1-wav).^2)
-          wav2 = wav;
+          wav2_best = wav;
           r0 =  mean((wav1-wav2).^2);
           do_roll = 1;
        end
     end
-    
+    wav2 = wav2_best;
     
     rc = sum(wav1 .* wav2)/(m1 * m2);
     dmu = 2 * abs(m1-m2)/(m1+m2);
