@@ -17,7 +17,7 @@
 #include <iostream>
 using namespace std;
 
-const int  Nthreads = 1024,  NrankMax = 6, maxFR = 10000, nt0max=81, NchanMax = 17, nsizes = 5;
+const int  Nthreads = 1024,  NrankMax = 6, maxFR = 10000, nt0max=81, NchanMax = 17, NchanNearMax = 64, nsizes = 5;
 
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -25,6 +25,7 @@ __global__ void	Conv1D(const double *Params, const float *data, const float *W, 
     volatile __shared__ float  sW[81*NrankMax], sdata[(Nthreads+81)];
     float y;
     int tid, tid0, bid, i, nid, Nrank, NT, nt0,  Nchan;
+//  called with <<<Nchan, Nthreads>>>
 
     tid 		= threadIdx.x;
     bid 		= blockIdx.x;
@@ -65,9 +66,10 @@ __global__ void  sumChannels(const double *Params, const float *data,
   float  Cmax, C0;
   float a[nsizes], d2;
   float  sigma;
-  volatile __shared__ float  sA[nsizes * 20];
-  
-  
+  volatile __shared__ float  sA[nsizes * NchanNearMax];
+
+  // called with sumChannels<<<tpP,Nthreads>>>, where tpP(NT/Nthreads, NchanUp)
+          
   tid 		= threadIdx.x;
   bidx 		= blockIdx.x;
   bidy 		= blockIdx.y;
@@ -186,6 +188,9 @@ __global__ void  maxChannels(const double *Params, const float *dataraw, const f
 	const int *iC,  const int *iC2, const float *dist2, const int *kkmax, 
         const float *dfilt, int *st, int *counter, float *cF){
     
+  // called with <<<tpC,Nthreads>>>, tpC = NT/Nthreads, NchanUp
+  // NchanUp = number of upsampled channels to check for maximum signal
+          
   int nt0, indx, tid, tid0, i, bid, NT, j,iChan, nt0min, Nrank, kfilt;
   int Nchan, NchanNear, NchanUp, NchanNearUp, bidy ;
   double Cf, d;
@@ -203,8 +208,8 @@ __global__ void  maxChannels(const double *Params, const float *dataraw, const f
   Nrank     = (int) Params[4];
   
   tid 		= threadIdx.x;
-  bid 		= blockIdx.x;
-  bidy = blockIdx.y;
+  bid 		= blockIdx.x;           //timepoints
+  bidy = blockIdx.y;                //channels
   
   tid0 = tid + bid * blockDim.x;
   while (tid0<NT-nt0-nt0min){
@@ -229,9 +234,9 @@ __global__ void  maxChannels(const double *Params, const float *dataraw, const f
                   indx = atomicAdd(&counter[0], 1);
                   if (indx<maxFR){
                       st[0+4*indx] = tid0;
-                      st[1+4*indx] = i;
-                      st[2+4*indx] = sqrt(d);
-                      st[3+4*indx] = kkmax[tid0 + NT*i];
+                      st[1+4*indx] = i;         //max channel in upsampled space
+                      st[2+4*indx] = sqrt(d);   //amplitude of filtered data
+                      st[3+4*indx] = kkmax[tid0 + NT*i]; //maximum pc
                       cF[indx] = sqrt(d);                      
                   }
               }

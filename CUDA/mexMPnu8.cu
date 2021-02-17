@@ -1183,9 +1183,10 @@ void mexFunction(int nlhs, mxArray *plhs[],
   cudaMemcpy(errmsg, d_errmsg, 1 * sizeof(int),   cudaMemcpyDeviceToHost);
   cudaFree(d_errmsg);
 
-
+  if (useStableMode) {
     //only free the memory if it was allocated
     cudaFree(d_draw64);
+  }
 
 
   cudaFree(d_counter);

@@ -85,6 +85,11 @@ for k = 1:ops.Nbatch
         spikedetector3PC(Params, dataRAW, wTEMP, iC-1, dist, v2, iC2-1, dist2, wPCA);
 %     [dat, kkmax, st, cF] = ...
 %         spikedetector3(Params, dataRAW, wTEMP, iC-1, dist, v2, iC2-1, dist2);
+ 
+    % st(1) = relative time (gets offest added)
+    % st(2) = max channel in upsampled space
+    % st(3) = max signal in data filtered with temporal templates
+    % st(4) = max PC (0-29, with 6 pcs and nsizes in spikedetectorPC = 5)
     
     ns = size(st,2);
     if nsp + ns>size(tF,3)
@@ -109,6 +114,17 @@ for k = 1:ops.Nbatch
 end
 tF = tF(:, :, 1:nsp);
 st3 = st3(1:nsp, :);
+[~,sortOrder] = sort(st3(:,1));
+
+st3 = st3(sortOrder,:);
+tF = tF(:,:,sortOrder); %make tF match st3
+
+% for diagnostics, saving st3 and tF to rez. Comment out to make
+% rez a more reasonable size. (st3 and tF are returned separately from this function)
+rez.st3 = st3;
+rez.tF = tF;
+
+
 
 rez.iC = iC;
 tF = permute(tF, [3, 1, 2]);

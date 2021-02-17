@@ -30,6 +30,8 @@ for j = 1:Nfilt
     dWU(:,:,j) = mu(j) * squeeze(W(:, j, :)) * squeeze(U(:, j, :))';
 end
 
+fprintf( 'size of dWU, matrix that holds the templates: \n');
+disp(size(dWU));
 
 ops.fig = getOr(ops, 'fig', 1); % whether to show plots every N batches
 
@@ -101,7 +103,10 @@ p1 = .95; % decay of nsp estimate in each batch
 % also, covariance matrix between templates
 [~, iW] = max(abs(dWU(nt0min, :, :)), [], 2);
 iW = int32(squeeze(iW));
-[WtW, iList] = getMeWtW(single(W), single(U), NchanNear);
+% WtW doesn't get used, but iList, the list of channels to use when calculating
+% template features, is used in extratFEAT in mpnu8 => get this list for 
+% Nnearest, the number of channels used to calculate template features.
+[WtW, iList] = getMeWtW(single(W), single(U), Nnearest);
 
 fprintf('Time %3.0fs. Final spike extraction ...\n', toc)
 
@@ -162,7 +167,7 @@ for ibatch = 1:niter
     [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp, errmsg] = ...
         mexMPnu8(Params, dataRAW, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
         wPCA);
-    
+       
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     
@@ -240,14 +245,28 @@ toc
 
 % discards the unused portion of the arrays
 st3 = st3(1:ntot, :);
-fW = fW(:, 1:ntot);
+fW = fW(:, 1:ntot);                 % currently not used after this point; will probably be added to phy output later
 fWpc = fWpc(:,:, 1:ntot);
+
+% sort these arrays for deterministic calculations in final_clustering
+[~,sortOrder] = sort(st3(:,1));
+st3 = st3(sortOrder,:);
+fW = fW(:,sortOrder);
+fWpc = fWpc(:,:,sortOrder);
 
 rez.dWU = dWU1 ./ single(reshape(nsp, [1,1,Nfilt]));
 rez.nsp = nsp;
 
 rez.iC = iC;
 
-fWpc = permute(fWpc, [3, 2, 1]);
-disp(size(fWpc))
+fWpc = permute(fWpc, [3, 2, 1]);    % returned as tF, used in final_clustering
+
+
+
+
+% for debugging, update st3 and tF in rez.
+% comment out to keep rez smaller
+rez.st3 = st3;
+rez.tF = fWpc;
+
 %%

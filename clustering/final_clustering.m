@@ -38,7 +38,7 @@ end
 
 
 ops = rez.ops;
-NchanNear   = getOr(ops, 'NtemplateChan', 32);
+NchanNear   = getOr(ops, 'NtemplateChan', 16);
 
 [iC, mask, C2C] = getClosestChannels(rez, ops.sigmaMask, NchanNear);
 
@@ -141,7 +141,7 @@ rez1.st3(:,1) = rez1.st3(:,1); % +  ops.ntbuff;
 rez1.st3(:,2) = hid;
 rez1.st3(:,3) = amps;
 
-
+rez1.tF = [];
 rez1.cProj = [];
 rez1.iNeigh = [];
 rez1.cProjPC = [];
@@ -154,6 +154,8 @@ rez1.mu = sum(sum(rez1.U.^2, 1),3).^.5;
 rez1.U = rez1.U ./ rez1.mu;
 rez1.mu = rez1.mu(:);
 
+% Note that this resets W -- any changes that happen during final_clustering are not included in final rez.
+% Also not that rez.dWU does not get set -- so changes to dWU are also not intluded in final rez.
 rez1.W = reshape(rez.wPCA, [61, 1, 6]);
 rez1.W = repmat(rez1.W, [1, n0, 1]);
 rez1.est_contam_rate = ones(n0,1);

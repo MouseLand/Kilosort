@@ -66,11 +66,11 @@ for k = 1:ops.Nbatch
 
     % run the CUDA function on this batch
     [dat, kkmax, st, cF] = spikedetector3(Params, dataRAW, wTEMP, iC-1, dist, v2, iC2-1, dist2);
-    
+ 
     % upsample the y position using the center of mass of template products
     % coming out of the CUDA function. 
-    ys = rez.yc(iC);
-    cF0 = max(0, cF);
+    ys = rez.yc(iC);    
+    cF0 = max(0, gather(cF));
     cF0 = cF0 ./ sum(cF0, 1);
     iChan = st(2, :) + 1;
     yct = sum(cF0 .* ys(:, iChan), 1);

@@ -1,6 +1,6 @@
 function rez  = template_learning(rez, tF, st3)
-% No explicit geometry dependence, but inherits list of closest channels iC
-% calculated in extrac_spikes after datashift correction, using ops.extractNchanNear
+% doesn't use any of the nearest neighbor params, but inherits list of closest channels iC
+% calculated in extract_spikes after datashift correction, using ops.extractNchanNear
 
 wPCA  = rez.wPCA;
 iC = rez.iC;
