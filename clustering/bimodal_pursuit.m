@@ -90,7 +90,8 @@ if flag==1
         
        wav = wroll(:,:,j) * reshape(wav2, [6, numel(wav2)/6]);
        wav = wav(:)';
-       if r0 > mean((wav1-wav).^2)
+       
+       if j==1 || r0 > mean((wav1-wav).^2)
           wav2_best = wav;
           r0 =  mean((wav1-wav2).^2);
           do_roll = 1;
