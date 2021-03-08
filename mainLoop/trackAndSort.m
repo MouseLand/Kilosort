@@ -233,7 +233,7 @@ st3 = st3(1:ntot, :);
 fW = fW(:, 1:ntot);
 fWpc = fWpc(:,:, 1:ntot);
 
-rez.dWU = dWU1 ./ single(reshape(nsp, [1,1,Nfilt]));
+rez.dWU = dWU1 ./ (1e-10 + single(reshape(nsp, [1,1,Nfilt])));
 rez.nsp = nsp;
 
 rez.iC = iC;
