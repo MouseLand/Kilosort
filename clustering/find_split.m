@@ -23,7 +23,7 @@ imin = find(ival);
 xmean = mean(x);
 
 if isempty(imin)
-    [~, imax] = min(abs(bins-xmean));
+    [~, imax] = min(abs(bins(1:nbins-1)-xmean));
     scmax = 0;
     isplit = imax;
     m0 = xmean;
