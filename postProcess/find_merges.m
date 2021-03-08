@@ -97,7 +97,7 @@ end
 hid = int32(rez.st3(:,2));
 ss = double(rez.st3(:,1)) / ops.fs;
 
-clust_good = check_clusters(hid, ss);
+clust_good = check_clusters(hid, ss, 0.2);
 sum(clust_good)
 rez.good = clust_good;
 

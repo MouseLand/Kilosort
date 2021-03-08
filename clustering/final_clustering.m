@@ -114,7 +114,7 @@ toc
 
 rez.xy = xy;
 
-clust_good = check_clusters(hid, ss);
+clust_good = check_clusters(hid, ss, .2);
 sum(clust_good)
 
 
