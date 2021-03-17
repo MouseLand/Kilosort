@@ -27,7 +27,8 @@ You must run and complete successfully `mexGPUall.m` in the `CUDA` folder. This 
 #### Option 1: Using the GUI
 
 Navigate to the `Kilosort` directory and run `kilosort`:
-```
+
+```bash
 >> cd \my\kilosort\directory\
 >> kilosort
 ```
