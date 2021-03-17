@@ -3,8 +3,8 @@
 Now is the best time to post feedback (good or bad) so please use Github issues freely! 
 
 For older versions, please see Github releases:   
-*updated from Kilosort2.5 on Jan 30, 2021.*  
-*updated from Kilosort2 on Oct 28, 2020.* 
+* *updated from [Kilosort2.5](https://github.com/MouseLand/Kilosort/releases/tag/v2.5) on Jan 30, 2021.*  
+* *updated from [Kilosort2](https://github.com/MouseLand/Kilosort/releases/tag/v2.0) on Oct 28, 2020.* 
 
 ![](https://github.com/MouseLand/Kilosort/blob/main/Docs/img/frame_full.png)
 
