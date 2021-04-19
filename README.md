@@ -68,7 +68,7 @@ eMouse simulation by Jennifer Colonell
 
 ## Questions
 
-Please create an issue for bugs / installation problems.
+Please create an issue for bugs / installation problems on [the project's GitHub Issue tracker](https://github.com/MouseLand/Kilosort/issues).
 
 ## Licence
 
