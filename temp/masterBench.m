@@ -3,7 +3,7 @@ addpath('D:\GitHub\npy-matlab')
 
 rootZ = 'H:\DATA\Spikes\Benchmark2015';
 
-pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github folder and put it somewhere else (together with the master_file)
+pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from GitHub folder and put it somewhere else (together with the master_file)
 run(fullfile(pathToYourConfigFile, 'configFile384.m'))
 
 ops.chanMap = 'H:\DATA\Spikes\Benchmark2015\forPRBimecToWhisper.mat';

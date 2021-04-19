@@ -5,7 +5,7 @@ dataObjs = get(axesObjs, 'Children');
 %%
 cc = dataObjs{2}.CData;
 %%
-addpath('D:\Github\Kilosort2\preProcess')
+addpath('D:\GitHub\Kilosort2\preProcess')
 cc = dataObjs{2}.CData;
 [ccsort, isort] = sort_by_rastermap(cc);
 %%

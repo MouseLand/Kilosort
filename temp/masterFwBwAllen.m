@@ -1,7 +1,7 @@
 addpath(genpath('D:\GitHub\KiloSort2')) % path to kilosort folder
 addpath('D:\GitHub\npy-matlab')
 
-pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from Github folder and put it somewhere else (together with the master_file)
+pathToYourConfigFile = 'D:\GitHub\KiloSort2\configFiles'; % take from GitHub folder and put it somewhere else (together with the master_file)
 run(fullfile(pathToYourConfigFile, 'configFile384.m'))
 
 ops.chanMap  = 'D:\GitHub\KiloSort2\configFiles\neuropixPhase3B2_kilosortChanMap.mat';
