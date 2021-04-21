@@ -1,6 +1,7 @@
-# Kilosort3: spike sorting on GPUs with template matching, drift correction and fancy clustering #
+# Kilosort3: spike sorting on GPUs with template matching, drift correction and fancy clustering
 
-Now is the best time to post feedback (good or bad) so please use Github issues freely! 
+Now is the best time to post feedback (good or bad) so please use Github issues freely!
+
 
 For older versions, please see Github releases:   
 
@@ -17,7 +18,7 @@ Kilosort2 can still be accessed by downloading the release "Kilosort 2.0". It im
 
 To aid in setting up a Kilosort2/2.5 run on your own probe configuration, we have developed a [graphical user interface](https://github.com/MouseLand/Kilosort/wiki/1.-The-GUI) where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2/2.5 sees it correctly. The picture above is another GUI visualization: it shows the templates detected by Kilosort2 over a 60ms interval from a Neuropixels recording. The final output of Kilosort2/2.5 can be visualized and curated in the [Phy GUI](https://github.com/kwikteam/phy), which must be installed separately. Since Phy is in Python, you will also need the [npy-matlab](https://github.com/kwikteam/npy-matlab) package.
 
-### Installation ###
+## Installation
 
 Requirements:
 
@@ -30,7 +31,7 @@ Requirements:
 
 You must run and complete successfully `mexGPUall.m` in the `CUDA` folder. This requires mexcuda support, which comes with the parallel computing toolbox. To set up mexcuda compilation, install the exact version of the CUDA toolkit compatible with your MATLAB version (see [here](https://www.mathworks.com/help/distcomp/gpu-support-by-release.html)). On Windows, you must also install a CPU compiler, for example the freely available [Visual Studio Community 2013](https://www.visualstudio.com/vs/older-downloads/). Note that the most recent editions of Visual Studio are usually not compatible with CUDA. If you had previously used a different CPU compiler in MATLAB, you must switch to the CUDA-compatible compiler using `mex -setup C++`. For more about mexcuda installation, see these [instructions](http://uk.mathworks.com/help/distcomp/mexcuda.html).
 
-### General instructions for running Kilosort2 ###
+### General instructions for running Kilosort2
 
 #### Option 1: Using the GUI
 
@@ -49,7 +50,7 @@ See the [GUI documentation](https://github.com/MouseLand/Kilosort/wiki/1.-The-GU
 3. Edit the config file with desired parameters. You should at least set the file paths `ops.fbinary`, `ops.root` and `ops.fproc` (this file will not exist yet - `kilosort` will create it), the sampling frequency `ops.fs`, the number of channels in the file `ops.NchanTOT` and the location of your channel map file `ops.chanMap`.
 4. Edit `main_kilosort.m` so that the paths at the top ([lines 3–4](https://github.com/MouseLand/Kilosort/blob/main/main_kilosort.m#L3-L4)) point to your local copies of those GitHub repositories, and so that the configuration file is correctly specified ([lines 6–7](https://github.com/MouseLand/Kilosort/blob/2fba667359dbddbb0e52e67fa848f197e44cf5ef/main_kilosort.m#L6-L7)).
 
-### Parameters ###
+### Parameters
 
 If you are unhappy with the quality of the automated sorting, try changing one of the main parameters:
 
@@ -61,27 +62,28 @@ If you are unhappy with the quality of the automated sorting, try changing one o
 
 A list of all the adjustable parameters is in the example configuration file.
 
-### Integration with Phy GUI ###
+## Integration with Phy GUI
+
 Kilosort2 provides a results file called `rez`, where the first column of `rez.st`are the spike times and the second column are the cluster identities. It also provides a field `rez.good` which is 1 if the algorithm classified that cluster as a good single unit. To visualize the results of Kilosort2, you can use [Phy](https://github.com/kwikteam/phy), which also provides a manual clustering interface for refining the results of the algorithm. Kilosort2 automatically sets the "good" units in Phy based on a <20% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
 
 Because Phy is written in Python, you also need to install [npy-matlab](https://github.com/kwikteam/npy-matlab), to provide read/write functions from MATLAB to Python.
 
 Detailed instructions for interpreting results are provided [here](https://github.com/kwikteam/phy-contrib/blob/master/docs/template-gui.md). That documentation was developed for Kilosort1, so things will look a little different with Kilosort2.
 
-### Credits ###
+## Credits
 
 Kilosort2 by Marius Pachitariu  
 GUI by Nick Steinmetz  
 eMouse simulation by Jennifer Colonell  
 
-### Questions ###
+## Questions
 
 Please create an issue for bugs / installation problems.
 
-### Licence ###
+## Licence
 
 This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with this program. If not, see http://www.gnu.org/licenses/.
+You should have received a copy of the GNU General Public License along with this program. If not, see <http://www.gnu.org/licenses>.
