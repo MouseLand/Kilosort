@@ -39,6 +39,8 @@ if exist(fullfile(savePath, '.phy'), 'dir')
 end
 
 spikeTimes = uint64(rez.st3(:,1));
+% account for ops.trange(1) to accomodate real time
+spikeTimes = spikeTimes - rez.ops.trange(1)*rez.ops.fs;
 % [spikeTimes, ii] = sort(spikeTimes);
 spikeTemplates = uint32(rez.st3(:,2));
 if size(rez.st3,2)>4
