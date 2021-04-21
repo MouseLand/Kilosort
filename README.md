@@ -2,9 +2,10 @@
 
 Now is the best time to post feedback (good or bad) so please use Github issues freely!
 
-For older versions, please see Github releases:
-*updated from Kilosort2.5 on Jan 30, 2021.*  
-*updated from Kilosort2 on Oct 28, 2020.*
+For older versions, please see Github releases:   
+
+* [Kilosort 2.5](https://github.com/MouseLand/Kilosort/releases/tag/v2.5) on Jan 30, 2021.
+* [Kilosort 2.0](https://github.com/MouseLand/Kilosort/releases/tag/v2.0) on Oct 28, 2020.
 
 ![](Docs/img/frame_full.png)
 
@@ -18,7 +19,14 @@ To aid in setting up a Kilosort2/2.5 run on your own probe configuration, we hav
 
 ## Installation
 
-Required toolboxes: parallel computing toolbox, signal processing toolbox, Statistics and Machine Learning Toolbox, MATLAB >=R2016b
+Requirements:
+
+* MATLAB >= R2016b
+* MATLAB Toolboxes:
+  * Parallel Computing Toolbox
+  * Signal Processing Toolbox
+  * Statistics and Machine Learning Toolbox
+* An NVIDIA GPU and CUDA capabilities
 
 You must run and complete successfully `mexGPUall.m` in the `CUDA` folder. This requires mexcuda support, which comes with the parallel computing toolbox. To set up mexcuda compilation, install the exact version of the CUDA toolkit compatible with your MATLAB version (see [here](https://www.mathworks.com/help/distcomp/gpu-support-by-release.html)). On Windows, you must also install a CPU compiler, for example the freely available [Visual Studio Community 2013](https://www.visualstudio.com/vs/older-downloads/). Note that the most recent editions of Visual Studio are usually not compatible with CUDA. If you had previously used a different CPU compiler in MATLAB, you must switch to the CUDA-compatible compiler using `mex -setup C++`. For more about mexcuda installation, see these [instructions](http://uk.mathworks.com/help/distcomp/mexcuda.html).
 
