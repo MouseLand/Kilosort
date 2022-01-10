@@ -439,7 +439,12 @@ classdef ksGUI < handle
             obj.P.colormap = cm.cm; 
             
             % get gui defaults/remembered settings
-            obj.P.settingsPath = fullfile(mfPath, 'userSettings.mat');
+            if ispc()
+                mfPath = winqueryreg('HKEY_CURRENT_USER',['Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders'],'Personal');
+                obj.P.settingsPath = fullfile(mfPath, 'userSettings.mat');
+            else
+                obj.P.settingsPath = fullfile(getenv('HOME'), '.userSettings.mat');
+            end
             if exist(obj.P.settingsPath, 'file')
                 savedSettings = load(obj.P.settingsPath);
                 if isfield(savedSettings, 'lastFile')
