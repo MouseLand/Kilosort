@@ -105,6 +105,7 @@ end
 if getOr(ops, 'fig', 1)  
     figure;
     set(gcf, 'Color', 'w')
+    coloroder(turbo(size(imin,2)))
     
     % plot the shift trace in um
     plot(imin * dd)
@@ -131,7 +132,7 @@ if getOr(ops, 'fig', 1)
     xlabel('time (sec)')
     ylabel('spike position (um)')
     title('Drift map')
-    
+    drawnow
 end
 %%
 % convert to um 
@@ -154,6 +155,7 @@ else
 end
 % keep track of dshift 
 rez.dshift = dshift;
+rez.yblk = yblk;
 % keep track of original spikes
 rez.st0 = st3;
 
