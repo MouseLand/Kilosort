@@ -105,7 +105,7 @@ end
 if getOr(ops, 'fig', 1)  
     figure;
     set(gcf, 'Color', 'w')
-    coloroder(turbo(size(imin,2)))
+    colororder(turbo(size(imin,2)))
     
     % plot the shift trace in um
     plot(imin * dd)
