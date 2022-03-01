@@ -134,6 +134,11 @@ if getOr(ops, 'fig', 1)
     title('Drift map')
     drawnow
 end
+
+% non-rigid registration
+[imin,F0] = align_nonrigid(F,imin,ceil(yblk/dd));
+yblk = ysamp';
+F0m=F0;
 %%
 % convert to um 
 dshift = imin * dd;

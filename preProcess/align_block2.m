@@ -6,7 +6,7 @@ function [imin,yblk, F0, F0m] = align_block2(F, ysamp, nblocks)
 Nbatches = size(F,3);
 
 % look up and down this many y bins to find best alignment
-n = 15;
+n = 30;
 dc = zeros(2*n+1, Nbatches);
 dt = -n:n;
 
@@ -65,7 +65,7 @@ yblk = zeros(length(ifirst), 1);
 
 % for each small block, we only look up and down this many samples to find
 % nonrigid shift
-n = 5;
+n = 30;
 dt = -n:n;
 
 % this part determines the up/down covariance for each block without
