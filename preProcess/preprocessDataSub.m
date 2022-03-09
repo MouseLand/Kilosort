@@ -8,6 +8,11 @@ function rez = preprocessDataSub(ops)
 % 4) channel whitening;
 % 5) scaling to int16 values
 
+% track git repo(s) with new utility (see <kilosortBasePath>/utils/gitStatus.m)
+if getOr(ops, 'useGit', 1)
+    ops = gitStatus(ops);
+end
+
 tic;
 ops.nt0 	  = getOr(ops, {'nt0'}, 61); % number of time samples for the templates (has to be <=81 due to GPU shared memory)
 ops.nt0min  = getOr(ops, 'nt0min', ceil(20 * ops.nt0/61)); % time sample where the negative peak should be aligned
