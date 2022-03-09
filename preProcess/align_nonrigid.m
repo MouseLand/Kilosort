@@ -3,8 +3,8 @@ function [nrshifts,F0] = align_nonrigid(F,ishift,iblk,sig)
 %   Detailed explanation goes here
 
 if nargin==3
-    % -4:4 pixels = -20:20 um sptial gaussian(5um spaceing), -8:8 pixels = -16:16 sec temporal gaussian(~2sec batch)
-    sig=[2,4];
+    % -10:10 pixels = -50:50 um sptial gaussian(5um spaceing), -3:3 pixels = -6:6 sec temporal gaussian(~2sec batch)
+    sig=[5,1.5];
 end
 
 nbatch = size(F,3);
