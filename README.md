@@ -1,4 +1,4 @@
-# Kilosort3: spike sorting on GPUs with template matching, drift correction and fancy clustering
+# Kilosort3: spike sorting on GPUs with template matching, drift correction and a new clustering method
 
 For older versions, please see Github releases:   
 
