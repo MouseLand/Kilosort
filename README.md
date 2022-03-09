@@ -1,5 +1,3 @@
-Note: I am currently at The Neuromatch Academy, and I won't do anything Kilosort-related until after the deep learning course!
-
 # Kilosort3: spike sorting on GPUs with template matching, drift correction and fancy clustering
 
 Now is the best time to post feedback (good or bad) so please use Github issues freely!
