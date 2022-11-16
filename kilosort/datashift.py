@@ -2,27 +2,27 @@ from scipy.sparse import coo_matrix
 import numpy as np
 from scipy.ndimage import gaussian_filter
 import torch
-import spikedetect
+from kilosort import spikedetect
 dev = torch.device('cuda')
 
-def bin_spikes(ops, st):
-    ymin = ops['yc'].min()
-    ymax = ops['yc'].max()
-    dd = ops['binning_depth'] # binning width in depth
+def bin_spikes(st, y_chan, n_batches, binning_depth, spike_threshold):
+    ymin = y_chan.min()
+    ymax = y_chan.max()
+    dd = binning_depth # binning width in depth
+    spkTh = spike_threshold
     dmin = ymin-1
     dmax = 1 + np.ceil((ymax-dmin)/dd).astype('int32')
-    Nbatches = ops['Nbatches']
-
+    
     batch_id = st[:,4].copy()
 
-    F = np.zeros((Nbatches, dmax, 20))
-    for t in range(ops['Nbatches']):
+    F = np.zeros((n_batches, dmax, 20))
+    for t in range(n_batches):
         ix = (batch_id==t).nonzero()[0]
         sst = st[ix]
 
         dep = sst[:,1] - dmin
-        amp = np.log10(np.minimum(99, sst[:,2])) - np.log10(ops['spkTh'])
-        amp = amp / (np.log10(100)-np.log10(ops['spkTh']))
+        amp = np.log10(np.minimum(99, sst[:,2])) - np.log10(spkTh)
+        amp = amp / (np.log10(100)-np.log10(spkTh))
 
         rows = (dep/dd).astype('int32')
         cols = (1e-5 + amp * 20).astype('int32')
@@ -35,9 +35,9 @@ def bin_spikes(ops, st):
     return F, ysamp
 
 
-def align_block2(F, ysamp, ops):
+def align_block2(F, ysamp, nblocks):
 
-    Nbatches = ops['Nbatches']
+    Nbatches = F.shape[0]
     n = 15
     dc = np.zeros((2*n+1, Nbatches))
     dt = np.arange(-n,n+1,1)
@@ -63,7 +63,6 @@ def align_block2(F, ysamp, ops):
                 dall[iter, ib] = dt[t]
         F0 = Fg.mean(0)
 
-    nblocks = ops['nblocks']
     nybins = F.shape[1]
     yl = nybins//nblocks
     ifirst = np.round(np.linspace(0,nybins-yl, 2 *nblocks-1)).astype('int32')
@@ -122,16 +121,20 @@ def kernel2D(x, y, sig = 1):
     Kn = np.exp(-ds / (2*sig**2))
     return Kn
 
-def run(ops):
-    st, tF, ops  = spikedetect.run(ops)
-    F, ysamp = bin_spikes(ops, st)
-    imin, yblk, F0, F0m = align_block2(F, ysamp, ops)
+def run(bfile, x_chan, y_chan, init_threshold, n_wavpc, binning_depth, 
+        spike_threshold, nblocks, sig_interp, ops):
+    st, tF,  wPCA, wTEMP, iC, iC2, weigh, ops  = spikedetect.run(bfile, x_chan, y_chan, init_threshold, n_wavpc, spike_threshold, ops)
+    ops['wPCA'] = wPCA
+    ops['wTEMP'] = wTEMP
+    F, ysamp = bin_spikes(st, y_chan, bfile.n_batches, binning_depth, spike_threshold)
+    imin, yblk, F0, F0m = align_block2(F, ysamp, nblocks)
 
-    dshift = imin * ops['binning_depth']
+    dshift = imin * binning_depth
     ops['yblk'] = yblk
     ops['dshift'] = dshift 
-    xp = np.vstack((ops['xc'],ops['yc'])).T
-    Kxx = kernel2D(xp, xp, ops['sig_interp'])
+    print(dshift[0].mean())
+    xp = np.stack((x_chan, y_chan), axis=-1)
+    Kxx = kernel2D(xp, xp, sig_interp)
     Kxx = torch.from_numpy(Kxx).to(dev)
     ops['iKxx'] = torch.linalg.inv(Kxx + 0.01 * torch.eye(Kxx.shape[0], device=dev))
     return ops

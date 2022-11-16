@@ -5,7 +5,7 @@ dev = torch.device('cuda')
 from scipy.sparse import csr_matrix 
 
 import faiss
-import hierarchical, swarmsplitter 
+from kilosort import hierarchical, swarmsplitter 
 
 def neigh_mat(Xd, nskip = 10, n_neigh=30):
     Xsub = Xd[::nskip]
@@ -293,7 +293,7 @@ def run(ops, st, tF):
 
     nskip = 20
 
-    Wall = torch.zeros((0, ops['Nchan'], ops['nwaves']))
+    Wall = torch.zeros((0, ops['probe']['Nchan'], ops['settings']['nwaves']))
     t0 = time.time()
     for kk in range(len(ycent)):
         # get the data
@@ -326,10 +326,10 @@ def run(ops, st, tF):
         nmax += Nfilt
 
         # we need the new templates here         
-        W = torch.zeros((Nfilt, ops['Nchan'], ops['nwaves']))
+        W = torch.zeros((Nfilt, ops['probe']['Nchan'], ops['settings']['nwaves']))
         for j in range(Nfilt):
             w = Xd[iclust==j].mean(0)
-            W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['nwaves'])).cpu()
+            W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['nwaves'])).cpu()
         
         Wall = torch.cat((Wall, W), 0)
 
@@ -345,7 +345,7 @@ def get_data_cpu(ops, PID, tF, ycenter,  xcenter, dmin = 20, dminx = 32, ncomps 
     iU = ops['iU'].cpu().numpy()
     iC = ops['iCC'][:, ops['iU']]
     #PID = st[:,5].long()
-    xcup, ycup = ops['xc'][iU], ops['yc'][iU]
+    xcup, ycup = ops['probe']['xc'][iU], ops['probe']['yc'][iU]
     xy = np.vstack((xcup, ycup))
     xy = torch.from_numpy(xy)
     
