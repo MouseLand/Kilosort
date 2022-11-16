@@ -293,7 +293,7 @@ def run(ops, st, tF):
 
     nskip = 20
 
-    Wall = torch.zeros((0, ops['probe']['Nchan'], ops['settings']['nwaves']))
+    Wall = torch.zeros((0, ops['probe']['n_chan'], ops['settings']['nwaves']))
     t0 = time.time()
     for kk in range(len(ycent)):
         # get the data
@@ -326,7 +326,7 @@ def run(ops, st, tF):
         nmax += Nfilt
 
         # we need the new templates here         
-        W = torch.zeros((Nfilt, ops['probe']['Nchan'], ops['settings']['nwaves']))
+        W = torch.zeros((Nfilt, ops['probe']['n_chan'], ops['settings']['nwaves']))
         for j in range(Nfilt):
             w = Xd[iclust==j].mean(0)
             W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['nwaves'])).cpu()

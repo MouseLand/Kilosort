@@ -79,7 +79,7 @@ def extract(bfile, ops, U):
 
 def align_U(U, ops):
     Uex = torch.einsum('xyz, yt -> xtz', U, ops['wPCA'])
-    X = Uex.reshape(-1, ops['probe']['Nchan']).T
+    X = Uex.reshape(-1, ops['probe']['n_chan']).T
     X = conv1d(X.unsqueeze(1), ops['wTEMP'].unsqueeze(1), padding=ops['settings']['nt']//2)
     Xmax = X.max(0)[0].max(0)[0].reshape(-1, ops['settings']['nt'])
     imax = torch.argmax(Xmax, 1)
@@ -96,7 +96,7 @@ def run(bfile, ops):
     iperm = np.random.permutation(bfile.n_batches)
     niter = 40
     bb = bfile.n_batches//niter
-    Nchan = ops['probe']['Nchan']
+    Nchan = ops['probe']['n_chan']
     nPC = ops['wPCA'].shape[0]
 
     U = torch.zeros((0, nPC, Nchan), device = dev)
@@ -130,7 +130,7 @@ def run(bfile, ops):
 def get_batch(bfile, iC, iC2, weigh, ops, isub, U):
     
     n_twav = bfile.n_twav
-    Nchan = ops['probe']['Nchan']
+    Nchan = ops['probe']['n_chan']
     nPC = ops['wPCA'].shape[0]
 
     tarange = torch.arange(-(n_twav//2),n_twav//2+1, device = dev)
@@ -204,7 +204,7 @@ def get_batch(bfile, iC, iC2, weigh, ops, isub, U):
 
 def get_new_templates(ops, tF, st):
     xcup, ycup, iC = ops['xcup'], ops['ycup'], ops['iC']
-    Nchan = ops['probe']['Nchan']
+    Nchan = ops['probe']['n_chan']
 
     Th = ops['settings']['spkTh']
     kk = 0

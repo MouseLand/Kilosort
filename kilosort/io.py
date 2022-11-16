@@ -1,16 +1,74 @@
 from typing import Optional, Tuple, Sequence
 from contextlib import contextmanager
 import os
+from glob import glob
+from scipy.io import loadmat
 import torch
 import numpy as np
 from torch.fft import fft, ifft, fftshift
-
+from pathlib import Path
 from kilosort.preprocessing import get_drift_matrix, fft_highpass
 
+def find_binary(data_folder):
+    """ find binary file in data_folder"""
+    filename  = glob(os.path.join(data_folder, '*.bin'))[0]
+    return filename
+
+def load_probe(probe_path):
+    """Load a .mat probe file from Kilosort2, or a PRB file and returns a dictionary
+    
+    adapted from https://github.com/MouseLand/pykilosort/blob/5712cfd2722a20554fa5077dd8699f68508d1b1a/pykilosort/utils.py#L592
+
+    """
+    probe = {}
+    probe_path = Path(probe_path).resolve()
+    required_keys = ['chanMap', 'yc', 'xc', 'n_chan']
+
+    if probe_path.suffix == '.prb':
+        # Support for PRB files.
+        # !DOES NOT WORK FOR PHASE3A PROBES WITH DISCONNECTED CHANNELS!
+        contents = probe_path.read_text()
+        metadata = {}
+        exec(contents, {}, metadata)
+        probe['chanMap'] = []
+        probe['xc'] = []
+        probe['yc'] = []
+        probe['kcoords'] = []
+        probe['n_chan'] = 0 
+        for cg in sorted(metadata['channel_groups']):
+            d = metadata['channel_groups'][cg]
+            ch = d['channels']
+            pos = d.get('geometry', {})
+            probe['chanMap'].append(ch)
+            probe['n_chan'] += len(ch)
+            probe['xc'].append([pos[c][0] for c in ch])
+            probe['yc'].append([pos[c][1] for c in ch])
+            probe['kcoords'].append([cg for c in ch])
+        probe['chanMap'] = np.concatenate(probe['chanMap']).ravel().astype(np.int32)
+        probe['xc'] = np.concatenate(probe['xc']).astype('float32')
+        probe['yc'] = np.concatenate(probe['yc']).astype('float32')
+        probe['kcoords'] = np.concatenate(probe['kcoords']).astype('float32')
+
+    elif probe_path.suffix == '.mat':
+        mat = loadmat(probe_path)
+        connected = mat['connected'].ravel().astype('bool')
+        probe['xc'] = mat['xcoords'].ravel().astype(np.float32)[connected]
+        nc = len(probe['xc'])
+        probe['yc'] = mat['ycoords'].ravel().astype(np.float32)[connected]
+        probe['kcoords'] = mat.get('kcoords', np.zeros(nc)).ravel().astype(np.float32)
+        probe['chanMap'] = (mat['chanMap'] - 1).ravel().astype(np.int32)[connected]  # NOTE: 0-indexing in Python
+        probe['n_chan'] = len(probe['chanMap'])  # NOTE: should match the # of columns in the raw data
+
+    for n in required_keys:
+        assert n in probe.keys()
+
+    return probe
+
 class BinaryRWFile:
-    def __init__(self, filename: str, n_chan: int, fs: int, 
-                batch_size: int, n_twav: int,
-                twav_min: int, write: bool = False):
+    def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
+                batch_size: int = 60000, n_twav: int = 61,
+                twav_min: int = 20, device: torch.device = torch.device('cpu'),
+                write: bool = False):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -22,15 +80,16 @@ class BinaryRWFile:
         ----------
         filename: str
             The filename of the file to read from or write to
-        n_chan: int
+        n_chan_bin: int
             number of channels
         """
         self.fs = fs
-        self.n_chan = n_chan
+        self.n_chan_bin = n_chan_bin
         self.filename = filename
         self.batch_size = batch_size 
         self.n_twav = n_twav 
         self.twav_min = twav_min
+        self.device = device
         if write:
             self.file = open(filename, mode='w+b')
         else:
@@ -55,7 +114,7 @@ class BinaryRWFile:
     @property
     def nbytesread(self):
         """number of bytes per sample (FIXED for given file)"""
-        return np.int64(2 * self.n_chan)
+        return np.int64(2 * self.n_chan_bin)
 
     @property
     def nbytes(self):
@@ -77,10 +136,10 @@ class BinaryRWFile:
         -------
         n_samples: int
             number of samples
-        n_chan: int
+        n_chan_bin: int
             number of channels
         """
-        return self.n_samples, self.n_chan
+        return self.n_samples, self.n_chan_bin
 
     @property
     def size(self) -> int:
@@ -145,11 +204,11 @@ class BinaryRWFile:
             if indices are slice, read slice with "read" function and return
         Returns
         -------
-        samples: len(indices) x n_chan
+        samples: len(indices) x n_chan_bin
             The requested samples
         """
         if not is_slice:
-            samples = np.empty((len(indices), self.n_chan), np.int16)
+            samples = np.empty((len(indices), self.n_chan_bin), np.int16)
             # load and bin data
             with temporary_pointer(self.file) as f:
                 for sample, ixx in zip(samples, indices):
@@ -176,14 +235,14 @@ class BinaryRWFile:
         ----------
         batch_size: int
             The number of samples to read at once.
-        samples: batch_size x n_chan
+        samples: batch_size x n_chan_bin
             The sample data
         """
         if not self._can_read:
             raise IOError("BinaryFile needs to write before it can read again.")
         nbytes = self.nbytesread * batch_size
         buff = self.file.read(nbytes)
-        data = np.frombuffer(buff, dtype=np.int16, offset=0).reshape(-1, self.n_chan)
+        data = np.frombuffer(buff, dtype=np.int16, offset=0).reshape(-1, self.n_chan_bin)
         if data.size == 0:
             return None
         indices = np.arange(self._index, self._index + data.shape[0])
@@ -211,7 +270,7 @@ class BinaryRWFile:
         s_stop = min(self.n_samples, s_stop)
         return np.arange(s_start, s_stop, s_step) if any([s_start, s_stop, s_step]) else None
 
-    def padded_batch_to_torch(self, ibatch, device=torch.device('cuda')):
+    def padded_batch_to_torch(self, ibatch):
         """ read batches from file """
         if ibatch==0:
             bstart = 0
@@ -222,22 +281,25 @@ class BinaryRWFile:
         data = self.ix(np.arange(bstart, bend), is_slice=True)        
         data = data.T
         nsamp = data.shape[-1]
-        X = torch.zeros((self.n_chan, self.batch_size + 2*self.n_twav), device = device)
+        X = torch.zeros((self.n_chan_bin, self.batch_size + 2*self.n_twav), device = self.device)
         # fix the data at the edges for the first and last batch
         if ibatch==0:
-            X[:, self.n_twav : self.n_twav+nsamp] = torch.from_numpy(data).to(device).float()
+            X[:, self.n_twav : self.n_twav+nsamp] = torch.from_numpy(data).to(self.device).float()
             X[:, :self.n_twav] = X[:, self.n_twav : self.n_twav+1]
         elif ibatch==self.n_batches-1:
-            X[:, :nsamp] = torch.from_numpy(data).to(device).float()
+            X[:, :nsamp] = torch.from_numpy(data).to(self.device).float()
             X[:, nsamp:] = X[:, nsamp-1:nsamp]
         else:
-            X[:] = torch.from_numpy(data).to(device).float()
+            X[:] = torch.from_numpy(data).to(self.device).float()
         return X 
 
 class BinaryFiltered(BinaryRWFile):
-    def __init__(self, filename: str, n_chan: int, fs: int, batch_size: int, n_twav: int, twav_min: int,
-                 channel_map: np.ndarray, hp_filter: torch.Tensor, whiten_mat: torch.Tensor, dshift: torch.Tensor):
-        super().__init__(filename, n_chan, fs, batch_size, n_twav, twav_min) 
+    def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
+                batch_size: int = 60000, n_twav: int = 61,
+                twav_min: int = 20, channel_map: np.ndarray = None, 
+                hp_filter: torch.Tensor = None, whiten_mat: torch.Tensor = None, 
+                dshift: torch.Tensor = None, device: torch.device = torch.device('cuda')):
+        super().__init__(filename, n_chan_bin, fs, batch_size, n_twav, twav_min, device) 
         self.channel_map = channel_map
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter
@@ -262,6 +324,7 @@ class BinaryFiltered(BinaryRWFile):
         if self.whiten_mat is not None:
             if self.dshift is not None and ops is not None and ibatch is not None:
                 M = get_drift_matrix(ops, self.dshift[ibatch])
+                #print(M.dtype, X.dtype, self.whiten_mat.dtype)
                 X = (M @ self.whiten_mat) @ X
             else:
                 X = self.whiten_mat @ X
@@ -275,13 +338,12 @@ class BinaryFiltered(BinaryRWFile):
             samples = self.ix(indices=self.from_slice(sample_indices), is_slice=True)
         else:
             samples = self.ix(indices=sample_indices, is_slice=False)
-        X = samples[(slice(None),) + crop] if crop else samples
-        X = X.T 
+        samples = samples[(slice(None),) + crop] if crop else samples
+        X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
         
-    def padded_batch_to_torch(self, ibatch, ops=None, 
-                                device=torch.device('cuda')):
-        X = super().padded_batch_to_torch(ibatch, device)        
+    def padded_batch_to_torch(self, ibatch, ops=None):
+        X = super().padded_batch_to_torch(ibatch)        
         return self.filter(X, ops, ibatch)
 
 

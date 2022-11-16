@@ -84,15 +84,15 @@ def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None)
     
     
 
-def get_whitening_matrix(f, x_chan, y_chan, nskip = 25, device=torch.device('cuda')):
+def get_whitening_matrix(f, x_chan, y_chan, nskip = 25):
     """ get the whitening matrix, use every nskip batches
     """    
     n_chan = len(f.channel_map)
     # collect the covariance matrix across channels
-    CC = torch.zeros((n_chan, n_chan), device=device)
+    CC = torch.zeros((n_chan, n_chan), device=f.device)
     k = 0
     for j in range(0, f.n_batches-1, nskip):
-        X = f.padded_batch_to_torch(j, device=device)
+        X = f.padded_batch_to_torch(j)
         # load data with high-pass filtering
         #X = load_transform(filename, j, ops, fwav = ops['fwav'])
         X = X[:, f.n_twav : -f.n_twav]
@@ -108,7 +108,7 @@ def get_whitening_matrix(f, x_chan, y_chan, nskip = 25, device=torch.device('cud
 def get_highpass_filter(fs = 30000, device=torch.device('cuda')):
     """ filter to use for high-pass filtering. 
     """
-    NT = 30122 #500
+    NT = 30122
     b,a = butter(3, 300, fs = fs, btype = 'high')
     x = np.zeros(NT)
     x[NT//2] = 1
@@ -120,8 +120,14 @@ def fft_highpass(hp_filter, NT=30122):
     """ convert filter to fourier domain"""
     device = hp_filter.device
     ft = hp_filter.shape[0]
-    pad = (NT - ft) // 2
-    hp = torch.cat((torch.zeros(pad, device=device), 
-                    hp_filter,
-                    torch.zeros(pad + (NT-pad*2-ft), device=device)))
-    return fft(hp)
+    if ft < NT:
+        pad = (NT - ft) // 2
+        fhp = fft(torch.cat((torch.zeros(pad, device=device), 
+                             hp_filter,
+                             torch.zeros(pad + (NT-pad*2-ft), device=device))))
+    elif ft > NT:
+        crop = (ft - NT) // 2 
+        fhp = fft(hp_filter[crop : crop + NT])
+    else:
+        fhp = fft(hp_filter)
+    return fhp
