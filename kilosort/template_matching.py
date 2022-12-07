@@ -1,13 +1,12 @@
 import numpy as np
-from kilosort import spikedetect, preprocessing
+import spikedetect, preprocessing
 import torch 
 dev = torch.device('cuda')
 from torch.nn.functional import conv1d, max_pool2d, max_pool1d
-from kilosort import CCG
-from kilosort.probe_utils import chan_weights
+
 
 def Wupdate(X, U, stt, ops):
-    nt = ops['settings']['nt']
+    nt = ops['nt']
     tiwave = torch.arange(-(nt//2), nt//2+1, device=dev) 
     xsub = X[:, stt[:,:1] + tiwave] @ ops['wPCA'].T
     Nfilt = U.shape[0]
@@ -21,7 +20,7 @@ def Wupdate(X, U, stt, ops):
     return Wsub, M.sum(1)
 
 def prepare_extract(ops, U, nC):
-    ds = (ops['probe']['xc'] - ops['probe']['xc'][:, np.newaxis])**2 +  (ops['probe']['yc'] - ops['probe']['yc'][:, np.newaxis])**2 
+    ds = (ops['xc'] - ops['xc'][:, np.newaxis])**2 +  (ops['yc'] - ops['yc'][:, np.newaxis])**2 
     iCC = np.argsort(ds, 0)[:nC]
     iCC = torch.from_numpy(iCC).to(dev)
     iU = torch.argmax((U**2).sum(1), -1)
@@ -29,23 +28,26 @@ def prepare_extract(ops, U, nC):
     return iCC, iU, Ucc
 
 
-def extract(bfile, ops, U):
+def extract(ops, U):
     nC = 10
     iCC, iU, Ucc = prepare_extract(ops, U, nC)
     ops['iCC'] = iCC
     ops['iU'] = iU
 
-    nt = ops['settings']['nt']
+    nt = ops['nt']
     tiwave = torch.arange(-(nt//2), nt//2+1, device=dev) 
 
     ctc = prepare_matching(ops, U)
     st = np.zeros((10**6, 3), 'float64')
-    tF  = torch.zeros((10**6, nC , ops['settings']['nwaves']))
-    tF2 = torch.zeros((10**6, nC , ops['settings']['nwaves']))
+    tF  = torch.zeros((10**6, nC , ops['nwaves']))
+    tF2 = torch.zeros((10**6, nC , ops['nwaves']))
 
     k = 0
-    for ibatch in range(bfile.n_batches):
-        X = bfile.padded_batch_to_torch(ibatch, ops)
+    for ibatch in np.arange(ops['Nbatches']):
+        X = preprocessing.load_transform(ops['filename'], ibatch, ops, fwav = ops['fwav'], 
+                            Wrot = ops['Wrot'], dshift = ops['dshift'])
+        
+        #X0 = X.clone()
 
         stt, amps, Xres = run_matching(ops, X, U, ctc)
 
@@ -60,7 +62,7 @@ def extract(bfile, ops, U):
             tF2 = torch.cat((tF2, torch.zeros_like(tF2)), 0)
 
         stt = stt.double()
-        st[k:k+nsp,0] = ((stt[:,0]-nt)/ops['settings']['fs'] + ibatch * (ops['settings']['NT']/ops['settings']['fs'])).cpu().numpy()
+        st[k:k+nsp,0] = ((stt[:,0]-nt)/ops['fs'] + ibatch * (ops['NT']/ops['fs'])).cpu().numpy()
         st[k:k+nsp,1] = stt[:,1].cpu().numpy()
         st[k:k+nsp,2] = amps[:,0].cpu().numpy()
         
@@ -79,35 +81,31 @@ def extract(bfile, ops, U):
 
 def align_U(U, ops):
     Uex = torch.einsum('xyz, yt -> xtz', U, ops['wPCA'])
-    X = Uex.reshape(-1, ops['probe']['n_chan']).T
-    X = conv1d(X.unsqueeze(1), ops['wTEMP'].unsqueeze(1), padding=ops['settings']['nt']//2)
-    Xmax = X.max(0)[0].max(0)[0].reshape(-1, ops['settings']['nt'])
+    X = Uex.reshape(-1, ops['Nchan']).T
+    X = conv1d(X.unsqueeze(1), ops['wTEMP'].unsqueeze(1), padding=ops['nt']//2)
+    Xmax = X.max(0)[0].max(0)[0].reshape(-1, ops['nt'])
     imax = torch.argmax(Xmax, 1)
 
     Unew = Uex.clone() 
-    for j in range(ops['settings']['nt']):
+    for j in range(ops['nt']):
         ix = imax==j
-        Unew[ix] = torch.roll(Unew[ix], ops['settings']['nt']//2 - j, -2)
+        Unew[ix] = torch.roll(Unew[ix], ops['nt']//2 - j, -2)
     Unew = torch.einsum('xty, zt -> xzy', Unew, ops['wPCA'])
     return Unew, imax
 
-def run(bfile, ops):
+def run(ops):
     np.random.seed(101)
-    iperm = np.random.permutation(bfile.n_batches)
+    iperm = np.random.permutation(ops['Nbatches'])
     niter = 40
-    bb = bfile.n_batches//niter
-    Nchan = ops['probe']['n_chan']
+    bb = ops['Nbatches']//niter
+    Nchan = ops['Nchan']
     nPC = ops['wPCA'].shape[0]
 
     U = torch.zeros((0, nPC, Nchan), device = dev)
 
-    x_chan, y_chan = ops['probe']['xc'], ops['probe']['yc']
-    cw = chan_weights(x_chan, y_chan)
-    xcup, ycup, dmin, dminx, iC, iC2, weigh = cw
-    
     for iiter in range(niter):
         isub = iperm[iiter*bb:(iiter+1)*bb]
-        st, tF, Wres, nn, vexp = get_batch(bfile, iC, iC2, weigh, ops, isub, U)    
+        st, tF, Wres, nn, vexp = get_batch(ops, isub, U)    
         if U.shape[0]>0:
             U = U + Wres / (1e-6 + nn.unsqueeze(-1).unsqueeze(-1))
             U = U[nn>0]
@@ -117,7 +115,6 @@ def run(bfile, ops):
             print(len(U), nn.sum().item(), len(st), vexp.item())
             continue
 
-        #Unew = get_new_templates(cw, Nchan, ops['settings']['spkTh'], tF, st, ops)
         Unew = get_new_templates(ops, tF, st)
         U = torch.cat((U, Unew), 0)
         print(len(U), len(Unew), nn.sum().item(), len(st), vexp.item())        
@@ -127,15 +124,18 @@ def run(bfile, ops):
     return U
 
 
-def get_batch(bfile, iC, iC2, weigh, ops, isub, U):
+def get_batch(ops, isub, U):
     
-    n_twav = bfile.n_twav
-    Nchan = ops['probe']['n_chan']
+    iC = ops['iC']
+    #iC2 = ops['iC2']
+    #weigh = ops['weigh']
+    nt = ops['nt']
+    Nchan = ops['Nchan']
     nPC = ops['wPCA'].shape[0]
 
-    tarange = torch.arange(-(n_twav//2),n_twav//2+1, device = dev)
+    tarange = torch.arange(-(nt//2),nt//2+1, device = dev)
 
-    nC = iC.shape[0]
+    nC = ops['iC'].shape[0]
     
     Nfilt = U.shape[0]
     if Nfilt>0:
@@ -143,14 +143,16 @@ def get_batch(bfile, iC, iC2, weigh, ops, isub, U):
     Wres = torch.zeros((Nfilt, nPC, Nchan), device = dev)
     nn = torch.zeros((Nfilt,), device = dev)
 
-    tF = torch.zeros((10**5, nC , ops['settings']['nwaves']), device=dev)
+    tF = torch.zeros((10**5, nC , ops['nwaves']), device=dev)
     st = torch.zeros((10**5, 6), device=dev)
     k = 0
     vexp = 0
     tau = 400
 
     for ibatch in isub:
-        X = bfile.padded_batch_to_torch(ibatch, ops)
+        #ibatch = iperm[ik*bb + j]
+        X = preprocessing.load_transform(ops['filename'], ibatch, ops, fwav = ops['fwav'], 
+                            Wrot = ops['Wrot'], dshift = ops['dshift'])
         
         if Nfilt>0:
             # do the template matching with W
@@ -170,10 +172,7 @@ def get_batch(bfile, iC, iC2, weigh, ops, isub, U):
 
 
         # do the template matching on residuals
-        xy, imax, amp, adist = spikedetect.template_match(Xres, ops['wTEMP'], n_twav, 
-                                                            ops['settings']['nwaves'], 
-                                        ops['settings']['spkTh'], iC, iC2, weigh)
-        #xy, imax, amp, adist = spikedetect.template_match(Xres, ops, ops['iC'], ops['iC2'], ops['weigh'])
+        xy, imax, amp, adist = spikedetect.template_match(Xres, ops, ops['iC'], ops['iC2'], ops['weigh'])
         
         xsub = Xres[iC[:,xy[:,:1]], xy[:,1:2] + tarange]
         xfeat = xsub @ ops['wPCA'].T
@@ -184,7 +183,7 @@ def get_batch(bfile, iC, iC2, weigh, ops, isub, U):
             st = torch.cat((st, torch.zeros_like(st)), 0)
 
         tF[k:k+nsp] = xfeat.transpose(0,1)# .reshape(-1, nPC * Nchan)
-        #st[k:k+nsp,0] = ((xy[:,1]-nt)/ops['settings']['fs'] + j * (ops['NT']/ops['settings']['fs']))
+        #st[k:k+nsp,0] = ((xy[:,1]-nt)/ops['fs'] + j * (ops['NT']/ops['fs']))
         #st[k:k+nsp,1] = yct
         st[k:k+nsp,2] = amp
         st[k:k+nsp,3] = imax
@@ -201,12 +200,11 @@ def get_batch(bfile, iC, iC2, weigh, ops, isub, U):
 
     return st, tF, Wres, nn, vexp
 
-
 def get_new_templates(ops, tF, st):
-    xcup, ycup, iC = ops['xcup'], ops['ycup'], ops['iC']
-    Nchan = ops['probe']['n_chan']
+    xcup, ycup = ops['xcup'], ops['ycup']
+    Nchan = ops['Nchan']
 
-    Th = ops['settings']['spkTh']
+    Th = ops['spkTh']
     kk = 0
 
     d0 = ops['dmin']
@@ -217,7 +215,7 @@ def get_new_templates(ops, tF, st):
     igood = torch.ones((len(ycent)), dtype = torch.bool, device = dev)
     for kk in range(len(ycent)):
         # get the data
-        Xd, ch_min, ch_max = get_data(st, tF, ycent[kk], xcup.mean(), iC, xcup, ycup, dmin = d0, dminx = ops['dminx'])
+        Xd, ch_min, ch_max = get_data(ops, st, tF, ycent[kk], xcup.mean(), dmin = d0, dminx = ops['dminx'])
         #print(ch_min, ch_max, len(Xd))
         if Xd is None:
             igood[kk] = 0
@@ -238,42 +236,12 @@ def get_new_templates(ops, tF, st):
 
     return U
 
-def get_new_templates_new(cw, Nchan, spike_threshold, tF, st, ops):
-    kk = 0
-    xcup, ycup, dmin, dminx, iC, iC2, weigh = cw
-    d0 = dmin
-    ycent = np.arange(ycup.min()+d0-1, ycup.max()+d0+1, 2*d0)
-
-    Wnew = torch.zeros((len(ycent), Nchan, 6), device = dev)
-
-    igood = torch.ones((len(ycent)), dtype = torch.bool, device = dev)
-    for kk in range(len(ycent)):
-        # get the data
-        Xd, ch_min, ch_max = get_data(st, tF, ycent[kk], xcup.mean(), iC, xcup, ycup, dmin = d0, dminx =dminx)
-        #print(ch_min, ch_max, len(Xd))
-        if Xd is None:
-            igood[kk] = 0
-            continue
-
-        # find new spikes
-        vexp = 2 * Xd @ Xd.T - (Xd**2).sum(1)
-        vsum = (vexp * (vexp>spike_threshold**2)).sum(0)
-        vmax, imax = torch.max(vsum, 0)
-        mu  = Xd[vexp[:, imax] > spike_threshold**2].mean(0)
-
-        Wnew[kk , ch_min:ch_max]  = mu.reshape((ch_max-ch_min, 6))
-
-    Wnew = Wnew[igood]
-    U = Wnew.transpose(2,1).contiguous()
-
-    U, _ = remove_duplicates(ops, U, ns = None, icl = None)
-
-    return U
 
 
-
-def get_data(st, tF, ycenter,  xcenter, iC, xcup, ycup, dmin = 20, dminx = 32, ncomps = 64):
+def get_data(ops, st, tF, ycenter,  xcenter, dmin = 20, dminx = 32, ncomps = 64):
+    iC = ops['iC']
     PID = st[:,5].long()
+    xcup, ycup = ops['xcup'], ops['ycup']
     xy = np.vstack((xcup, ycup))
     xy = torch.from_numpy(xy).to(dev)
     
@@ -305,8 +273,16 @@ def get_data(st, tF, ycenter,  xcenter, iC, xcup, ycup, dmin = 20, dminx = 32, n
     Xd = torch.reshape(dd, (nspikes, -1))
     return Xd, ch_min, ch_max
 
+def postprocess_templates(Wall, ops):
+
+    Wall2, _ = align_U(Wall, ops)
+    Wall3, _= remove_duplicates(ops, Wall2)
+
+    return Wall3
+
+
 def prepare_matching(ops, U):
-    nt = ops['settings']['nt']
+    nt = ops['nt']
     W = ops['wPCA'].contiguous()
     WtW = conv1d(W.reshape(-1, 1,nt), W.reshape(-1, 1 ,nt), padding = nt) 
     WtW = torch.flip(WtW, [2,])
@@ -333,7 +309,7 @@ def paired_compare(ops, U):
     dmu = 2 * (mu - mu.unsqueeze(1)) / (mu + mu.unsqueeze(1))
     return torch.logical_and(cc > .9, dmu<.2)
 
-
+import CCG
 def remove_duplicates(ops, U0, ns = None, icl = None, st = None):
     if icl is not None:
         iclust = icl.astype('int64')
@@ -391,8 +367,8 @@ def remove_duplicates(ops, U0, ns = None, icl = None, st = None):
 
 
 def run_matching(ops, X, U, ctc):
-    Th = ops['settings']['spkTh']
-    nt = ops['settings']['nt']
+    Th = ops['spkTh']
+    nt = ops['nt']
     W = ops['wPCA'].contiguous()
 
     nm = (U**2).sum(-1).sum(-1)

@@ -5,7 +5,7 @@ dev = torch.device('cuda')
 from scipy.sparse import csr_matrix 
 
 import faiss
-from kilosort import hierarchical, swarmsplitter 
+import hierarchical, swarmsplitter 
 
 def neigh_mat(Xd, nskip = 10, n_neigh=30):
     Xsub = Xd[::nskip]
@@ -281,8 +281,54 @@ def run_one(Xd, st0, nskip = 20, lam = 0):
     return iclust1
 
 import time
-def run(ops, st, tF):
+
+
+def xy_templates(ops):
+    iU = ops['iU'].cpu().numpy()
+    iC = ops['iCC'][:, ops['iU']]
+    #PID = st[:,5].long()
+    xcup, ycup = ops['xc'][iU], ops['yc'][iU]
+    xy = np.vstack((xcup, ycup))
+    xy = torch.from_numpy(xy)
+
+    iU = ops['iU'].cpu().numpy()
+    iC = ops['iCC'][:, ops['iU']]    
+    return xy, iC
+
+def xy_up(ops):
     xcup, ycup = ops['xcup'], ops['ycup']
+    xy = np.vstack((xcup, ycup))
+    xy = torch.from_numpy(xy)
+
+    iC = ops['iC'] 
+    return xy, iC
+
+def xy_c(ops):
+    xcup, ycup = ops['xc'][::4], ops['yc'][::4]    
+    xy = np.vstack((xcup, ycup+10))
+    xy = torch.from_numpy(xy)
+
+    iC = ops['iC']
+    #print(1)
+    return xy, iC
+
+
+def run(ops, st, tF,  mode = 'template'):
+
+    if mode == 'template':
+        xy, iC = xy_templates(ops)
+        iclust_template = st[:,1].astype('int32')
+        xcup, ycup = ops['xcup'], ops['ycup']
+    elif mode == 'spikes_nn':
+        xy, iC = xy_c(ops)
+        xcup, ycup = ops['xc'][::4], ops['yc'][::4]   
+        iclust_template = st[:,5].astype('int32')
+    else:
+        xy, iC = xy_up(ops)
+        iclust_template = st[:,5].astype('int32')
+        xcup, ycup = ops['xcup'], ops['ycup']
+
+    
 
     d0 = ops['dmin']
     ycent = np.arange(ycup.min()+d0-1, ycup.max()+d0+1, 2*d0)
@@ -293,13 +339,13 @@ def run(ops, st, tF):
 
     nskip = 20
 
-    Wall = torch.zeros((0, ops['probe']['n_chan'], ops['settings']['nwaves']))
+    Wall = torch.zeros((0, ops['Nchan'], ops['nwaves']))
     t0 = time.time()
     for kk in range(len(ycent)):
         # get the data
-        iclust_template = st[:,1].astype('int32')
+        #iclust_template = st[:,1].astype('int32')
 
-        Xd, ch_min, ch_max, igood  = get_data_cpu(ops, iclust_template, tF, ycent[kk],  
+        Xd, ch_min, ch_max, igood  = get_data_cpu(ops, xy, iC, iclust_template, tF, ycent[kk],  
                                     xcup.mean(), dmin = d0, dminx = ops['dminx'], ncomps = 64)
 
         if Xd is None:            
@@ -317,7 +363,7 @@ def run(ops, st, tF):
 
             xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
-            xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust, my_clus) #, meta = st0)
+            xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust, my_clus)#, meta = st0)
 
             iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
 
@@ -326,10 +372,10 @@ def run(ops, st, tF):
         nmax += Nfilt
 
         # we need the new templates here         
-        W = torch.zeros((Nfilt, ops['probe']['n_chan'], ops['settings']['nwaves']))
+        W = torch.zeros((Nfilt, ops['Nchan'], ops['nwaves']))
         for j in range(Nfilt):
             w = Xd[iclust==j].mean(0)
-            W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['nwaves'])).cpu()
+            W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['nwaves'])).cpu()
         
         Wall = torch.cat((Wall, W), 0)
 
@@ -339,15 +385,14 @@ def run(ops, st, tF):
     return clu, Wall
 
 
-def get_data_cpu(ops, PID, tF, ycenter,  xcenter, dmin = 20, dminx = 32, ncomps = 64):
+def get_data_cpu(ops, xy, iC, PID, tF, ycenter,  xcenter, dmin = 20, dminx = 32, ncomps = 64):
     PID =  torch.from_numpy(PID).long()
 
-    iU = ops['iU'].cpu().numpy()
-    iC = ops['iCC'][:, ops['iU']]
-    #PID = st[:,5].long()
-    xcup, ycup = ops['probe']['xc'][iU], ops['probe']['yc'][iU]
-    xy = np.vstack((xcup, ycup))
-    xy = torch.from_numpy(xy)
+    #iU = ops['iU'].cpu().numpy()
+    #iC = ops['iCC'][:, ops['iU']]    
+    #xcup, ycup = ops['xc'][iU], ops['yc'][iU]
+    #xy = np.vstack((xcup, ycup))
+    #xy = torch.from_numpy(xy)
     
     y0 = ycenter # xy[1].mean() - ycenter
     x0 = xcenter #xy[0].mean() - xcenter
@@ -395,3 +440,22 @@ def assign_iclust0(Xg, mu):
     nm = (mu**2).sum(1)
     iclust = torch.argmax(2*vv-nm, 1)
     return iclust
+
+
+from torch.nn.functional import conv1d
+
+def align_U(U, ops):
+    Uex = torch.einsum('xyz, zt -> xty', U.to(dev), ops['wPCA'])
+    X = Uex.reshape(-1, ops['Nchan']).T
+    X = conv1d(X.unsqueeze(1), ops['wTEMP'].unsqueeze(1), padding=ops['nt']//2)
+    Xmax = X.abs().max(0)[0].max(0)[0].reshape(-1, ops['nt'])
+    imax = torch.argmax(Xmax, 1)
+
+    Unew = Uex.clone() 
+    for j in range(ops['nt']):
+        ix = imax==j
+        Unew[ix] = torch.roll(Unew[ix], ops['nt']//2 - j, -2)
+    Unew = torch.einsum('xty, zt -> xzy', Unew, ops['wPCA'])#.transpose(1,2).cpu()
+    return Unew, imax
+
+
