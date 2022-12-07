@@ -80,17 +80,17 @@ def extract(ops, U):
     return st, tF, tF2, ops
 
 def align_U(U, ops):
-    Uex = torch.einsum('xyz, yt -> xtz', U, ops['wPCA'])
+    Uex = torch.einsum('xyz, zt -> xty', U.to(dev), ops['wPCA'])
     X = Uex.reshape(-1, ops['Nchan']).T
     X = conv1d(X.unsqueeze(1), ops['wTEMP'].unsqueeze(1), padding=ops['nt']//2)
-    Xmax = X.max(0)[0].max(0)[0].reshape(-1, ops['nt'])
+    Xmax = X.abs().max(0)[0].max(0)[0].reshape(-1, ops['nt'])
     imax = torch.argmax(Xmax, 1)
 
     Unew = Uex.clone() 
     for j in range(ops['nt']):
         ix = imax==j
         Unew[ix] = torch.roll(Unew[ix], ops['nt']//2 - j, -2)
-    Unew = torch.einsum('xty, zt -> xzy', Unew, ops['wPCA'])
+    Unew = torch.einsum('xty, zt -> xzy', Unew, ops['wPCA'])#.transpose(1,2).cpu()
     return Unew, imax
 
 def run(ops):
@@ -274,7 +274,6 @@ def get_data(ops, st, tF, ycenter,  xcenter, dmin = 20, dminx = 32, ncomps = 64)
     return Xd, ch_min, ch_max
 
 def postprocess_templates(Wall, ops):
-    Wall = Wall.transpose(1,2)
     Wall2, _ = align_U(Wall, ops)
     Wall3, _= remove_duplicates(ops, Wall2)
 
