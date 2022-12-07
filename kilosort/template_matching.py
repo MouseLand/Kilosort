@@ -274,7 +274,7 @@ def get_data(ops, st, tF, ycenter,  xcenter, dmin = 20, dminx = 32, ncomps = 64)
     return Xd, ch_min, ch_max
 
 def postprocess_templates(Wall, ops):
-
+    Wall = Wall.transpose(1,2)
     Wall2, _ = align_U(Wall, ops)
     Wall3, _= remove_duplicates(ops, Wall2)
 
