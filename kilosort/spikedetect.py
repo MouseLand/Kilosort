@@ -1,7 +1,7 @@
 from torch.nn.functional import max_pool2d, avg_pool2d, conv1d, max_pool1d
 import numpy as np
 import torch
-import preprocessing 
+from kilosort import preprocessing 
 from sklearn.cluster import KMeans
 from sklearn.decomposition import TruncatedSVD
 
@@ -32,7 +32,7 @@ def get_waves_old(ops):
     k = 0
 
     for j in range(ops['Nbatches']):
-        X = preprocessing.load_transform(ops['filename'], j, ops, fwav = ops['fwav'], Wrot = ops['Wrot'])
+        X = preprocessing.load_transform(ops['filename'], j, ops, fwav = ops['fwav'], Wrot = ops['Wrot'], device=device)
         xs = find_peaks(X, ops)
         nsp = len(xs)
         if k+nsp>100000:
@@ -53,10 +53,10 @@ def get_waves_old(ops):
 
     return wPCA, wTEMP
 
-def get_waves(ops):
-    dd = np.load('/media/marius/ssd1/data/spikes/wTEMP.npz')
-    wTEMP = torch.from_numpy(dd['wTEMP']).to(dev)
-    wPCA = torch.from_numpy(dd['wPCA']).to(dev)
+def get_waves(ops, device=torch.device('cuda')):
+    dd = np.load('/github/kilosort_dev/kilosort/wTEMP.npz')
+    wTEMP = torch.from_numpy(dd['wTEMP']).to(device)
+    wPCA = torch.from_numpy(dd['wPCA']).to(device)
     return wPCA, wTEMP
 
 def template_centers(ops):
@@ -78,14 +78,14 @@ def template_centers(ops):
     return ops
 
 
-def template_match(X, ops, iC, iC2, weigh):
+def template_match(X, ops, iC, iC2, weigh, device=torch.device('cuda')):
     NT = X.shape[-1]
     nt = ops['nt']
     Nchan = ops['Nchan']
     Nfilt = iC.shape[1]
 
-    tch0 = torch.zeros(1,device = dev)
-    tch1 = torch.ones(1,device = dev)
+    tch0 = torch.zeros(1,device = device)
+    tch1 = torch.ones(1,device = device)
 
     W = ops['wTEMP'].unsqueeze(1)
     B = conv1d(X.unsqueeze(1), W, padding=nt//2)
@@ -95,12 +95,12 @@ def template_match(X, ops, iC, iC2, weigh):
 
     niter = 40
     nb = (NT-1)//niter+1
-    As    = torch.zeros((Nfilt, NT), device=dev)
-    Amaxs = torch.zeros((Nfilt, NT), device=dev)
-    imaxs = torch.zeros((Nfilt, NT), dtype = torch.int64, device=dev)
+    As    = torch.zeros((Nfilt, NT), device=device)
+    Amaxs = torch.zeros((Nfilt, NT), device=device)
+    imaxs = torch.zeros((Nfilt, NT), dtype = torch.int64, device=device)
 
-    ti = torch.arange(Nfilt, device = dev)
-    tj = torch.arange(nb, device = dev)
+    ti = torch.arange(Nfilt, device = device)
+    tj = torch.arange(nb, device = device)
 
     for t in range(niter):
         A = torch.einsum('ijk, jklm-> iklm', weigh, B[iC,:, nb*t:nb*(t+1)])        
@@ -133,27 +133,27 @@ def template_match(X, ops, iC, iC2, weigh):
     return xy, imax, amp, adist
 
 
-def nearest_chans(ys, yc, xs, xc, nC):
+def nearest_chans(ys, yc, xs, xc, nC, device=torch.device('cuda')):
     ds = (ys - yc[:,np.newaxis])**2 + (xs - xc[:,np.newaxis])**2
     iC = np.argsort(ds, 0)[:nC]
-    iC = torch.from_numpy(iC).to(dev)
+    iC = torch.from_numpy(iC).to(device)
     ds = np.sort(ds, 0)[:nC]
     return iC, ds
 
-def yweighted(yc, iC, adist, xy):    
+def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):    
 
-    yy = torch.from_numpy(yc).to(dev)[iC]
+    yy = torch.from_numpy(yc).to(device)[iC]
     cF0 = torch.nn.functional.relu(adist)
     cF0 = cF0/cF0.sum(0)
 
     yct = (cF0 * yy[:,xy[:,0]]).sum(0)
     return yct
 
-def run(ops, dshift = None):        
+def run(ops, dshift = None, device=torch.device('cuda')):        
     sig = 10
     nsizes = 5
 
-    ops['wPCA'], ops['wTEMP'] = get_waves(ops)
+    ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
     #print(ops['wTEMP'].shape, ops['wPCA'].shape)
 
     ops = template_centers(ops)   
@@ -169,8 +169,8 @@ def run(ops, dshift = None):
     iC, ds = nearest_chans(ys, yc, xs, xc, nC)
     iC2, ds2 = nearest_chans(ys, ys, xs, xs, nC2)
 
-    ds_torch = torch.from_numpy(ds).to(dev).float()
-    weigh = torch.exp(- ds_torch.unsqueeze(-1) / (sig * (1+torch.arange(nsizes, device = dev)))**2)
+    ds_torch = torch.from_numpy(ds).to(device).float()
+    weigh = torch.exp(- ds_torch.unsqueeze(-1) / (sig * (1+torch.arange(nsizes, device = device)))**2)
     weigh = torch.permute(weigh, (2, 0, 1)).contiguous()
     weigh = weigh / (weigh**2).sum(1).unsqueeze(1)**.5
 
@@ -179,17 +179,17 @@ def run(ops, dshift = None):
 
     k = 0
     nt = ops['nt']
-    tarange = torch.arange(-(nt//2),nt//2+1, device = dev)
+    tarange = torch.arange(-(nt//2),nt//2+1, device = device)
 
     import time
     t0 = time.time()
     for j in range(ops['Nbatches']):
         X = preprocessing.load_transform(ops['filename'], j, ops, fwav = ops['fwav'], 
-                            Wrot = ops['Wrot'], dshift = dshift)
+                            Wrot = ops['Wrot'], dshift = dshift, device=device)
 
         #print(X.std())
-        xy, imax, amp, adist = template_match(X, ops, iC, iC2, weigh)
-        yct = yweighted(yc, iC, adist, xy)
+        xy, imax, amp, adist = template_match(X, ops, iC, iC2, weigh, device=device)
+        yct = yweighted(yc, iC, adist, xy, device=device)
         nsp = len(xy)
 
         if k+nsp>st.shape[0]    :

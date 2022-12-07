@@ -1,11 +1,10 @@
 import numpy as np
 import torch
 from torch import sparse_coo_tensor as coo
-dev = torch.device('cuda')
 from scipy.sparse import csr_matrix 
 
 import faiss
-import hierarchical, swarmsplitter 
+from kilosort import hierarchical, swarmsplitter 
 
 def neigh_mat(Xd, nskip = 10, n_neigh=30):
     Xsub = Xd[::nskip]
@@ -50,7 +49,7 @@ def assign_mu(iclust, Xg, cols_mu, tones, nclust = None, lpow = 1):
 
     return mu, N
 
-def assign_iclust_slow(Xg, mu, rows_neigh, isub, kn, tones2, lam = 1):
+def assign_iclust_slow(Xg, mu, rows_neigh, isub, kn, tones2, lam = 1, device=torch.device('cuda')):
     NN, nfeat = Xg.shape
     nclust = mu.shape[0]
     n_neigh = kn.shape[-1]
@@ -64,20 +63,20 @@ def assign_iclust_slow(Xg, mu, rows_neigh, isub, kn, tones2, lam = 1):
     from scipy.sparse import coo_matrix
     C = coo_matrix((values, indices), (NN, nclust)).tocsr()
     vexp = C[np.arange(NN)[:, np.newaxis], isub[kn].cpu().numpy()].todense()
-    vexp = torch.from_numpy(vexp).to(dev)
+    vexp = torch.from_numpy(vexp).to(device)
 
     # too much memory, this can be a loop
     vv = torch.einsum('ij, ikj -> ik', Xg , mu[isub[kn]])
     nm = (mu**2).sum(1)[isub[kn]]
     vexp = vexp + 2*vv-nm
     
-    tarange = torch.arange(NN, device = dev)#.tile(1,n_neigh)    
+    tarange = torch.arange(NN, device = device)#.tile(1,n_neigh)    
     imax = torch.argmax(vexp, 1)
     iclust = isub[kn[tarange, imax]]
 
     return iclust
 
-def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj):
+def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj, device=torch.device('cuda')):
     NN = kn.shape[0]
 
     ij = torch.vstack((rows_neigh.flatten(), isub[kn].flatten()))
@@ -85,8 +84,8 @@ def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj):
     xN = xN.to_dense()
 
     if lam > 0:
-        tones = torch.ones(len(kj), device = dev)
-        tzeros = torch.zeros(len(kj), device = dev)
+        tones = torch.ones(len(kj), device = device)
+        tzeros = torch.zeros(len(kj), device = device)
         ij = torch.vstack((tzeros, isub))    
         kN = coo(ij, tones, (1, nclust))
     
@@ -96,7 +95,7 @@ def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj):
 
     return iclust
 
-def assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,ki,kj):
+def assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,ki,kj, device=torch.device('cuda')):
     n_neigh = kn.shape[1]
     cols = iclust.unsqueeze(-1).tile((1, n_neigh))
     iis = torch.vstack((kn.flatten(), cols.flatten()))
@@ -105,8 +104,8 @@ def assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,ki,kj):
     xS = xS.to_dense()
 
     if lam > 0:
-        tones = torch.ones(len(ki), device = dev)
-        tzeros = torch.zeros(len(ki), device = dev)
+        tones = torch.ones(len(ki), device = device)
+        tzeros = torch.zeros(len(ki), device = device)
         ij = torch.vstack((tzeros, iclust))    
         kN = coo(ij, tones, (1, nclust))
         xS = xS - lam / m * (kj.unsqueeze(-1) * kN.to_dense())
@@ -114,54 +113,54 @@ def assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,ki,kj):
     isub = torch.argmax(xS, 1)
     return isub
 
-def Mstats(M):
+def Mstats(M, device=torch.device('cuda')):
     m = M.sum()
     ki = np.array(M.sum(1)).flatten()
     kj = np.array(M.sum(0)).flatten()
     ki = m * ki/ki.sum()
     kj = m * kj/kj.sum()
 
-    ki = torch.from_numpy(ki).to(dev)
-    kj = torch.from_numpy(kj).to(dev)
+    ki = torch.from_numpy(ki).to(device)
+    kj = torch.from_numpy(kj).to(device)
     
     return m, ki, kj
 
 
-def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200, seed = 1, niter = 200, lam = 0):    
+def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200, seed = 1, niter = 200, lam = 0, device=torch.device('cuda')):    
 
     if kn is None:
         kn, M = neigh_mat(Xd, nskip = nskip, n_neigh = n_neigh)
 
-    m, ki, kj = Mstats(M)
+    m, ki, kj = Mstats(M, device=device)
 
     #Xg = torch.from_numpy(Xd).to(dev)
-    Xg = Xd.to(dev)
-    kn = torch.from_numpy(kn).to(dev)
+    Xg = Xd.to(device)
+    kn = torch.from_numpy(kn).to(device)
 
     n_neigh = kn.shape[1]
     NN, nfeat = Xg.shape
     nsub = (NN-1)//nskip + 1
 
-    rows_neigh = torch.arange(NN, device = dev).unsqueeze(-1).tile((1,n_neigh))
+    rows_neigh = torch.arange(NN, device = device).unsqueeze(-1).tile((1,n_neigh))
     
-    tones2 = torch.ones((NN, n_neigh), device = dev)
+    tones2 = torch.ones((NN, n_neigh), device = device)
 
     if iclust is None:
-        iclust_init =  kmeans_plusplus(Xg, niter = nclust, seed = seed)
+        iclust_init =  kmeans_plusplus(Xg, niter = nclust, seed = seed, device=device)
         iclust = iclust_init.clone()
     else:
         iclust_init = iclust.clone()
         
     for t in range(niter):
         # given iclust, reassign isub
-        isub = assign_isub(iclust, kn, tones2, nclust , nsub, lam, m,ki,kj)
+        isub = assign_isub(iclust, kn, tones2, nclust , nsub, lam, m,ki,kj, device=device)
 
         # given mu and isub, reassign iclust
-        iclust = assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj)
+        iclust = assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj, device=device)
     
     _, iclust = torch.unique(iclust, return_inverse=True)    
     nclust = iclust.max() + 1
-    isub = assign_isub(iclust, kn, tones2, nclust , nsub, lam, m,ki,kj)
+    isub = assign_isub(iclust, kn, tones2, nclust , nsub, lam, m,ki,kj, device=device)
 
     iclust = iclust.cpu().numpy()
     isub = isub.cpu().numpy()
@@ -169,7 +168,7 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
     return iclust, isub, M, iclust_init
 
 
-def kmeans_plusplus(Xg, niter = 200, seed = 1):
+def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
     #Xg = torch.from_numpy(Xd).to(dev)    
     vtot = (Xg**2).sum(1)
 
@@ -178,10 +177,10 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1):
 
     ntry = 100
     NN, nfeat = Xg.shape    
-    mu = torch.zeros((niter, nfeat), device = dev)
-    vexp0 = torch.zeros(NN,device = dev)
+    mu = torch.zeros((niter, nfeat), device = device)
+    vexp0 = torch.zeros(NN,device = device)
 
-    iclust = torch.zeros((NN,), dtype = torch.int, device = dev)
+    iclust = torch.zeros((NN,), dtype = torch.int, device = device)
     for j in range(niter):
         v2 = torch.relu(vtot - vexp0) 
         isamp = torch.multinomial(v2, ntry)
@@ -313,7 +312,7 @@ def xy_c(ops):
     return xy, iC
 
 
-def run(ops, st, tF,  mode = 'template'):
+def run(ops, st, tF,  mode = 'template', device=torch.device('cuda')):
 
     if mode == 'template':
         xy, iC = xy_templates(ops)
@@ -359,7 +358,7 @@ def run(ops, st, tF,  mode = 'template'):
             st0 = st[igood,0]
 
             # find new clusters
-            iclust, iclust0, M, iclust_init = cluster(Xd,nskip = nskip, lam = 1, seed = 5)
+            iclust, iclust0, M, iclust_init = cluster(Xd,nskip = nskip, lam = 1, seed = 5, device=device)
 
             xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
@@ -444,8 +443,8 @@ def assign_iclust0(Xg, mu):
 
 from torch.nn.functional import conv1d
 
-def align_U(U, ops):
-    Uex = torch.einsum('xyz, zt -> xty', U.to(dev), ops['wPCA'])
+def align_U(U, ops, device=torch.device('cuda')):
+    Uex = torch.einsum('xyz, zt -> xty', U.to(device), ops['wPCA'])
     X = Uex.reshape(-1, ops['Nchan']).T
     X = conv1d(X.unsqueeze(1), ops['wTEMP'].unsqueeze(1), padding=ops['nt']//2)
     Xmax = X.abs().max(0)[0].max(0)[0].reshape(-1, ops['nt'])

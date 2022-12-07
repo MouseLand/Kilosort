@@ -2,8 +2,7 @@ from scipy.sparse import coo_matrix
 import numpy as np
 from scipy.ndimage import gaussian_filter
 import torch
-import spikedetect
-dev = torch.device('cuda')
+from kilosort import spikedetect
 
 def bin_spikes(ops, st):
     ymin = ops['yc'].min()
@@ -35,13 +34,13 @@ def bin_spikes(ops, st):
     return F, ysamp
 
 
-def align_block2(F, ysamp, ops):
+def align_block2(F, ysamp, ops, device=torch.device('cuda')):
 
     Nbatches = ops['Nbatches']
     n = 15
     dc = np.zeros((2*n+1, Nbatches))
     dt = np.arange(-n,n+1,1)
-    Fg = torch.from_numpy(F).to(dev).float()
+    Fg = torch.from_numpy(F).to(device).float()
     Fg = Fg - Fg.mean(1).unsqueeze(1)
     F0 = Fg[np.minimum(300, Nbatches//2)]
 
@@ -122,16 +121,16 @@ def kernel2D(x, y, sig = 1):
     Kn = np.exp(-ds / (2*sig**2))
     return Kn
 
-def run(ops):
-    st, tF, ops  = spikedetect.run(ops)
+def run(ops, device=torch.device('cuda')):
+    st, tF, ops  = spikedetect.run(ops, device=device)
     F, ysamp = bin_spikes(ops, st)
-    imin, yblk, F0, F0m = align_block2(F, ysamp, ops)
+    imin, yblk, F0, F0m = align_block2(F, ysamp, ops, device=device)
 
     dshift = imin * ops['binning_depth']
     ops['yblk'] = yblk
     ops['dshift'] = dshift 
     xp = np.vstack((ops['xc'],ops['yc'])).T
     Kxx = kernel2D(xp, xp, ops['sig_interp'])
-    Kxx = torch.from_numpy(Kxx).to(dev)
-    ops['iKxx'] = torch.linalg.inv(Kxx + 0.01 * torch.eye(Kxx.shape[0], device=dev))
+    Kxx = torch.from_numpy(Kxx).to(device)
+    ops['iKxx'] = torch.linalg.inv(Kxx + 0.01 * torch.eye(Kxx.shape[0], device=device))
     return ops

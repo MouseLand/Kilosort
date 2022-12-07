@@ -52,7 +52,7 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
 
     # random amplitudes
     # for good neurons
-    amp_sim = np.random.exponential(scale=1., size=(n_sim,)) * 10. + 8.
+    amp_sim = np.random.exponential(scale=1., size=(n_sim,)) * 12. + 12.
     # for MUA / noise
     amp_sim = np.append(amp_sim, 
                         np.random.rand(n_noise) * 8. + 4.,
@@ -246,8 +246,8 @@ def create_simulation(filename, whiten_mat_dat, st, cl, wfs, wfs_x, contaminatio
             noise_b[:, :384] = noise
             X = torch.from_numpy(data[ibatch * batch_size : min(n_batches * batch_size, (ibatch+1) * batch_size)]).float()
             #X[:,:384] = torch.linalg.solve(whiten_mat_dat.cpu(), X[:,:384].T).T
-            #X = (noise_b + X).numpy()
-            X = X.numpy()
+            X = (noise_b + X).numpy()
+            #X = X.numpy()
             to_write = np.clip(200 * X, -2**15 + 1, 2**15 - 1).astype('int16')
             if ibatch%100==0:
                 print(ibatch, to_write.shape)

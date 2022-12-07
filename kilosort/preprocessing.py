@@ -5,7 +5,6 @@ from scipy.interpolate import interp1d
 from scipy import io
 from glob import glob
 from torch.fft import fft, ifft, fftshift
-dev = torch.device('cuda')
 
 def whitening_from_covariance(CC):
     """ whitening matrix for a covariance matrix CC
@@ -15,11 +14,11 @@ def whitening_from_covariance(CC):
     Wrot =(E / (D+eps)**.5) @ E.T
     return Wrot
 
-def whitening_local(CC, xc, yc, nrange = 32):
+def whitening_local(CC, xc, yc, nrange = 32, device=torch.device('cuda')):
     """ loop through each channel and compute its whitening filter based on nearest channels
     """
     Nchan = CC.shape[0]
-    Wrot = torch.zeros((Nchan,Nchan), device = dev)
+    Wrot = torch.zeros((Nchan,Nchan), device = device)
     for j in range(CC.shape[0]):
         ds = (xc[j] - xc)**2 + (yc[j] - yc)**2
         isort = np.argsort(ds)
@@ -36,32 +35,33 @@ def kernel2D_torch(x, y, sig = 1):
     Kn = torch.exp(-ds / (2*sig**2))
     return Kn
 
-def get_drift_matrix(ops, dshift):
+
+def get_drift_matrix(ops, dshift, device=torch.device('cuda')):
     """ for a given dshift drift, computes the linear drift matrix for interpolation
     """
 
     # first, interpolate drifts to every channel
     yblk = ops['yblk']
     finterp = interp1d(yblk, dshift, fill_value="extrapolate", kind = 'linear')
-    shifts = finterp(ops['yc'])
+    shifts = finterp(ops['probe']['yc'])
 
     # compute coordinates of desired interpolation
-    xp = np.vstack((ops['xc'],ops['yc'])).T
+    xp = np.vstack((ops['probe']['xc'],ops['probe']['yc'])).T
     yp = xp.copy()
     yp[:,1] -= shifts
 
-    xp = torch.from_numpy(xp).to(dev)
-    yp = torch.from_numpy(yp).to(dev)
+    xp = torch.from_numpy(xp).to(device)
+    yp = torch.from_numpy(yp).to(device)
 
     # run interpolated to obtain a kernel
-    Kyx = kernel2D_torch(yp, xp, ops['sig_interp'])
+    Kyx = kernel2D_torch(yp, xp, ops['settings']['sig_interp'])
     
     # multiply with precomputed kernel matrix of original channels
     M = Kyx @ ops['iKxx']
 
     return M
 
-def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None) :
+def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None, device=torch.device('cuda')) :
     """ this function loads a batch of data ibatch and optionally:
      - if chanMap is present, then the channels are subsampled
      - if fwav is present, then the data is high-pass filtered
@@ -91,17 +91,17 @@ def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None)
         data = np.reshape(data, (-1, NchanTOT)).T
 
     nsamp = data.shape[-1]
-    X = torch.zeros((NchanTOT, NTbuff), device = dev)
+    X = torch.zeros((NchanTOT, NTbuff), device = device)
 
     # fix the data at the edges for the first and last batch
     if ibatch==0:
-        X[:, nt:nt+nsamp] = torch.from_numpy(data).to(dev).float()
+        X[:, nt:nt+nsamp] = torch.from_numpy(data).to(device).float()
         X[:, :nt] = X[:, nt:nt+1]
     elif ibatch==ops['Nbatches']-1:
-        X[:, :nsamp] = torch.from_numpy(data).to(dev).float()
+        X[:, :nsamp] = torch.from_numpy(data).to(device).float()
         X[:, nsamp:] = X[:, nsamp-1:nsamp]
     else:
-        X[:] = torch.from_numpy(data).to(dev).float()
+        X[:] = torch.from_numpy(data).to(device).float()
 
     # pick only the channels specified in the chanMap
     if chanMap is not None:
@@ -122,7 +122,7 @@ def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None)
     # whitening, with optional drift correction
     if Wrot is not None:
         if dshift is not None:
-            M = get_drift_matrix(ops, dshift[ibatch])
+            M = get_drift_matrix(ops, dshift[ibatch], device=device)
             X = (M @ Wrot) @ X
         else:
             X = Wrot @ X
@@ -135,7 +135,7 @@ def find_file(ops):
     ops['Nbatches'] = (file_size-1)//(ops['NchanTOT']*ops['NT']*2) + 1
     return ops
 
-def get_whitening_matrix(ops, nskip = 25):
+def get_whitening_matrix_old(ops, nskip = 25, device=torch.device('cuda')):
     """ get the whitening matrix, use every nskip batches
     """    
     filename = ops['filename']
@@ -144,11 +144,11 @@ def get_whitening_matrix(ops, nskip = 25):
     nt = ops['nt']
 
     # collect the covariance matrix across channels
-    CC = torch.zeros((Nchan,Nchan), device = dev)
+    CC = torch.zeros((Nchan,Nchan), device = device)
     k = 0
     for j in range(0,Nbatches-1, nskip):
         # load data with high-pass filtering
-        X = load_transform(filename, j, ops, fwav = ops['fwav'])#[0]
+        X = load_transform(filename, j, ops, fwav = ops['fwav'], device=device)#[0]
         X = X[:,nt:-nt]
         CC = CC + (X @ X.T)/X.shape[1]
         k+=1
@@ -156,10 +156,10 @@ def get_whitening_matrix(ops, nskip = 25):
     CC = CC / k
 
     # compute the local whitening filters and collect back into Wrot
-    Wrot = whitening_local(CC, ops['xc'], ops['yc'])
+    Wrot = whitening_local(CC, ops['xc'], ops['yc'], device=device)
     return Wrot
 
-def get_fwav(NT = 30122, fs = 30000):
+def get_fwav(NT = 30122, fs = 30000, device=torch.device('cuda')):
     """ Fourier filter to use for high-pass filtering. 
     Currently depends on NT, but it could get padded for larger NT. 
     """
@@ -168,44 +168,64 @@ def get_fwav(NT = 30122, fs = 30000):
     x = np.zeros(NT)
     x[NT//2] = 1
     wav = filtfilt(b,a , x).copy()
-    wav = torch.from_numpy(wav).to(dev).float()
+    wav = torch.from_numpy(wav).to(device).float()
     fwav = fft(wav)
 
     return fwav
 
-def add_config(ops):
-    """add configuration options from the matlab probe files
+def get_whitening_matrix(f, x_chan, y_chan, nskip = 25):
+    """ get the whitening matrix, use every nskip batches
+    """    
+    n_chan = len(f.channel_map)
+    # collect the covariance matrix across channels
+    CC = torch.zeros((n_chan, n_chan), device=f.device)
+    k = 0
+    for j in range(0, f.n_batches-1, nskip):
+        X = f.padded_batch_to_torch(j)
+        # load data with high-pass filtering
+        #X = load_transform(filename, j, ops, fwav = ops['fwav'])
+        X = X[:, f.n_twav : -f.n_twav]
+        CC = CC + (X @ X.T)/X.shape[1]
+        k+=1
+        # covariance matrix
+    CC = CC / k
+
+    # compute the local whitening filters and collect back into Wrot
+    Wrot = whitening_local(CC, x_chan, y_chan, device=f.device)
+    return Wrot
+
+def get_highpass_filter(fs = 30000, device=torch.device('cuda')):
+    """ filter to use for high-pass filtering. 
     """
+    NT = 30122
+    b,a = butter(3, 300, fs = fs, btype = 'high')
+    x = np.zeros(NT)
+    x[NT//2] = 1
+    hp_filter = filtfilt(b, a , x).copy()
+    hp_filter = torch.from_numpy(hp_filter).to(device).float()
+    return hp_filter
 
-    config_file = os.path.join(ops['root_config'] , ops['config_fname'] )
-    dconfig     = io.loadmat(config_file)
+def fft_highpass(hp_filter, NT=30122):
+    """ convert filter to fourier domain"""
+    device = hp_filter.device
+    ft = hp_filter.shape[0]
+    if ft < NT:
+        pad = (NT - ft) // 2
+        fhp = fft(torch.cat((torch.zeros(pad, device=device), 
+                             hp_filter,
+                             torch.zeros(pad + (NT-pad*2-ft), device=device))))
+    elif ft > NT:
+        crop = (ft - NT) // 2 
+        fhp = fft(hp_filter[crop : crop + NT])
+    else:
+        fhp = fft(hp_filter)
+    return fhp
+
+def run(ops, device=torch.device('cuda')):
     
-    connected = dconfig['connected'].astype('bool')
-
-    #ops['Nchan']     = connected.sum()
-
-    chanMap = np.arange(384)
-    #chanMap = connected.nonzero()[0]
-
-    ops['chanMap']   = chanMap #dconfig['chanMap'][connected].astype('int16').flatten() - 1
-    ops['xc']        = dconfig['xcoords'].flatten()[chanMap].astype('float32')
-    ops['yc']        = dconfig['ycoords'].flatten()[chanMap].astype('float32')
-
-    ops['Nchan'] = len(ops['chanMap'])
-
-    ops['NTbuff'] = ops['NT'] + 2 * ops['nt']
-    return ops
-
-def run(ops):
-    # find binary file in the folder
-    ops  = find_file(ops)
-
-    # find probe configuration file and load 
-    ops  = add_config(ops)
-
     # precompute high-pass filter
-    ops['fwav'] = get_fwav(ops['NTbuff'], ops['fs'])
+    ops['fwav'] = get_fwav(ops['NTbuff'], ops['fs'], device=device)
 
     # compute whitening matrix
-    ops['Wrot'] = get_whitening_matrix(ops, nskip = ops['nskip'])
+    ops['Wrot'] = get_whitening_matrix_old(ops, nskip = ops['nskip'], device=device)
     return ops
