@@ -52,6 +52,7 @@ def load_probe(probe_path):
     elif probe_path.suffix == '.mat':
         mat = loadmat(probe_path)
         connected = mat['connected'].ravel().astype('bool')
+        connected[:] = True
         probe['xc'] = mat['xcoords'].ravel().astype(np.float32)[connected]
         nc = len(probe['xc'])
         probe['yc'] = mat['ycoords'].ravel().astype(np.float32)[connected]
@@ -96,7 +97,7 @@ class BinaryRWFile:
             self.file = open(filename, mode='r+b')
         self._index = 0
         self._can_read = True
-        self.n_batches = self.n_samples // self.batch_size + 1
+        self.n_batches = int(np.ceil(self.n_samples / self.batch_size))
 
     @staticmethod
     def convert_numpy_file_to_binary(from_filename: str, to_filename: str) -> None:
@@ -257,7 +258,7 @@ class BinaryRWFile:
         data: 2D or 3D array
             The sample(s) to write.  Should be the same width and height as the other samples in the file.
         """
-        self.file.write(bytearray(np.minimum(data, 2 ** 15 - 2).astype('int16')))
+        self.file.write(bytearray(data))
 
 
     def from_slice(self, s: slice) -> Optional[np.ndarray]:
@@ -270,7 +271,7 @@ class BinaryRWFile:
         s_stop = min(self.n_samples, s_stop)
         return np.arange(s_start, s_stop, s_step) if any([s_start, s_stop, s_step]) else None
 
-    def padded_batch_to_torch(self, ibatch):
+    def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
         if ibatch==0:
             bstart = 0
@@ -286,12 +287,18 @@ class BinaryRWFile:
         if ibatch==0:
             X[:, self.n_twav : self.n_twav+nsamp] = torch.from_numpy(data).to(self.device).float()
             X[:, :self.n_twav] = X[:, self.n_twav : self.n_twav+1]
+            bstart = - self.n_twav
         elif ibatch==self.n_batches-1:
             X[:, :nsamp] = torch.from_numpy(data).to(self.device).float()
             X[:, nsamp:] = X[:, nsamp-1:nsamp]
+            bend += self.n_twav
         else:
             X[:] = torch.from_numpy(data).to(self.device).float()
-        return X 
+        inds = [bstart, bend]
+        if return_inds:
+            return X, inds
+        else:
+            return X
 
 class BinaryFiltered(BinaryRWFile):
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
@@ -342,10 +349,13 @@ class BinaryFiltered(BinaryRWFile):
         X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
         
-    def padded_batch_to_torch(self, ibatch, ops=None):
-        X = super().padded_batch_to_torch(ibatch)        
-        return self.filter(X, ops, ibatch)
-
+    def padded_batch_to_torch(self, ibatch, ops=None, return_inds=False):
+        if return_inds:
+            X, inds = super().padded_batch_to_torch(ibatch, return_inds=return_inds)
+            return self.filter(X, ops, ibatch), inds
+        else:
+            X = super().padded_batch_to_torch(ibatch)
+            return self.filter(X, ops, ibatch)
 
 @contextmanager
 def temporary_pointer(file):
