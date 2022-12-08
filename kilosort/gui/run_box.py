@@ -1,6 +1,5 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-# from pykilosort.gui.sanity_plots import SanityPlotWidget
 from kilosort.gui.sorter import KiloSortWorker
 
 
@@ -21,14 +20,12 @@ class RunBox(QtWidgets.QGroupBox):
         self.preprocess_button = QtWidgets.QPushButton("Preprocess")
         self.spike_sort_button = QtWidgets.QPushButton("Spikesort")
         self.export_button = QtWidgets.QPushButton("Export for Phy")
-        self.sanity_plot_option = QtWidgets.QCheckBox("Show Sanity Plots")
 
         self.buttons = [
             self.run_all_button,
             self.preprocess_button,
             self.spike_sort_button,
             self.export_button,
-            self.sanity_plot_option,
         ]
 
         self.data_path = None
@@ -57,8 +54,6 @@ class RunBox(QtWidgets.QGroupBox):
         self.spike_sort_button.setEnabled(False)
         self.export_button.setEnabled(False)
 
-        self.sanity_plot_option.setChecked(True)
-
         self.run_all_button.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
         )
@@ -67,7 +62,6 @@ class RunBox(QtWidgets.QGroupBox):
         self.layout.addWidget(self.preprocess_button, 0, 2, 1, 2)
         self.layout.addWidget(self.spike_sort_button, 1, 2, 1, 2)
         self.layout.addWidget(self.export_button, 2, 2, 1, 2)
-        self.layout.addWidget(self.sanity_plot_option, 2, 1, 1, 1)
 
         self.setLayout(self.layout)
 
@@ -89,7 +83,6 @@ class RunBox(QtWidgets.QGroupBox):
             self.export_button.setEnabled(True)
         else:
             self.export_button.setEnabled(False)
-        self.sanity_plot_option.setEnabled(True)
 
     @QtCore.pyqtSlot(bool)
     def disable_all_input(self, value):
@@ -184,29 +177,11 @@ class RunBox(QtWidgets.QGroupBox):
         QtWidgets.QApplication.processEvents()
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
 
-        # if self.sanity_plot_option.isChecked() and "spikesort" in steps:
-        #     dissimilarity_plot = SanityPlotWidget(parent=None,
-        #                                           num_remote_plots=2,
-        #                                           title="Dissimilarity Matrices")
-        #     dissimilarity_plot.resize(600, 400)
-        #
-        #     diagnostic_plot = SanityPlotWidget(parent=None,
-        #                                        num_remote_plots=4,
-        #                                        title="Diagnostic Plots")
-        #     diagnostic_plot.resize(750, 600)
-        #     sanity_plots = True
-        #     self.remote_widgets = [dissimilarity_plot, diagnostic_plot]
-        #
-        # else:
-        #     sanity_plots = False
-        #     self.remote_widgets = None
-
         worker = KiloSortWorker(
             context=self.get_current_context(),
             data_path=self.data_path,
             output_directory=self.results_directory,
             steps=steps,
-            # sanity_plots=sanity_plots,
             plot_widgets=self.remote_widgets,
         )
 
