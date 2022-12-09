@@ -283,12 +283,12 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.context.filt_binary_file = filt_binary_file
 
+        self.data_view_box.set_whitening_matrix(self.context.whitening_matrix)
+        self.data_view_box.set_highpass_filter(self.context.highpass_filter)
+
     def setup_data_view(self):
         self.data_view_box.setup_seek(self.context)
         self.data_view_box.create_plot_items()
-        self.data_view_box.set_whitening_matrix(self.context.whitening_matrix)
-        self.data_view_box.set_highpass_filter(self.context.highpass_filter)
-        self.data_view_box.update_plot(self.context)
         self.data_view_box.enable_view_buttons()
 
     def setup_context(self):
