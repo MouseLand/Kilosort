@@ -615,7 +615,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             NT = int(self.NT_input.text())
             assert NT > 0
 
-            self.nt = NT
+            self.NT = NT
 
             if self.check_settings():
                 self.enable_load()
@@ -639,7 +639,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             spkTh = float(self.spkTh_input.text())
             assert spkTh > 0.0
 
-            self.nt = spkTh
+            self.spkTh = spkTh
 
             if self.check_settings():
                 self.enable_load()
@@ -657,7 +657,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             Th = float(self.Th_input.text())
             assert Th > 0.0
 
-            self.nt = Th
+            self.Th = Th
 
             if self.check_settings():
                 self.enable_load()
@@ -675,7 +675,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             nwaves = int(self.nwaves_input.text())
             assert nwaves > 0
 
-            self.nt = nwaves
+            self.nwaves = nwaves
 
             if self.check_settings():
                 self.enable_load()
@@ -699,7 +699,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             nskip = int(self.nskip_input.text())
             assert nskip > 0
 
-            self.nt = nskip
+            self.nskip = nskip
 
             if self.check_settings():
                 self.enable_load()
@@ -723,7 +723,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             nt0min = int(self.nt0min_input.text())
             assert nt0min > 0
 
-            self.nt = nt0min
+            self.nt0min = nt0min
 
             if self.check_settings():
                 self.enable_load()
@@ -747,7 +747,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             nblocks = int(self.nblocks_input.text())
             assert nblocks > 0
 
-            self.nt = nblocks
+            self.nblocks = nblocks
 
             if self.check_settings():
                 self.enable_load()
@@ -771,7 +771,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             binning_depth = float(self.binning_depth_input.text())
             assert binning_depth > 0.0
 
-            self.nt = binning_depth
+            self.binning_depth = binning_depth
 
             if self.check_settings():
                 self.enable_load()
@@ -789,7 +789,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             sig_interp = float(self.sig_interp_input.text())
             assert sig_interp > 0.0
 
-            self.nt = sig_interp
+            self.sig_interp = sig_interp
 
             if self.check_settings():
                 self.enable_load()

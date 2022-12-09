@@ -213,6 +213,8 @@ class BinaryRWFile:
             # load and bin data
             with temporary_pointer(self.file) as f:
                 for sample, ixx in zip(samples, indices):
+                    print(ixx)
+                    print(self._index)
                     if ixx!=self._index:
                         f.seek(self.nbytesread * ixx)
                     buff = f.read(self.nbytesread)

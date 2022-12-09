@@ -175,7 +175,7 @@ def get_fwav(NT = 30122, fs = 30000, device=torch.device('cuda')):
 
 def get_whitening_matrix(f, x_chan, y_chan, nskip = 25):
     """ get the whitening matrix, use every nskip batches
-    """    
+    """
     n_chan = len(f.channel_map)
     # collect the covariance matrix across channels
     CC = torch.zeros((n_chan, n_chan), device=f.device)
