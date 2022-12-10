@@ -327,7 +327,7 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
 def create_simulation(filename, st, cl, wfs, wfs_x, contaminations,
                       n_sim=100, n_noise=1000, n_batches=500,
                       batch_size=60000, tsig=50, tpad=100, n_chan_bin=385, drift=True,
-                      drift_range=5, drift_seed=0, ups=10
+                      drift_range=5, drift_seed=0, ups=10, whiten_mat = None,
                              ):
     """ simulate neuropixels 3B probe recording """
 
@@ -358,9 +358,16 @@ def create_simulation(filename, st, cl, wfs, wfs_x, contaminations,
             noise = torch.cat((noise_pad, noise_next[tpad : -tpad]), axis=0)
             noise_b[:, :384] = noise
             X = torch.from_numpy(data[ibatch * batch_size : min(n_batches * batch_size, (ibatch+1) * batch_size)]).float()
-            #X[:,:384] = torch.linalg.solve(whiten_mat_dat.cpu(), X[:,:384].T).T
-            X = (noise_b + X).numpy()
-            to_write = np.clip(200 * X, -2**15 + 1, 2**15 - 1).astype('int16')
+            
+            X = (noise_b + X)
+
+            if whiten_mat is not None:
+                X[:,:384] = torch.linalg.solve(whiten_mat.cpu(), X[:,:384].T).T
+
+            X = X.numpy()
+            to_write = np.clip(20 * X, -2**15 + 1, 2**15 - 1).astype('int16')
+            #to_write = np.clip(X, -2**15 + 1, 2**15 - 1).astype('int16')
+
             if ibatch%100==0:
                 print(f'writing batch {ibatch} out of {n_batches}')
             bfile.write(to_write)
