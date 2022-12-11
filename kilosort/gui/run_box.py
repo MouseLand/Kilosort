@@ -46,7 +46,8 @@ class RunBox(QtWidgets.QGroupBox):
         self.setup()
 
     def setup(self):
-        self.run_all_button.clicked.connect(self.run_all)
+        # self.run_all_button.clicked.connect(self.run_all)
+        self.run_all_button.clicked.connect(self.spikesort)
         # self.preprocess_button.clicked.connect(self.preprocess)
         self.spike_sort_button.clicked.connect(self.spikesort)
         self.export_button.clicked.connect(self.export)
