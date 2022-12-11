@@ -49,33 +49,6 @@ def assign_mu(iclust, Xg, cols_mu, tones, nclust = None, lpow = 1):
 
     return mu, N
 
-def assign_iclust_slow(Xg, mu, rows_neigh, isub, kn, tones2, lam = 1, device=torch.device('cuda')):
-    NN, nfeat = Xg.shape
-    nclust = mu.shape[0]
-    n_neigh = kn.shape[-1]
-
-    ij = torch.vstack((rows_neigh.flatten(), isub[kn].flatten()))
-    xN = coo(ij, (1e-12 + tones2).flatten(), (NN, nclust))
-    xN = xN.coalesce()
-    
-    values  = xN.values().cpu().numpy()
-    indices = xN.indices().cpu().numpy()
-    from scipy.sparse import coo_matrix
-    C = coo_matrix((values, indices), (NN, nclust)).tocsr()
-    vexp = C[np.arange(NN)[:, np.newaxis], isub[kn].cpu().numpy()].todense()
-    vexp = torch.from_numpy(vexp).to(device)
-
-    # too much memory, this can be a loop
-    vv = torch.einsum('ij, ikj -> ik', Xg , mu[isub[kn]])
-    nm = (mu**2).sum(1)[isub[kn]]
-    vexp = vexp + 2*vv-nm
-    
-    tarange = torch.arange(NN, device = device)#.tile(1,n_neigh)    
-    imax = torch.argmax(vexp, 1)
-    iclust = isub[kn[tarange, imax]]
-
-    return iclust
-
 def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj, device=torch.device('cuda')):
     NN = kn.shape[0]
 
@@ -201,59 +174,6 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
 
     return iclust
 
-def collapse_neighbors(iclust, kn, tones2, isub, nclust = None):
-    n_neigh = kn.shape[1]
-    cols = iclust.unsqueeze(-1).tile((1, n_neigh))
-    rows = isub[kn]
-    iis = torch.vstack((cols.flatten(), rows.flatten()))
-
-    ccN = coo(iis, tones2.flatten(), (nclust, nclust))
-    ccN = ccN.to_dense()
-    return ccN
-
-
-def big_merge(Xg, cols_mu, iclust, kn, tones, tones2, nsub, lam):
-    _, iclust = torch.unique(iclust, return_inverse=True)
-    nclust = iclust.max() + 1
-    isub = assign_isub(iclust, kn, tones2, nclust = nclust, nsub=nsub)
-
-    ccN = collapse_neighbors(iclust, kn, tones2, isub, nclust = nclust)
-    #ccN = ccN + ccN.T
-    ccN = ccN - torch.diag(torch.diag(ccN))
-
-    mu, N  = assign_mu(iclust, Xg, cols_mu, tones, nclust = nclust)
-    mu2, N = assign_mu(iclust, Xg, cols_mu, tones, nclust = nclust, lpow = 2)
-    nsum = N.sum()
-    N = N/nsum
-    ccN = ccN/nsum
-
-    while 1:
-        score = compute_score(mu,mu2,N,ccN, lam)
-        if score.max() <.00001:
-            break
-        ki,kj = np.unravel_index(score.argmax().cpu(), score.shape)
-        
-        # update mu
-        mu[ki]  = (mu[ki]  * N[ki] +  mu[kj] * N[kj]) / (N[ki] + N[kj])
-        mu2[ki] = (mu2[ki] * N[ki] + mu2[kj] * N[kj]) / (N[ki] + N[kj])
-        mu[kj] = 0
-        mu2[kj] = 0
-
-        # update N
-        N[ki] = N[ki] + N[kj]
-        N[kj] = 0
-
-        # update ccN
-        ccN[ki]   = ccN[ki]   + ccN[kj]
-        ccN[:,ki] = ccN[:,ki] + ccN[:,kj]
-        ccN[ki,ki] = 0
-        ccN[kj] = 0
-        ccN[:,kj] = 0
-
-        iclust[iclust==kj] = ki
-    return iclust 
-
-
 def compute_score(mu, mu2, N, ccN, lam):
     mu_pairs  = ((N*mu).unsqueeze(1)  + N*mu)  / (1e-6 + N+N[:,0]).unsqueeze(-1)
     mu2_pairs = ((N*mu2).unsqueeze(1) + N*mu2) / (1e-6 + N+N[:,0]).unsqueeze(-1)
@@ -355,14 +275,17 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda')):
             #nmax += 1
             iclust = torch.zeros((Xd.shape[0],))
         else:
-            st0 = st[igood,0]
+            if mode is 'template':
+                st0 = st[igood,0]/ops['fs']
+            else:
+                st0 = None
 
             # find new clusters
             iclust, iclust0, M, iclust_init = cluster(Xd,nskip = nskip, lam = 1, seed = 5, device=device)
 
             xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
-            xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust, my_clus)#, meta = st0)
+            xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust, my_clus, meta = st0)
 
             iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
 
@@ -439,22 +362,3 @@ def assign_iclust0(Xg, mu):
     nm = (mu**2).sum(1)
     iclust = torch.argmax(2*vv-nm, 1)
     return iclust
-
-
-from torch.nn.functional import conv1d
-
-def align_U(U, ops, device=torch.device('cuda')):
-    Uex = torch.einsum('xyz, zt -> xty', U.to(device), ops['wPCA'])
-    X = Uex.reshape(-1, ops['Nchan']).T
-    X = conv1d(X.unsqueeze(1), ops['wTEMP'].unsqueeze(1), padding=ops['nt']//2)
-    Xmax = X.abs().max(0)[0].max(0)[0].reshape(-1, ops['nt'])
-    imax = torch.argmax(Xmax, 1)
-
-    Unew = Uex.clone() 
-    for j in range(ops['nt']):
-        ix = imax==j
-        Unew[ix] = torch.roll(Unew[ix], ops['nt']//2 - j, -2)
-    Unew = torch.einsum('xty, zt -> xzy', Unew, ops['wPCA'])#.transpose(1,2).cpu()
-    return Unew, imax
-
-
