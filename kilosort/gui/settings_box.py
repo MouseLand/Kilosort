@@ -461,8 +461,10 @@ class SettingsBox(QtWidgets.QGroupBox):
                 probe_prb = create_prb(probe_layout)
                 probe_path = Path(self.gui.new_probe_files_path).joinpath(probe_name)
                 with open(probe_path, "w+") as probe_file:
-                    # TODO: pretty print output
-                    str_prb = f"""channel_groups = {probe_prb}"""
+                    str_dict = pprint.pformat(
+                        probe_prb, indent=4, compact=False,
+                    )
+                    str_prb = f"""channel_groups = {str_dict}"""
                     probe_file.write(str_prb)
                 assert probe_path.exists()
 
