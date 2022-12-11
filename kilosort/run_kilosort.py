@@ -67,7 +67,7 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
     torch.random.manual_seed(1)
 
     ops          = preprocessing.run(ops, device=device)
-    ops['Nbatches'] = 200
+    #ops['Nbatches'] = 200
 
     ops         = datashift.run(ops, device=device)
 
