@@ -101,7 +101,6 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.bad_channel_color = (100, 100, 100)
         self.channels_displayed_traces = 32
         self.channels_displayed_colormap = None
-        self.data_range = (0, 3000)
         self.seek_range = (0, 100)
         self.scale_factor = 1.0
         self.traces_scaling_factor = {
@@ -151,7 +150,7 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.data_view_widget.mouseEnabled = True
         self.data_view_widget.hideAxis("left")
         self.data_view_widget.disableAutoRange()
-        self.data_view_widget.sceneObj.sigMouseClicked.connect(self.scene_clicked)
+        self.data_view_widget.sceneObj.sigMouseClicked.connect(self.on_scene_clicked)
 
         self.data_view_widget.signalChangeChannel.connect(
             self.on_wheel_scroll_plus_control
@@ -450,16 +449,16 @@ class DataViewBox(QtWidgets.QGroupBox):
 
                 self.update_plot()
 
-    def scene_clicked(self, ev):
+    def on_scene_clicked(self, ev):
         if self.context_set():
             if ev.button() == QtCore.Qt.LeftButton:
+                sample_rate = self.get_context().params["fs"]
                 if self.traces_mode_active():
                     x_pos = self.data_view_box.mapSceneToView(ev.pos()).x()
                 else:
                     x_pos = self.colormap_image.mapFromScene(ev.pos()).x()
-                range_min = self.data_range[0]
-                range_max = self.data_range[1]
-                fraction = (x_pos - range_min) / range_max
+                plot_range = self.plot_range * sample_rate
+                fraction = x_pos / plot_range
                 if fraction > 0.5:
                     self.shift_current_time(direction=1)
                 else:
