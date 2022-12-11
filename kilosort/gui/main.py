@@ -183,8 +183,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         if self.context is not None:
             self.data_view_box.change_plot_scaling(direction)
 
-    def toggle_view(self):
-        self.data_view_box.toggle_mode()
+    # def toggle_view(self):
+    #     self.data_view_box.toggle_mode()
 
     def toggle_mode(self, mode):
         if mode == "raw":
@@ -316,7 +316,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def update_data_view(self):
         self.data_view_box.set_whitening_matrix(self.context.whitening_matrix)
-        self.data_view_box.clear_cached_traces()
+        # self.data_view_box.clear_cached_traces()
         self.data_view_box.update_plot(self.context)
 
     def update_run_box(self):
