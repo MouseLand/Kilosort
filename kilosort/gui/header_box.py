@@ -9,9 +9,9 @@ class HeaderBox(QtWidgets.QWidget):
 
         self.layout = QtWidgets.QHBoxLayout()
 
-        self.kilosort_text = QtWidgets.QLabel()
-        self.kilosort_text.setText(f"Kilosort {__version__[:3]}")
-        self.kilosort_text.setFont(QtGui.QFont("Arial", 20, QtGui.QFont.Black))
+        # self.kilosort_text = QtWidgets.QLabel()
+        # self.kilosort_text.setText(f"Kilosort {__version__[:3]}")
+        # self.kilosort_text.setFont(QtGui.QFont("Arial", 20, QtGui.QFont.Black))
 
         self.controls_button = QtWidgets.QPushButton("Controls")
         self.controls_button.clicked.connect(self.show_controls_popup)
@@ -21,7 +21,7 @@ class HeaderBox(QtWidgets.QWidget):
 
         self.reset_gui_button = QtWidgets.QPushButton("Reset GUI")
 
-        self.layout.addWidget(self.kilosort_text)
+        # self.layout.addWidget(self.kilosort_text)
         self.layout.addStretch(0)
         self.layout.addWidget(self.controls_button)
         self.layout.addWidget(self.help_button)
