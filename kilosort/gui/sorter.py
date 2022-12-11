@@ -1,7 +1,10 @@
 import numpy as np
 import torch
 from PyQt5 import QtCore
+from kilosort.gui.logger import setup_logger
 from kilosort.run_kilosort import run_kilosort
+
+logger = setup_logger(__name__)
 
 
 class KiloSortWorker(QtCore.QThread):
@@ -53,5 +56,6 @@ class KiloSortWorker(QtCore.QThread):
             self.finishedSpikesort.emit(self.context)
 
         if "export" in self.steps:
-            run_export(self.context, self.data_path, self.output_directory)
-            self.finishedAll.emit(self.context)
+            # run_export(self.context, self.data_path, self.output_directory)
+            # self.finishedAll.emit(self.context)
+            raise NotImplementedError("Export for Phy has not been implemented yet!")
