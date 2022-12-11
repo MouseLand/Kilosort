@@ -523,7 +523,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                     else:
                         self.probe_layout = probe_layout
 
-                        total_channels = self.probe_layout.NchanTOT
+                        total_channels = self.probe_layout["n_chan"]
                         total_channels = self.estimate_total_channels(total_channels)
                         self.num_channels_input.setText(str(total_channels))
 
