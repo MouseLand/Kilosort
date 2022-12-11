@@ -1,5 +1,7 @@
 import numpy as np
+import torch
 from PyQt5 import QtCore
+from kilosort.run_kilosort import run_kilosort
 
 
 class KiloSortWorker(QtCore.QThread):
@@ -10,35 +12,44 @@ class KiloSortWorker(QtCore.QThread):
     def __init__(
             self,
             context,
-            data_path,
             output_directory,
             steps,
-            sanity_plots=False,
-            plot_widgets=None,
             *args,
             **kwargs):
         super(KiloSortWorker, self).__init__(*args, **kwargs)
         self.context = context
-        self.data_path = data_path
+        self.data_path = context.data_path
         self.output_directory = output_directory
-
-        self.sanity_plots = sanity_plots
-        self.plot_widgets = plot_widgets
 
         assert isinstance(steps, list) or isinstance(steps, str)
         self.steps = steps if isinstance(steps, list) else [steps]
 
     def run(self):
-        if "preprocess" in self.steps:
-            self.context.reset()
-            self.context.probe = self.context.raw_probe.copy()
-            self.context = run_preprocess(self.context)
-            self.finishedPreprocess.emit(self.context)
-
         if "spikesort" in self.steps:
-            self.context = run_spikesort(self.context,
-                                         sanity_plots=self.sanity_plots,
-                                         plot_widgets=self.plot_widgets)
+            settings = self.context.params
+            probe = self.context.probe
+            settings["data_folder"] = self.data_path.parent
+            ops, st, tF, clu, Wall, is_ref = run_kilosort(
+                settings=settings,
+                probe=probe,
+                device=torch.device("cuda")
+            )
+
+            output_folder = self.context.context_path
+
+            ops_arr = np.array(ops)
+            np.save(output_folder / "ops.npy", ops_arr)
+
+            np.save(output_folder / "st.npy", st)
+
+            np.save(output_folder / "tF.npy", tF.cpu().numpy())
+
+            np.save(output_folder / "clu.npy", clu)
+
+            np.save(output_folder / "Wall.npy", Wall.cpu().numpy())
+
+            np.save(output_folder / "is_ref.npy", np.array(is_ref))
+
             self.finishedSpikesort.emit(self.context)
 
         if "export" in self.steps:

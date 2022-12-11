@@ -184,10 +184,8 @@ class RunBox(QtWidgets.QGroupBox):
 
         worker = KiloSortWorker(
             context=self.get_current_context(),
-            data_path=self.data_path,
             output_directory=self.results_directory,
             steps=steps,
-            plot_widgets=self.remote_widgets,
         )
 
         # worker.finishedPreprocess.connect(self.finished_preprocess)
