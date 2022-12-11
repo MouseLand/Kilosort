@@ -410,6 +410,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             "NT": self.NT,
             "spkTh": self.spkTh,
             "Th": self.Th,
+            "Th_detect": self.Th_detect,
             "nwaves": self.nwaves,
             "nskip": self.nskip,
             "nt0min": self.nt0min,
