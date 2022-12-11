@@ -126,17 +126,17 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.third_boxes_layout.addWidget(self.settings_box, 85)
         self.third_boxes_layout.addWidget(self.run_box, 15)
 
-        self.second_boxes_layout.addLayout(self.third_boxes_layout, 60)
-        self.second_boxes_layout.addWidget(self.probe_view_box, 40)
+        self.second_boxes_layout.addLayout(self.third_boxes_layout, 50)
+        self.second_boxes_layout.addWidget(self.probe_view_box, 50)
 
-        self.first_boxes_layout.addLayout(self.second_boxes_layout, 79)
-        self.first_boxes_layout.addWidget(self.message_log_box, 21)
+        self.first_boxes_layout.addLayout(self.second_boxes_layout, 75)
+        self.first_boxes_layout.addWidget(self.message_log_box, 25)
 
         self.fourth_boxes_layout.addWidget(self.header_box, 3)
         self.fourth_boxes_layout.addWidget(self.data_view_box, 97)
 
-        self.boxes_layout.addLayout(self.first_boxes_layout, 30)
-        self.boxes_layout.addLayout(self.fourth_boxes_layout, 70)
+        self.boxes_layout.addLayout(self.first_boxes_layout, 25)
+        self.boxes_layout.addLayout(self.fourth_boxes_layout, 75)
 
         self.boxes.setLayout(self.boxes_layout)
         self.content_layout.addWidget(self.boxes, 90)

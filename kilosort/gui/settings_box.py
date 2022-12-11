@@ -56,10 +56,10 @@ class SettingsBox(QtWidgets.QGroupBox):
         self._probes = []
         self.populate_probe_selector()
 
-        self.num_channels_text = QtWidgets.QLabel("Number of Channels")
+        self.num_channels_text = QtWidgets.QLabel("number of channels")
         self.num_channels_input = QtWidgets.QLineEdit()
 
-        self.sampling_frequency_text = QtWidgets.QLabel("Sampling Frequency (in Hz)")
+        self.sampling_frequency_text = QtWidgets.QLabel("sampling frequency")
         self.sampling_frequency_input = QtWidgets.QLineEdit()
 
         self.nt_text = QtWidgets.QLabel("nt")
