@@ -56,6 +56,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.first_boxes_layout = QtWidgets.QVBoxLayout()
         self.second_boxes_layout = QtWidgets.QHBoxLayout()
         self.third_boxes_layout = QtWidgets.QVBoxLayout()
+        self.fourth_boxes_layout = QtWidgets.QVBoxLayout()
 
         self.settings_box = SettingsBox(self)
         self.probe_view_box = ProbeViewBox(self)
@@ -122,8 +123,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def setup(self):
         self.setWindowTitle(f"Kilosort 4")
 
-        self.content_layout.addWidget(self.header_box, 3)
-
         self.third_boxes_layout.addWidget(self.settings_box, 85)
         self.third_boxes_layout.addWidget(self.run_box, 15)
 
@@ -133,8 +132,11 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.first_boxes_layout.addLayout(self.second_boxes_layout, 79)
         self.first_boxes_layout.addWidget(self.message_log_box, 21)
 
+        self.fourth_boxes_layout.addWidget(self.header_box, 3)
+        self.fourth_boxes_layout.addWidget(self.data_view_box, 97)
+
         self.boxes_layout.addLayout(self.first_boxes_layout, 30)
-        self.boxes_layout.addWidget(self.data_view_box, 70)
+        self.boxes_layout.addLayout(self.fourth_boxes_layout, 70)
 
         self.boxes.setLayout(self.boxes_layout)
         self.content_layout.addWidget(self.boxes, 90)
