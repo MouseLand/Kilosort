@@ -1,9 +1,5 @@
-import os
 from pathlib import Path
-
-import numpy as np
 import torch
-
 from kilosort import preprocessing
 from kilosort.gui import (
     DataViewBox,
