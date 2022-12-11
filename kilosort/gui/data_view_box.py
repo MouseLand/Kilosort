@@ -1,16 +1,8 @@
 import numpy as np
-import typing as t
 import pyqtgraph as pg
-import torch
-
-from kilosort import preprocessing
 from kilosort.gui.logger import setup_logger
 from kilosort.gui.palettes import COLORMAP_COLORS
-# from kilosort.gui.sorter import filter_and_whiten, get_predicted_traces
-# from kilosort.preprocess import get_approx_whitening_matrix
 from PyQt5 import QtCore, QtWidgets
-
-from kilosort.io import BinaryFiltered
 
 logger = setup_logger(__name__)
 
