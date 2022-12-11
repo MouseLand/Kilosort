@@ -2,7 +2,16 @@ import os
 from glob import glob
 import numpy as np
 import torch
-from kilosort import preprocessing, datashift, template_matching, clustering_qr, CCG, clustering_qr, io, spikedetect
+from kilosort import (
+    preprocessing,
+    datashift,
+    template_matching,
+    clustering_qr,
+    CCG,
+    clustering_qr,
+    io,
+    spikedetect,
+)
 #from kilosort import default_settings
 
 
