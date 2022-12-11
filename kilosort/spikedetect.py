@@ -54,7 +54,7 @@ def get_waves_old(ops):
     return wPCA, wTEMP
 
 def get_waves(ops, device=torch.device('cuda')):
-    dd = np.load('/github/kilosort_dev/kilosort/wTEMP.npz')
+    dd = np.load('/media/marius/ssd1/data/spikes/wTEMP.npz')
     wTEMP = torch.from_numpy(dd['wTEMP']).to(device)
     wPCA = torch.from_numpy(dd['wPCA']).to(device)
     return wPCA, wTEMP
@@ -119,7 +119,7 @@ def template_match(X, ops, iC, iC2, weigh, device=torch.device('cuda')):
     Amaxs[:,:nt] = 0
     Amaxs[:,-nt:] = 0
     Amaxs  = max_pool1d(Amaxs.unsqueeze(0), (2*nt0+1), stride = 1, padding = nt0).squeeze(0)
-    xy = torch.logical_and(Amaxs==As, As > ops['spkTh']).nonzero()
+    xy = torch.logical_and(Amaxs==As, As > ops['Th_detect']).nonzero()
     imax = imaxs[xy[:,0], xy[:,1]]
     amp = As[xy[:,0], xy[:,1]]
 

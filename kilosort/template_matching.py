@@ -2,21 +2,7 @@ import numpy as np
 from kilosort import spikedetect, preprocessing, CCG
 import torch 
 from torch.nn.functional import conv1d, max_pool2d, max_pool1d
-
-
-def Wupdate(X, U, stt, ops, device=torch.device('cuda')):
-    nt = ops['nt']
-    tiwave = torch.arange(-(nt//2), nt//2+1, device=device) 
-    xsub = X[:, stt[:,:1] + tiwave] @ ops['wPCA'].T
-    Nfilt = U.shape[0]
-
-    nsp = xsub.shape[1]
-    M = torch.zeros((Nfilt, nsp), dtype=torch.float, device = device)
-    M[stt[:,1], torch.arange(nsp)] = 1
-
-    Wsub = torch.einsum('ijk, lj -> lki', xsub, M)
-    #Wsub = Wsub / (1e-3 + M.sum(1).unsqueeze(1))
-    return Wsub, M.sum(1)
+import CCG
 
 def prepare_extract(ops, U, nC, device=torch.device('cuda')):
     ds = (ops['xc'] - ops['xc'][:, np.newaxis])**2 +  (ops['yc'] - ops['yc'][:, np.newaxis])**2 
@@ -25,7 +11,6 @@ def prepare_extract(ops, U, nC, device=torch.device('cuda')):
     iU = torch.argmax((U**2).sum(1), -1)
     Ucc = U[torch.arange(U.shape[0]),:,iCC[:,iU]]
     return iCC, iU, Ucc
-
 
 def extract(ops, U, device=torch.device('cuda')):
     nC = 10
@@ -61,7 +46,9 @@ def extract(ops, U, device=torch.device('cuda')):
             tF2 = torch.cat((tF2, torch.zeros_like(tF2)), 0)
 
         stt = stt.double()
-        st[k:k+nsp,0] = ((stt[:,0]-nt)/ops['fs'] + ibatch * (ops['NT']/ops['fs'])).cpu().numpy()
+        #st[k:k+nsp,0] = ((stt[:,0]-nt)/ops['fs'] + ibatch * (ops['NT']/ops['fs'])).cpu().numpy()
+        st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['NT'])).cpu().numpy()
+
         st[k:k+nsp,1] = stt[:,1].cpu().numpy()
         st[k:k+nsp,2] = amps[:,0].cpu().numpy()
         
@@ -75,7 +62,6 @@ def extract(ops, U, device=torch.device('cuda')):
     st = st[:k]
     tF = tF[:k]
     tF2 = tF2[:k]
-
     return st, tF, tF2, ops
 
 def align_U(U, ops, device=torch.device('cuda')):
@@ -92,192 +78,13 @@ def align_U(U, ops, device=torch.device('cuda')):
     Unew = torch.einsum('xty, zt -> xzy', Unew, ops['wPCA'])#.transpose(1,2).cpu()
     return Unew, imax
 
-def run(ops, device=torch.device('cuda')):
-    np.random.seed(101)
-    iperm = np.random.permutation(ops['Nbatches'])
-    niter = 40
-    bb = ops['Nbatches']//niter
-    Nchan = ops['Nchan']
-    nPC = ops['wPCA'].shape[0]
 
-    U = torch.zeros((0, nPC, Nchan), device = device)
-
-    for iiter in range(niter):
-        isub = iperm[iiter*bb:(iiter+1)*bb]
-        st, tF, Wres, nn, vexp = get_batch(ops, isub, U, device=device)    
-        if U.shape[0]>0:
-            U = U + Wres / (1e-6 + nn.unsqueeze(-1).unsqueeze(-1))
-            U = U[nn>0]
-
-        if iiter>niter-10:
-            U, _ = align_U(U, ops, device=device)
-            print(len(U), nn.sum().item(), len(st), vexp.item())
-            continue
-
-        Unew = get_new_templates(ops, tF, st, device=device)
-        U = torch.cat((U, Unew), 0)
-        print(len(U), len(Unew), nn.sum().item(), len(st), vexp.item())        
-        
-        U, _ = align_U(U, ops, device=device)
-        
-    return U
-
-
-def get_batch(ops, isub, U, device=torch.device('cuda')):
-    
-    iC = ops['iC']
-    #iC2 = ops['iC2']
-    #weigh = ops['weigh']
-    nt = ops['nt']
-    Nchan = ops['Nchan']
-    nPC = ops['wPCA'].shape[0]
-
-    tarange = torch.arange(-(nt//2),nt//2+1, device = device)
-
-    nC = ops['iC'].shape[0]
-    
-    Nfilt = U.shape[0]
-    if Nfilt>0:
-        ctc = prepare_matching(ops, U)
-    Wres = torch.zeros((Nfilt, nPC, Nchan), device = device)
-    nn = torch.zeros((Nfilt,), device = device)
-
-    tF = torch.zeros((10**5, nC , ops['nwaves']), device=device)
-    st = torch.zeros((10**5, 6), device=device)
-    k = 0
-    vexp = 0
-    tau = 400
-
-    for ibatch in isub:
-        #ibatch = iperm[ik*bb + j]
-        X = preprocessing.load_transform(ops['filename'], ibatch, ops, fwav = ops['fwav'], 
-                            Wrot = ops['Wrot'], dshift = ops['dshift'], device=device)
-        
-        if Nfilt>0:
-            # do the template matching with W
-            stt, B, Xres = run_matching(ops, X, U, ctc, device=device)
-
-            # get updates for W
-            Wres0, nn0 = Wupdate(Xres, U, stt, ops)
-            
-            nn   += nn0 #res[1]
-            Wres += Wres0   
-
-            #nn0 = nn0.unsqueeze(-1).unsqueeze(-1)
-            #U = U + (1 - torch.exp(-nn0/tau)) * (Wres0/(1e-6 + nn0))
-            #ctc = prepare_matching(ops, U)
-        else:
-            Xres = X
-
-
-        # do the template matching on residuals
-        xy, imax, amp, adist = spikedetect.template_match(Xres, ops, ops['iC'], ops['iC2'], ops['weigh'])
-        
-        xsub = Xres[iC[:,xy[:,:1]], xy[:,1:2] + tarange]
-        xfeat = xsub @ ops['wPCA'].T
-
-        nsp = len(xy)
-        if k+nsp>tF.shape[0]:                     
-            tF = torch.cat((tF, torch.zeros_like(tF)), 0)
-            st = torch.cat((st, torch.zeros_like(st)), 0)
-
-        tF[k:k+nsp] = xfeat.transpose(0,1)# .reshape(-1, nPC * Nchan)
-        #st[k:k+nsp,0] = ((xy[:,1]-nt)/ops['fs'] + j * (ops['NT']/ops['fs']))
-        #st[k:k+nsp,1] = yct
-        st[k:k+nsp,2] = amp
-        st[k:k+nsp,3] = imax
-        st[k:k+nsp,4] = ibatch    
-        st[k:k+nsp,5] = xy[:,0]
-
-        k+= nsp
-
-        vexp += (Xres**2).mean() / (X**2).mean()
-    vexp = vexp/len(isub)
-
-    tF = tF[:k]
-    st = st[:k]
-
-    return st, tF, Wres, nn, vexp
-
-def get_new_templates(ops, tF, st, device=torch.device('cuda')):
-    xcup, ycup = ops['xcup'], ops['ycup']
-    Nchan = ops['Nchan']
-
-    Th = ops['spkTh']
-    kk = 0
-
-    d0 = ops['dmin']
-    ycent = np.arange(ycup.min()+d0-1, ycup.max()+d0+1, 2*d0)
-
-    Wnew = torch.zeros((len(ycent), Nchan, 6), device = device)
-
-    igood = torch.ones((len(ycent)), dtype = torch.bool, device = device)
-    for kk in range(len(ycent)):
-        # get the data
-        Xd, ch_min, ch_max = get_data(ops, st, tF, ycent[kk], xcup.mean(), dmin = d0, dminx = ops['dminx'])
-        #print(ch_min, ch_max, len(Xd))
-        if Xd is None:
-            igood[kk] = 0
-            continue
-
-        # find new spikes
-        vexp = 2 * Xd @ Xd.T - (Xd**2).sum(1)
-        vsum = (vexp * (vexp>Th**2)).sum(0)
-        vmax, imax = torch.max(vsum, 0)
-        mu  = Xd[vexp[:, imax] > Th**2].mean(0)
-
-        Wnew[kk , ch_min:ch_max]  = mu.reshape((ch_max-ch_min, 6))
-
-    Wnew = Wnew[igood]
-    U = Wnew.transpose(2,1).contiguous()
-
-    U, _ = remove_duplicates(ops, U, ns = None, icl = None)
-
-    return U
-
-
-
-def get_data(ops, st, tF, ycenter,  xcenter, dmin = 20, dminx = 32, ncomps = 64, device=torch.device('cuda')):
-    iC = ops['iC']
-    PID = st[:,5].long()
-    xcup, ycup = ops['xcup'], ops['ycup']
-    xy = np.vstack((xcup, ycup))
-    xy = torch.from_numpy(xy).to(device)
-    
-    y0 = ycenter # xy[1].mean() - ycenter
-    x0 = xcenter #xy[0].mean() - xcenter
-
-    #print(dmin, dminx)
-    ix = torch.logical_and(torch.abs(xy[1] - y0) < dmin, torch.abs(xy[0] - x0) < dminx)
-    #print(ix.nonzero()[:,0])
-    igood = ix[PID].nonzero()[:,0]
-
-    if len(igood)==0:
-        return None, None,  None
-
-    pid = st[igood, 5].int()
-    data = tF[igood]
-    nspikes, nchanraw, nfeatures = data.shape
-    ichan = torch.unique(iC[:, ix])
-    ch_min = torch.min(ichan)
-    ch_max = torch.max(ichan)+1
-    nchan = ch_max - ch_min
-
-    dd = torch.zeros((nspikes, nchan, nfeatures), device = device)
-    for j in ix.nonzero()[:,0]:
-        ij = (pid==j).nonzero()[:,0]
-        #print(ij.sum())
-        dd[ij.unsqueeze(-1), iC[:,j]-ch_min] = data[ij]
-
-    Xd = torch.reshape(dd, (nspikes, -1))
-    return Xd, ch_min, ch_max
-
-def postprocess_templates(Wall, ops, device=torch.device('cuda')):
-    Wall2, _ = align_U(Wall, ops, device=device)
-    Wall3, _= remove_duplicates(ops, Wall2)
-
+def postprocess_templates(Wall, ops, clu, st, dev = torch.device('cuda')):
+    Wall2, _ = align_U(Wall, ops)
+    #Wall3, _= remove_duplicates(ops, Wall2)
+    Wall3, _, _ = merging_function(ops, Wall2.transpose(1,2), clu, st[:,0], 0.9, 'mu')
+    Wall3 = Wall3.transpose(1,2).to(dev)
     return Wall3
-
 
 def prepare_matching(ops, U):
     nt = ops['nt']
@@ -292,76 +99,6 @@ def prepare_matching(ops, U):
     ctc = torch.einsum('ijkm, kml -> ijl', UtU, WtW)
 
     return ctc
-
-
-def paired_compare(ops, U):
-    ctc = prepare_matching(ops, U)
-
-    cc = ctc.max(-1)[0]
-    cdiag = (1e-6 + torch.diag(cc))**.5
-    cc = cc / torch.outer(cdiag, cdiag)
-    cc = cc - torch.diag(torch.diag(cc))
-
-    mu = (U**2).sum(-1).sum(-1)**.5
-
-    dmu = 2 * (mu - mu.unsqueeze(1)) / (mu + mu.unsqueeze(1))
-    return torch.logical_and(cc > .9, dmu<.2)
-
-def remove_duplicates(ops, U0, ns = None, icl = None, st = None):
-    if icl is not None:
-        iclust = icl.astype('int64')
-    else:
-        iclust = None
-    U = U0.clone()
-
-    if ns is None:
-        ns = np.ones(U.shape[0], )
-    
-    CR = 0
-    while 1:
-        ikeep = np.ones(U.shape[0], bool)
-        imerge = paired_compare(ops, U)
-        if imerge.sum()==0:
-            break
-
-        while 1:
-            xy = imerge.nonzero()
-            if len(xy)==0:
-                break
-            xy = xy.cpu().numpy().astype('int64')
-            x = xy[0,0]
-            y = xy[0,1]
-
-            ikeep[y] = 0
-
-            imerge[x,:] = 0
-            imerge[:,x] = 0
-            imerge[y,:] = 0
-            imerge[:,y] = 0
-
-            U[x] = (U[x] * ns[x] + U[y] * ns[y]) / (ns[x] + ns[y])
-            ns[x] = ns[x] + ns[y]
-            if icl is not None:                
-                st1 = st[iclust==y]
-                st2 = st[iclust==x]
-                cross_refractory = CCG.check_CCG(st1,  st2, nbins = 500, tbin  = 1/1000)[1]
-                CR += cross_refractory
-                iclust[iclust==y] = x
-
-        #import pdb; pdb.set_trace()        
-        U = U[ikeep]
-        ns = ns[ikeep]
-        if icl is not None:
-            isum = np.cumsum(ikeep) - 1
-            iclust  = isum[iclust]
-
-    if icl is not None:
-        print(CR)
-    return U, iclust
-
-
-
-
 
 def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
     Th = ops['spkTh']
@@ -432,3 +169,94 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
     amps = amps[:k]
 
     return  st, amps, Xres
+
+
+def merging_function(ops, Wall, clu, st, r_thresh = 0.5, mode = 'ccg', dev = torch.device('cuda')):
+    clu2 = clu.copy()
+    clu_unq, ns = np.unique(clu2, return_counts = True)
+
+    Ww = Wall.to(dev)
+    NN = len(Ww)
+
+    isort = np.argsort(ns)[::-1]
+
+    is_merged = np.zeros(NN, 'bool')
+    is_good = np.zeros(NN,)
+
+    if mode == 'ccg':
+        is_ref = CCG.refract(clu, st/ops['fs'])[0]
+
+    nt = ops['nt']
+    W = ops['wPCA'].contiguous()
+    WtW = conv1d(W.reshape(-1, 1,nt), W.reshape(-1, 1 ,nt), padding = nt) 
+    WtW = torch.flip(WtW, [2,])
+
+    t = 0
+    nmerge = 0
+    while t<NN:
+        #if t%100==0:
+            #print(t, nmerge)
+
+        kk = clu_unq[isort[t]]
+
+        if (mode == 'ccg') and is_ref[kk]==0:
+            t += 1
+            continue
+
+        if is_merged[kk]:            
+            t += 1
+            continue
+
+        mu = (Ww**2).sum((1,2), keepdims=True)**.5
+        Wnorm = Ww / (1e-6 + mu)
+
+        UtU = torch.einsum('lk, jlm -> jkm',  Wnorm[kk], Wnorm)
+        ctc = torch.einsum('jkm, kml -> jl', UtU, WtW)
+
+        cmax = ctc.max(1)[0]
+        cmax[kk] = 0
+
+        jsort = np.argsort(cmax.cpu().numpy())[::-1]
+
+        if mode == 'ccg':
+            st0 = st[clu2==kk] / ops['fs']
+        
+        is_ccg  = 0
+        for j in range(NN):
+            jj = jsort[j]
+            if cmax[jj] < r_thresh:
+                break
+            # compare with CCG
+            if mode == 'ccg':
+                st1 = st[clu2==jj] / ops['fs']
+                _, is_ccg, _ = CCG.check_CCG(st0, st1)        
+            else:
+                dmu = 2 * (mu[kk] - mu[jj]) / (mu[kk] + mu[jj])
+                is_ccg = dmu.abs() < 0.2
+
+            if is_ccg:
+                is_merged[jj] = 1
+                Ww[kk] = ns[kk]/(ns[kk]+ns[jj]) * Ww[kk] + ns[jj]/(ns[kk]+ns[jj]) * Ww[jj]            
+                Ww[jj] = 0
+
+                ns[kk] += ns[jj]
+                ns[jj] = 0
+                clu2[clu2==jj] = kk            
+
+                break
+
+        if is_ccg==0:            
+            t +=1    
+        else:                
+            nmerge+=1
+    
+    imap = np.cumsum((~is_merged).astype('int32')) - 1
+
+    Ww = Ww[~is_merged]
+    clu2 = imap[clu2]
+    if mode == 'ccg':
+        is_ref = is_ref[~is_merged]
+    else:
+        is_ref = None
+
+    return Ww.cpu(), clu2, is_ref
