@@ -26,7 +26,7 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.data_seek_widget = pg.PlotWidget(useOpenGL=True)
         self.seek_view_box = self.data_seek_widget.getViewBox()
         self.time_seek = pg.InfiniteLine(
-            pen=pg.mkPen((255, 0, 0, 128)), movable=True, name="indicator"
+            pen=pg.mkPen((255, 0, 0, 128), width=3), movable=True, name="indicator"
         )
         self.time_label = pg.TextItem(color=(180, 180, 180))
 
