@@ -210,7 +210,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.results_directory = settings.pop("results_directory")
         self.probe_layout = settings.pop("probe_layout")
         # self.time_range = settings.pop("time_range")
-        self.num_channels = settings["num_channels"]
+        self.num_channels = settings["n_chan_bin"]
 
         # params = KilosortParams()
         # params = params.parse_obj(advanced_options)
@@ -234,7 +234,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         QtWidgets.QApplication.restoreOverrideCursor()
 
     def load_binary_files(self):
-        n_channels = self.params["num_channels"]
+        n_channels = self.params["n_chan_bin"]
         sample_rate = self.params["fs"]
         channel_map = self.probe_layout["chanMap"]
         x_chan = self.probe_layout["xc"]

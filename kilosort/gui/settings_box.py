@@ -393,7 +393,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             "working_directory": self.working_directory_path,
             "results_directory": self.results_directory_path,
             "probe_layout": self.probe_layout,
-            "num_channels": self.num_channels,
+            "n_chan_bin": self.num_channels,
             "fs": self.sampling_frequency,
             "nt": self.nt,
             "NT": self.NT,
