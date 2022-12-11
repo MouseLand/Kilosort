@@ -16,9 +16,9 @@ class RunBox(QtWidgets.QGroupBox):
 
         self.layout = QtWidgets.QGridLayout()
 
-        self.run_all_button = QtWidgets.QPushButton("Sort and Export")
+        self.run_all_button = QtWidgets.QPushButton("Run and Export")
         # self.preprocess_button = QtWidgets.QPushButton("Preprocess")
-        self.spike_sort_button = QtWidgets.QPushButton("Spikesort")
+        self.spike_sort_button = QtWidgets.QPushButton("Run")
         self.export_button = QtWidgets.QPushButton("Export for Phy")
 
         self.buttons = [
