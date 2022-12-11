@@ -220,11 +220,5 @@ def new_clusters(iclust, my_clus, xtree, tstat):
         xtree[xtree[:,0] == ind[j], 0] = j
         xtree[xtree[:,1] == ind[j], 1] = j
 
-    #nc = len(xtree)
-    #for j in range(nc):
-    #    jorig = xtree[j, 2]
-#        xtree[j, 2] = nc + j + 1
-        #xtree[xtree[:,0] == jorig, 0] = nc + j + 1
-        #xtree[xtree[:,1] == jorig, 1] = nc + j + 1
 
     return iclust1

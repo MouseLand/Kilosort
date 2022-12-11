@@ -6,15 +6,15 @@ logger = setup_logger(__name__)
 
 
 def create_prb(probe):
-    chan_map = np.array(probe.chanMap)
-    xc, yc = np.array(probe.xc), np.array(probe.yc)
+    chan_map = np.array(probe["chanMap"])
+    xc, yc = np.array(probe["xc"]), np.array(probe["yc"])
     probe_prb = {}
-    unique_channel_groups = np.unique(np.array(probe.kcoords))
+    unique_channel_groups = np.unique(np.array(probe["kcoords"]))
 
     for channel_group in unique_channel_groups:
         probe_prb[channel_group] = {}
 
-        channel_group_pos = np.where(probe.kcoords == channel_group)
+        channel_group_pos = np.where(probe["kcoords"] == channel_group)
         group_channels = chan_map[channel_group_pos]
         group_xc = xc[channel_group_pos]
         group_yc = yc[channel_group_pos]

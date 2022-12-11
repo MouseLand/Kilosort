@@ -36,7 +36,7 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
     nt = ops['settings']['nt']
     NT = ops['settings']['NT']
     fs = ops['settings']['fs']
-    NchanTOT = ops['settings']['n_chan_bin']
+    NchanTOT = ops['settings']['NchanTOT']
     twav_min = ops['settings']['nt0min']
     n_wavpc = ops['settings']['nwaves']
 
@@ -57,7 +57,6 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
         whiten_mat = preprocessing.get_whitening_matrix(bfile, x_chan, y_chan, 
                                                         nskip = ops['settings']['nskip'])
         ops['Nbatches'] = bfile.n_batches
-    print(time.time()-tic)
 
     print(time.time()-tic)
 
@@ -68,7 +67,7 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
     torch.random.manual_seed(1)
 
     ops          = preprocessing.run(ops, device=device)
-    #ops['Nbatches'] = 1400
+    #ops['Nbatches'] = 200
 
     ops         = datashift.run(ops, device=device)
 
@@ -78,12 +77,14 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
 
     clu, Wall   = clustering_qr.run(ops, st0, tF, mode = 'spikes') 
 
-
-    Wall3       = template_matching.postprocess_templates(Wall, ops, device=device)
+    Wall3       = template_matching.postprocess_templates(Wall, ops, clu, st0, device=device)
 
     st, tF, tF2, ops = template_matching.extract(ops, Wall3, device=device)
 
     clu, Wall   = clustering_qr.run(ops, st, tF,  mode = 'template', device=device)
 
-    is_ref = CCG.refract(clu, st[:,0])
+    #is_ref = CCG.refract(clu, st[:,0])
+
+    Wall, clu, is_ref = template_matching.merging_function(ops, Wall, clu, st[:,0])
+    
     return ops, st, tF, clu, Wall, is_ref

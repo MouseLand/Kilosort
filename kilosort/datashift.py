@@ -20,8 +20,8 @@ def bin_spikes(ops, st):
         sst = st[ix]
 
         dep = sst[:,1] - dmin
-        amp = np.log10(np.minimum(99, sst[:,2])) - np.log10(ops['spkTh'])
-        amp = amp / (np.log10(100)-np.log10(ops['spkTh']))
+        amp = np.log10(np.minimum(99, sst[:,2])) - np.log10(ops['Th_detect'])
+        amp = amp / (np.log10(100)-np.log10(ops['Th_detect']))
 
         rows = (dep/dd).astype('int32')
         cols = (1e-5 + amp * 20).astype('int32')
