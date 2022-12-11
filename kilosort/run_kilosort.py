@@ -88,7 +88,7 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
     clu, Wall   = clustering_qr.run(ops, st0, tF, mode = 'spikes') 
 
 
-    Wall3       = template_matching.postprocess_templates(Wall, ops, device=device)
+    Wall3       = template_matching.postprocess_templates(Wall, ops, clu, st0, device=device)
 
     st, tF, tF2, ops = template_matching.extract(ops, Wall3, device=device)
 
