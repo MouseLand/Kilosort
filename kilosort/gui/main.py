@@ -104,8 +104,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
                 self.shift_data(time_shift=-1)
             elif event.key() == QtCore.Qt.Key_Right:
                 self.shift_data(time_shift=1)
-            elif event.key() == QtCore.Qt.Key_C:
-                self.toggle_view()
+            # elif event.key() == QtCore.Qt.Key_C:
+            #     self.toggle_view()
             elif event.key() == QtCore.Qt.Key_1:
                 self.toggle_mode("raw")
             elif event.key() == QtCore.Qt.Key_2:
@@ -290,7 +290,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def setup_data_view(self):
         self.data_view_box.setup_seek(self.context)
-        self.data_view_box.create_plot_items()
+        # self.data_view_box.create_plot_items()
         self.data_view_box.enable_view_buttons()
 
     def setup_context(self):
