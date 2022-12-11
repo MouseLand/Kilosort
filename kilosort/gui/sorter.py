@@ -39,6 +39,9 @@ class KiloSortWorker(QtCore.QThread):
             )
 
             output_folder = self.context.context_path
+            if not output_folder.exists():
+                logger.info(f"Context path at {output_folder} does not exist. The folder will be created.")
+                output_folder.mkdir(parents=True)
 
             ops_arr = np.array(ops)
             np.save(output_folder / "ops.npy", ops_arr)
@@ -53,6 +56,7 @@ class KiloSortWorker(QtCore.QThread):
 
             np.save(output_folder / "is_ref.npy", np.array(is_ref))
 
+            logger.info(f"Spike sorting output saved in {output_folder}!")
             self.finishedSpikesort.emit(self.context)
 
         if "export" in self.steps:
