@@ -7,7 +7,8 @@ install_deps = [
     'scikit-learn',
     'torch>=1.6',
     'numba',
-    'faiss-cpu'
+    'faiss-cpu',
+    'matplotlib',
 ]
 
 gui_deps = [

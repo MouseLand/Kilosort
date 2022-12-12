@@ -224,14 +224,12 @@ Controls <br>
 -------- <br>
 <br>
 [1 2 3 4]        - activate/deactivate raw/filtered/prediction/residual views of the dataset <br>
-[c]              - toggle between colormap mode and traces mode <br>
 [up/down]        - move through channels in traces mode <br>
 [scroll]         - move forward/backward in time <br>
 [ctrl + scroll]  - add/remove channels in colormap mode; slide up/down probe in traces mode <br>
 [alt + scroll]   - change data/colormap scaling <br>
 [shift + scroll] - zoom in/out in time <br>
 [left click]     - move forward/backward in time <br>
-[right click]    - enable/disable channel for analysis <br>
 </font>
 """
 
