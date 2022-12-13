@@ -163,10 +163,10 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
 
     # random amplitudes
     # for good neurons
-    amp_sim = np.random.exponential(scale=1., size=(n_sim,)) * 12. + 10.
+    amp_sim = np.random.exponential(scale=1., size=(n_sim,)) * 7. + 10.
     # for MUA / noise
     amp_sim = np.append(amp_sim, 
-                        np.random.rand(n_noise) * 8. + 4.,
+                        np.random.rand(n_noise) * 6. + 4.,
                         axis=0)
 
     # create good neurons
@@ -179,7 +179,8 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
         # random spike train, waveform and channel per neuron
         sp_rand = np.random.randint(cl.max()+1)
         wf_rand = np.random.randint(len(good_neurons))
-        cb_rand = np.random.randint(96-1)
+        # pad to avoid best channel on first 4 or last 4 channels
+        cb_rand = np.random.randint(96-2) + 1
         frac_rand = np.random.beta(1, 3) * 0.8 + 0.2
 
         # spike train
@@ -216,7 +217,7 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
         # random firing rate, waveform and channel per neuron
         fr_rand = np.random.randint(len(frs))
         wf_rand = np.random.randint(len(bad_neurons))
-        cb_rand = np.random.randint(96-1)
+        cb_rand = np.random.randint(96)
         frac_rand = np.random.beta(1, 3) * 0.8 + 0.2
 
         # spike train
@@ -268,7 +269,7 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
             drift_chan = gaussian_filter1d(drift_chan, tsig, axis=0)
             drift_chan -= drift_chan.min(axis=0) 
             drift_chan /= drift_chan.max(axis=0)
-            drift_chan *= 3
+            drift_chan *= 5 - (20-drift_range)/6
             drift_chan = gaussian_filter1d(drift_chan*4, 2, axis=-1)
             drift_chan += drift_sim[:,np.newaxis]
             drift_chan -= drift_chan.min() 
@@ -284,7 +285,7 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
         drift_chan = 10 * np.ones((n_batches, 9), 'float32')
 
     # upsample to get drift for all channels
-    f = interp1d(np.linspace(0, 384, drift_chan.shape[1]+2)[1:-1], drift_chan, axis=-1, fill_value='extrapolate')
+    f = interp1d(np.linspace(0, 383, drift_chan.shape[1]+2)[1:-1], drift_chan, axis=-1, fill_value='extrapolate')
     drift_sim_ups = f(np.arange(0,384))
     drift_sim_ups = np.floor(drift_sim_ups * ups).astype(int)
     print(drift_sim_ups.min(), drift_sim_ups.max())
@@ -303,7 +304,7 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
         wfi = wf_sim[i]
         ic0 = cb_sim[i] - nc//2
         iw0 = max(0, -ic0)
-        ic1 = min(383, ic0+nc)
+        ic1 = min(384, ic0+nc)
         ic0 = max(0, ic0)
         iw1 = ic1 - ic0 + iw0
         # spikes from neuron            
