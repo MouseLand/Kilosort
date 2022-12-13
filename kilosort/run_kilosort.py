@@ -2,7 +2,16 @@ import os
 from glob import glob
 import numpy as np
 import torch
-from kilosort import preprocessing, datashift, template_matching, clustering_qr, CCG, clustering_qr, io, spikedetect
+from kilosort import (
+    preprocessing,
+    datashift,
+    template_matching,
+    clustering_qr,
+    CCG,
+    clustering_qr,
+    io,
+    spikedetect,
+)
 #from kilosort import default_settings
 
 
@@ -36,7 +45,7 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
     nt = ops['settings']['nt']
     NT = ops['settings']['NT']
     fs = ops['settings']['fs']
-    NchanTOT = ops['settings']['NchanTOT']
+    NchanTOT = ops['settings']['n_chan_bin']
     twav_min = ops['settings']['nt0min']
     n_wavpc = ops['settings']['nwaves']
 
@@ -86,5 +95,5 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
     #is_ref = CCG.refract(clu, st[:,0])
 
     Wall, clu, is_ref = template_matching.merging_function(ops, Wall, clu, st[:,0])
-    
+
     return ops, st, tF, clu, Wall, is_ref

@@ -1,4 +1,3 @@
-import json
 import os
 import pprint
 from pathlib import Path
@@ -18,7 +17,8 @@ DEFAULT_PARAMS = {
     "fs"            : 30000,
     "nt"            : 61,
     "Th"            : 6,
-    "spkTh"         : 10,
+    "spkTh"         : 8,
+    "Th_detect"     : 9,
     "nwaves"        : 6,
     "nskip"         : 25,
     "nt0min"        : 20,
@@ -56,10 +56,10 @@ class SettingsBox(QtWidgets.QGroupBox):
         self._probes = []
         self.populate_probe_selector()
 
-        self.num_channels_text = QtWidgets.QLabel("Number of Channels")
+        self.num_channels_text = QtWidgets.QLabel("number of channels")
         self.num_channels_input = QtWidgets.QLineEdit()
 
-        self.sampling_frequency_text = QtWidgets.QLabel("Sampling Frequency (in Hz)")
+        self.sampling_frequency_text = QtWidgets.QLabel("sampling frequency")
         self.sampling_frequency_input = QtWidgets.QLineEdit()
 
         self.nt_text = QtWidgets.QLabel("nt")
@@ -73,6 +73,9 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         self.spkTh_text = QtWidgets.QLabel("spkTh")
         self.spkTh_input = QtWidgets.QLineEdit()
+
+        self.Th_detect_text = QtWidgets.QLabel("Th_detect")
+        self.Th_detect_input = QtWidgets.QLineEdit()
 
         self.nwaves_text = QtWidgets.QLabel("nwaves")
         self.nwaves_input = QtWidgets.QLineEdit()
@@ -105,6 +108,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.NT = None
         self.Th = None
         self.spkTh = None
+        self.Th_detect = None
         self.nwaves = None
         self.nskip = None
         self.nt0min = None
@@ -123,6 +127,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.NT_input,
             self.Th_input,
             self.spkTh_input,
+            self.Th_detect_input,
             self.nwaves_input,
             self.nskip_input,
             self.nt0min_input,
@@ -238,6 +243,11 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.spkTh_input.textChanged.connect(self.on_spkTh_changed)
 
         row_count += 1
+        layout.addWidget(self.Th_detect_text, row_count, 0, 1, 3)
+        layout.addWidget(self.Th_detect_input, row_count, 3, 1, 2)
+        self.Th_detect_input.textChanged.connect(self.on_Th_detect_changed)
+
+        row_count += 1
         layout.addWidget(self.nwaves_text, row_count, 0, 1, 3)
         layout.addWidget(self.nwaves_input, row_count, 3, 1, 2)
         self.nwaves_input.textChanged.connect(self.on_nwaves_changed)
@@ -283,6 +293,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.NT_input.setText(str(default_params["NT"]))
         self.Th_input.setText(str(default_params["Th"]))
         self.spkTh_input.setText(str(default_params["spkTh"]))
+        self.Th_detect_input.setText(str(default_params["Th_detect"]))
         self.nwaves_input.setText(str(default_params["nwaves"]))
         self.nskip_input.setText(str(default_params["nskip"]))
         self.nt0min_input.setText(str(default_params["nt0min"]))
@@ -393,12 +404,13 @@ class SettingsBox(QtWidgets.QGroupBox):
             "working_directory": self.working_directory_path,
             "results_directory": self.results_directory_path,
             "probe_layout": self.probe_layout,
-            "num_channels": self.num_channels,
+            "n_chan_bin": self.num_channels,
             "fs": self.sampling_frequency,
             "nt": self.nt,
             "NT": self.NT,
             "spkTh": self.spkTh,
             "Th": self.Th,
+            "Th_detect": self.Th_detect,
             "nwaves": self.nwaves,
             "nskip": self.nskip,
             "nt0min": self.nt0min,
@@ -461,8 +473,10 @@ class SettingsBox(QtWidgets.QGroupBox):
                 probe_prb = create_prb(probe_layout)
                 probe_path = Path(self.gui.new_probe_files_path).joinpath(probe_name)
                 with open(probe_path, "w+") as probe_file:
-                    # TODO: pretty print output
-                    str_prb = f"""channel_groups = {probe_prb}"""
+                    str_dict = pprint.pformat(
+                        probe_prb, indent=4, compact=False,
+                    )
+                    str_prb = f"""channel_groups = {str_dict}"""
                     probe_file.write(str_prb)
                 assert probe_path.exists()
 
@@ -523,7 +537,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                     else:
                         self.probe_layout = probe_layout
 
-                        total_channels = self.probe_layout.NchanTOT
+                        total_channels = self.probe_layout["n_chan"]
                         total_channels = self.estimate_total_channels(total_channels)
                         self.num_channels_input.setText(str(total_channels))
 
@@ -648,6 +662,24 @@ class SettingsBox(QtWidgets.QGroupBox):
             logger.exception(
                 "Invalid inputs!\n"
                 "Check that spkTh > 0!"
+            )
+            self.disable_load()
+
+    @QtCore.pyqtSlot()
+    def on_Th_detect_changed(self):
+        try:
+            Th_detect = float(self.Th_detect_input.text())
+            assert Th_detect > 0.0
+
+            self.Th_detect = Th_detect
+
+            if self.check_settings():
+                self.enable_load()
+
+        except AssertionError:
+            logger.exception(
+                "Invalid inputs!\n"
+                "Check that Th_detect > 0.0!"
             )
             self.disable_load()
 

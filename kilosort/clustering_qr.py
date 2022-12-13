@@ -301,7 +301,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda')):
         
         Wall = torch.cat((Wall, W), 0)
 
-        if kk%10==0:
+        if kk%20==0:
             print(kk, nmax, time.time()-t0)
 
     return clu, Wall

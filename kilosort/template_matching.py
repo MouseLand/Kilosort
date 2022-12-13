@@ -2,7 +2,6 @@ import numpy as np
 from kilosort import spikedetect, preprocessing, CCG
 import torch 
 from torch.nn.functional import conv1d, max_pool2d, max_pool1d
-import CCG
 
 def prepare_extract(ops, U, nC, device=torch.device('cuda')):
     ds = (ops['xc'] - ops['xc'][:, np.newaxis])**2 +  (ops['yc'] - ops['yc'][:, np.newaxis])**2 
@@ -47,7 +46,7 @@ def extract(ops, U, device=torch.device('cuda')):
 
         stt = stt.double()
         #st[k:k+nsp,0] = ((stt[:,0]-nt)/ops['fs'] + ibatch * (ops['NT']/ops['fs'])).cpu().numpy()
-        st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['NT'])).cpu().numpy()
+        st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['NT'])).cpu().numpy() - nt//2 + 20
 
         st[k:k+nsp,1] = stt[:,1].cpu().numpy()
         st[k:k+nsp,2] = amps[:,0].cpu().numpy()
@@ -56,12 +55,15 @@ def extract(ops, U, device=torch.device('cuda')):
         tF2[k:k+nsp] = xfeat2.transpose(0,1).cpu()
 
         k+= nsp
-        if ibatch%100==0:
+        if ibatch%250==0:
             print(ibatch)
     
-    st = st[:k]
-    tF = tF[:k]
-    tF2 = tF2[:k]
+    isort = np.argsort(st[:k,0])
+
+    st = st[isort]
+    tF = tF[isort]
+    tF2 = tF2[isort]
+
     return st, tF, tF2, ops
 
 def align_U(U, ops, device=torch.device('cuda')):

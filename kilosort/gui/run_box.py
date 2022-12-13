@@ -16,9 +16,9 @@ class RunBox(QtWidgets.QGroupBox):
 
         self.layout = QtWidgets.QGridLayout()
 
-        self.run_all_button = QtWidgets.QPushButton("Sort and Export")
+        self.run_all_button = QtWidgets.QPushButton("Run and Export")
         # self.preprocess_button = QtWidgets.QPushButton("Preprocess")
-        self.spike_sort_button = QtWidgets.QPushButton("Spikesort")
+        self.spike_sort_button = QtWidgets.QPushButton("Run")
         self.export_button = QtWidgets.QPushButton("Export for Phy")
 
         self.buttons = [
@@ -46,7 +46,8 @@ class RunBox(QtWidgets.QGroupBox):
         self.setup()
 
     def setup(self):
-        self.run_all_button.clicked.connect(self.run_all)
+        # self.run_all_button.clicked.connect(self.run_all)
+        self.run_all_button.clicked.connect(self.spikesort)
         # self.preprocess_button.clicked.connect(self.preprocess)
         self.spike_sort_button.clicked.connect(self.spikesort)
         self.export_button.clicked.connect(self.export)
@@ -184,10 +185,8 @@ class RunBox(QtWidgets.QGroupBox):
 
         worker = KiloSortWorker(
             context=self.get_current_context(),
-            data_path=self.data_path,
             output_directory=self.results_directory,
             steps=steps,
-            plot_widgets=self.remote_widgets,
         )
 
         # worker.finishedPreprocess.connect(self.finished_preprocess)

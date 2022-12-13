@@ -52,13 +52,13 @@ def load_probe(probe_path):
     elif probe_path.suffix == '.mat':
         mat = loadmat(probe_path)
         connected = mat['connected'].ravel().astype('bool')
-        connected[:] = True
+        # connected[:] = True
         probe['xc'] = mat['xcoords'].ravel().astype(np.float32)[connected]
         nc = len(probe['xc'])
         probe['yc'] = mat['ycoords'].ravel().astype(np.float32)[connected]
         probe['kcoords'] = mat.get('kcoords', np.zeros(nc)).ravel().astype(np.float32)
         probe['chanMap'] = (mat['chanMap'] - 1).ravel().astype(np.int32)[connected]  # NOTE: 0-indexing in Python
-        probe['n_chan'] = len(probe['chanMap'])  # NOTE: should match the # of columns in the raw data
+        probe['n_chan'] = (mat['chanMap'] - 1).ravel().astype(np.int32).shape[0]  # NOTE: should match the # of columns in the raw data
 
     for n in required_keys:
         assert n in probe.keys()

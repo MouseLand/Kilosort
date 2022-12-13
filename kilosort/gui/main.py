@@ -1,9 +1,5 @@
-import os
 from pathlib import Path
-
-import numpy as np
 import torch
-
 from kilosort import preprocessing
 from kilosort.gui import (
     DataViewBox,
@@ -56,6 +52,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.first_boxes_layout = QtWidgets.QVBoxLayout()
         self.second_boxes_layout = QtWidgets.QHBoxLayout()
         self.third_boxes_layout = QtWidgets.QVBoxLayout()
+        self.fourth_boxes_layout = QtWidgets.QVBoxLayout()
 
         self.settings_box = SettingsBox(self)
         self.probe_view_box = ProbeViewBox(self)
@@ -103,8 +100,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
                 self.shift_data(time_shift=-1)
             elif event.key() == QtCore.Qt.Key_Right:
                 self.shift_data(time_shift=1)
-            elif event.key() == QtCore.Qt.Key_C:
-                self.toggle_view()
+            # elif event.key() == QtCore.Qt.Key_C:
+            #     self.toggle_view()
             elif event.key() == QtCore.Qt.Key_1:
                 self.toggle_mode("raw")
             elif event.key() == QtCore.Qt.Key_2:
@@ -122,19 +119,20 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def setup(self):
         self.setWindowTitle(f"Kilosort 4")
 
-        self.content_layout.addWidget(self.header_box, 3)
-
         self.third_boxes_layout.addWidget(self.settings_box, 85)
         self.third_boxes_layout.addWidget(self.run_box, 15)
 
-        self.second_boxes_layout.addLayout(self.third_boxes_layout, 60)
-        self.second_boxes_layout.addWidget(self.probe_view_box, 40)
+        self.second_boxes_layout.addLayout(self.third_boxes_layout, 50)
+        self.second_boxes_layout.addWidget(self.probe_view_box, 50)
 
-        self.first_boxes_layout.addLayout(self.second_boxes_layout, 79)
-        self.first_boxes_layout.addWidget(self.message_log_box, 21)
+        self.first_boxes_layout.addLayout(self.second_boxes_layout, 75)
+        self.first_boxes_layout.addWidget(self.message_log_box, 25)
 
-        self.boxes_layout.addLayout(self.first_boxes_layout, 30)
-        self.boxes_layout.addWidget(self.data_view_box, 70)
+        self.fourth_boxes_layout.addWidget(self.header_box, 3)
+        self.fourth_boxes_layout.addWidget(self.data_view_box, 97)
+
+        self.boxes_layout.addLayout(self.first_boxes_layout, 25)
+        self.boxes_layout.addLayout(self.fourth_boxes_layout, 75)
 
         self.boxes.setLayout(self.boxes_layout)
         self.content_layout.addWidget(self.boxes, 90)
@@ -181,8 +179,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         if self.context is not None:
             self.data_view_box.change_plot_scaling(direction)
 
-    def toggle_view(self):
-        self.data_view_box.toggle_mode()
+    # def toggle_view(self):
+    #     self.data_view_box.toggle_mode()
 
     def toggle_mode(self, mode):
         if mode == "raw":
@@ -210,7 +208,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.results_directory = settings.pop("results_directory")
         self.probe_layout = settings.pop("probe_layout")
         # self.time_range = settings.pop("time_range")
-        self.num_channels = settings["num_channels"]
+        self.num_channels = settings["n_chan_bin"]
 
         # params = KilosortParams()
         # params = params.parse_obj(advanced_options)
@@ -234,7 +232,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         QtWidgets.QApplication.restoreOverrideCursor()
 
     def load_binary_files(self):
-        n_channels = self.params["num_channels"]
+        n_channels = self.params["n_chan_bin"]
         sample_rate = self.params["fs"]
         channel_map = self.probe_layout["chanMap"]
         x_chan = self.probe_layout["xc"]
@@ -288,7 +286,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def setup_data_view(self):
         self.data_view_box.setup_seek(self.context)
-        self.data_view_box.create_plot_items()
+        # self.data_view_box.create_plot_items()
         self.data_view_box.enable_view_buttons()
 
     def setup_context(self):
@@ -314,7 +312,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def update_data_view(self):
         self.data_view_box.set_whitening_matrix(self.context.whitening_matrix)
-        self.data_view_box.clear_cached_traces()
+        # self.data_view_box.clear_cached_traces()
         self.data_view_box.update_plot(self.context)
 
     def update_run_box(self):
