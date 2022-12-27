@@ -9,7 +9,7 @@ For older versions, please see Github releases:
 
 If you use any version of Kilosort, please cite the original Kilosort paper: 
 
-Pachitariu, M., Steinmetz, N., Kadir, S., & Carandini, M. (2016). Kilosort: realtime spike-sorting for extracellular electrophysiology with hundreds of channels. BioRxiv, 061481.
+**Pachitariu, M., Steinmetz, N., Kadir, S., & Carandini, M. (2016). Kilosort: realtime spike-sorting for extracellular electrophysiology with hundreds of channels. BioRxiv, 061481.**
 
 Depending what version you use, please also cite: 
 
