@@ -9,6 +9,14 @@ If you use any version of Kilosort, please cite the original Kilosort paper:
 
 Pachitariu, M., Steinmetz, N., Kadir, S., & Carandini, M. (2016). Kilosort: realtime spike-sorting for extracellular electrophysiology with hundreds of channels. BioRxiv, 061481.
 
+Depending what version you use, please also cite: 
+
+for Kilosort 2:   Stringer, C., Pachitariu, M., Steinmetz, N., Reddy, C. B., Carandini, M., & Harris, K. D. (2019). Spontaneous behaviors drive multidimensional, brainwide activity. Science, 364(6437), eaav7893.
+
+for Kilosort 2.5:   Steinmetz, N. A., Aydin, C., Lebedeva, A., Okun, M., Pachitariu, M., Bauza, M., ... & Harris, T. D. (2021). Neuropixels 2.0: A miniaturized high-density probe for stable, long-term brain recordings. Science, 372(6539), eabf4588.
+
+for Kilosort 3: Pachitariu, M. (2021). Kilosort 3. https://github.com/MouseLand/Kilosort. 
+
 
 ![](Docs/img/frame_full.png)
 
