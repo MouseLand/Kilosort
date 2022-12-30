@@ -23,6 +23,9 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
             raise ValueError('no path to data provided, set "data_folder="')
         settings['data_folder'] = data_folder
 
+    if not os.path.exists(settings['data_folder']):
+        return FileExistsError(f"data_folder '{settings['data_folder']}' does not exist")
+
     # find probe configuration file and load
     if probe is None: 
         probe  = io.load_probe(settings['probe_path'])
@@ -96,4 +99,16 @@ def run_kilosort(settings=None, probe=None, data_folder=None, device=torch.devic
 
     Wall, clu, is_ref = template_matching.merging_function(ops, Wall, clu, st[:,0])
 
-    return ops, st, tF, clu, Wall, is_ref
+    is_ref, est_contam_rate = CCG.refract(clu, st/ops['fs'])
+
+    W = ops['wPCA'].contiguous()
+    WtW = conv1d(W.reshape(-1, 1,nt), W.reshape(-1, 1 ,nt), padding = nt) 
+    WtW = torch.flip(WtW, [2,])
+    mu = (Wall**2).sum((1,2), keepdims=True)**.5
+    Wnorm = Wall / (1e-6 + mu)
+    UtU = torch.einsum('ilk, jlm -> ijkm',  Wnorm, Wnorm)
+    similar_templates = torch.einsum('ijkm, kml -> ijl', UtU, WtW)
+
+
+
+    return ops, st, tF, clu, Wall, is_ref, est_contam_rate

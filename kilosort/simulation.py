@@ -3,12 +3,17 @@ import os, time
 import matplotlib.pyplot as plt 
 import torch 
 from scipy.interpolate import interp1d
-from scipy.ndimage import gaussian_filter1d
+from scipy.ndimage import gaussian_filter1d, convolve1d
 
 from kilosort.datashift import kernel2D
 from kilosort import io
 
-def preprocess_wfs_sts(filename, y_chan, x_chan, ups=10, device=torch.device('cuda')):
+def preprocess_wfs_sts(filename, y_chan, x_chan, y_chan_up=None, x_chan_up=None,
+                       ups=10, device=torch.device('cuda')):
+    if y_chan_up is None:
+        y_chan_up = y_chan
+        x_chan_up = x_chan
+
     ### waveforms and spike trains from data
     f = np.load(filename, allow_pickle=True)
     sts_all = f['sts_all']
@@ -84,16 +89,18 @@ def preprocess_wfs_sts(filename, y_chan, x_chan, ups=10, device=torch.device('cu
     # smooth across drift positions to reduce variability in waveform shape across drift
     # upsample to allow 10x more drift positions
     sig_interp = 20
-    lam = 1
+    lam = 1e-2
     wfs_smoothed = np.zeros((wfs.shape[0], wfs.shape[1]*ups, *wfs.shape[2:]),'float32')
     for ic in range(4):
         iwc = wfs_x == ic
         nd,nt,nc = wfs.shape[-3:]
-        xp = np.vstack((y_chan[ic : ic+nc], x_chan[ic : ic+nc])).T
+        
+        xpu = np.vstack((y_chan_up[ic : ic+nc], x_chan_up[ic : ic+nc])).T
         zup = np.arange(0,nd*2,2./ups)[:,np.newaxis,np.newaxis]
         zup = np.concatenate((zup, np.zeros((nd*ups,1,1))), axis=-1)
-        xup = (np.tile(xp[np.newaxis,:], (nd*ups,1,1)) + zup).reshape(-1, 2)
+        xup = (np.tile(xpu[np.newaxis,:], (nd*ups,1,1)) + zup).reshape(-1, 2)
 
+        xp = np.vstack((y_chan[ic : ic+nc], x_chan[ic : ic+nc])).T
         zp = np.arange(0,nd*2,2)[:,np.newaxis,np.newaxis]
         zp = np.concatenate((zp, np.zeros((nd,1,1))), axis=-1)
         xp = (np.tile(xp[np.newaxis,:], (nd,1,1)) + zp).reshape(-1, 2)    
@@ -111,9 +118,9 @@ def preprocess_wfs_sts(filename, y_chan, x_chan, ups=10, device=torch.device('cu
         wf0s = wf0s.reshape(-1, nd*ups, nc, nt).transpose(3,2)
         wfs_smoothed[iwc] = wf0s.cpu().numpy()
     wfs_smoothed /= ((wfs_smoothed**2).sum(axis=(2,3), keepdims=True)**0.5).mean(axis=1, keepdims=True)
-
-    return wfs_smoothed, wfs_x, contaminations, sts, cls
-
+    wfs = wfs_smoothed
+    
+    return wfs, wfs_x, contaminations, sts, cls
 
 
 def generate_background(NT, fs=30000, device=torch.device('cuda')):
@@ -145,7 +152,8 @@ def generate_background(NT, fs=30000, device=torch.device('cuda')):
 def generate_spikes(st, cl, wfs, wfs_x, contaminations,
                     n_sim=200, n_noise=1000, n_batches=500, tsig=50, 
                     batch_size=60000, twav_min=50, drift=True,
-                    drift_range=5, drift_seed=0, ups=10):
+                    drift_range=5, drift_seed=0, fast=False, step=False,
+                    n_batches_sim=None, ups=10):
     """ simulate spikes using 
         - random waveforms from wfs with x-pos wfs_x 
         - spike train stats from (st, cl) 
@@ -154,6 +162,9 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
     WARNING: requires RAM for full simulation as written
 
     """
+    n_batches_all = n_batches     
+    n_batches = n_batches_sim if n_batches_sim is not None else n_batches
+    
     n_bins, n_twav, nc = wfs.shape[1:] 
     st_sim = np.zeros(0, 'uint64')
     cl_sim = np.zeros(0, 'uint32')
@@ -256,29 +267,43 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
     np.random.seed(drift_seed)
     # overall drift
     if drift:
-        rand = True
-        if rand:
-            drift_sim = np.random.randn(n_batches)
-            drift_sim = gaussian_filter1d(drift_sim, tsig)
-            drift_sim -= drift_sim.min()
-            drift_sim /= drift_sim.max()
-            drift_sim *= drift_range
+        slow_n = n_batches_all // 10 if fast else n_batches_all
 
-            # drift across probe (9 positions)
-            drift_chan = np.random.randn(n_batches, 9)
-            drift_chan = gaussian_filter1d(drift_chan, tsig, axis=0)
-            drift_chan -= drift_chan.min(axis=0) 
-            drift_chan /= drift_chan.max(axis=0)
-            drift_chan *= 5 - (20-drift_range)/6
-            drift_chan = gaussian_filter1d(drift_chan*4, 2, axis=-1)
-            drift_chan += drift_sim[:,np.newaxis]
-            drift_chan -= drift_chan.min() 
-            drift_chan /= drift_chan.max()
-            drift_chan *= drift_range
-            drift_chan += 10 - drift_range/2
-        else:
-            drift_chan = 5 + np.tile(np.linspace(0, 10, n_batches)[:,np.newaxis], (1, 9))
-            drift_chan = drift_chan.astype('float32')
+        drift_sim = np.random.randn(slow_n)
+        drift_sim = gaussian_filter1d(drift_sim, tsig)
+        drift_sim -= drift_sim.min()
+        drift_sim /= drift_sim.max()
+        drift_sim *= drift_range
+
+        # drift across probe (9 positions)
+        drift_chan = np.random.randn(slow_n, 9)
+        drift_chan = gaussian_filter1d(drift_chan, tsig, axis=0)
+        drift_chan -= drift_chan.min(axis=0) 
+        drift_chan /= drift_chan.max(axis=0)
+        drift_chan *= 5 - (20-drift_range)/6
+        drift_chan = gaussian_filter1d(drift_chan*4, 2, axis=-1)
+        drift_chan += drift_sim[:,np.newaxis]
+        drift_chan -= drift_chan.min() 
+        drift_chan /= drift_chan.max()
+        drift_chan *= drift_range
+        drift_chan += 10 - drift_range / 2
+
+        if fast: 
+            fast_drift = np.zeros(n_batches)
+            fast_drift[np.random.permutation(n_batches)[:300]] = 1 
+            t = np.arange(20)
+            kernel = np.exp(-t/2.5) - np.exp(-t)
+            kernel /= kernel.max()
+            fast_drift = convolve1d(fast_drift, kernel)
+            fast_drift *= 5
+            drift_chan = np.tile(drift_chan[:,np.newaxis], (1,10,1))
+            drift_chan = drift_chan.reshape(n_batches, -1)
+            drift_chan -= 5
+            drift_chan += fast_drift[:,np.newaxis]
+        elif step:
+            drift_chan -= 7.5
+            drift_chan[n_batches//2:] += 15
+
         plt.plot(drift_chan);
         plt.show()
     else:
@@ -316,6 +341,7 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
             ist = drifti == d
             if ist.sum() > 0:
                 inds = np.nonzero(ist)[0]
+                #print(len(inds))
                 for k in range(n_splits):
                     ki = np.arange(k, len(inds), n_splits)
                     # indices for spike waveform
@@ -323,7 +349,7 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
                     stb = stb[:,np.newaxis].astype(int) + np.arange(0, n_twav, 1, int)
                     data[stb, ic0:ic1] += wfi[d][:, iw0:iw1]
                         
-        if i%250==0:
+        if i%250==0 or i==(n_sim+n_noise-1):
             print(i, time.time()-tic)
 
     return data, st_sim, cl_sim, amp_sim, wf_sim, cb_sim, wfid_sim, drift_sim_ups
@@ -331,7 +357,8 @@ def generate_spikes(st, cl, wfs, wfs_x, contaminations,
 def create_simulation(filename, st, cl, wfs, wfs_x, contaminations,
                       n_sim=100, n_noise=1000, n_batches=500,
                       batch_size=60000, tsig=50, tpad=100, n_chan_bin=385, drift=True,
-                      drift_range=5, drift_seed=0, ups=10, whiten_mat = None,
+                      drift_range=5, drift_seed=0, fast=False, step=False,
+                      ups=10, whiten_mat = None,
                              ):
     """ simulate neuropixels 3B probe recording """
 
@@ -339,7 +366,8 @@ def create_simulation(filename, st, cl, wfs, wfs_x, contaminations,
     data, st_sim, cl_sim, amp_sim, wf_sim, cb_sim, wfid_sim, drift_sim_ups = generate_spikes(st, cl, wfs, wfs_x, 
                                                                           contaminations, n_sim=n_sim, n_noise=n_noise, 
                                                                           n_batches=n_batches, tsig=tsig, 
-                                                                          batch_size=batch_size, drift=drift,
+                                                                          batch_size=batch_size, drift=drift, 
+                                                                          fast=fast, step=step,
                                                                           drift_range=drift_range, drift_seed=drift_seed,
                                                                            ups=ups)
 

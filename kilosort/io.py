@@ -11,8 +11,16 @@ from kilosort.preprocessing import get_drift_matrix, fft_highpass
 
 def find_binary(data_folder):
     """ find binary file in data_folder"""
-    filename  = glob(os.path.join(data_folder, '*.bin'))[0]
-    return filename
+    filenames  = glob(os.path.join(data_folder, '*.bin'))
+    if len(filenames)==0:
+        raise FileNotFoundError('no binary file *.bin found in folder')
+    # if there are multiple binary files, find one with "ap" tag
+    if len(filenames) > 1:
+        filenames = [filename for filename in filenames if 'ap' in filename]
+    # if more than one, raise an error, user needs to specify binary
+    if len(filenames) > 1:
+        raise ValueError('multiple binary files in folder with "ap" tag, please specify filename')
+    return filenames[0]
 
 def load_probe(probe_path):
     """Load a .mat probe file from Kilosort2, or a PRB file and returns a dictionary
@@ -52,7 +60,6 @@ def load_probe(probe_path):
     elif probe_path.suffix == '.mat':
         mat = loadmat(probe_path)
         connected = mat['connected'].ravel().astype('bool')
-        # connected[:] = True
         probe['xc'] = mat['xcoords'].ravel().astype(np.float32)[connected]
         nc = len(probe['xc'])
         probe['yc'] = mat['ycoords'].ravel().astype(np.float32)[connected]

@@ -73,7 +73,7 @@ def match_neuron(kk, clu, yclu, st_i, clu0, yclu0, st0_i):
     fmax = 0
     miss = 0
     fpos = 0
-    for j in range(20):
+    for j in range(min(len(isort), 20)):
         ss0 = st0_i[clu0==isort[j]]
 
         if len(ss0) ==0:

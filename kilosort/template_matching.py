@@ -46,7 +46,7 @@ def extract(ops, U, device=torch.device('cuda')):
 
         stt = stt.double()
         #st[k:k+nsp,0] = ((stt[:,0]-nt)/ops['fs'] + ibatch * (ops['NT']/ops['fs'])).cpu().numpy()
-        st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['NT'])).cpu().numpy() - nt//2 + 20
+        st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['NT'])).cpu().numpy() - nt//2 + ops['nt0min']
 
         st[k:k+nsp,1] = stt[:,1].cpu().numpy()
         st[k:k+nsp,2] = amps[:,0].cpu().numpy()
@@ -186,7 +186,7 @@ def merging_function(ops, Wall, clu, st, r_thresh = 0.5, mode = 'ccg', dev = tor
     is_good = np.zeros(NN,)
 
     if mode == 'ccg':
-        is_ref = CCG.refract(clu, st/ops['fs'])[0]
+        is_ref, est_contam_rate = CCG.refract(clu, st/ops['fs'])
 
     nt = ops['nt']
     W = ops['wPCA'].contiguous()
@@ -255,6 +255,7 @@ def merging_function(ops, Wall, clu, st, r_thresh = 0.5, mode = 'ccg', dev = tor
     imap = np.cumsum((~is_merged).astype('int32')) - 1
 
     Ww = Ww[~is_merged]
+
     clu2 = imap[clu2]
     if mode == 'ccg':
         is_ref = is_ref[~is_merged]

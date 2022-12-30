@@ -54,7 +54,7 @@ def get_waves_old(ops):
     return wPCA, wTEMP
 
 def get_waves(ops, device=torch.device('cuda')):
-    dd = np.load('/media/marius/ssd1/data/spikes/wTEMP.npz')
+    dd = np.load('/github/kilosort_dev/kilosort/wTEMP.npz')
     wTEMP = torch.from_numpy(dd['wTEMP']).to(device)
     wPCA = torch.from_numpy(dd['wPCA']).to(device)
     return wPCA, wTEMP
