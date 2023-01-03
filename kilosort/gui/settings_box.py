@@ -1,7 +1,7 @@
 import os
 import pprint
 from pathlib import Path
-
+from natsort import natsorted
 import numpy as np
 from kilosort.gui.logger import setup_logger
 from kilosort.gui.minor_gui_elements import ProbeBuilder, create_prb
@@ -37,19 +37,20 @@ class SettingsBox(QtWidgets.QGroupBox):
         QtWidgets.QGroupBox.__init__(self, parent=parent)
 
         self.gui = parent
+        
+        self.select_data_file = QtWidgets.QPushButton("Select Binary File")
+        self.data_file_path = Path(self.gui.data_path).resolve()
+        self.data_file_path_input = QtWidgets.QLineEdit(os.fspath(self.data_file_path) 
+                                                        if self.data_file_path is not None else "")
 
-        self.select_data_file = QtWidgets.QPushButton("Select Data File")
-        self.data_file_path_input = QtWidgets.QLineEdit("")
-
-        self.select_working_directory = QtWidgets.QPushButton(
-            "Select Working Dir."
-        )
-        self.working_directory_input = QtWidgets.QLineEdit("")
-
+        if self.data_file_path is not None:
+            self.results_directory_path = self.data_file_path.parent.joinpath('kilosort4/')
+        self.gui.results_directory = self.results_directory_path 
         self.select_results_directory = QtWidgets.QPushButton(
             "Select Results Dir."
         )
-        self.results_directory_input = QtWidgets.QLineEdit("")
+        self.results_directory_input = QtWidgets.QLineEdit(os.fspath(self.results_directory_path) 
+                                                            if self.results_directory_path is not None else "")
 
         self.probe_layout_text = QtWidgets.QLabel("Select Probe Layout")
         self.probe_layout_selector = QtWidgets.QComboBox()
@@ -98,9 +99,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.load_settings_button = QtWidgets.QPushButton("LOAD")
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
 
-        self.data_file_path = None
-        self.working_directory_path = None
-        self.results_directory_path = None
         self.probe_layout = None
         self.num_channels = None
         self.sampling_frequency = None
@@ -119,7 +117,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.input_fields = [
             self.data_file_path_input,
             self.results_directory_input,
-            self.working_directory_input,
             self.probe_layout_selector,
             self.num_channels_input,
             self.sampling_frequency_input,
@@ -140,7 +137,6 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.load_settings_button,
             self.probe_preview_button,
             self.select_data_file,
-            self.select_working_directory,
             self.select_results_directory,
         ]
 
@@ -168,19 +164,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.data_file_path_input.textChanged.connect(self.on_data_file_path_changed)
         self.data_file_path_input.editingFinished.connect(
             self.on_data_file_path_changed
-        )
-
-        row_count += 1
-        layout.addWidget(self.select_working_directory, row_count, 0, 1, 3)
-        layout.addWidget(self.working_directory_input, row_count, 3, 1, 2)
-        self.select_working_directory.clicked.connect(
-            self.on_select_working_dir_clicked
-        )
-        self.working_directory_input.textChanged.connect(
-            self.on_working_directory_changed
-        )
-        self.working_directory_input.editingFinished.connect(
-            self.on_working_directory_changed
         )
 
         row_count += 1
@@ -312,17 +295,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         if data_file_name:
             self.data_file_path_input.setText(data_file_name)
 
-    def on_select_working_dir_clicked(self):
-        file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
-        working_dir_name = QtWidgets.QFileDialog.getExistingDirectoryUrl(
-            parent=self,
-            caption="Choose working directory...",
-            directory=QtCore.QUrl(os.path.expanduser("~")),
-            options=file_dialog_options,
-        )
-        if working_dir_name:
-            self.working_directory_input.setText(working_dir_name.toLocalFile())
-
     def on_select_results_dir_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
         results_dir_name = QtWidgets.QFileDialog.getExistingDirectoryUrl(
@@ -333,18 +305,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         )
         if results_dir_name:
             self.results_directory_input.setText(results_dir_name.toLocalFile())
-
-    def on_working_directory_changed(self):
-        working_directory = Path(self.working_directory_input.text())
-        try:
-            assert working_directory.exists()
-
-            self.working_directory_path = working_directory
-            if self.check_settings():
-                self.enable_load()
-        except AssertionError:
-            logger.exception("Please select an existing working directory!")
-            self.disable_load()
 
     def on_results_directory_changed(self):
         results_directory = Path(self.results_directory_input.text())
@@ -366,12 +326,10 @@ class SettingsBox(QtWidgets.QGroupBox):
             assert data_file_path.exists()
 
             parent_folder = data_file_path.parent
-            results_folder = parent_folder / "phy_export" / data_file_path.stem
-            self.working_directory_input.setText(parent_folder.as_posix())
+            results_folder = parent_folder / "kilosort4"
             self.results_directory_input.setText(results_folder.as_posix())
 
             self.data_file_path = data_file_path
-            self.working_directory_path = parent_folder
             self.results_directory_path = results_folder
 
             if self.check_settings():
@@ -401,8 +359,7 @@ class SettingsBox(QtWidgets.QGroupBox):
     def check_settings(self):
         self.settings = {
             "data_file_path": self.data_file_path,
-            "working_directory": self.working_directory_path,
-            "results_directory": self.results_directory_path,
+            "results_dir": self.results_directory_path,
             "probe_layout": self.probe_layout,
             "n_chan_bin": self.num_channels,
             "fs": self.sampling_frequency,
@@ -837,17 +794,18 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.probe_layout_selector.clear()
 
         probe_folders = [self.gui.new_probe_files_path]
-
+        
         probes_list = []
         for probe_folder in probe_folders:
-            probes = os.listdir(probe_folder)
+            probes = os.listdir(os.fspath(probe_folder))
             probes = [
                 probe
                 for probe in probes
                 if probe.endswith(".mat") or probe.endswith(".prb")
             ]
             probes_list.extend(probes)
-
+        probes_list = natsorted(probes_list)
+        probes_list.sort(key=lambda f: os.path.splitext(f)[1])
         self.probe_layout_selector.addItems([""] + probes_list + ["[new]", "other..."])
         self._probes = probes_list
 
@@ -882,7 +840,6 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def reset(self):
         self.data_file_path_input.clear()
-        self.working_directory_input.clear()
         self.results_directory_input.clear()
         self.probe_layout_selector.setCurrentIndex(0)
         self.set_default_field_values(None)

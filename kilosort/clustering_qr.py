@@ -1,9 +1,10 @@
+from io import StringIO
 import numpy as np
 import torch
 from torch import sparse_coo_tensor as coo
 from scipy.sparse import csr_matrix 
-
 import faiss
+from tqdm import tqdm 
 from kilosort import hierarchical, swarmsplitter 
 
 def neigh_mat(Xd, nskip = 10, n_neigh=30):
@@ -99,7 +100,8 @@ def Mstats(M, device=torch.device('cuda')):
     return m, ki, kj
 
 
-def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200, seed = 1, niter = 200, lam = 0, device=torch.device('cuda')):    
+def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200, 
+            seed = 1, niter = 200, lam = 0, device=torch.device('cuda')):    
 
     if kn is None:
         kn, M = neigh_mat(Xd, nskip = nskip, n_neigh = n_neigh)
@@ -232,7 +234,7 @@ def xy_c(ops):
     return xy, iC
 
 
-def run(ops, st, tF,  mode = 'template', device=torch.device('cuda')):
+def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_bar=None):
 
     if mode == 'template':
         xy, iC = xy_templates(ops)
@@ -260,7 +262,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda')):
 
     Wall = torch.zeros((0, ops['Nchan'], ops['nwaves']))
     t0 = time.time()
-    for kk in range(len(ycent)):
+    for kk in tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None, mininterval=10 if progress_bar else None):
         # get the data
         #iclust_template = st[:,1].astype('int32')
 
@@ -275,7 +277,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda')):
             #nmax += 1
             iclust = torch.zeros((Xd.shape[0],))
         else:
-            if mode is 'template':
+            if mode == 'template':
                 st0 = st[igood,0]/ops['fs']
             else:
                 st0 = None
@@ -301,7 +303,10 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda')):
         
         Wall = torch.cat((Wall, W), 0)
 
-        if kk%20==0:
+        if progress_bar is not None:
+            progress_bar.emit(int((kk+1) / len(ycent) * 100))
+        
+        if 0:#kk%50==0:
             print(kk, nmax, time.time()-t0)
 
     return clu, Wall

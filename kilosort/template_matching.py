@@ -1,7 +1,10 @@
+from io import StringIO
+import time
 import numpy as np
 from kilosort import spikedetect, preprocessing, CCG
 import torch 
 from torch.nn.functional import conv1d, max_pool2d, max_pool1d
+from tqdm import tqdm
 
 def prepare_extract(ops, U, nC, device=torch.device('cuda')):
     ds = (ops['xc'] - ops['xc'][:, np.newaxis])**2 +  (ops['yc'] - ops['yc'][:, np.newaxis])**2 
@@ -11,7 +14,7 @@ def prepare_extract(ops, U, nC, device=torch.device('cuda')):
     Ucc = U[torch.arange(U.shape[0]),:,iCC[:,iU]]
     return iCC, iU, Ucc
 
-def extract(ops, U, device=torch.device('cuda')):
+def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     nC = 10
     iCC, iU, Ucc = prepare_extract(ops, U, nC, device=device)
     ops['iCC'] = iCC
@@ -26,11 +29,11 @@ def extract(ops, U, device=torch.device('cuda')):
     tF2 = torch.zeros((10**6, nC , ops['nwaves']))
 
     k = 0
-    for ibatch in np.arange(ops['Nbatches']):
-        X = preprocessing.load_transform(ops['filename'], ibatch, ops, fwav = ops['fwav'], 
-                            Wrot = ops['Wrot'], dshift = ops['dshift'], device=device)
-        
-        #X0 = X.clone()
+
+    s = StringIO()
+    for ibatch in tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
+                        mininterval=60 if progress_bar else None):
+        X = bfile.padded_batch_to_torch(ibatch, ops)
 
         stt, amps, Xres = run_matching(ops, X, U, ctc, device=device)
 
@@ -55,9 +58,10 @@ def extract(ops, U, device=torch.device('cuda')):
         tF2[k:k+nsp] = xfeat2.transpose(0,1).cpu()
 
         k+= nsp
-        if ibatch%250==0:
-            print(ibatch)
-    
+        
+        if progress_bar is not None:
+            progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
+
     isort = np.argsort(st[:k,0])
 
     st = st[isort]

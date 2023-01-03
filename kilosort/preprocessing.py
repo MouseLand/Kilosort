@@ -2,7 +2,6 @@ import torch, os, scipy
 import numpy as np
 from scipy.signal import butter, filtfilt
 from scipy.interpolate import interp1d
-from scipy import io
 from glob import glob
 from torch.fft import fft, ifft, fftshift
 
@@ -61,74 +60,6 @@ def get_drift_matrix(ops, dshift, device=torch.device('cuda')):
 
     return M
 
-def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None, device=torch.device('cuda')) :
-    """ this function loads a batch of data ibatch and optionally:
-     - if chanMap is present, then the channels are subsampled
-     - if fwav is present, then the data is high-pass filtered
-     - if Wrot is present,  then the data is whitened
-     - if dshift is present, then the data is drift-corrected    
-    """
-    nt = ops['nt']
-    NT = ops['NT']
-    NTbuff   = ops['NTbuff']
-    chanMap  = ops['chanMap']
-    NchanTOT = ops['NchanTOT']
-
-    with open(filename, mode='rb') as f: 
-        # seek the beginning of the batch
-        f.seek(2*NT*NchanTOT*ibatch , 0)
-
-        # go back "NTbuff" samples, unless this is the first batch
-        if ibatch==0:
-            buff = f.read((NTbuff-nt) * NchanTOT * 2)
-        else:    
-            f.seek(- 2*nt*NchanTOT , 1)
-            buff = f.read(NTbuff * NchanTOT * 2)          
-
-        # read and transpose data
-        # this gives a warning, but it's much faster than the alternatives... 
-        data = np.frombuffer(buff, dtype=np.int16, offset=0)
-        data = np.reshape(data, (-1, NchanTOT)).T
-
-    nsamp = data.shape[-1]
-    X = torch.zeros((NchanTOT, NTbuff), device = device)
-
-    # fix the data at the edges for the first and last batch
-    if ibatch==0:
-        X[:, nt:nt+nsamp] = torch.from_numpy(data).to(device).float()
-        X[:, :nt] = X[:, nt:nt+1]
-    elif ibatch==ops['Nbatches']-1:
-        X[:, :nsamp] = torch.from_numpy(data).to(device).float()
-        X[:, nsamp:] = X[:, nsamp-1:nsamp]
-    else:
-        X[:] = torch.from_numpy(data).to(device).float()
-
-    # pick only the channels specified in the chanMap
-    if chanMap is not None:
-        X = X[chanMap]
-        
-
-    # remove the mean of each channel, and the median across channels
-    X = X - X.mean(1).unsqueeze(1)
-    X = X - torch.median(X, 0)[0]
-  
-    # high-pass filtering in the Fourier domain (much faster than filtfilt etc)
-    if fwav is not None:
-        X = torch.real(ifft(fft(X) * torch.conj(fwav)))
-        X = fftshift(X, dim = -1)
-
-    Xr = X.clone()
-
-    # whitening, with optional drift correction
-    if Wrot is not None:
-        if dshift is not None:
-            M = get_drift_matrix(ops, dshift[ibatch], device=device)
-            X = (M @ Wrot) @ X
-        else:
-            X = Wrot @ X
-
-    return X#, Xr
-
 def find_file(ops):
     ops['filename']  = glob(os.path.join(ops['root_bin'], '*bin'))[0]
     file_size = os.path.getsize(ops['filename'])
@@ -173,10 +104,10 @@ def get_fwav(NT = 30122, fs = 30000, device=torch.device('cuda')):
 
     return fwav
 
-def get_whitening_matrix(f, x_chan, y_chan, nskip = 25):
+def get_whitening_matrix(f, xc, yc, nskip = 25):
     """ get the whitening matrix, use every nskip batches
     """
-    n_chan = len(f.channel_map)
+    n_chan = len(f.chan_map)
     # collect the covariance matrix across channels
     CC = torch.zeros((n_chan, n_chan), device=f.device)
     k = 0
@@ -184,14 +115,14 @@ def get_whitening_matrix(f, x_chan, y_chan, nskip = 25):
         X = f.padded_batch_to_torch(j)
         # load data with high-pass filtering
         #X = load_transform(filename, j, ops, fwav = ops['fwav'])
-        X = X[:, f.n_twav : -f.n_twav]
+        X = X[:, f.nt : -f.nt]
         CC = CC + (X @ X.T)/X.shape[1]
         k+=1
         # covariance matrix
     CC = CC / k
 
     # compute the local whitening filters and collect back into Wrot
-    Wrot = whitening_local(CC, x_chan, y_chan, device=f.device)
+    Wrot = whitening_local(CC, xc, yc, device=f.device)
     return Wrot
 
 def get_highpass_filter(fs = 30000, device=torch.device('cuda')):

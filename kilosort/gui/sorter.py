@@ -1,6 +1,9 @@
+import os
 import numpy as np
 import torch
 from PyQt5 import QtCore
+from PyQt5.QtCore import pyqtSignal
+
 from kilosort.gui.logger import setup_logger
 from kilosort.run_kilosort import run_kilosort
 
@@ -11,19 +14,19 @@ class KiloSortWorker(QtCore.QThread):
     finishedPreprocess = QtCore.pyqtSignal(object)
     finishedSpikesort = QtCore.pyqtSignal(object)
     finishedAll = QtCore.pyqtSignal(object)
+    progress_bar = pyqtSignal(int)
 
     def __init__(
             self,
             context,
-            output_directory,
+            results_directory,
             steps,
             *args,
             **kwargs):
         super(KiloSortWorker, self).__init__(*args, **kwargs)
         self.context = context
         self.data_path = context.data_path
-        self.output_directory = output_directory
-
+        self.results_directory = results_directory
         assert isinstance(steps, list) or isinstance(steps, str)
         self.steps = steps if isinstance(steps, list) else [steps]
 
@@ -31,35 +34,19 @@ class KiloSortWorker(QtCore.QThread):
         if "spikesort" in self.steps:
             settings = self.context.params
             probe = self.context.probe
-            settings["data_folder"] = self.data_path.parent
-            ops, st, tF, clu, Wall, is_ref = run_kilosort(
+            settings["data_dir"] = self.data_path.parent
+            settings["filename"] = self.data_path
+            results_directory = self.results_directory
+            if not results_directory.exists():
+                logger.info(f"Results dir at {results_directory} does not exist. The folder will be created.")
+                results_directory.mkdir(parents=True)
+            run_kilosort(
                 settings=settings,
                 probe=probe,
-                device=torch.device("cuda")
+                results_dir=results_directory,
+                device=torch.device("cuda"),
+                progress_bar=self.progress_bar
             )
 
-            output_folder = self.context.context_path
-            if not output_folder.exists():
-                logger.info(f"Context path at {output_folder} does not exist. The folder will be created.")
-                output_folder.mkdir(parents=True)
-
-            ops_arr = np.array(ops)
-            np.save(output_folder / "ops.npy", ops_arr)
-
-            np.save(output_folder / "st.npy", st)
-
-            np.save(output_folder / "tF.npy", tF.cpu().numpy())
-
-            np.save(output_folder / "clu.npy", clu)
-
-            np.save(output_folder / "Wall.npy", Wall.cpu().numpy())
-
-            np.save(output_folder / "is_ref.npy", np.array(is_ref))
-
-            logger.info(f"Spike sorting output saved in {output_folder}!")
+            logger.info(f"Spike sorting output saved in\n{results_directory}")
             self.finishedSpikesort.emit(self.context)
-
-        if "export" in self.steps:
-            # run_export(self.context, self.data_path, self.output_directory)
-            # self.finishedAll.emit(self.context)
-            raise NotImplementedError("Export for Phy has not been implemented yet!")

@@ -9,12 +9,13 @@ class MessageLogBox(QtWidgets.QGroupBox):
         QtWidgets.QGroupBox.__init__(self, parent=parent)
         self.setTitle("Message Log Box")
         self.gui = parent
-        self.layout = QtWidgets.QHBoxLayout()
+        self.layout = QtWidgets.QGridLayout()
+        self.setLayout(self.layout)
         self.log_box = QtWidgets.QPlainTextEdit()
         self.log_box.setReadOnly(True)
         self.log_box.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
         self.log_box.setFont(QtGui.QFont("Monospace"))
-        self.layout.addWidget(self.log_box)
+        self.layout.addWidget(self.log_box, 0, 0, 1, 1)
 
         log_box_document = self.log_box.document()
         default_font = log_box_document.defaultFont()
@@ -24,7 +25,6 @@ class MessageLogBox(QtWidgets.QGroupBox):
         XStream.stdout().messageWritten.connect(self.update_text)
         XStream.stderr().messageWritten.connect(self.update_text)
 
-        self.setLayout(self.layout)
 
     @QtCore.pyqtSlot(str)
     def update_text(self, text):

@@ -5,10 +5,11 @@ install_deps = [
     'numpy>=1.20.0',
     'scipy',
     'scikit-learn',
+    'tqdm',
     'torch>=1.6',
     'numba',
     'faiss-cpu',
-    'matplotlib',
+    'natsort',
 ]
 
 gui_deps = [
@@ -26,7 +27,6 @@ docs_deps = [
 
 try:
     import torch
-
     a = torch.ones(2, 3)
     version = int(torch.__version__.split(".")[1])
     if version >= 6:
@@ -69,7 +69,6 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'kilosort = kilosort.gui.launch:launcher',
         ]
     }
 )

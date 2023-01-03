@@ -1,6 +1,9 @@
 from numba import njit
 import numpy as np
+import torch
+from torch.nn.functional import conv1d
 import math 
+from tqdm import trange 
 
 @njit()
 def compute_CCG(st1, st2, tbin = 1/1000, nbins = 500):
@@ -79,6 +82,15 @@ def check_CCG(st1, st2=None, nbins = 500, tbin  = 1/1000):
     cross_refractory = Q12<.25 and (R12<.05)# or R00<.25)
     return is_refractory, cross_refractory, Q12
 
+def similarity(Wall, W, nt=61):
+    WtW = conv1d(W.reshape(-1, 1,nt), W.reshape(-1, 1 ,nt), padding = nt) 
+    WtW = torch.flip(WtW, [2,])
+    mu = (Wall**2).sum((1,2), keepdims=True)**.5
+    Wnorm = Wall / (1e-6 + mu)
+    UtU = torch.einsum('ilk, jlm -> ijkm',  Wnorm, Wnorm)
+    similar_templates = torch.einsum('ijkm, kml -> ijl', UtU.cpu(), WtW.cpu()).numpy()
+    similar_templates = similar_templates.max(axis=-1)
+    return similar_templates
 
 def refract(iclust2, st0):
     
@@ -94,8 +106,8 @@ def refract(iclust2, st0):
         if len(st1)>10:
             is_refractory[kk], cross_refractory[kk], Q12[kk] = check_CCG(st1,  nbins = 500, tbin  = 1/1000)
 
-        if kk%100==0:
-            print(kk, is_refractory.sum())
-    print(kk, is_refractory.sum())
+        #if kk%100==0:
+        #    print(kk, is_refractory.sum())
+    #print(kk, is_refractory.sum())
 
     return is_refractory, Q12

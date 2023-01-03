@@ -1,22 +1,23 @@
 from typing import Optional, Tuple, Sequence
 from contextlib import contextmanager
-import os
+import os, shutil
 from glob import glob
 from scipy.io import loadmat
 import torch
 import numpy as np
 from torch.fft import fft, ifft, fftshift
 from pathlib import Path
+from kilosort import CCG
 from kilosort.preprocessing import get_drift_matrix, fft_highpass
 
-def find_binary(data_folder):
+def find_binary(data_dir):
     """ find binary file in data_folder"""
-    filenames  = glob(os.path.join(data_folder, '*.bin'))
+    filenames  = list(data_dir.glob('*.bin'))
     if len(filenames)==0:
         raise FileNotFoundError('no binary file *.bin found in folder')
     # if there are multiple binary files, find one with "ap" tag
     if len(filenames) > 1:
-        filenames = [filename for filename in filenames if 'ap' in filename]
+        filenames = [filename for filename in filenames if 'ap' in filename.as_posix()]
     # if more than one, raise an error, user needs to specify binary
     if len(filenames) > 1:
         raise ValueError('multiple binary files in folder with "ap" tag, please specify filename')
@@ -35,6 +36,7 @@ def load_probe(probe_path):
     if probe_path.suffix == '.prb':
         # Support for PRB files.
         # !DOES NOT WORK FOR PHASE3A PROBES WITH DISCONNECTED CHANNELS!
+        # Also does not remove reference channel in PHASE3B probes
         contents = probe_path.read_text()
         metadata = {}
         exec(contents, {}, metadata)
@@ -72,10 +74,83 @@ def load_probe(probe_path):
 
     return probe
 
+def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None):
+    if results_dir is None:
+        results_dir = ops['data_dir'].joinpath('kilosort4')
+    results_dir.mkdir(exist_ok=True)
+
+    # probe properties
+    chan_map = probe['chanMap']
+    channel_positions = np.stack((probe['xc'], probe['yc']), axis=-1)
+    np.save((results_dir / 'channel_map.npy'), chan_map)
+    np.save((results_dir / 'channel_positions.npy'), channel_positions)
+
+    # whitening matrix ** saving real whitening matrix doesn't work with phy currently
+    whitening_mat = ops['Wrot'].cpu().numpy()
+    np.save((results_dir / 'whitening_mat_dat.npy'), whitening_mat)
+    whitening_mat = 0.005 * np.eye(len(chan_map), dtype='float32')
+    whitening_mat_inv = np.linalg.inv(whitening_mat + 1e-5 * np.eye(whitening_mat.shape[0]))
+    np.save((results_dir / 'whitening_mat.npy'), whitening_mat)
+    np.save((results_dir / 'whitening_mat_inv.npy'), whitening_mat_inv)
+
+    # spike properties
+    spike_times = st[:,0]
+    spike_clusters = clu
+    amplitudes = ((tF**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
+    np.save((results_dir / 'spike_times.npy'), spike_times)
+    np.save((results_dir / 'spike_templates.npy'), spike_clusters)
+    np.save((results_dir / 'spike_clusters.npy'), spike_clusters)
+    np.save((results_dir / 'amplitudes.npy'), amplitudes)
+
+    # template properties
+    similar_templates = CCG.similarity(Wall, ops['wPCA'].contiguous(), nt=ops['nt'])
+    n_temp = Wall.shape[0]
+    template_amplitudes = ((Wall**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
+    templates = (Wall.unsqueeze(-1).cpu() * ops['wPCA'].cpu()).sum(axis=-2).numpy()
+    templates = templates.transpose(0,2,1)
+    templates_ind = np.tile(np.arange(Wall.shape[1])[np.newaxis, :], (templates.shape[0],1))
+    np.save((results_dir / 'similar_templates.npy'), similar_templates)
+    np.save((results_dir / 'templates.npy'), templates)
+    np.save((results_dir / 'templates_ind.npy'), templates_ind)
+    
+    # contamination ratio
+    is_ref, est_contam_rate = CCG.refract(clu, spike_times / ops['fs'])
+
+    # write properties to *.tsv
+    stypes = ['ContamPct', 'Amplitude', 'KSLabel']
+    ks_labels = [['mua', 'good'][int(r)] for r in is_ref]
+    props = [est_contam_rate*100, template_amplitudes, ks_labels]
+    for stype, prop in zip(stypes, props):
+        with open((results_dir / f'cluster_{stype}.tsv'), 'w') as f:
+            f.write(f'cluster_id\t{stype}\n')
+            for i,p in enumerate(prop):
+                if stype != 'KSLabel':
+                    f.write(f'{i}\t{p:.1f}\n')
+                else:
+                    f.write(f'{i}\t{p}\n')
+        if stype == 'KSLabel':
+            shutil.copyfile((results_dir / f'cluster_{stype}.tsv'), 
+                            (results_dir / f'cluster_group.tsv'))
+
+    # params.py
+    params = {'dat_path': "'" + os.fspath(ops['settings']['filename']) + "'",
+            'n_channels_dat': 385,#len(chan_map),
+            'dtype': "'int16'",
+            'offset': 0,
+            'sample_rate': ops['settings']['fs'],
+            'hp_filtered': False }
+    with open((results_dir / 'params.py'), 'w') as f: 
+        for key in params.keys():
+            f.write(f'{key} = {params[key]}\n')
+
+    return results_dir, similar_templates, is_ref, est_contam_rate
+
+
+
 class BinaryRWFile:
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
-                batch_size: int = 60000, n_twav: int = 61,
-                twav_min: int = 20, device: torch.device = torch.device('cpu'),
+                NT: int = 60000, nt: int = 61,
+                nt0min: int = 20, device: torch.device = torch.device('cpu'),
                 write: bool = False):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
@@ -94,30 +169,14 @@ class BinaryRWFile:
         self.fs = fs
         self.n_chan_bin = n_chan_bin
         self.filename = filename
-        self.batch_size = batch_size 
-        self.n_twav = n_twav 
-        self.twav_min = twav_min
+        self.NT = NT 
+        self.nt = nt 
+        self.nt0min = nt0min
         self.device = device
-        if write:
-            self.file = open(filename, mode='w+b')
-        else:
-            self.file = open(filename, mode='r+b')
-        self._index = 0
-        self._can_read = True
-        self.n_batches = int(np.ceil(self.n_samples / self.batch_size))
-
-    @staticmethod
-    def convert_numpy_file_to_binary(from_filename: str, to_filename: str) -> None:
-        """
-        Works with npz files, pickled npy files, etc.
-        Parameters
-        ----------
-        from_filename: str
-            The npy file to convert
-        to_filename: str
-            The binary file that will be created
-        """
-        np.load(from_filename).tofile(to_filename)
+        self.n_batches = int(np.ceil(self.n_samples / self.NT))
+        
+        self.file = np.memmap(self.filename, mode='w+' if write else 'r',
+                              dtype='int16', shape=self.shape)
 
     @property
     def nbytesread(self):
@@ -127,10 +186,8 @@ class BinaryRWFile:
     @property
     def nbytes(self):
         """total number of bytes in the file."""
-        with temporary_pointer(self.file) as f:
-            f.seek(0, 2)
-            return f.tell()
-
+        return os.path.getsize(self.filename)
+        
     @property
     def n_samples(self) -> int:
         """total number of samples in the file."""
@@ -164,7 +221,7 @@ class BinaryRWFile:
         """
         Closes the file.
         """
-        self.file.close()
+        self.file._mmap.close()
         
     def __enter__(self):
         return self
@@ -174,131 +231,33 @@ class BinaryRWFile:
 
     def __setitem__(self, *items):
         sample_indices, data = items
-        self.ix_write(data=data, indices=self.from_slice(sample_indices))
+        self.file[sample_indices] = data
         
     def __getitem__(self, *items):
         sample_indices, *crop = items
-        if isinstance(sample_indices, int):
-            samples = self.ix(indices=[sample_indices], is_slice=False)
-        elif isinstance(sample_indices, slice):
-            samples = self.ix(indices=self.from_slice(sample_indices), is_slice=True)
-        else:
-            samples = self.ix(indices=sample_indices, is_slice=False)
-        return samples[(slice(None),) + crop] if crop else samples
-
-    def ix_write(self, data, indices: Sequence[int]):
-        """
-        Writes the samples at index values "indices".
-        Parameters
-        ----------
-        indices: int array
-            The sample indices to get, must be a slice
-        """
-        i0 = indices[0]
-        batch_size = len(indices)
-        if self._index != i0:
-            self.file.seek(self.nbytesread * (i0 - self._index), 1)
-        self._index = i0 + batch_size
-        self.write(data)  
-
-    def ix(self, indices: Sequence[int], is_slice=False):
-        """
-        Returns the samples at index values "indices".
-        Parameters
-        ----------
-        indices: int array
-            The sample indices to get
-        is_slice: bool, default False
-            if indices are slice, read slice with "read" function and return
-        Returns
-        -------
-        samples: len(indices) x n_chan_bin
-            The requested samples
-        """
-        if not is_slice:
-            samples = np.empty((len(indices), self.n_chan_bin), np.int16)
-            # load and bin data
-            with temporary_pointer(self.file) as f:
-                for sample, ixx in zip(samples, indices):
-                    if ixx!=self._index:
-                        f.seek(self.nbytesread * ixx)
-                    buff = f.read(self.nbytesread)
-                    data = np.frombuffer(buff, dtype=np.int16, offset=0)
-                    sample[:] = data
-                    #self._index = ixx+1
-        else:
-            i0 = indices[0]
-            batch_size = len(indices)
-            if self._index != i0:
-                self.file.seek(self.nbytesread * i0)
-            _, samples = self.read(batch_size=batch_size)
-            self._index = i0 + batch_size
-        
-        return samples
-
-    def read(self, batch_size=1) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-        """
-        Returns the next sample(s) in the file and its associated indices.
-        Parameters
-        ----------
-        batch_size: int
-            The number of samples to read at once.
-        samples: batch_size x n_chan_bin
-            The sample data
-        """
-        if not self._can_read:
-            raise IOError("BinaryFile needs to write before it can read again.")
-        nbytes = self.nbytesread * batch_size
-        buff = self.file.read(nbytes)
-        data = np.frombuffer(buff, dtype=np.int16, offset=0).reshape(-1, self.n_chan_bin)
-        if data.size == 0:
-            return None
-        indices = np.arange(self._index, self._index + data.shape[0])
-        self._index += data.shape[0]
-        return indices, data
-
-    def write(self, data: np.ndarray) -> None:
-        """
-        Writes sample(s) to the file.
-        Parameters
-        ----------
-        data: 2D or 3D array
-            The sample(s) to write.  Should be the same width and height as the other samples in the file.
-        """
-        self.file.write(bytearray(data))
-
-
-    def from_slice(self, s: slice) -> Optional[np.ndarray]:
-        """Creates an np.arange() array from a Python slice object.  Helps provide numpy-like slicing interfaces."""
-        s_start = 0 if s.start is None else s.start
-        s_step = 1 if s.step is None else s.step 
-        s_stop = self.n_samples if s.stop is None else s.stop
-        s_start = self.n_samples + s_start if s_start < 0 else s_start
-        s_stop = self.n_samples + s_stop if s_stop < 0 else s_stop
-        s_stop = min(self.n_samples, s_stop)
-        return np.arange(s_start, s_stop, s_step) if any([s_start, s_stop, s_step]) else None
+        return self.file[sample_indices]
 
     def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
         if ibatch==0:
             bstart = 0
-            bend = self.batch_size + self.n_twav
+            bend = self.NT + self.nt
         else:
-            bstart = ibatch * self.batch_size - self.n_twav
-            bend = min(self.n_samples, bstart + self.batch_size + 2*self.n_twav)
-        data = self.ix(np.arange(bstart, bend), is_slice=True)        
+            bstart = ibatch * self.NT - self.nt
+            bend = min(self.n_samples, bstart + self.NT + 2*self.nt)
+        data = self.file[bstart : bend]
         data = data.T
         nsamp = data.shape[-1]
-        X = torch.zeros((self.n_chan_bin, self.batch_size + 2*self.n_twav), device = self.device)
+        X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device = self.device)
         # fix the data at the edges for the first and last batch
         if ibatch==0:
-            X[:, self.n_twav : self.n_twav+nsamp] = torch.from_numpy(data).to(self.device).float()
-            X[:, :self.n_twav] = X[:, self.n_twav : self.n_twav+1]
-            bstart = - self.n_twav
+            X[:, self.nt : self.nt+nsamp] = torch.from_numpy(data).to(self.device).float()
+            X[:, :self.nt] = X[:, self.nt : self.nt+1]
+            bstart = - self.nt
         elif ibatch==self.n_batches-1:
             X[:, :nsamp] = torch.from_numpy(data).to(self.device).float()
             X[:, nsamp:] = X[:, nsamp-1:nsamp]
-            bend += self.n_twav
+            bend += self.nt
         else:
             X[:] = torch.from_numpy(data).to(self.device).float()
         inds = [bstart, bend]
@@ -307,22 +266,23 @@ class BinaryRWFile:
         else:
             return X
 
+
 class BinaryFiltered(BinaryRWFile):
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
-                batch_size: int = 60000, n_twav: int = 61,
-                twav_min: int = 20, channel_map: np.ndarray = None, 
-                hp_filter: torch.Tensor = None, whiten_mat: torch.Tensor = None, 
-                dshift: torch.Tensor = None, device: torch.device = torch.device('cuda')):
-        super().__init__(filename, n_chan_bin, fs, batch_size, n_twav, twav_min, device) 
-        self.channel_map = channel_map
+                 NT: int = 60000, nt: int = 61,
+                 nt0min: int = 20, chan_map: np.ndarray = None, 
+                 hp_filter: torch.Tensor = None, whiten_mat: torch.Tensor = None, 
+                 dshift: torch.Tensor = None, device: torch.device = torch.device('cuda')):
+        super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device) 
+        self.chan_map = chan_map
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter
         self.dshift = dshift
 
     def filter(self, X, ops=None, ibatch=None):
         # pick only the channels specified in the chanMap
-        if self.channel_map is not None:
-            X = X[self.channel_map]
+        if self.chan_map is not None:
+            X = X[self.chan_map]
 
         # remove the mean of each channel, and the median across channels
         X = X - X.mean(1).unsqueeze(1)
@@ -346,13 +306,7 @@ class BinaryFiltered(BinaryRWFile):
 
     def __getitem__(self, *items):
         sample_indices, *crop = items
-        if isinstance(sample_indices, int):
-            samples = self.ix(indices=[sample_indices], is_slice=False)
-        elif isinstance(sample_indices, slice):
-            samples = self.ix(indices=self.from_slice(sample_indices), is_slice=True)
-        else:
-            samples = self.ix(indices=sample_indices, is_slice=False)
-        samples = samples[(slice(None),) + crop] if crop else samples
+        samples = self.file[sample_indices]
         X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
         
@@ -364,9 +318,7 @@ class BinaryFiltered(BinaryRWFile):
             X = super().padded_batch_to_torch(ibatch)
             return self.filter(X, ops, ibatch)
 
-@contextmanager
-def temporary_pointer(file):
-    """context manager that resets file pointer location to its original place upon exit."""
-    orig_pointer = file.tell()
-    yield file
-    file.seek(orig_pointer)
+
+    
+
+

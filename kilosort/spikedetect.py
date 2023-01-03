@@ -1,9 +1,13 @@
+from io import StringIO
+import time
 from torch.nn.functional import max_pool2d, avg_pool2d, conv1d, max_pool1d
 import numpy as np
 import torch
-from kilosort import preprocessing 
 from sklearn.cluster import KMeans
 from sklearn.decomposition import TruncatedSVD
+from tqdm import tqdm
+
+from kilosort.utils import template_path
 
 dev = torch.device('cuda')
 
@@ -26,35 +30,8 @@ def find_peaks(X, ops, loc_range = [5,5], long_range = [7,31]):
     xs = torch.nonzero(is_peak)
     return xs
 
-def get_waves_old(ops):
-    dt = torch.arange(ops['nt'], device=dev) - ops['nt0min']
-    clips = torch.zeros((100000, ops['nt']), device=dev)
-    k = 0
-
-    for j in range(ops['Nbatches']):
-        X = preprocessing.load_transform(ops['filename'], j, ops, fwav = ops['fwav'], Wrot = ops['Wrot'], device=device)
-        xs = find_peaks(X, ops)
-        nsp = len(xs)
-        if k+nsp>100000:
-            break;
-        clips[k:k+nsp] = X[xs[:,:1], xs[:,1:2] + dt]
-        k += nsp
-
-    clips = clips[:k]
-    clips = clips/(clips**2).sum(1).unsqueeze(1)**.5
-    clips = clips.cpu().numpy()
-    
-    model = TruncatedSVD(n_components = ops['nwaves']).fit(clips)
-    wPCA = torch.from_numpy(model.components_).to(dev).float()
-    
-    model = KMeans(n_clusters = ops['nwaves'], n_init = 1).fit(clips)
-    wTEMP = torch.from_numpy(model.cluster_centers_).to(dev).float()
-    wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
-
-    return wPCA, wTEMP
-
 def get_waves(ops, device=torch.device('cuda')):
-    dd = np.load('/github/kilosort_dev/kilosort/wTEMP.npz')
+    dd = np.load(template_path())
     wTEMP = torch.from_numpy(dd['wTEMP']).to(device)
     wPCA = torch.from_numpy(dd['wPCA']).to(device)
     return wPCA, wTEMP
@@ -149,7 +126,7 @@ def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):
     yct = (cF0 * yy[:,xy[:,0]]).sum(0)
     return yct
 
-def run(ops, dshift = None, device=torch.device('cuda')):        
+def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):        
     sig = 10
     nsizes = 5
 
@@ -180,14 +157,11 @@ def run(ops, dshift = None, device=torch.device('cuda')):
     k = 0
     nt = ops['nt']
     tarange = torch.arange(-(nt//2),nt//2+1, device = device)
+    s = StringIO()
+    for ibatch in tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
+                        mininterval=60 if progress_bar else None):
+        X = bfile.padded_batch_to_torch(ibatch, ops)
 
-    import time
-    t0 = time.time()
-    for j in range(ops['Nbatches']):
-        X = preprocessing.load_transform(ops['filename'], j, ops, fwav = ops['fwav'], 
-                            Wrot = ops['Wrot'], dshift = dshift, device=device)
-
-        #print(X.std())
         xy, imax, amp, adist = template_match(X, ops, iC, iC2, weigh, device=device)
         yct = yweighted(yc, iC, adist, xy, device=device)
         nsp = len(xy)
@@ -200,18 +174,18 @@ def run(ops, dshift = None, device=torch.device('cuda')):
         xfeat = xsub @ ops['wPCA'].T
         tF[k:k+nsp] = xfeat.transpose(0,1).cpu().numpy()
 
-        st[k:k+nsp,0] = ((xy[:,1]-nt)/ops['fs'] + j * (ops['NT']/ops['fs'])).cpu().numpy()
+        st[k:k+nsp,0] = ((xy[:,1]-nt)/ops['fs'] + ibatch * (ops['NT']/ops['fs'])).cpu().numpy()
         st[k:k+nsp,1] = yct.cpu().numpy()
         st[k:k+nsp,2] = amp.cpu().numpy()
         st[k:k+nsp,3] = imax.cpu().numpy()
-        st[k:k+nsp,4] = j    
+        st[k:k+nsp,4] = ibatch
         st[k:k+nsp,5] = xy[:,0].cpu().numpy()
 
         k = k + nsp
-        # time should go to seconds here. need amplitude and yct also. others less important. 
         
-    print(time.time()-t0)
-
+        if progress_bar is not None:
+            progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
+            
     st = st[:k]
     tF = tF[:k]
     ops['iC'] = iC

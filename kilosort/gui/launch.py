@@ -1,11 +1,11 @@
-import sys
+import sys, argparse
 
 import pyqtgraph as pg
 from kilosort.gui import DarkPalette, KiloSortGUI
 from PyQt5 import QtWidgets
 
 
-def launcher():
+def launcher(filename=None):
     kilosort_application = QtWidgets.QApplication(sys.argv)
     kilosort_application.setStyle("Fusion")
     kilosort_application.setPalette(DarkPalette())
@@ -19,12 +19,9 @@ def launcher():
     pg.setConfigOption("foreground", "w")
     pg.setConfigOption("useOpenGL", True)
 
-    kilosort_gui = KiloSortGUI(kilosort_application)
-    kilosort_gui.showMaximized()
+    kilosort_gui = KiloSortGUI(kilosort_application, filename=filename)
+    # kilosort_gui.showMaximized()
     kilosort_gui.show()
 
     sys.exit(kilosort_application.exec_())
 
-
-if __name__ == "__main__":
-    launcher()

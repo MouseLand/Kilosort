@@ -11,31 +11,32 @@ from kilosort.gui import (
 )
 from kilosort.gui.logger import setup_logger
 from kilosort.io import BinaryFiltered
+from kilosort.utils import DOWNLOADS_DIR, download_probes
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 logger = setup_logger(__name__)
 
 
 class KiloSortGUI(QtWidgets.QMainWindow):
-    def __init__(self, application, *args, **kwargs):
-        super(KiloSortGUI, self).__init__(*args, **kwargs)
+    def __init__(self, application, filename=None, **kwargs):
+        super(KiloSortGUI, self).__init__(**kwargs)
 
         self.app = application
 
-        self.data_path = None
+        self.data_path = filename
         self.probe_layout = None
         self.params = None
-        self.working_directory = None
         self.results_directory = None
 
         # self.probe_files_path = Path(probes.__file__).parent
         # assert self.probe_files_path.exists()
 
-        self.local_config_path = Path.home() / ".kilosort"
-        self.local_config_path.mkdir(exist_ok=True)
+        self.local_config_path = DOWNLOADS_DIR
+        self.local_config_path.mkdir(parents=True, exist_ok=True)
 
         self.new_probe_files_path = self.local_config_path / "probes"
         self.new_probe_files_path.mkdir(exist_ok=True)
+        download_probes(self.new_probe_files_path)
 
         # self.time_range = None
         self.num_channels = None
@@ -117,7 +118,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             event.ignore()
 
     def setup(self):
-        self.setWindowTitle(f"Kilosort 4")
+        self.setWindowTitle(f"Kilosort4")
 
         self.third_boxes_layout.addWidget(self.settings_box, 85)
         self.third_boxes_layout.addWidget(self.run_box, 15)
@@ -125,8 +126,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.second_boxes_layout.addLayout(self.third_boxes_layout, 50)
         self.second_boxes_layout.addWidget(self.probe_view_box, 50)
 
-        self.first_boxes_layout.addLayout(self.second_boxes_layout, 75)
-        self.first_boxes_layout.addWidget(self.message_log_box, 25)
+        self.first_boxes_layout.addLayout(self.second_boxes_layout, 60)
+        self.first_boxes_layout.addWidget(self.message_log_box, 40)
 
         self.fourth_boxes_layout.addWidget(self.header_box, 3)
         self.fourth_boxes_layout.addWidget(self.data_view_box, 97)
@@ -204,8 +205,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         # advanced_options = self.settings_box.advanced_options
 
         self.data_path = settings.pop("data_file_path")
-        self.working_directory = settings.pop("working_directory")
-        self.results_directory = settings.pop("results_directory")
+        self.results_directory = settings.pop("results_dir")
         self.probe_layout = settings.pop("probe_layout")
         # self.time_range = settings.pop("time_range")
         self.num_channels = settings["n_chan_bin"]
@@ -234,16 +234,16 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def load_binary_files(self):
         n_channels = self.params["n_chan_bin"]
         sample_rate = self.params["fs"]
-        channel_map = self.probe_layout["chanMap"]
-        x_chan = self.probe_layout["xc"]
-        y_chan = self.probe_layout["yc"]
+        chan_map = self.probe_layout["chanMap"]
+        xc = self.probe_layout["xc"]
+        yc = self.probe_layout["yc"]
         nskip = self.params["nskip"]
 
         binary_file = BinaryFiltered(
             filename=self.data_path,
             n_chan_bin=n_channels,
             fs=sample_rate,
-            channel_map=channel_map,
+            chan_map=chan_map,
             device=torch.device("cpu"),
         )
 
@@ -258,14 +258,14 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             filename=self.data_path,
             n_chan_bin=n_channels,
             fs=sample_rate,
-            channel_map=channel_map,
+            chan_map=chan_map,
             hp_filter=self.context.highpass_filter,
             device=torch.device("cpu"),
         ) as bin_file:
             self.context.whitening_matrix = preprocessing.get_whitening_matrix(
                 f=bin_file,
-                x_chan=x_chan,
-                y_chan=y_chan,
+                xc=xc,
+                yc=yc,
                 nskip=nskip,
             )
 
@@ -273,7 +273,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             filename=self.data_path,
             n_chan_bin=n_channels,
             fs=sample_rate,
-            channel_map=channel_map,
+            chan_map=chan_map,
             hp_filter=self.context.highpass_filter,
             whiten_mat=self.context.whitening_matrix,
             device=torch.device("cpu"),
@@ -290,10 +290,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.data_view_box.enable_view_buttons()
 
     def setup_context(self):
-        context_path = Path(self.working_directory) / ".kilosort" / self.data_path.stem
-
         self.context = Context(
-            context_path=context_path,
+            context_path = self.results_directory,
             probe=self.probe_layout,
             raw_probe=self.probe_layout.copy(),
             params=self.params,
@@ -317,7 +315,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def update_run_box(self):
         self.run_box.set_data_path(self.data_path)
-        self.run_box.set_working_directory(self.working_directory)
         self.run_box.set_results_directory(self.results_directory)
 
     @QtCore.pyqtSlot(dict)

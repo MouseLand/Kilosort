@@ -121,8 +121,8 @@ def kernel2D(x, y, sig = 1):
     Kn = np.exp(-ds / (2*sig**2))
     return Kn
 
-def run(ops, device=torch.device('cuda')):
-    st, tF, ops  = spikedetect.run(ops, device=device)
+def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
+    st, tF, ops  = spikedetect.run(ops, bfile, device=device, progress_bar=progress_bar)
     F, ysamp = bin_spikes(ops, st)
     imin, yblk, F0, F0m = align_block2(F, ysamp, ops, device=device)
 
