@@ -1,12 +1,12 @@
 # Kilosort4 pre-release
 
-# Installation
+You can run Kilosort4 without installing it locally using google colab. An example colab notebook is available [here](https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing). It will download some test data, run kilosort4 on it, and show some plots.
 
-## Local installation
+# Installation
 
 ### System requirements
 
-Linux and Windows 64-bit are supported for running the code. At least 8GB of RAM is required to run the software. The software has been tested on Windows 10 and Ubuntu 20.04. 
+Linux and Windows 64-bit are supported for running the code. At least 8GB of GPU RAM is required to run the software. The software has been tested on Windows 10 and Ubuntu 20.04. 
 
 ### Instructions
 
