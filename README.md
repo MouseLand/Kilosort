@@ -11,13 +11,9 @@ If you use any version of Kilosort, please cite the new Kilosort paper:
 
 **Pachitariu, M., Sridhar, S., & Stringer, C. (2023). Solving the spike sorting problem with Kilosort. bioRxiv, 2023-01.**
 
-Depending what version you use, please also cite: 
+If you use **Kilosort 2.5**, please also cite:   
 
-for **Kilosort 2.5**:   Steinmetz, N. A., Aydin, C., Lebedeva, A., Okun, M., Pachitariu, M., Bauza, M., ... & Harris, T. D. (2021). Neuropixels 2.0: A miniaturized high-density probe for stable, long-term brain recordings. Science, 372(6539), eabf4588.
-
-for **Kilosort 2**:   Stringer, C., Pachitariu, M., Steinmetz, N., Reddy, C. B., Carandini, M., & Harris, K. D. (2019). Spontaneous behaviors drive multidimensional, brainwide activity. Science, 364(6437), eaav7893.
-
-for **Kilosort 1**:   Pachitariu, M., Steinmetz, N., Kadir, S., Carandini, M., & Kenneth D, H. (2016). Kilosort: realtime spike-sorting for extracellular electrophysiology with hundreds of channels. BioRxiv, 061481.
+Steinmetz, N. A., Aydin, C., Lebedeva, A., Okun, M., Pachitariu, M., Bauza, M., ... & Harris, T. D. (2021). Neuropixels 2.0: A miniaturized high-density probe for stable, long-term brain recordings. Science, 372(6539), eabf4588.
 
 ![](Docs/img/frame_full.png)
 
