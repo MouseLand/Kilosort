@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from torch.fft import fft, ifft, fftshift
 
-
+np.random.seed(123)
 # TODO: Preprocessing unit tests, group by pipeline step
 
 class TestFiltering:
@@ -67,10 +67,10 @@ class TestFiltering:
 class TestWhitening:
     # Random data to whiten
     x = torch.from_numpy(np.random.rand(10,1000).astype('float32'))
+    cc = (x @ x.T)/x.shape[1]
 
     def test_whitening_from_covariance(self):
-        cc = (self.x @ self.x.T)/self.x.shape[1]
-        wm = kpp.whitening_from_covariance(cc)
+        wm = kpp.whitening_from_covariance(self.cc)
         whitened = (wm @ self.x).numpy()
         new_cov = (whitened @ whitened.T)/whitened.shape[1]
 
@@ -78,10 +78,26 @@ class TestWhitening:
         # identity matrix.
         assert np.allclose(new_cov, np.identity(new_cov.shape[1]), atol=1e-4)
 
-    # TODO: These rely on probe file and binary file, see notes below about
-    #       possibility of disentangling that for easier testing.
     def test_whitening_local(self):
-        pass
+        xc = np.array([0.0, 1.0]*5)                        # fake x-positions
+        yc = np.array([np.floor(i/2) for i in range(10)])  # fake y-positions
+        wm = kpp.whitening_local(
+            self.cc, xc, yc, nrange=3, device=torch.device('cpu')
+            )
+
+        whitened = (wm @ self.x).numpy()
+        new_cov = (whitened @ whitened.T)/whitened.shape[1]
+        # Covariance matrix of whitened data should be very close to the
+        # identity matrix.
+
+        # TODO: Ask Marius about this. I guess it only tries to decorrelate within
+        #       the specified nrange? But I'm getting sort of mixed results for
+        #       the random data, where some channels are decorrelated with their
+        #       neighbors but others aren't.
+        # assert np.allclose(new_cov, np.identity(new_cov.shape[1]), atol=1e-4)
+
+    # TODO: This relies on binary file, see notes below about
+    #       possibility of disentangling that for easier testing.
     def test_get_whitening(self):
         pass
 
@@ -100,3 +116,6 @@ class TestDriftCorrection:
 #       are actually applied to some tensor in pytorch, so ideally the main
 #       data wrapper would just store that (with some separate object referenced
 #       for updating the current tensor).
+
+# NOTE: Any changes there have to be mindful of the output format expected by
+#       Phy and SpikeInterface
