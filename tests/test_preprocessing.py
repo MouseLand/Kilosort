@@ -65,6 +65,23 @@ class TestFiltering:
 
 
 class TestWhitening:
+    # Random data to whiten
+    x = torch.from_numpy(np.random.rand(10,1000, dtype='float32'))
+
+    def test_whitening_from_covariance(self):
+        cc = (self.x @ self.x.T)/self.x.shape[1]
+        wm = kpp.whitening_from_covariance(cc)
+        whitened = (wm @ self.x).numpy()
+        new_cov = (whitened @ whitened.T)/whitened.shape[1]
+
+        # Covariance matrix of whitened data should be very close to the
+        # identity matrix.
+        assert np.allclose(new_cov, np.identity(whitened.shape[1]), atol=1e-4)
+
+    # TODO: These rely on probe file and binary file, see notes below about
+    #       possibility of disentangling that for easier testing.
+    def test_whitening_local(self):
+        pass
     def test_get_whitening(self):
         pass
 
