@@ -10,10 +10,10 @@ class TestFiltering:
     # 2 seconds of time samples at 30Khz, 1 channel
     t = np.linspace(0, 2, 60000, False, dtype='float32')[np.newaxis,...]
     # 100hz and 500hz signals
-    sine_100hz = torch.from_numpy(np.sin(2*np.pi*100*t)).to('cuda')
-    sine_500hz = torch.from_numpy(np.sin(2*np.pi*500*t)).to('cuda')
+    sine_100hz = torch.from_numpy(np.sin(2*np.pi*100*t))
+    sine_500hz = torch.from_numpy(np.sin(2*np.pi*500*t))
     # high pass filter (hard-coded for 300hz threshold)
-    hp_filter = kpp.get_highpass_filter()
+    hp_filter = kpp.get_highpass_filter(device=torch.device('cpu'))
 
     def test_get_highpass_filter(self):
         # Add dummy axes, shape (channels in, channels out, width)
