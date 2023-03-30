@@ -34,8 +34,7 @@ def default_settings():
     return settings
 
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None, filename=None,
-                 results_dir=None, device=torch.device('cuda'), progress_bar=None,
-                 save=True):
+                 results_dir=None, device=torch.device('cuda'), progress_bar=None):
 
     tic0 = time.time()
 
@@ -174,20 +173,18 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None, file
 
     bfile.close()
 
-    # NOTE: Generally speaking, `save=False` should only be used for testing.
-    if save:
-        print('\nsaving to phy and computing refractory periods')
-        # save to phy and compute more properties of units
-        results_dir, similar_templates, is_ref, est_contam_rate = io.save_to_phy(st, clu, tF, Wall, probe, ops, 
-                                                                    results_dir=results_dir )
-        print(f'{int(is_ref.sum())} units found with good refractory periods')
-        
-        ops['settings']['results_dir'] = results_dir
-        runtime = time.time()-tic0 
-        print(f'\ntotal runtime: {runtime:.2f}s = {int(runtime//3600):02d}:{int(runtime//60):02d}:{int(runtime%60)} h:m:s')
-        ops['runtime'] = runtime 
-        ops_arr = np.array(ops)
-        
-        np.save(results_dir / 'ops.npy', ops_arr)
+    print('\nsaving to phy and computing refractory periods')
+    # save to phy and compute more properties of units
+    results_dir, similar_templates, is_ref, est_contam_rate = io.save_to_phy(st, clu, tF, Wall, probe, ops, 
+                                                                results_dir=results_dir )
+    print(f'{int(is_ref.sum())} units found with good refractory periods')
+    
+    ops['settings']['results_dir'] = results_dir
+    runtime = time.time()-tic0 
+    print(f'\ntotal runtime: {runtime:.2f}s = {int(runtime//3600):02d}:{int(runtime//60):02d}:{int(runtime%60)} h:m:s')
+    ops['runtime'] = runtime 
+    ops_arr = np.array(ops)
+    
+    np.save(results_dir / 'ops.npy', ops_arr)
 
     return ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
