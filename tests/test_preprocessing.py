@@ -1,10 +1,13 @@
-import kilosort.preprocessing as kpp
 import numpy as np
+import scipy.signal as ss
 import torch
 from torch.fft import fft, ifft, fftshift
 
+import kilosort.preprocessing as kpp
+from kilosort import datashift
+
+
 np.random.seed(123)
-# TODO: Preprocessing unit tests, group by pipeline step
 
 class TestFiltering:
     # 2 seconds of time samples at 30Khz, 1 channel
@@ -26,10 +29,6 @@ class TestFiltering:
         # but neither case is exact.
         assert torch.max(filtered_100hz) < 0.01
         assert torch.max(filtered_500hz) > 0.9
-
-        # TODO: are there specific properties of the filter that should be checked?
-        #       the function is pretty much just a couple scipy calls, so I'm not
-        #       sure what else I should check here that wouldn't be trivial.
 
     def test_fft_highpass(self):
         fft1 = kpp.fft_highpass(self.hp_filter, NT=1000)    # crop filter
@@ -66,7 +65,21 @@ class TestFiltering:
 
 class TestWhitening:
     # Random data to whiten
-    x = torch.from_numpy(np.random.rand(10,1000).astype('float32'))
+    n_chans = 100
+    x = np.random.rand(n_chans,1000)
+    b,a = ss.butter(4, 300, 'high', fs=30000)
+    x_filt = ss.filtfilt(b, a, x)
+    # Fake x- and y-positions
+    xc = np.array([0.0, 1.0]*int(n_chans/2))               
+    yc = np.array([np.floor(i/2) for i in range(n_chans)])
+    # Add correlation based on distance
+    # TODO: This isn't working as expected. Goal is to add correlation between
+    #       channels based on distance, e.g. nearby channels should be correlated,
+    #       distant channels should not be.
+    # TODO: just use sample real data instead.
+    # w_corr = np.fromfunction(lambda i,j: np.exp(-(i-j)**2), shape=(n_chans, n_chans))
+    x = torch.from_numpy(x.astype('float32')).to('cpu')
+    # Get correlation matrix
     cc = (x @ x.T)/x.shape[1]
 
     def test_whitening_from_covariance(self):
@@ -79,10 +92,9 @@ class TestWhitening:
         assert np.allclose(new_cov, np.identity(new_cov.shape[1]), atol=1e-4)
 
     def test_whitening_local(self):
-        xc = np.array([0.0, 1.0]*5)                        # fake x-positions
-        yc = np.array([np.floor(i/2) for i in range(10)])  # fake y-positions
+
         wm = kpp.whitening_local(
-            self.cc, xc, yc, nrange=3, device=torch.device('cpu')
+            self.cc, self.xc, self.yc, nrange=30, device=torch.device('cpu')
             )
 
         whitened = (wm @ self.x).numpy()
@@ -102,20 +114,25 @@ class TestWhitening:
         pass
 
 class TestDriftCorrection:
-    pass
 
+    def test_datashift(self, bfile, saved_ops, torch_device):
+        # TODO: maybe make this a separate test module instead? There's
+        #       quite a bit there.
+        saved_yblk = saved_ops['yblk']
+        saved_dshift = saved_ops['dshift']
+        saved_iKxx = saved_ops['iKxx'].to(torch_device)
+        ops = datashift.run(saved_ops, bfile, device=torch_device)
 
-# TODO: in separate test module, start on rough determinism/exact match test,
-#       e.g. break up into steps as much as possible and check that output
-#       matches pre-computed version after each step. Need to slice out a reasonable
-#       size chunk of sample data to do this with, so that each step can be
-#       saved to file without taking up a lot of space.
-# TODO: How to set up a binary file for this, to do the full pipeline?
-# TODO: Separately, is there some way we can disentangle the binary file read/write
-#       from the other code, for easier testing? Ultimately, all of the operations
-#       are actually applied to some tensor in pytorch, so ideally the main
-#       data wrapper would just store that (with some separate object referenced
-#       for updating the current tensor).
+        # TODO: this fails on dshift, but the final version doesn't. So, dshift
+        #       must be overwritten later on in the pipeline. Need to save the
+        #       initial result separately.
+        print('testing yblk...')
+        assert np.allclose(saved_yblk, ops['yblk'])
+        print('testing dshift...')
+        assert np.allclose(saved_dshift, ops['dshift'])
+        print('testing iKxx...')
+        assert torch.allclose(saved_iKxx, ops['iKxx'])
+        
 
-# NOTE: Any changes there have to be mindful of the output format expected by
-#       Phy and SpikeInterface
+    def test_get_drift_matrix(self):
+        pass
