@@ -64,60 +64,51 @@ class TestFiltering:
 
 
 class TestWhitening:
-    # Random data to whiten
-    n_chans = 100
-    x = np.random.rand(n_chans,1000)
-    b,a = ss.butter(4, 300, 'high', fs=30000)
-    x_filt = ss.filtfilt(b, a, x)
-    # Fake x- and y-positions
-    xc = np.array([0.0, 1.0]*int(n_chans/2))               
-    yc = np.array([np.floor(i/2) for i in range(n_chans)])
-    # Add correlation based on distance
-    # TODO: This isn't working as expected. Goal is to add correlation between
-    #       channels based on distance, e.g. nearby channels should be correlated,
-    #       distant channels should not be.
-    # TODO: just use sample real data instead.
-    # w_corr = np.fromfunction(lambda i,j: np.exp(-(i-j)**2), shape=(n_chans, n_chans))
-    x = torch.from_numpy(x.astype('float32')).to('cpu')
-    # Get correlation matrix
-    cc = (x @ x.T)/x.shape[1]
 
     def test_whitening_from_covariance(self):
-        wm = kpp.whitening_from_covariance(self.cc)
-        whitened = (wm @ self.x).numpy()
+        x = np.random.rand(100, 1000)
+        cc = (x @ x.T)/1000
+        wm = kpp.whitening_from_covariance(cc)
+        whitened = (wm @ x).numpy()
         new_cov = (whitened @ whitened.T)/whitened.shape[1]
 
         # Covariance matrix of whitened data should be very close to the
         # identity matrix.
         assert np.allclose(new_cov, np.identity(new_cov.shape[1]), atol=1e-4)
 
-    def test_whitening_local(self):
+    def test_get_whitening(self, bfile, saved_ops):
+        xc = saved_ops['probe']['xc']
+        yc = saved_ops['probe']['yc']
+        wm = kpp.get_whitening_matrix(bfile, xc, yc)
 
-        wm = kpp.whitening_local(
-            self.cc, self.xc, self.yc, nrange=30, device=torch.device('cpu')
-            )
+        ### Perform other preprocessing steps on data to ensure valid result.
+        # TODO: better way to encapsulate these steps for re-use.
+        # Get first batch of data
+        X = torch.from_numpy(bfile.file[:bfile.NT,:]).to(bfile.device).float()
+        # Remove unwanted channels
+        if bfile.chan_map is not None:
+            X = X[bfile.chan_map]
+        # remove the mean of each channel, and the median across channels
+        X = X - X.mean(1).unsqueeze(1)
+        X = X - torch.median(X, 0)[0]
+        # high-pass filtering in the Fourier domain (much faster than filtfilt etc)
+        fwav = kpp.fft_highpass(bfile.hp_filter, NT=X.shape[1])
+        X = torch.real(ifft(fft(X) * torch.conj(fwav)))
+        X = fftshift(X, dim = -1)
+        ###
 
-        whitened = (wm @ self.x).numpy()
+        # Apply whitening matrix to one batch
+        whitened = (wm @ X)
         new_cov = (whitened @ whitened.T)/whitened.shape[1]
-        # Covariance matrix of whitened data should be very close to the
-        # identity matrix.
+        identity = torch.eye(new_cov.shape[1], device=bfile.device)
+        # Covariance matrix of whitened data should be approximately equal
+        # to the identity matrix.
+        assert torch.allclose(new_cov, identity, atol=1e-2)
 
-        # TODO: Ask Marius about this. I guess it only tries to decorrelate within
-        #       the specified nrange? But I'm getting sort of mixed results for
-        #       the random data, where some channels are decorrelated with their
-        #       neighbors but others aren't.
-        # assert np.allclose(new_cov, np.identity(new_cov.shape[1]), atol=1e-4)
-
-    # TODO: This relies on binary file, see notes below about
-    #       possibility of disentangling that for easier testing.
-    def test_get_whitening(self):
-        pass
 
 class TestDriftCorrection:
 
     def test_datashift(self, bfile, saved_ops, torch_device):
-        # TODO: maybe make this a separate test module instead? There's
-        #       quite a bit there.
         saved_yblk = saved_ops['yblk']
         saved_dshift = saved_ops['dshift']
         saved_iKxx = saved_ops['iKxx'].to(torch_device)
