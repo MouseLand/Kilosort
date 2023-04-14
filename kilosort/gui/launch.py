@@ -6,6 +6,7 @@ from PyQt5 import QtWidgets
 
 
 def launcher(filename=None):
+    filename = '' if filename is None else filename
     kilosort_application = QtWidgets.QApplication(sys.argv)
     kilosort_application.setStyle("Fusion")
     kilosort_application.setPalette(DarkPalette())
