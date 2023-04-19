@@ -129,14 +129,19 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None, file
     torch.random.manual_seed(1)
 
     ### drift computation
-    print('\ncomputing drift')
-    tic = time.time()
-    bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min, chan_map, 
-                              hp_filter=hp_filter, whiten_mat=whiten_mat, device=device)
-    ops         = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
-    bfile.close()
-    print(f'drift computed in {time.time()-tic : .2f}s; total {time.time()-tic0 : .2f}s')
     
+    if ops['nblocks']>0:
+        print('\ncomputing drift')
+        tic = time.time()
+        bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min, chan_map, 
+                                hp_filter=hp_filter, whiten_mat=whiten_mat, device=device)
+        ops         = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
+        bfile.close()
+        print(f'drift computed in {time.time()-tic : .2f}s; total {time.time()-tic0 : .2f}s')
+    else:
+        ops['dshift'] = None
+        print('nblocks = 0, skipping drift correction')
+
     # binary file with drift correction
     bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min, chan_map, 
                               hp_filter=hp_filter, whiten_mat=whiten_mat, dshift=ops['dshift'])

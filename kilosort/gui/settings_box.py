@@ -734,7 +734,7 @@ class SettingsBox(QtWidgets.QGroupBox):
     def on_nblocks_changed(self):
         try:
             nblocks = int(self.nblocks_input.text())
-            assert nblocks > 0
+            assert nblocks >= 0
 
             self.nblocks = nblocks
 
