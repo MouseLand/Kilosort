@@ -183,6 +183,11 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     it returns vertical correction amplitudes for each batch, and for multiple blocks in a batch if nblocks > 1. 
     """
     
+    if ops['nblocks']<1:
+        ops['dshift'] = None 
+        print('nblocks = 0, skipping drift correction')
+        return ops
+    
     # the first step is to extract all spikes using the universal templates 
     st, _, ops  = spikedetect.run(ops, bfile, device=device, progress_bar=progress_bar)
 
