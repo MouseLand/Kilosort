@@ -74,7 +74,7 @@ def load_probe(probe_path):
 
     return probe
 
-def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None):
+def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None, data_dtype=None):
     if results_dir is None:
         results_dir = ops['data_dir'].joinpath('kilosort4')
     results_dir.mkdir(exist_ok=True)
@@ -133,9 +133,10 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None):
                             (results_dir / f'cluster_group.tsv'))
 
     # params.py
+    dtype = "'uint16'" if data_dtype is None else f"'{data_dtype}'"
     params = {'dat_path': "'" + os.fspath(ops['settings']['filename']) + "'",
-            'n_channels_dat': 385,#len(chan_map),
-            'dtype': "'int16'",
+            'n_channels_dat': 385,#len(chan_map),  # TODO: why is 385 hard-coded here?
+            'dtype': dtype,
             'offset': 0,
             'sample_rate': ops['settings']['fs'],
             'hp_filtered': False }
@@ -149,7 +150,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None):
 
 class BinaryRWFile:
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
-                NT: int = 60000, nt: int = 61,
+                NT: int = 60000, nt: int = 61, dtype=None,
                 nt0min: int = 20, device: torch.device = torch.device('cpu'),
                 write: bool = False):
         """
@@ -174,9 +175,10 @@ class BinaryRWFile:
         self.nt0min = nt0min
         self.device = device
         self.n_batches = int(np.ceil(self.n_samples / self.NT))
+        self.dtype = dtype if dtype is not None else 'uint16'
         
         self.file = np.memmap(self.filename, mode='w+' if write else 'r',
-                              dtype='int16', shape=self.shape)
+                              dtype=self.dtype, shape=self.shape)
 
     @property
     def nbytesread(self):
