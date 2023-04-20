@@ -1,6 +1,4 @@
-import pytest
 import numpy as np
-import scipy.signal as ss
 import torch
 from torch.fft import fft, ifft, fftshift
 
