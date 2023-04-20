@@ -173,7 +173,6 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None, file
 
     bfile.close()
 
-    
     print('\nsaving to phy and computing refractory periods')
     # save to phy and compute more properties of units
     results_dir, similar_templates, is_ref, est_contam_rate = io.save_to_phy(st, clu, tF, Wall, probe, ops, 
