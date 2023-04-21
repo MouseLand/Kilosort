@@ -40,7 +40,7 @@ def data_directory():
     """Specifies directory for test data and results, downloads if needed."""
 
     # Set path to directory within tests/ folder dynamically
-    data_path = Path(kilosort.__file__).parents[1] / 'tests/.test_data/'
+    data_path = Path.home() / '.kilosort/.test_data/'
     data_path.mkdir(exist_ok=True)
 
     binary_path = data_path / 'ZFM-02370_mini.imec0.ap.bin'

@@ -56,3 +56,15 @@ This should work fine in the `kilosort` environment you made (if not make a new 
 ~~~
 phy template-gui params.py
 ~~~
+
+### Developer instructions
+
+Need to install pytest
+~~~
+pip install pytest
+~~~
+
+Then run all tests with:
+~~~
+pytest tests/ --runslow
+
