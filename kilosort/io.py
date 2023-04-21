@@ -133,7 +133,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None, data_dtype=None
                             (results_dir / f'cluster_group.tsv'))
 
     # params.py
-    dtype = "'uint16'" if data_dtype is None else f"'{data_dtype}'"
+    dtype = "'int16'" if data_dtype is None else f"'{data_dtype}'"
     params = {'dat_path': "'" + os.fspath(ops['settings']['filename']) + "'",
             'n_channels_dat': 385,#len(chan_map),  # TODO: why is 385 hard-coded here?
             'dtype': dtype,
@@ -150,9 +150,9 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None, data_dtype=None
 
 class BinaryRWFile:
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
-                NT: int = 60000, nt: int = 61, dtype=None,
-                nt0min: int = 20, device: torch.device = torch.device('cpu'),
-                write: bool = False):
+                 NT: int = 60000, nt: int = 61, nt0min: int = 20,
+                 device: torch.device = torch.device('cpu'), write: bool = False,
+                 dtype=None):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -175,7 +175,7 @@ class BinaryRWFile:
         self.nt0min = nt0min
         self.device = device
         self.n_batches = int(np.ceil(self.n_samples / self.NT))
-        self.dtype = dtype if dtype is not None else 'uint16'
+        self.dtype = dtype if dtype is not None else 'int16'
         
         self.file = np.memmap(self.filename, mode='w+' if write else 'r',
                               dtype=self.dtype, shape=self.shape)
@@ -271,11 +271,11 @@ class BinaryRWFile:
 
 class BinaryFiltered(BinaryRWFile):
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
-                 NT: int = 60000, nt: int = 61,
-                 nt0min: int = 20, chan_map: np.ndarray = None, 
-                 hp_filter: torch.Tensor = None, whiten_mat: torch.Tensor = None, 
-                 dshift: torch.Tensor = None, device: torch.device = torch.device('cuda')):
-        super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device) 
+                 NT: int = 60000, nt: int = 61, nt0min: int = 20,
+                 chan_map: np.ndarray = None, hp_filter: torch.Tensor = None,
+                 whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
+                 device: torch.device = torch.device('cuda'), dtype=None):
+        super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device, dtype=dtype) 
         self.chan_map = chan_map
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter
