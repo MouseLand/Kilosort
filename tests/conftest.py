@@ -40,23 +40,23 @@ def data_directory():
     """Specifies directory for test data and results, downloads if needed."""
 
     # Set path to directory within tests/ folder dynamically
-    # data_path = Path(kilosort.__file__).parent / 'tests/.test_data/'
-    # data_path.mkdir(exist_ok=True)
+    data_path = Path(kilosort.__file__).parents[1] / 'tests/.test_data/'
+    data_path.mkdir(exist_ok=True)
 
-    # binary_path = data_directory / 'neuropix1_90s.bin'
-    # binary_url = 'https://www.suite2p.org/static/test_data/test_inputs.zip'
-    # if not binary_path.is_file():
-    #     download_data(binary_path, binary_url)
+    binary_path = data_path / 'ZFM-02370_mini.imec0.ap.bin'
+    binary_url = 'https://www.kilosort.org/downloads/ZFM-02370_mini.imec0.ap.zip'
+    if not binary_path.is_file():
+        download_data(binary_path, binary_url)
 
-    # results_path = data_path / 'saved_results/'
-    # results_url = 'https://www.suite2p.org/static/test_data/test_outputs.zip'
-    # if not results_path.is_dir():
-    #     download_data(results_path, results_url)
+    results_path = data_path / 'saved_results/'
+    results_url = 'https://www.kilosort.org/downloads/pytest.zip'
+    if not results_path.is_dir():
+        download_data(results_path, results_url)
+        # Extracts to folder 'pytest' by default, rename to make it clear what
+        # goes in the folder.
+        p = data_path / 'pytest'
+        p.rename(results_path)
 
-    data_path = Path("C:/code/kilosort4_data/")
-    # TODO: move this to a remote repository, hard-coded for Jacob's PC for now.
-    #       Everything should be set up, just uncomment above block once the files
-    #       are hosted (and updated urls as appropriate).
     return data_path
 
 
@@ -69,6 +69,7 @@ def download_data(local, remote):
     download_url_to_file(remote, zip_file)  
     with zipfile.ZipFile(zip_file, "r") as zip_ref:
         zip_ref.extractall(local.parent)
+    zip_file.unlink()  # delete zip archive after extracting data
 
 
 # @retry  # TODO: look at tenacity package, determine if this is necessary
@@ -128,13 +129,14 @@ def download_url_to_file(url, dst, progress=True):
     finally:
         # Close and delete temporary file
         f.close()
-        if f.name.is_file():
-            Path(f.name).unlink()
+        p = Path(f.name)
+        if p.is_file():
+            p.unlink()
 
 
 @pytest.fixture()
 def results_directory(data_directory):
-    return data_directory.joinpath("pytest/")
+    return data_directory.joinpath("saved_results/")
 
 ### End
 
