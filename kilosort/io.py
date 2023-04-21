@@ -1,14 +1,16 @@
-from typing import Optional, Tuple, Sequence
-from contextlib import contextmanager
+from pathlib import Path
+from typing import Tuple
 import os, shutil
-from glob import glob
+import warnings
+
 from scipy.io import loadmat
 import torch
 import numpy as np
 from torch.fft import fft, ifft, fftshift
-from pathlib import Path
+
 from kilosort import CCG
 from kilosort.preprocessing import get_drift_matrix, fft_highpass
+
 
 def find_binary(data_dir):
     """ find binary file in data_folder"""
@@ -149,6 +151,9 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None, data_dtype=None
 
 
 class BinaryRWFile:
+
+    supported_dtypes = ['uint16', 'int16', 'int32', 'float32']
+
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = torch.device('cpu'), write: bool = False,
@@ -174,16 +179,36 @@ class BinaryRWFile:
         self.nt = nt 
         self.nt0min = nt0min
         self.device = device
+
+        if dtype is None:
+            print(
+                "Interpreting binary file as default dtype='int16'. If data was "
+                "saved in a different format, specify dtype kwarg in `run_kilosort`."
+                )
+            dtype = 'int16'
+        self.dtype = dtype
+
+        if self.dtype not in self.supported_dtypes:
+            message = f"""
+                {self.dtype} is not supported and may result in unexpected
+                behavior or errors. Supported types are:\n
+                {self.supported_dtypes}
+                """
+            warnings.warn(message, RuntimeWarning)
+
+        # Must come after dtype since dtype is necessary for computing n_samples
         self.n_batches = int(np.ceil(self.n_samples / self.NT))
-        self.dtype = dtype if dtype is not None else 'int16'
-        
-        self.file = np.memmap(self.filename, mode='w+' if write else 'r',
-                              dtype=self.dtype, shape=self.shape)
+
+        mode = 'w+' if write else 'r'
+        self.file = np.memmap(self.filename, mode=mode, dtype=self.dtype,
+                              shape=self.shape)
+
 
     @property
     def nbytesread(self):
         """number of bytes per sample (FIXED for given file)"""
-        return np.int64(2 * self.n_chan_bin)
+        n_bytes = np.dtype(self.dtype).itemsize
+        return np.int64(n_bytes * self.n_chan_bin)
 
     @property
     def nbytes(self):
@@ -275,6 +300,7 @@ class BinaryFiltered(BinaryRWFile):
                  chan_map: np.ndarray = None, hp_filter: torch.Tensor = None,
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
                  device: torch.device = torch.device('cuda'), dtype=None):
+
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device, dtype=dtype) 
         self.chan_map = chan_map
         self.whiten_mat = whiten_mat
@@ -309,6 +335,13 @@ class BinaryFiltered(BinaryRWFile):
     def __getitem__(self, *items):
         sample_indices, *crop = items
         samples = self.file[sample_indices]
+        # Shift data to one sign
+        if self.dtype == 'uint16':
+            samples = samples - 2**15
+        # Scale down 
+        if self.dtype in ['uint16', 'int16']:
+            samples = samples / (2**15)
+
         X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
         
@@ -319,8 +352,3 @@ class BinaryFiltered(BinaryRWFile):
         else:
             X = super().padded_batch_to_torch(ibatch)
             return self.filter(X, ops, ibatch)
-
-
-    
-
-
