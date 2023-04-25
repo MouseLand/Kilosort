@@ -151,8 +151,8 @@ def saved_ops(results_directory):
 def torch_device():
     return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-@pytest.fixture(data_directory)
-def bfile(saved_ops, torch_device):
+@pytest.fixture()
+def bfile(saved_ops, torch_device, data_directory):
 
     settings = data_directory / saved_ops['settings']
     # Don't get filename from settings, will be different based on OS and which
