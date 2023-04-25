@@ -154,10 +154,10 @@ def torch_device():
 @pytest.fixture()
 def bfile(saved_ops, torch_device, data_directory):
 
-    settings = data_directory / saved_ops['settings']
+    settings = saved_ops['settings']
     # Don't get filename from settings, will be different based on OS and which
     # system ran tests originally.
-    filename = 'ZFM-02370_mini.imec0.ap.bin'
+    filename = data_directory / 'ZFM-02370_mini.imec0.ap.bin'
 
     # TODO: add option to load BinaryFiltered from ops dict, move this code
     #       to that function
