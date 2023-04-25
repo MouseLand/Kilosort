@@ -4,10 +4,8 @@ import numpy as np
 import pytest
 import torch
 
-import kilosort
-import kilosort.preprocessing as kpp
 from kilosort import io
-from kilosort import PROBE_DIR
+from kilosort.utils import download_probes
 
 
 ### runslow flag configured according to response from Manu CJ here:
@@ -56,6 +54,9 @@ def data_directory():
         # goes in the folder.
         p = data_path / 'pytest'
         p.rename(results_path)
+
+    # Download default probe files if they don't already exist.
+    download_probes()
 
     return data_path
 
