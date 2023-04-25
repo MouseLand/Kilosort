@@ -162,7 +162,7 @@ def bfile(saved_ops, torch_device):
     # TODO: add option to load BinaryFiltered from ops dict, move this code
     #       to that function
     bfile = io.BinaryFiltered(
-        , settings['n_chan_bin'], settings['fs'],
+        filename, settings['n_chan_bin'], settings['fs'],
         settings['NT'], settings['nt'], settings['nt0min'],
         saved_ops['probe']['chanMap'], hp_filter=saved_ops['fwav'],
         whiten_mat=saved_ops['Wrot'], dshift=saved_ops['dshift'],
