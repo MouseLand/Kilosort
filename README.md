@@ -20,7 +20,7 @@ First make sure the NVIDIA driver for your GPU is installed, and the CUDA and CU
 4. To activate this new environment, run `conda activate kilosort`
 5. Change into the directory containing the code, it should have a `setup.py` file in it.
 6. To install the minimal version of kilosort, run `python -m pip install .`.  
-7. To install kilosort and the GUI, run `python -m pip install ,[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install '.[gui]'.
+7. To install kilosort and the GUI, run `python -m pip install .[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install '.[gui]'.
 
 This will install the CPU version of torch in the environment, we need the **GPU** version. First remove the CPU version:
 ~~~
