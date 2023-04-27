@@ -1,9 +1,9 @@
 Installing Kilosort
 ===================
 You can run Kilosort4 without installing it locally using google colab.
-An example colab notebook is available
-`here <https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing>`_.
-It will download some test data, run kilosort4 on it, and show some plots.
+An `example colab notebook <https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing>`_
+is available. It will download some test data, run kilosort4 on it,
+and show some plots.
 
 
 Installation
