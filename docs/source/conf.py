@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'Kilosort 4'
+project = 'Kilosort4'
 copyright = '2023, Marius Pachitariu & Carsen Stringer'
 author = 'Jacob Pennington (documentation)'
 release = '0.0.1'
@@ -17,7 +17,9 @@ release = '0.0.1'
 extensions = [
     'sphinx.ext.doctest',
     'myst_parser',            # Use markdown files in addition to .rst
-    'nbsphinx'                # Render notebooks
+    'nbsphinx',               # Render notebooks
+    'sphinx_rtd_theme'
+
     ]
 
 # Notebooks will be displayed even if they include errors
@@ -32,6 +34,26 @@ exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
+html_logo = '_static/logo.jpg'
 
-html_theme = 'alabaster'
+# The theme to use for HTML and HTML Help pages.  See the documentation for
+# a list of builtin themes.
+#
+html_theme = 'sphinx_rtd_theme'
+
+html_theme_options = {
+    'canonical_url': '',
+    'analytics_id': 'UA-XXXXXXX-1',  #  Provided by Google in your dashboard
+    'logo_only': False,
+    'display_version': True,
+    'prev_next_buttons_location': 'top',
+    'style_external_links': False,
+    'style_nav_header_background': 'black',
+    # Toc options
+    'collapse_navigation': True,
+    'sticky_navigation': True,
+    'navigation_depth': 4,
+    'includehidden': True,
+    'titles_only': False
+}
 html_static_path = ['_static']
