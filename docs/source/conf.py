@@ -16,8 +16,8 @@ release = '0.0.1'
 
 extensions = [
     'sphinx.ext.doctest',
-    'myst_parser',
-    'nbsphinx'
+    'myst_parser',            # Use markdown files in addition to .rst
+    'nbsphinx'                # Render notebooks
     ]
 
 # Notebooks will be displayed even if they include errors
