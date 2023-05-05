@@ -1,5 +1,6 @@
 import os
 import pprint
+import warnings
 from pathlib import Path
 from natsort import natsorted
 import numpy as np
@@ -294,6 +295,17 @@ class SettingsBox(QtWidgets.QGroupBox):
         )
         if data_file_name:
             self.data_file_path_input.setText(data_file_name)
+
+    def set_data_file_path_from_drag_and_drop(self, filename):
+        if filename.endswith(".bin") or filename.endswith(".dat"):
+            self.data_file_path_input.setText(filename)
+        else:
+            warnings.warn_explicit(
+                message="Only .bin or .dat files can be loaded!",
+                category=UserWarning,
+                filename="",
+                lineno=0,
+                )
 
     def on_select_results_dir_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
