@@ -1,5 +1,6 @@
 .. toctree::
     :maxdepth: 1
 
-    load_data
+    step_by_step
     make_probe
+    load_data
