@@ -1,14 +1,16 @@
-from typing import Optional, Tuple, Sequence
-from contextlib import contextmanager
-import os, shutil
-from glob import glob
-from scipy.io import loadmat
-import torch
-import numpy as np
-from torch.fft import fft, ifft, fftshift
+import json
+from typing import Tuple
 from pathlib import Path
+import os, shutil
+
+from scipy.io import loadmat
+import numpy as np
+import torch
+from torch.fft import fft, ifft, fftshift
+
 from kilosort import CCG
 from kilosort.preprocessing import get_drift_matrix, fft_highpass
+
 
 def find_binary(data_dir):
     """ find binary file in data_folder"""
@@ -22,6 +24,7 @@ def find_binary(data_dir):
     if len(filenames) > 1:
         raise ValueError('multiple binary files in folder with "ap" tag, please specify filename')
     return filenames[0]
+
 
 def load_probe(probe_path):
     """Load a .mat probe file from Kilosort2, or a PRB file and returns a dictionary
@@ -69,10 +72,56 @@ def load_probe(probe_path):
         probe['chanMap'] = (mat['chanMap'] - 1).ravel().astype(np.int32)[connected]  # NOTE: 0-indexing in Python
         probe['n_chan'] = (mat['chanMap'] - 1).ravel().astype(np.int32).shape[0]  # NOTE: should match the # of columns in the raw data
 
+    elif probe_path.suffix == '.json':
+        with open(probe_path, 'r') as f:
+            probe = json.load(f)
+        for k in list(probe.keys()):
+            # Convert lists back to arrays
+            v = probe[k]
+            if isinstance(v, list):
+                dtype = np.int32 if k == 'chanMap' else np.float32
+                probe[k] = np.array(v, dtype=dtype)
+
     for n in required_keys:
         assert n in probe.keys()
 
     return probe
+
+
+def save_probe(probe_dict, filepath):
+    """Save a probe dictionary to a .json text file.
+
+    Parameters
+    ----------
+    probe_dict : dict
+        A dictionary containing probe information in the format expected by
+        Kilosort4, with keys 'chanMap', 'xc', 'yc', and 'kcoords'.
+    filepath : str or pathlib.Path
+        Location where .json file should be stored.
+
+    Raises
+    ------
+    RuntimeWarning
+        If filepath does not end in '.json'
+    
+    """
+
+    if Path(filepath).suffix != '.json':
+        raise RuntimeWarning(
+            'Saving json probe to a file whose suffix is not .json. '
+            'kilosort.io.load_probe will not recognize this file.' 
+        )
+
+    d = probe_dict.copy()
+    # Convert arrays to lists, since arrays aren't json-able
+    for k in list(d.keys()):
+        v = d[k]
+        if isinstance(v, np.ndarray):
+            d[k] = v.tolist()
+    
+    with open(filepath, 'w') as f:
+        f.write(json.dumps(d))
+
 
 def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None):
     if results_dir is None:
