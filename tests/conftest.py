@@ -33,7 +33,7 @@ def pytest_collection_modifyitems(config, items):
 ### Configure data paths, download data if not already present.
 # Adapted from https://github.com/MouseLand/suite2p/blob/main/conftest.py
 # TODO: also download probe file if not already present
-@pytest.fixture()
+@pytest.fixture(scope='session')
 def data_directory():
     """Specifies directory for test data and results, downloads if needed."""
 
@@ -72,8 +72,9 @@ def download_data(local, remote):
         zip_ref.extractall(local.parent)
     zip_file.unlink()  # delete zip archive after extracting data
 
-
-# @retry  # TODO: look at tenacity package, determine if this is necessary
+# TODO: look at tenacity package, determine if this is necessary, would introduce
+#       another dependency
+# @retry
 def download_url_to_file(url, dst, progress=True):
     """Download object at the given URL to a local path.
     
@@ -135,7 +136,7 @@ def download_url_to_file(url, dst, progress=True):
             p.unlink()
 
 
-@pytest.fixture()
+@pytest.fixture(scope='session')
 def results_directory(data_directory):
     return data_directory.joinpath("saved_results/")
 
@@ -143,18 +144,22 @@ def results_directory(data_directory):
 
 
 ### Load data for use by unit and regression tests
-@pytest.fixture()
+@pytest.fixture(scope='session')
+def torch_device():
+    return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
+@pytest.fixture(scope='session')
 def saved_ops(results_directory):
     ops = np.load(results_directory / 'ops.npy', allow_pickle=True).item()
     return ops
 
-@pytest.fixture()
 def torch_device():
     return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-@pytest.fixture()
+@pytest.fixture(scope='session')
 def bfile(saved_ops, torch_device, data_directory):
-
+    # TODO: add option to load BinaryFiltered from ops dict, move this code
+    #       to that function
     settings = saved_ops['settings']
     # Don't get filename from settings, will be different based on OS and which
     # system ran tests originally.

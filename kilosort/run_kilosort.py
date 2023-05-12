@@ -33,8 +33,9 @@ def default_settings():
     settings['probe_name'] = 'neuropixPhase3B1_kilosortChanMap.mat'
     return settings
 
-def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None, filename=None,
-                 results_dir=None, device=torch.device('cuda'), progress_bar=None):
+def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
+                 filename=None, data_dtype=None, results_dir=None,
+                 device=torch.device('cuda'), progress_bar=None):
 
     tic0 = time.time()
 
@@ -88,6 +89,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None, file
     ops['probe'] = probe
     #{'settings': settings,
             # 'probe': probe}
+    ops['data_dtype'] = data_dtype
 
     
     nt = ops['settings']['nt']
@@ -112,7 +114,8 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None, file
     # compute high pass filter
     hp_filter = preprocessing.get_highpass_filter(ops['settings']['fs'], device=device)
     # compute whitening matrix
-    bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min, chan_map, hp_filter, device=device)
+    bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min,
+                              chan_map, hp_filter, device=device, dtype=data_dtype)
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, 
                                                     nskip = ops['settings']['nskip'])
     bfile.close()
@@ -134,14 +137,16 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None, file
     print('\ncomputing drift')
     tic = time.time()
     bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min, chan_map, 
-                            hp_filter=hp_filter, whiten_mat=whiten_mat, device=device)
+                              hp_filter=hp_filter, whiten_mat=whiten_mat,
+                              device=device, dtype=data_dtype)
     ops         = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()
     print(f'drift computed in {time.time()-tic : .2f}s; total {time.time()-tic0 : .2f}s')
     
     # binary file with drift correction
     bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min, chan_map, 
-                              hp_filter=hp_filter, whiten_mat=whiten_mat, dshift=ops['dshift'])
+                              hp_filter=hp_filter, whiten_mat=whiten_mat,
+                              dshift=ops['dshift'], dtype=data_dtype)
 
     ### spike sorting
 
@@ -177,8 +182,10 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None, file
 
     print('\nsaving to phy and computing refractory periods')
     # save to phy and compute more properties of units
-    results_dir, similar_templates, is_ref, est_contam_rate = io.save_to_phy(st, clu, tF, Wall, probe, ops, 
-                                                                results_dir=results_dir )
+    results_dir, similar_templates, is_ref, est_contam_rate = io.save_to_phy(
+            st, clu, tF, Wall, probe, ops, results_dir=results_dir,
+            data_dtype=data_dtype
+            )
     print(f'{int(is_ref.sum())} units found with good refractory periods')
     
     ops['settings']['results_dir'] = str(results_dir)
