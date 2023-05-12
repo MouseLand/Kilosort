@@ -21,9 +21,7 @@ In brief:
    from kilosort import run_kilosort
    results = run_kilosort()
 
-See this
-`collab notebook <https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing>`_
-for a more detailed walkthrough.
+See the "Step-by-step" tutorial for a more detailed walkthrough.
 
 
 Integration with Phy GUI
