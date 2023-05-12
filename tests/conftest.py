@@ -4,10 +4,8 @@ import numpy as np
 import pytest
 import torch
 
-import kilosort
-import kilosort.preprocessing as kpp
 from kilosort import io
-from kilosort import PROBE_DIR
+from kilosort.utils import download_probes
 
 
 ### runslow flag configured according to response from Manu CJ here:
@@ -56,6 +54,9 @@ def data_directory():
         # goes in the folder.
         p = data_path / 'pytest'
         p.rename(results_path)
+
+    # Download default probe files if they don't already exist.
+    download_probes()
 
     return data_path
 
@@ -152,14 +153,22 @@ def saved_ops(results_directory):
     ops = np.load(results_directory / 'ops.npy', allow_pickle=True).item()
     return ops
 
+def torch_device():
+    return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
 @pytest.fixture(scope='session')
-def bfile(saved_ops, torch_device):
+def bfile(saved_ops, torch_device, data_directory):
     # TODO: add option to load BinaryFiltered from ops dict, move this code
     #       to that function
     settings = saved_ops['settings']
+    # Don't get filename from settings, will be different based on OS and which
+    # system ran tests originally.
+    filename = data_directory / 'ZFM-02370_mini.imec0.ap.bin'
 
+    # TODO: add option to load BinaryFiltered from ops dict, move this code
+    #       to that function
     bfile = io.BinaryFiltered(
-        settings['filename'], settings['n_chan_bin'], settings['fs'],
+        filename, settings['n_chan_bin'], settings['fs'],
         settings['NT'], settings['nt'], settings['nt0min'],
         saved_ops['probe']['chanMap'], hp_filter=saved_ops['fwav'],
         whiten_mat=saved_ops['Wrot'], dshift=saved_ops['dshift'],

@@ -62,7 +62,9 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
             raise FileExistsError(f"filename '{filename}' does not exist")
         data_dir = filename.parent
         
-    settings['filename'] = filename 
+    # Convert paths to strings when saving to ops, otherwise ops can only
+    # be loaded on the operating system that originally ran the code.
+    settings['filename'] = filename
     settings['data_dir'] = data_dir
 
     results_dir = settings.get('results_dir', None) if results_dir is None else results_dir
@@ -186,12 +188,19 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
             )
     print(f'{int(is_ref.sum())} units found with good refractory periods')
     
-    ops['settings']['results_dir'] = results_dir
+    ops['settings']['results_dir'] = str(results_dir)
     runtime = time.time()-tic0 
     print(f'\ntotal runtime: {runtime:.2f}s = {int(runtime//3600):02d}:{int(runtime//60):02d}:{int(runtime%60)} h:m:s')
     ops['runtime'] = runtime 
     ops_arr = np.array(ops)
     
+    # Convert paths to strings before saving, otherwise ops can only be loaded
+    # on the system that originally ran the code (causes problems for tests).
+    # TODO: why do these get saved twice?
+    ops['filename'] = str(ops['filename'])
+    ops['data_dir'] = str(ops['data_dir'])
+    ops['settings']['filename'] = str(ops['settings']['filename'])
+    ops['settings']['data_dir'] = str(ops['settings']['data_dir'])
     np.save(results_dir / 'ops.npy', ops_arr)
 
     return ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
