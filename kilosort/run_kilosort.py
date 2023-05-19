@@ -58,7 +58,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     st, clu, tF, Wall = sort_spikes(ops, device, bfile, tic0=tic0,
                                     progress_bar=progress_bar)
     ops, similar_templates, is_ref, est_contam_rate = \
-        save_sorting(ops, st, clu, tF, Wall, tic0)
+        save_sorting(ops, results_dir, st, clu, tF, Wall, tic0)
 
     return ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
 
@@ -162,7 +162,7 @@ def compute_preprocessing(ops, device, tic0=np.nan):
     """
 
     tic = time.time()
-    n_chan_bin, fs, NT, nt, twav_min, chan_map, hp_filter, dtype, xc, yc = \
+    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, xc, yc = \
         get_run_parameters(ops)
     nskip = ops['settings']['nskip']
     
@@ -212,7 +212,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
     tic = time.time()
     print('\ncomputing drift')
 
-    n_chan_bin, fs, NT, nt, twav_min, chan_map, hp_filter, dtype, xc, yc = \
+    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, _, _ = \
         get_run_parameters(ops)
     hp_filter = ops['preprocessing']['hp_filter']
     whiten_mat = ops['preprocessing']['whiten_mat']
@@ -301,13 +301,15 @@ def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     return st, clu, tF, Wall
 
 
-def save_sorting(ops, st, clu, tF, Wall, tic0=np.nan):  
+def save_sorting(ops, results_dir, st, clu, tF, Wall, tic0=np.nan):  
     """Save sorting results, and format them for use with Phy
 
     Parameters
     -------
     ops : dict
         Dictionary storing settings and results for all algorithmic steps.
+    results_dir : pathlib.Path
+        Directory where results should be saved.
     st : np.ndarray
         1D vector of spike times for all clusters.
     clu : np.ndarray
