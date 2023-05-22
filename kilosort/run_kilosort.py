@@ -53,6 +53,9 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     torch.random.manual_seed(1)
     ops, bfile = compute_drift_correction(ops, device, tic0=tic0,
                                           progress_bar=progress_bar)
+    
+    # Save intermediate `ops` for use by GUI plots
+    save_ops(ops, results_dir)
 
     # Sort spikes and save results
     st, clu, tF, Wall = sort_spikes(ops, device, bfile, tic0=tic0,
@@ -355,3 +358,11 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, tic0=np.nan):
     np.save(results_dir / 'ops.npy', ops_arr)
 
     return ops, similar_templates, is_ref, est_contam_rate
+
+
+def save_ops(ops, results_dir):
+    """Save intermediate `ops` dictionary to `results_dir/ops.npy`."""
+    if results_dir is None:
+        results_dir = ops['data_dir'].joinpath('kilosort4')
+    results_dir.mkdir(exist_ok=True)
+    np.save(results_dir / 'ops.npy', np.array(ops))
