@@ -69,6 +69,10 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
                  filename=None, data_dtype=None, results_dir=None,
                  device=torch.device('cuda'), progress_bar=None):
 
+    if data_dtype is None:
+        print("Interpreting binary file as default dtype='int16'. If data was "
+              "saved in a different format, specify `data_dtype`.")
+
     tic0 = time.time()
 
     if settings is None:

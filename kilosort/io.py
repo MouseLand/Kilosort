@@ -230,10 +230,6 @@ class BinaryRWFile:
         self.device = device
 
         if dtype is None:
-            print(
-                "Interpreting binary file as default dtype='int16'. If data was "
-                "saved in a different format, specify dtype kwarg in `run_kilosort`."
-                )
             dtype = 'int16'
         self.dtype = dtype
 
