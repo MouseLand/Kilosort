@@ -15,22 +15,54 @@ from kilosort import (
 )
 
 def default_settings():
+    """Get default settings dict for `run_kilosort`.
+
+    Returns
+    -------
+    settings : dict
+        A dictionary of parameters with the following keys:
+        settings = {
+            'NchanTOT'  : Total number of channels on probe.
+            'fs'        : Sampling frequency of probe.
+            'nt'        : Number of samples per waveform.
+            'Th'        : TODO, some other threshold.
+            'spkTh'     : Spike detection threshold for learned templates.
+            'Th_detect' : Spike detection threshold for universal templates.
+            'nwaves'    : Number of universal templates to use.
+            'nskip'     : Batch striding for computing whitening matrix.
+            'nt0min'    : Sample index for aligning waveforms, so that their
+                          minimum value happens here. Default of 20 roughly
+                          aligns to the sodium peak.
+            'NT'        : Number of samples included in each batch of data.
+            'nblocks'   : Number of non-overlapping blocks for drift correction.
+            'binning_depth' : TODO, something to do with drift correction.
+            'sig_interp': Sigma for interpolation (spatial standard deviation).
+                          Indicates scale of waveform's smoothness for drift
+                          correction, in units of microns.
+            'n_chan_bin': Same as NchanTOT.
+                          TODO: Why use both?
+            'probe_name': Name of probe to load from Kilosort4's probe directory.
+                          This will only be used if no `probe` kwarg is specified
+                          for `run_kilosort`.
+        }
+    
+    """
     settings = {}
-    settings['NchanTOT'] = 385
-    settings['fs']       = 30000
-    settings['nt']     =  61
-    settings['Th']       = 8
-    settings['spkTh']    = 8
-    settings['Th_detect']    = 9
-    settings['nwaves']   = 6
-    settings['nskip']    = 25
-    settings['nt0min']   = int(20 * settings['nt']/61)
-    settings['NT']       = 2 * settings['fs']
-    settings['nblocks']  = 5
+    settings['NchanTOT']      = 385
+    settings['fs']            = 30000
+    settings['nt']            = 61
+    settings['Th']            = 8
+    settings['spkTh']         = 8
+    settings['Th_detect']     = 9
+    settings['nwaves']        = 6
+    settings['nskip']         = 25
+    settings['nt0min']        = int(20 * settings['nt']/61)
+    settings['NT']            = 2 * settings['fs']
+    settings['nblocks']       = 5
     settings['binning_depth'] = 5
-    settings['sig_interp'] = 20
-    settings['n_chan_bin'] = settings['NchanTOT']
-    settings['probe_name'] = 'neuropixPhase3B1_kilosortChanMap.mat'
+    settings['sig_interp']    = 20
+    settings['n_chan_bin']    = settings['NchanTOT']
+    settings['probe_name']    = 'neuropixPhase3B1_kilosortChanMap.mat'
     return settings
 
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
