@@ -344,22 +344,25 @@ class BinaryFiltered(BinaryRWFile):
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  chan_map: np.ndarray = None, hp_filter: torch.Tensor = None,
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
-                 device: torch.device = torch.device('cuda'), dtype=None):
+                 device: torch.device = torch.device('cuda'), do_CAR=True,
+                 dtype=None):
 
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device, dtype=dtype) 
         self.chan_map = chan_map
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter
         self.dshift = dshift
+        self.do_CAR = do_CAR
 
     def filter(self, X, ops=None, ibatch=None):
         # pick only the channels specified in the chanMap
         if self.chan_map is not None:
             X = X[self.chan_map]
 
-        # remove the mean of each channel, and the median across channels
-        X = X - X.mean(1).unsqueeze(1)
-        X = X - torch.median(X, 0)[0]
+        if self.do_CAR:
+            # remove the mean of each channel, and the median across channels
+            X = X - X.mean(1).unsqueeze(1)
+            X = X - torch.median(X, 0)[0]
     
         # high-pass filtering in the Fourier domain (much faster than filtfilt etc)
         if self.hp_filter is not None:

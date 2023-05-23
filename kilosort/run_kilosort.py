@@ -66,12 +66,15 @@ def default_settings():
     return settings
 
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
-                 filename=None, data_dtype=None, results_dir=None,
+                 filename=None, data_dtype=None, results_dir=None, do_CAR=True,
                  device=torch.device('cuda'), progress_bar=None):
 
     if data_dtype is None:
         print("Interpreting binary file as default dtype='int16'. If data was "
               "saved in a different format, specify `data_dtype`.")
+
+    if not do_CAR:
+        print("Skipping common average reference.")
 
     tic0 = time.time()
 
@@ -126,6 +129,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     #{'settings': settings,
             # 'probe': probe}
     ops['data_dtype'] = data_dtype
+    ops['do_CAR'] = do_CAR
 
     
     nt = ops['settings']['nt']
@@ -151,7 +155,8 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     hp_filter = preprocessing.get_highpass_filter(ops['settings']['fs'], device=device)
     # compute whitening matrix
     bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min,
-                              chan_map, hp_filter, device=device, dtype=data_dtype)
+                              chan_map, hp_filter, device=device, do_CAR=do_CAR,
+                              dtype=data_dtype)
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, 
                                                     nskip = ops['settings']['nskip'])
     bfile.close()
@@ -174,7 +179,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     tic = time.time()
     bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min, chan_map, 
                               hp_filter=hp_filter, whiten_mat=whiten_mat,
-                              device=device, dtype=data_dtype)
+                              device=device, do_CAR=do_CAR, dtype=data_dtype)
     ops         = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()
     print(f'drift computed in {time.time()-tic : .2f}s; total {time.time()-tic0 : .2f}s')
@@ -182,7 +187,8 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     # binary file with drift correction
     bfile = io.BinaryFiltered(filename, n_chan_bin, fs, NT, nt, twav_min, chan_map, 
                               hp_filter=hp_filter, whiten_mat=whiten_mat,
-                              dshift=ops['dshift'], dtype=data_dtype)
+                              dshift=ops['dshift'], do_CAR=do_CAR,
+                              dtype=data_dtype)
 
     ### spike sorting
 
