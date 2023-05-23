@@ -16,27 +16,66 @@ from kilosort import (
 )
 
 def default_settings():
+    """Get default settings dict for `run_kilosort`.
+
+    Returns
+    -------
+    settings : dict
+        A dictionary of parameters with the following keys:
+        settings = {
+            'NchanTOT'  : Total number of channels on probe.
+            'fs'        : Sampling frequency of probe.
+            'nt'        : Number of samples per waveform.
+            'Th'        : TODO, some other threshold.
+            'spkTh'     : Spike detection threshold for learned templates.
+            'Th_detect' : Spike detection threshold for universal templates.
+            'nwaves'    : Number of universal templates to use.
+            'nskip'     : Batch striding for computing whitening matrix.
+            'nt0min'    : Sample index for aligning waveforms, so that their
+                          minimum value happens here. Default of 20 roughly
+                          aligns to the sodium peak.
+            'NT'        : Number of samples included in each batch of data.
+            'nblocks'   : Number of non-overlapping blocks for drift correction.
+            'binning_depth' : TODO, something to do with drift correction.
+            'sig_interp': Sigma for interpolation (spatial standard deviation).
+                          Indicates scale of waveform's smoothness for drift
+                          correction, in units of microns.
+            'n_chan_bin': Same as NchanTOT.
+                          TODO: Why use both?
+            'probe_name': Name of probe to load from Kilosort4's probe directory.
+                          This will only be used if no `probe` kwarg is specified
+                          for `run_kilosort`.
+        }
+    
+    """
     settings = {}
-    settings['NchanTOT'] = 385
-    settings['fs']       = 30000
-    settings['nt']     =  61
-    settings['Th']       = 8
-    settings['spkTh']    = 8
-    settings['Th_detect']    = 9
-    settings['nwaves']   = 6
-    settings['nskip']    = 25
-    settings['nt0min']   = int(20 * settings['nt']/61)
-    settings['NT']       = 2 * settings['fs']
-    settings['nblocks']  = 5
+    settings['NchanTOT']      = 385
+    settings['fs']            = 30000
+    settings['nt']            = 61
+    settings['Th']            = 8
+    settings['spkTh']         = 8
+    settings['Th_detect']     = 9
+    settings['nwaves']        = 6
+    settings['nskip']         = 25
+    settings['nt0min']        = int(20 * settings['nt']/61)
+    settings['NT']            = 2 * settings['fs']
+    settings['nblocks']       = 5
     settings['binning_depth'] = 5
-    settings['sig_interp'] = 20
-    settings['n_chan_bin'] = settings['NchanTOT']
-    settings['probe_name'] = 'neuropixPhase3B1_kilosortChanMap.mat'
+    settings['sig_interp']    = 20
+    settings['n_chan_bin']    = settings['NchanTOT']
+    settings['probe_name']    = 'neuropixPhase3B1_kilosortChanMap.mat'
     return settings
 
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
-                 filename=None, data_dtype=None, results_dir=None,
+                 filename=None, data_dtype=None, results_dir=None, do_CAR=True,
                  device=torch.device('cuda'), progress_bar=None):
+
+    if data_dtype is None:
+        print("Interpreting binary file as default dtype='int16'. If data was "
+              "saved in a different format, specify `data_dtype`.")
+
+    if not do_CAR:
+        print("Skipping common average reference.")
 
     tic0 = time.time()
 
@@ -121,6 +160,7 @@ def initialize_ops(settings, probe, data_dtype) -> dict:
     ops['settings'] = settings 
     ops['probe'] = probe
     ops['data_dtype'] = data_dtype
+    ops['do_CAR'] = do_CAR
     ops['NTbuff'] = ops['NT'] + 2 * ops['nt']
     ops['Nchan'] = len(probe['chanMap'])
     ops['NchanTOT'] = ops['settings']['n_chan_bin']
@@ -139,6 +179,7 @@ def get_run_parameters(ops) -> list:
         ops['settings']['nt0min'],  # also called twav_min
         ops['probe']['chanMap'],
         ops['data_dtype'],
+        ops['do_CAR'],
         ops['probe']['xc'],
         ops['probe']['yc']
     ]
@@ -165,7 +206,7 @@ def compute_preprocessing(ops, device, tic0=np.nan):
     """
 
     tic = time.time()
-    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, xc, yc = \
+    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, xc, yc = \
         get_run_parameters(ops)
     nskip = ops['settings']['nskip']
     
@@ -173,8 +214,10 @@ def compute_preprocessing(ops, device, tic0=np.nan):
     hp_filter = preprocessing.get_highpass_filter(ops['settings']['fs'], device=device)
     # Compute whitening matrix
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min,
-                              chan_map, hp_filter, device=device, dtype=dtype)
+                              chan_map, hp_filter, device=device, do_CAR=do_CAR,
+                              dtype=dtype)
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip)
+
     bfile.close()
 
     # Save results
@@ -215,14 +258,15 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
     tic = time.time()
     print('\ncomputing drift')
 
-    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, _, _ = \
+    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, _, _ = \
         get_run_parameters(ops)
     hp_filter = ops['preprocessing']['hp_filter']
     whiten_mat = ops['preprocessing']['whiten_mat']
 
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
                               hp_filter=hp_filter, whiten_mat=whiten_mat,
-                              device=device, dtype=dtype)
+                              device=device, do_CAR=do_CAR, dtype=data_dtype)
+
     ops         = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()
     print(f'drift computed in {time.time()-tic : .2f}s; ' + 
@@ -231,7 +275,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
     # binary file with drift correction
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
                               hp_filter=hp_filter, whiten_mat=whiten_mat,
-                              dshift=ops['dshift'], dtype=dtype)
+                              dshift=ops['dshift'], do_CAR=do_CAR, dtype=dtype)
 
     return ops, bfile
 

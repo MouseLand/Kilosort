@@ -153,6 +153,7 @@ def saved_ops(results_directory):
     ops = np.load(results_directory / 'ops.npy', allow_pickle=True).item()
     return ops
 
+@pytest.fixture(scope='session')
 def torch_device():
     return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
