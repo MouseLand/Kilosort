@@ -1,8 +1,3 @@
-.. Kilosort 4 documentation master file, created by
-   sphinx-quickstart on Tue Apr 25 10:41:57 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Kilosort4
 ==========
 
@@ -26,10 +21,7 @@ please see our pre-print on `BioArxiv <https://www.biorxiv.org/content/10.1101/2
    tutorials/tutorials
 
 
+.. toctree::
+   :caption: Reference:
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   api/kilosort

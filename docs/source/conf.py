@@ -1,5 +1,6 @@
 # NOTE: To build locally, run the following from the top level of the Kilosort4
 #       repository: `sphinx-build -b html docs/source docs/build/html`
+#       For api: `sphinx-apidoc -f -o docs/source/api kilosort`
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -21,9 +22,13 @@ extensions = [
     'sphinx.ext.doctest',
     'myst_parser',            # Use markdown files in addition to .rst
     'nbsphinx',               # Render notebooks
-    'sphinx_rtd_theme'
-
+    'sphinx_rtd_theme',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon'
     ]
+
+autoapi_dirs = ['.../kilosort']
+master_doc = 'index'
 
 # Notebooks will be displayed even if they include errors
 nbsphinx_allow_errors = True
