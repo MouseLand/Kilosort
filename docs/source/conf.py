@@ -1,3 +1,6 @@
+# NOTE: To build locally, run the following from the top level of the Kilosort4
+#       repository: `sphinx-build -b html docs/source docs/build/html`
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
