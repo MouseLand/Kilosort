@@ -1,6 +1,7 @@
 # NOTE: To build locally, run the following from the top level of the Kilosort4
 #       repository: `sphinx-build -b html docs/source docs/build/html`
-#       For api: `sphinx-apidoc -f -o docs/source/api kilosort`
+#       For api: `sphinx-apidoc -f -o docs/source/api kilosort` (WIP)
+#                For now, add to api.rst manually instead.
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -24,7 +25,8 @@ extensions = [
     'nbsphinx',               # Render notebooks
     'sphinx_rtd_theme',
     'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    'sphinx.ext.viewcode'
     ]
 
 autoapi_dirs = ['.../kilosort']

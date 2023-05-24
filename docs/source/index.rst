@@ -21,7 +21,11 @@ please see our pre-print on `BioArxiv <https://www.biorxiv.org/content/10.1101/2
    tutorials/tutorials
 
 
+..
+   Hidden so that API reference shows on the sidebar but doesn't clutter up
+   the main page.
 .. toctree::
    :caption: Reference:
+   :hidden:
 
-   api/kilosort
+   api
