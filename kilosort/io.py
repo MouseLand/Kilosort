@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Union
 import os, shutil
 import warnings
 
@@ -13,17 +13,25 @@ from kilosort import CCG
 from kilosort.preprocessing import get_drift_matrix, fft_highpass
 
 
-def find_binary(data_dir):
-    """ find binary file in data_folder"""
-    filenames  = list(data_dir.glob('*.bin'))
-    if len(filenames)==0:
-        raise FileNotFoundError('no binary file *.bin found in folder')
-    # if there are multiple binary files, find one with "ap" tag
+def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
+    """Find binary file in `data_dir`."""
+
+    data_dir = Path(data_dir)
+    filenames = list(data_dir.glob('*.bin')) + list(data_dir.glob('*.bat'))
+    if len(filenames) == 0:
+        raise FileNotFoundError('No binary file (*.bin or *.bat) found in folder')
+
+    # TODO: Why give this preference? Not all binary files will have this tag.
+    # If there are multiple binary files, find one with "ap" tag
     if len(filenames) > 1:
-        filenames = [filename for filename in filenames if 'ap' in filename.as_posix()]
-    # if more than one, raise an error, user needs to specify binary
+        filenames = [f for f in filenames if 'ap' in f.as_posix()]
+
+    # If there is still more than one, raise an error, user needs to specify
+    # full path.
     if len(filenames) > 1:
-        raise ValueError('multiple binary files in folder with "ap" tag, please specify filename')
+        raise ValueError('Multiple binary files in folder with "ap" tag, '
+                         'please specify filename')
+
     return filenames[0]
 
 
