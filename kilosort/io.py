@@ -359,9 +359,9 @@ class BinaryFiltered(BinaryRWFile):
         if self.chan_map is not None:
             X = X[self.chan_map]
 
+        X = X - X.mean(1).unsqueeze(1)
         if self.do_CAR:
             # remove the mean of each channel, and the median across channels
-            X = X - X.mean(1).unsqueeze(1)
             X = X - torch.median(X, 0)[0]
     
         # high-pass filtering in the Fourier domain (much faster than filtfilt etc)
@@ -386,9 +386,7 @@ class BinaryFiltered(BinaryRWFile):
         # Shift data to one sign
         if self.dtype == 'uint16':
             samples = samples - 2**15
-        # Scale down 
-        if self.dtype in ['uint16', 'int16']:
-            samples = samples / (2**15)
+            samples = samples.astype('int16')
 
         X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
