@@ -97,7 +97,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     if settings is None: settings = default_settings()
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir)
-    ops = initialize_ops(settings, probe, data_dtype)
+    ops = initialize_ops(settings, probe, data_dtype, do_CAR)
 
     # Set preprocessing and drift correction parameters
     ops = compute_preprocessing(ops, device, tic0=tic0)
@@ -166,7 +166,7 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir):
     return filename, data_dir, results_dir, probe
 
 
-def initialize_ops(settings, probe, data_dtype) -> dict:
+def initialize_ops(settings, probe, data_dtype, do_CAR) -> dict:
     """Package settings and probe information into a single `ops` dictionary."""
 
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
@@ -279,7 +279,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
 
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
                               hp_filter=hp_filter, whiten_mat=whiten_mat,
-                              device=device, do_CAR=do_CAR, dtype=data_dtype)
+                              device=device, do_CAR=do_CAR, dtype=dtype)
 
     ops         = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()
