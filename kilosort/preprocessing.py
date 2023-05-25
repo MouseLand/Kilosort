@@ -66,14 +66,6 @@ def get_drift_matrix(ops, dshift, device=torch.device('cuda')):
 
     return M
 
-def find_file(ops):
-    # currently finds only binary files with .bin extension
-    ops['filename']  = glob(os.path.join(ops['root_bin'], '*bin'))[0]
-    file_size = os.path.getsize(ops['filename'])
-
-    # assumes an (u)int16 file
-    ops['Nbatches'] = (file_size-1)//(ops['NchanTOT']*ops['NT']*2) + 1
-    return ops
 
 def get_fwav(NT = 30122, fs = 30000, device=torch.device('cuda')):
     """ precomputes a filter to use for high-pass filtering, to be used with fft in pytorch. 
