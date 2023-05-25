@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 import torch
 from torch.fft import fft, ifft, fftshift
@@ -121,6 +122,7 @@ class TestWhitening:
 
 class TestDriftCorrection:
 
+    @pytest.mark.slow
     def test_datashift(self, bfile, saved_ops, torch_device):
         saved_yblk = saved_ops['yblk']
         saved_dshift = saved_ops['dshift']
@@ -139,4 +141,5 @@ class TestDriftCorrection:
         
 
     def test_get_drift_matrix(self):
+        # TODO
         pass
