@@ -82,7 +82,8 @@ def default_settings():
 
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
                  filename=None, data_dtype=None, results_dir=None, do_CAR=True,
-                 device=torch.device('cuda'), progress_bar=None):
+                 invert_sign=False, device=torch.device('cuda'),
+                 progress_bar=None):
 
     if data_dtype is None:
         print("Interpreting binary file as default dtype='int16'. If data was "
@@ -97,7 +98,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     if settings is None: settings = default_settings()
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir)
-    ops = initialize_ops(settings, probe, data_dtype, do_CAR)
+    ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign)
 
     # Set preprocessing and drift correction parameters
     ops = compute_preprocessing(ops, device, tic0=tic0)
@@ -166,7 +167,7 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir):
     return filename, data_dir, results_dir, probe
 
 
-def initialize_ops(settings, probe, data_dtype, do_CAR) -> dict:
+def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign) -> dict:
     """Package settings and probe information into a single `ops` dictionary."""
 
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
@@ -175,6 +176,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR) -> dict:
     ops['probe'] = probe
     ops['data_dtype'] = data_dtype
     ops['do_CAR'] = do_CAR
+    ops['invert_sign'] = invert_sign
     ops['NTbuff'] = ops['NT'] + 2 * ops['nt']
     ops['Nchan'] = len(probe['chanMap'])
     ops['NchanTOT'] = ops['settings']['n_chan_bin']
@@ -194,6 +196,7 @@ def get_run_parameters(ops) -> list:
         ops['probe']['chanMap'],
         ops['data_dtype'],
         ops['do_CAR'],
+        ops['invert_sign'],
         ops['probe']['xc'],
         ops['probe']['yc']
     ]
@@ -220,7 +223,7 @@ def compute_preprocessing(ops, device, tic0=np.nan):
     """
 
     tic = time.time()
-    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, xc, yc = \
+    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, xc, yc = \
         get_run_parameters(ops)
     nskip = ops['settings']['nskip']
     
@@ -229,7 +232,7 @@ def compute_preprocessing(ops, device, tic0=np.nan):
     # Compute whitening matrix
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min,
                               chan_map, hp_filter, device=device, do_CAR=do_CAR,
-                              dtype=dtype)
+                              invert_sign=invert, dtype=dtype)
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip)
 
     bfile.close()
@@ -272,14 +275,15 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
     tic = time.time()
     print('\ncomputing drift')
 
-    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, _, _ = \
+    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, _, _ = \
         get_run_parameters(ops)
     hp_filter = ops['preprocessing']['hp_filter']
     whiten_mat = ops['preprocessing']['whiten_mat']
 
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
                               hp_filter=hp_filter, whiten_mat=whiten_mat,
-                              device=device, do_CAR=do_CAR, dtype=dtype)
+                              device=device, do_CAR=do_CAR, invert_sign=invert,
+                              dtype=dtype)
 
     ops         = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()

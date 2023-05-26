@@ -353,7 +353,7 @@ class BinaryFiltered(BinaryRWFile):
                  chan_map: np.ndarray = None, hp_filter: torch.Tensor = None,
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
                  device: torch.device = torch.device('cuda'), do_CAR=True,
-                 dtype=None):
+                 invert_sign=False, dtype=None):
 
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device, dtype=dtype) 
         self.chan_map = chan_map
@@ -361,6 +361,7 @@ class BinaryFiltered(BinaryRWFile):
         self.hp_filter = hp_filter
         self.dshift = dshift
         self.do_CAR = do_CAR
+        self.invert_sign=invert_sign
 
     def filter(self, X, ops=None, ibatch=None):
         # pick only the channels specified in the chanMap
@@ -395,6 +396,8 @@ class BinaryFiltered(BinaryRWFile):
         if self.dtype == 'uint16':
             samples = samples - 2**15
             samples = samples.astype('int16')
+        if self.invert_sign:
+            samples *= -1
 
         X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
