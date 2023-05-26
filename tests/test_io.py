@@ -65,7 +65,8 @@ channel_groups = {
 
 def test_bat_extension(torch_device, data_directory):
     # Create memmap, write to file, close the file again.
-    path = data_directory / 'temp_memmap.bat'
+    path = data_directory / 'binary_test' / 'temp_memmap.bat'
+    path.parent.mkdir(parents=True, exist_ok=True)
     N, C = (1000, 10)
     r = np.random.rand(N,C)*2 - 1    # scale to (-1,1)
     r = (r*(2**14)).astype(np.int16)     # scale up
@@ -76,7 +77,10 @@ def test_bat_extension(torch_device, data_directory):
         a.flush()
         del(a)
 
-        bfile = io.BinaryFiltered(path, C, device=torch_device)
+        directory = path.parent
+        filename = io.find_binary(directory)
+        assert filename == path
+        bfile = io.BinaryFiltered(filename, C, device=torch_device)
         x = bfile[0:100]  # Test data retrieval
 
         bfile.close()
