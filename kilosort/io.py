@@ -186,7 +186,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None, data_dtype=None
     # params.py
     dtype = "'int16'" if data_dtype is None else f"'{data_dtype}'"
     params = {'dat_path': f"'{Path(ops['settings']['filename']).as_posix()}'",
-            'n_channels_dat': 385,#len(chan_map),  # TODO: why is 385 hard-coded here?
+            'n_channels_dat': len(chan_map),
             'dtype': dtype,
             'offset': 0,
             'sample_rate': ops['settings']['fs'],
