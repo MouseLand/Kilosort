@@ -368,6 +368,9 @@ class BinaryFiltered(BinaryRWFile):
         if self.chan_map is not None:
             X = X[self.chan_map]
 
+        if self.invert_sign:
+            X = X * -1
+
         X = X - X.mean(1).unsqueeze(1)
         if self.do_CAR:
             # remove the mean of each channel, and the median across channels
@@ -396,8 +399,6 @@ class BinaryFiltered(BinaryRWFile):
         if self.dtype == 'uint16':
             samples = samples - 2**15
             samples = samples.astype('int16')
-        if self.invert_sign:
-            samples *= -1
 
         X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
