@@ -52,7 +52,7 @@ def data_directory():
         download_data(results_path, results_url)
         # Extracts to folder 'pytest' by default, rename to make it clear what
         # goes in the folder.
-        p = data_path / 'pytest'
+        p = data_path / 'saved_results'
         p.rename(results_path)
 
     # Download default probe files if they don't already exist.
@@ -138,7 +138,7 @@ def download_url_to_file(url, dst, progress=True):
 
 @pytest.fixture(scope='session')
 def results_directory(data_directory):
-    return data_directory.joinpath("saved_results/")
+    return data_directory / "saved_results"
 
 ### End
 

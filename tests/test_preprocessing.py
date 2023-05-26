@@ -79,6 +79,7 @@ class TestWhitening:
             atol=1e-4
             )
 
+    @pytest.mark.slow
     def test_get_whitening(self, bfile, saved_ops):
         xc = saved_ops['probe']['xc']
         yc = saved_ops['probe']['yc']
