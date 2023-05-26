@@ -400,6 +400,8 @@ class BinaryFiltered(BinaryRWFile):
             samples = samples - 2**15
             samples = samples.astype('int16')
 
+        assert False
+
         X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
         
