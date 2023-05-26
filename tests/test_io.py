@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from kilosort.io import save_probe, load_probe
+from kilosort import io
 
 
 def test_probe_io():
@@ -36,15 +36,15 @@ channel_groups = {
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json_file = Path(f.name)
         print(json_file)
-        save_probe(json_probe, json_file)
+        io.save_probe(json_probe, json_file)
 
     with tempfile.NamedTemporaryFile(mode='w', suffix='.prb', delete=False) as f:
         f.write(prb_probe)
         prb_file = Path(f.name)
 
     # Load both with kilosort.io
-    probe1 = load_probe(json_file)
-    probe2 = load_probe(prb_file)
+    probe1 = io.load_probe(json_file)
+    probe2 = io.load_probe(prb_file)
 
     print('probe1:')
     print(probe1)
@@ -61,3 +61,30 @@ channel_groups = {
         # Remove temporary files
         json_file.unlink()
         prb_file.unlink()
+
+
+def test_bat_extension(torch_device, data_directory):
+    # Create memmap, write to file, close the file again.
+    path = data_directory / 'binary_test' / 'temp_memmap.bat'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    N, C = (1000, 10)
+    r = np.random.rand(N,C)*2 - 1    # scale to (-1,1)
+    r = (r*(2**14)).astype(np.int16)     # scale up
+
+    try:
+        a = np.memmap(path, mode='w+', shape=(N,C), dtype=np.int16)
+        a[:] = r[:]
+        a.flush()
+        del(a)
+
+        directory = path.parent
+        filename = io.find_binary(directory)
+        assert filename == path
+        bfile = io.BinaryFiltered(filename, C, device=torch_device)
+        x = bfile[0:100]  # Test data retrieval
+
+        bfile.close()
+
+    finally:
+        # Delete memmap file and re-raise exception
+        path.unlink()
