@@ -39,7 +39,7 @@ def data_directory():
 
     # Set path to directory within tests/ folder dynamically
     data_path = Path.home() / '.kilosort/.test_data/'
-    data_path.mkdir(exist_ok=True)
+    data_path.mkdir(parents=True, exist_ok=True)
 
     binary_path = data_path / 'ZFM-02370_mini.imec0.ap.bin'
     binary_url = 'https://www.kilosort.org/downloads/ZFM-02370_mini.imec0.ap.zip'
