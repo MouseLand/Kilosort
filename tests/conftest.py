@@ -52,7 +52,7 @@ def data_directory():
         download_data(results_path, results_url)
         # Extracts to folder 'pytest' by default, rename to make it clear what
         # goes in the folder.
-        p = data_path / 'saved_results'
+        p = data_path / 'pytest'
         p.rename(results_path)
 
     # Download default probe files if they don't already exist.
