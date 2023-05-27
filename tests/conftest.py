@@ -8,15 +8,13 @@ from kilosort import io
 from kilosort.utils import download_probes
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--cpu", action="store_true", default=False, help="only use CPU, not GPU"
-    )
+@pytest.fixture(scope='session')
+def cpu(request):
+    return request.config.getoption('--cpu')
 
 @pytest.fixture(scope='session')
-def torch_device(request):
-    force_cpu = request.config.getoption('--cpu')
-    if force_cpu:
+def torch_device(cpu):
+    if cpu:
         return torch.device('cpu')
     else:
         return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -25,6 +23,9 @@ def torch_device(request):
 ### runslow flag configured according to response from Manu CJ here:
 # https://stackoverflow.com/questions/47559524/pytest-how-to-skip-tests-unless-you-declare-an-option-flag
 def pytest_addoption(parser):
+    parser.addoption(
+        "--cpu", action="store_true", default=False, help="only use CPU, not GPU"
+    )
     parser.addoption(
         "--runslow", action="store_true", default=False, help="run slow tests"
     )
@@ -156,11 +157,6 @@ def results_directory(data_directory):
 
 ### End
 
-
-### Load data for use by unit and regression tests
-@pytest.fixture(scope='session')
-def torch_device():
-    return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 @pytest.fixture(scope='session')
 def saved_ops(results_directory):
