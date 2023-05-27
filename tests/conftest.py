@@ -13,9 +13,14 @@ def pytest_addoption(parser):
         "--cpu", action="store_true", default=False, help="only use CPU, not GPU"
     )
 
-@pytest.fixture
-def force_cpu(request):
-    return request.config.getoption("--cpu")
+@pytest.fixture(scope='session')
+def torch_device(request):
+    force_cpu = request.config.getoption('--cpu')
+    if force_cpu:
+        return torch.device('cpu')
+    else:
+        return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
 
 ### runslow flag configured according to response from Manu CJ here:
 # https://stackoverflow.com/questions/47559524/pytest-how-to-skip-tests-unless-you-declare-an-option-flag
@@ -161,13 +166,6 @@ def torch_device():
 def saved_ops(results_directory):
     ops = np.load(results_directory / 'ops.npy', allow_pickle=True).item()
     return ops
-
-@pytest.fixture(scope='session')
-def torch_device(force_cpu):
-    if force_cpu:
-        return torch.device('cpu')
-    else:
-        return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 @pytest.fixture(scope='session')
 def bfile(saved_ops, torch_device, data_directory):
