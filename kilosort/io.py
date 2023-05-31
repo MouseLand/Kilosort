@@ -206,6 +206,47 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None, data_dtype=None
     return results_dir, similar_templates, is_ref, est_contam_rate
 
 
+def save_ops(ops, results_dir=None):
+    """Save intermediate `ops` dictionary to `results_dir/ops.npy`."""
+
+    if results_dir is None:
+        results_dir = Path(ops['data_dir']) / 'kilosort4'
+    else:
+        results_dir = Path(results_dir)
+    results_dir.mkdir(exist_ok=True)
+
+    ops = ops.copy()
+    # Convert paths to strings before saving, otherwise ops can only be loaded
+    # on the system that originally ran the code (causes problems for tests).
+    ops['settings']['results_dir'] = str(results_dir)
+    # TODO: why do these get saved twice?
+    ops['filename'] = str(ops['filename'])
+    ops['data_dir'] = str(ops['data_dir'])
+    ops['settings']['filename'] = str(ops['settings']['filename'])
+    ops['settings']['data_dir'] = str(ops['settings']['data_dir'])
+
+    # Convert pytorch tensors to numpy arrays before saving, otherwise loading
+    # ops on a different system may not work (if saved from GPU, but loaded
+    # on a system with only CPU).
+    ops['is_tensor'] = []
+    for k, v in ops.items():
+        if isinstance(v, torch.Tensor):
+            ops[k] = v.cpu().numpy()
+            ops['is_tensor'].append(k)
+
+    np.save(results_dir / 'ops.npy', np.array(ops))
+
+
+def load_ops(ops_path, device=torch.device('cuda')):
+    """Load a saved `ops` dictionary and convert some arrays to tensors."""
+
+    ops = np.load(ops_path, allow_pickle=True).item()
+    for k, v in ops.items():
+        if k in ops['is_tensor']:
+            ops[k] = torch.from_numpy(v).to(device)
+
+    return ops
+
 
 class BinaryRWFile:
 

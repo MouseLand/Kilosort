@@ -15,6 +15,7 @@ from kilosort import (
     PROBE_DIR
 )
 
+
 def default_settings():
     """Get default settings dict for `run_kilosort`.
 
@@ -80,6 +81,7 @@ def default_settings():
     settings['probe_name']    = 'neuropixPhase3B1_kilosortChanMap.mat'
     return settings
 
+
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
                  filename=None, data_dtype=None, results_dir=None, do_CAR=True,
                  invert_sign=False, device=torch.device('cuda'),
@@ -109,7 +111,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
                                           progress_bar=progress_bar)
     
     # Save intermediate `ops` for use by GUI plots
-    save_ops(ops, results_dir)
+    io.save_ops(ops, results_dir)
 
     # Sort spikes and save results
     st, clu, tF, Wall = sort_spikes(ops, device, bfile, tic0=tic0,
@@ -403,28 +405,14 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, tic0=np.nan):
             )
     print(f'{int(is_ref.sum())} units found with good refractory periods')
     
-    ops['settings']['results_dir'] = str(results_dir)
     runtime = time.time()-tic0
     print(f'\nTotal runtime: {runtime:.2f}s = {int(runtime//3600):02d}:' +
           f'{int(runtime//60):02d}:{int(runtime%60)} h:m:s')
     ops['runtime'] = runtime 
-    ops_arr = np.array(ops)
-    
-    # Convert paths to strings before saving, otherwise ops can only be loaded
-    # on the system that originally ran the code (causes problems for tests).
-    # TODO: why do these get saved twice?
-    ops['filename'] = str(ops['filename'])
-    ops['data_dir'] = str(ops['data_dir'])
-    ops['settings']['filename'] = str(ops['settings']['filename'])
-    ops['settings']['data_dir'] = str(ops['settings']['data_dir'])
-    np.save(results_dir / 'ops.npy', ops_arr)
+
+    io.save_ops(ops, results_dir)
 
     return ops, similar_templates, is_ref, est_contam_rate
 
 
-def save_ops(ops, results_dir):
-    """Save intermediate `ops` dictionary to `results_dir/ops.npy`."""
-    if results_dir is None:
-        results_dir = ops['data_dir'].joinpath('kilosort4')
-    results_dir.mkdir(exist_ok=True)
-    np.save(results_dir / 'ops.npy', np.array(ops))
+

@@ -159,8 +159,8 @@ def results_directory(data_directory):
 
 
 @pytest.fixture(scope='session')
-def saved_ops(results_directory):
-    ops = np.load(results_directory / 'ops.npy', allow_pickle=True).item()
+def saved_ops(results_directory, torch_device):
+    ops = io.load_ops(results_directory / 'ops.npy', device=torch_device)
     return ops
 
 @pytest.fixture(scope='session')

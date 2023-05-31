@@ -10,15 +10,9 @@ from kilosort import run_kilosort, default_settings
 # Use `pytest --runslow` option to include this in tests.
 @pytest.mark.slow
 def test_pipeline(data_directory, results_directory, saved_ops, torch_device):
-    settings = default_settings()
-    # TODO: replace this with a pytest fixture that downloads test data from
-    #       remote repository. 
-    settings['data_dir'] = data_directory
-    # TODO: add option to not save results to file? Otherwise this will need
-    #       to store and overwrite some results files every time, which is
-    #       unnecessary.
+
     ops, st, clu, _, _, _, _, _ = run_kilosort(
-        settings=settings, probe_name='neuropixPhase3B1_kilosortChanMap.mat',
+        data_dir=data_directory, probe_name='neuropixPhase3B1_kilosortChanMap.mat',
         device=torch_device
         )
     st = st[:,0]  # only first column is spike times, that's all that gets saved
