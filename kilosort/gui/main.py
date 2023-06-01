@@ -238,6 +238,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         xc = self.probe_layout["xc"]
         yc = self.probe_layout["yc"]
         nskip = self.params["nskip"]
+        data_dtype = self.params["data_dtype"]
 
         binary_file = BinaryFiltered(
             filename=self.data_path,
@@ -245,6 +246,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             fs=sample_rate,
             chan_map=chan_map,
             device=torch.device("cpu"),
+            dtype=data_dtype,
         )
 
         self.context.binary_file = binary_file
@@ -261,6 +263,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             chan_map=chan_map,
             hp_filter=self.context.highpass_filter,
             device=torch.device("cpu"),
+            dtype=data_dtype,
         ) as bin_file:
             self.context.whitening_matrix = preprocessing.get_whitening_matrix(
                 f=bin_file,
@@ -277,6 +280,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             hp_filter=self.context.highpass_filter,
             whiten_mat=self.context.whitening_matrix,
             device=torch.device("cpu"),
+            dtype=data_dtype,
         )
 
         self.context.filt_binary_file = filt_binary_file
