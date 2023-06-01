@@ -1,7 +1,6 @@
 from pathlib import Path
-import logging
+import shutil
 
-import numpy as np
 import pytest
 import torch
 
@@ -65,12 +64,18 @@ def data_directory(download):
 
     binary_path = data_path / 'ZFM-02370_mini.imec0.ap.bin'
     binary_url = 'https://www.kilosort.org/downloads/ZFM-02370_mini.imec0.ap.zip'
-    if (not binary_path.is_file()) or (download == 'binary') or (download == 'both'):
+    if (download == 'binary') or (download == 'both'):
+        if binary_path.is_file():
+            binary_path.unlink()
+    if not binary_path.is_file():
         download_data(binary_path, binary_url)
 
     results_path = data_path / 'saved_results/'
     results_url = 'https://www.kilosort.org/downloads/pytest.zip'
-    if (not results_path.is_dir()) or (download == 'results') or (download == 'both'):
+    if ((download == 'results') or (download == 'both')):
+        if results_path.is_dir():
+            shutil.rmtree(results_path)
+    if not results_path.is_dir():
         download_data(results_path, results_url)
 
     # Download default probe files if they don't already exist.
