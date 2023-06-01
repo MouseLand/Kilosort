@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 
 import numpy as np
 import pytest
@@ -11,6 +12,10 @@ from kilosort.utils import download_probes
 @pytest.fixture(scope='session')
 def cpu(request):
     return request.config.getoption('--cpu')
+
+@pytest.fixture(scope='session')
+def download(request):
+    return request.config.getoption('--download')
 
 @pytest.fixture(scope='session')
 def torch_device(cpu):
@@ -28,6 +33,9 @@ def pytest_addoption(parser):
     )
     parser.addoption(
         "--runslow", action="store_true", default=False, help="run slow tests"
+    )
+    parser.addoption(
+        "--download", action="store", default='', help="binary, results, or both"
     )
 
 def pytest_configure(config):
@@ -47,9 +55,8 @@ def pytest_collection_modifyitems(config, items):
 
 ### Configure data paths, download data if not already present.
 # Adapted from https://github.com/MouseLand/suite2p/blob/main/conftest.py
-# TODO: also download probe file if not already present
 @pytest.fixture(scope='session')
-def data_directory():
+def data_directory(download):
     """Specifies directory for test data and results, downloads if needed."""
 
     # Set path to directory within tests/ folder dynamically
@@ -58,12 +65,12 @@ def data_directory():
 
     binary_path = data_path / 'ZFM-02370_mini.imec0.ap.bin'
     binary_url = 'https://www.kilosort.org/downloads/ZFM-02370_mini.imec0.ap.zip'
-    if not binary_path.is_file():
+    if (not binary_path.is_file()) or (download == 'binary') or (download == 'both'):
         download_data(binary_path, binary_url)
 
     results_path = data_path / 'saved_results/'
     results_url = 'https://www.kilosort.org/downloads/pytest.zip'
-    if not results_path.is_dir():
+    if (not results_path.is_dir()) or (download == 'results') or (download == 'both'):
         download_data(results_path, results_url)
 
     # Download default probe files if they don't already exist.
