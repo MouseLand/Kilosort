@@ -5,7 +5,7 @@ from natsort import natsorted
 import numpy as np
 from kilosort.gui.logger import setup_logger
 from kilosort.gui.minor_gui_elements import ProbeBuilder, create_prb
-from kilosort.io import load_probe
+from kilosort.io import load_probe, BinaryRWFile
 from PyQt5 import QtCore, QtWidgets
 from scipy.io.matlab.miobase import MatReadError
 
@@ -26,6 +26,7 @@ DEFAULT_PARAMS = {
     "nblocks"       : 5,
     "binning_depth" : 5,
     "sig_interp"    : 20,
+    "data_dtype"    : "int16",
 }
 
 
@@ -56,6 +57,10 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.probe_layout_selector = QtWidgets.QComboBox()
         self._probes = []
         self.populate_probe_selector()
+
+        self.dtype_selector_text = QtWidgets.QLabel("Data dtype:")
+        self.dtype_selector = QtWidgets.QComboBox()
+        self.populate_dtype_selector()
 
         self.num_channels_text = QtWidgets.QLabel("number of channels")
         self.num_channels_input = QtWidgets.QLineEdit()
@@ -100,6 +105,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
 
         self.probe_layout = None
+        self.data_dtype = None
         self.num_channels = None
         self.sampling_frequency = None
         self.nt = None
@@ -118,6 +124,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.data_file_path_input,
             self.results_directory_input,
             self.probe_layout_selector,
+            self.dtype_selector,
             self.num_channels_input,
             self.sampling_frequency_input,
             self.nt_input,
@@ -196,6 +203,16 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.probe_preview_button, row_count, 3, 1, 2)
 
         row_count += 1
+        layout.addWidget(self.dtype_selector_text, row_count, 0, 1, 3)
+        layout.addWidget(self.dtype_selector, row_count, 3, 1, 2)
+        self.dtype_selector.setSizeAdjustPolicy(
+            QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
+        )
+        self.dtype_selector.currentTextChanged.connect(
+            self.on_data_dtype_selected
+        )
+
+        row_count += 1
         layout.addWidget(self.num_channels_text, row_count, 0, 1, 3)
         layout.addWidget(self.num_channels_input, row_count, 3, 1, 2)
         self.num_channels_input.textChanged.connect(self.on_number_of_channels_changed)
@@ -272,6 +289,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         self.num_channels_input.setText(str(default_params["n_chan_bin"]))
         self.sampling_frequency_input.setText(str(default_params["fs"]))
+        self.dtype_selector.setCurrentText(default_params["data_dtype"])
         self.nt_input.setText(str(default_params["nt"]))
         self.NT_input.setText(str(default_params["NT"]))
         self.Th_input.setText(str(default_params["Th"]))
@@ -361,6 +379,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             "data_file_path": self.data_file_path,
             "results_dir": self.results_directory_path,
             "probe_layout": self.probe_layout,
+            "data_dtype": self.data_dtype,
             "n_chan_bin": self.num_channels,
             "fs": self.sampling_frequency,
             "nt": self.nt,
@@ -513,6 +532,11 @@ class SettingsBox(QtWidgets.QGroupBox):
                 self.probe_layout_selector.setCurrentIndex(0)
                 self.disable_load()
                 self.disable_preview_probe()
+
+    def on_data_dtype_selected(self, data_dtype):
+        self.data_dtype = data_dtype
+        if self.check_settings():
+            self.enable_load()
 
     def on_number_of_channels_changed(self):
         try:
@@ -808,6 +832,12 @@ class SettingsBox(QtWidgets.QGroupBox):
         probes_list.sort(key=lambda f: os.path.splitext(f)[1])
         self.probe_layout_selector.addItems([""] + probes_list + ["[new]", "other..."])
         self._probes = probes_list
+
+    def populate_dtype_selector(self):
+        self.dtype_selector.clear()
+
+        supported_dtypes = BinaryRWFile.supported_dtypes
+        self.dtype_selector.addItems(supported_dtypes)
 
     def estimate_total_channels(self, num_channels):
         if self.data_file_path is not None:
