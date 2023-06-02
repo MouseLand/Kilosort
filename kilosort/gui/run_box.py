@@ -4,6 +4,7 @@ from kilosort.gui.sorter import KiloSortWorker
 
 
 class RunBox(QtWidgets.QGroupBox):
+    setupContextForRun = QtCore.pyqtSignal()
     updateContext = QtCore.pyqtSignal(object)
     sortingStepStatusUpdate = QtCore.pyqtSignal(dict)
     disableInput = QtCore.pyqtSignal(bool)
@@ -159,6 +160,7 @@ class RunBox(QtWidgets.QGroupBox):
 
     def run_steps(self, steps):
         self.disableInput.emit(True)
+        self.setupContextForRun.emit()
         QtWidgets.QApplication.processEvents()
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
 
