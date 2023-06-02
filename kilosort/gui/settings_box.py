@@ -319,12 +319,14 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.data_file_path_input.setText(filename)
             logger.info(f"File at location: {filename} is ready to load!")
         else:
-            warnings.warn_explicit(
-                message="Only .bin, .dat and .bat files can be loaded!",
-                category=UserWarning,
-                filename="",
-                lineno=0,
+            QtWidgets.QMessageBox.warning(
+                self.parent(),
+                "Wrong file type!",
+                "Drag and drop only works with .bin, .dat and .bat files!",
+                QtWidgets.QMessageBox.StandardButton.Ok,
+                QtWidgets.QMessageBox.StandardButton.Ok,
             )
+            logger.warning("Drag and drop only works with .bin, .dat and .bat files!")
 
     def on_select_results_dir_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
