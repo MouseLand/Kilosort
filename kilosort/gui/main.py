@@ -130,7 +130,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         filename = files[0]
         if self.context is None:
             self.settings_box.set_data_file_path_from_drag_and_drop(filename)
-            logger.info(f"File at location: {filename} is ready to load!")
         else:
             response = QtWidgets.QMessageBox.warning(
                 self,
