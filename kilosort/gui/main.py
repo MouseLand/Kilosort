@@ -125,6 +125,12 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         else:
             event.ignore()
 
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
     def dropEvent(self, event):
         files = [u.toLocalFile() for u in event.mimeData().urls()]
         filename = files[0]
