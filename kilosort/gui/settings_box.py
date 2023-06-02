@@ -1,5 +1,6 @@
 import os
 import pprint
+import warnings
 from pathlib import Path
 from natsort import natsorted
 import numpy as np
@@ -312,6 +313,20 @@ class SettingsBox(QtWidgets.QGroupBox):
         )
         if data_file_name:
             self.data_file_path_input.setText(data_file_name)
+
+    def set_data_file_path_from_drag_and_drop(self, filename):
+        if filename.endswith(".bin") or filename.endswith(".dat") or filename.endswith(".bat"):
+            self.data_file_path_input.setText(filename)
+            logger.info(f"File at location: {filename} is ready to load!")
+        else:
+            QtWidgets.QMessageBox.warning(
+                self.parent(),
+                "Wrong file type!",
+                "Drag and drop only works with .bin, .dat and .bat files!",
+                QtWidgets.QMessageBox.StandardButton.Ok,
+                QtWidgets.QMessageBox.StandardButton.Ok,
+            )
+            logger.warning("Drag and drop only works with .bin, .dat and .bat files!")
 
     def on_select_results_dir_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog

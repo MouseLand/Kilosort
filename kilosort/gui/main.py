@@ -61,6 +61,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.run_box = RunBox(self)
         self.message_log_box = MessageLogBox(self)
 
+        self.setAcceptDrops(True)
+
         self.setup()
 
     def keyPressEvent(self, event):
@@ -116,6 +118,37 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             event.accept()
         else:
             event.ignore()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        files = [u.toLocalFile() for u in event.mimeData().urls()]
+        filename = files[0]
+        if self.context is None:
+            self.settings_box.set_data_file_path_from_drag_and_drop(filename)
+        else:
+            response = QtWidgets.QMessageBox.warning(
+                self,
+                "Are you sure?",
+                "You are attempting to load a new file while another file "
+                "is already loaded. Are you sure you want to proceed?",
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                QtWidgets.QMessageBox.No
+                )
+                
+            if response == QtWidgets.QMessageBox.Yes:
+                self.settings_box.set_data_file_path_from_drag_and_drop(filename)
+
 
     def setup(self):
         self.setWindowTitle(f"Kilosort4")
