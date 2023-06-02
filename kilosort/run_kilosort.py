@@ -287,14 +287,14 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
                               device=device, do_CAR=do_CAR, invert_sign=invert,
                               dtype=dtype)
 
-    ops         = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
+    ops = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()
     print(f'drift computed in {time.time()-tic : .2f}s; ' + 
             f'total {time.time()-tic0 : .2f}s')
     
     # binary file with drift correction
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
-                              hp_filter=hp_filter, whiten_mat=whiten_mat,
+                              hp_filter=hp_filter, whiten_mat=whiten_mat, device=device,
                               dshift=ops['dshift'], do_CAR=do_CAR, dtype=dtype)
 
     return ops, bfile
@@ -332,33 +332,37 @@ def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
 
     tic = time.time()
     print(f'\nExtracting spikes using built-in templates')
-    st0, tF, ops  = spikedetect.run(ops, bfile, device=device, progress_bar=progress_bar)
-    tF          = torch.from_numpy(tF)
+    st0, tF, ops = spikedetect.run(ops, bfile, device=device, progress_bar=progress_bar)
+    tF = torch.from_numpy(tF)
     print(f'{len(st0)} spikes extracted in {time.time()-tic : .2f}s; ' + 
             f'total {time.time()-tic0 : .2f}s')
 
     tic = time.time()
     print('\nFirst clustering')
-    clu, Wall   = clustering_qr.run(ops, st0, tF, mode = 'spikes', progress_bar=progress_bar)
-    Wall3       = template_matching.postprocess_templates(Wall, ops, clu, st0, device=device)
+    clu, Wall = clustering_qr.run(ops, st0, tF, mode='spikes', device=device,
+                                  progress_bar=progress_bar)
+    Wall3 = template_matching.postprocess_templates(Wall, ops, clu, st0, device=device)
     print(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' +
             f'total {time.time()-tic0 : .2f}s')
     
     tic = time.time()
     print('\nExtracting spikes using cluster waveforms')
-    st, tF, tF2, ops = template_matching.extract(ops, bfile, Wall3, device=device, progress_bar=progress_bar)
+    st, tF, tF2, ops = template_matching.extract(ops, bfile, Wall3, device=device,
+                                                 progress_bar=progress_bar)
     print(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
             f'total {time.time()-tic0 : .2f}s')
 
     tic = time.time()
     print('\nFinal clustering')
-    clu, Wall   = clustering_qr.run(ops, st, tF,  mode = 'template', device=device, progress_bar=progress_bar)
+    clu, Wall = clustering_qr.run(ops, st, tF,  mode = 'template', device=device,
+                                  progress_bar=progress_bar)
     print(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' + 
             f'total {time.time()-tic0 : .2f}s')
 
     tic = time.time()
     print('\nMerging clusters')
-    Wall, clu, is_ref = template_matching.merging_function(ops, Wall, clu, st[:,0])
+    Wall, clu, is_ref = template_matching.merging_function(ops, Wall, clu, st[:,0],
+                                                           device=device)
     clu = clu.astype('int32')
     print(f'{clu.max()+1} units found, in {time.time()-tic : .2f}s; ' + 
             f'total {time.time()-tic0 : .2f}s')

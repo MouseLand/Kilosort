@@ -261,7 +261,7 @@ class BinaryRWFile:
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = torch.device('cpu'), write: bool = False,
-                 dtype=None):
+                 dtype: str = None):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -288,7 +288,7 @@ class BinaryRWFile:
             dtype = 'int16'
         self.dtype = dtype
 
-        if self.dtype not in self.supported_dtypes:
+        if str(self.dtype) not in self.supported_dtypes:
             message = f"""
                 {self.dtype} is not supported and may result in unexpected
                 behavior or errors. Supported types are:\n
@@ -375,7 +375,7 @@ class BinaryRWFile:
         data = self.file[bstart : bend]
         data = data.T
         nsamp = data.shape[-1]
-        X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device = self.device)
+        X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device=self.device)
         # fix the data at the edges for the first and last batch
         if ibatch==0:
             X[:, self.nt : self.nt+nsamp] = torch.from_numpy(data).to(self.device).float()
@@ -399,8 +399,8 @@ class BinaryFiltered(BinaryRWFile):
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  chan_map: np.ndarray = None, hp_filter: torch.Tensor = None,
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
-                 device: torch.device = torch.device('cuda'), do_CAR=True,
-                 invert_sign=False, dtype=None):
+                 device: torch.device = torch.device('cuda'), do_CAR: bool = True,
+                 invert_sign: bool = False, dtype=None):
 
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device, dtype=dtype) 
         self.chan_map = chan_map
@@ -432,7 +432,7 @@ class BinaryFiltered(BinaryRWFile):
         # whitening, with optional drift correction
         if self.whiten_mat is not None:
             if self.dshift is not None and ops is not None and ibatch is not None:
-                M = get_drift_matrix(ops, self.dshift[ibatch])
+                M = get_drift_matrix(ops, self.dshift[ibatch], device=self.device)
                 #print(M.dtype, X.dtype, self.whiten_mat.dtype)
                 X = (M @ self.whiten_mat) @ X
             else:
