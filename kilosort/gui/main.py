@@ -123,7 +123,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         if event.mimeData().hasUrls():
             event.accept()
         else:
-            logger.info(event.mimeData().formats())
             event.ignore()
 
     def dragMoveEvent(self, event):
