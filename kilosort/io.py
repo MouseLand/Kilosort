@@ -233,6 +233,8 @@ def save_ops(ops, results_dir=None):
         if isinstance(v, torch.Tensor):
             ops[k] = v.cpu().numpy()
             ops['is_tensor'].append(k)
+    ops['preprocessing'] = {k: v.cpu().numpy()
+                            for k, v in ops['preprocessing'].items()}
 
     np.save(results_dir / 'ops.npy', np.array(ops))
 
@@ -244,6 +246,10 @@ def load_ops(ops_path, device=torch.device('cuda')):
     for k, v in ops.items():
         if k in ops['is_tensor']:
             ops[k] = torch.from_numpy(v).to(device)
+    # TODO: Why do we have one copy of this saved as numpy, one as tensor,
+    #       at different levels?
+    ops['preprocessing'] = {k: torch.from_numpy(v).to(device)
+                            for k,v in ops['preprocessing'].items()}
 
     return ops
 
