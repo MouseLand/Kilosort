@@ -317,6 +317,7 @@ class SettingsBox(QtWidgets.QGroupBox):
     def set_data_file_path_from_drag_and_drop(self, filename):
         if filename.endswith(".bin") or filename.endswith(".dat") or filename.endswith(".bat"):
             self.data_file_path_input.setText(filename)
+            logger.info(f"File at location: {filename} is ready to load!")
         else:
             warnings.warn_explicit(
                 message="Only .bin, .dat and .bat files can be loaded!",
