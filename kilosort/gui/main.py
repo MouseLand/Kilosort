@@ -144,7 +144,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.header_box.reset_gui_button.clicked.connect(self.reset_gui)
 
-        self.settings_box.settingsUpdated.connect(self.set_parameters)
+        self.settings_box.settingsUpdated.connect(self.load_data)
         self.settings_box.previewProbe.connect(self.probe_view_box.preview_probe)
 
         self.data_view_box.channelChanged.connect(self.probe_view_box.update_probe_view)
@@ -200,6 +200,10 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.settings_box.disable_all_input(value)
         self.run_box.disable_all_input(value)
 
+    def load_data(self):
+        self.set_parameters()
+        self.do_load()
+
     def set_parameters(self):
         settings = self.settings_box.settings
         # advanced_options = self.settings_box.advanced_options
@@ -218,8 +222,9 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.params = params
 
+    def do_load(self):
         self.disable_all_input(True)
-        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+        QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
 
         self.prepare_for_new_context()
         self.setup_context()
