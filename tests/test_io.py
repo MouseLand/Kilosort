@@ -88,3 +88,30 @@ def test_bat_extension(torch_device, data_directory):
     finally:
         # Delete memmap file and re-raise exception
         path.unlink()
+
+
+def test_dat_extension(torch_device, data_directory):
+    # Create memmap, write to file, close the file again.
+    path = data_directory / 'binary_test' / 'temp_memmap.dat'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    N, C = (1000, 10)
+    r = np.random.rand(N,C)*2 - 1    # scale to (-1,1)
+    r = (r*(2**14)).astype(np.int16)     # scale up
+
+    try:
+        a = np.memmap(path, mode='w+', shape=(N,C), dtype=np.int16)
+        a[:] = r[:]
+        a.flush()
+        del(a)
+
+        directory = path.parent
+        filename = io.find_binary(directory)
+        assert filename == path
+        bfile = io.BinaryFiltered(filename, C, device=torch_device)
+        x = bfile[0:100]  # Test data retrieval
+
+        bfile.close()
+
+    finally:
+        # Delete memmap file and re-raise exception
+        path.unlink()

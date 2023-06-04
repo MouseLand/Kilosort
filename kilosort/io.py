@@ -17,7 +17,8 @@ def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
     """Find binary file in `data_dir`."""
 
     data_dir = Path(data_dir)
-    filenames = list(data_dir.glob('*.bin')) + list(data_dir.glob('*.bat'))
+    filenames = list(data_dir.glob('*.bin')) + list(data_dir.glob('*.bat')) \
+                + list(data_dir.glob('*.dat'))
     if len(filenames) == 0:
         raise FileNotFoundError('No binary file (*.bin or *.bat) found in folder')
 
