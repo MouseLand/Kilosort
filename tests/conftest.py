@@ -9,27 +9,17 @@ from kilosort.utils import download_probes
 
 
 @pytest.fixture(scope='session')
-def cpu(request):
-    return request.config.getoption('--cpu')
-
-@pytest.fixture(scope='session')
 def download(request):
     return request.config.getoption('--download')
 
 @pytest.fixture(scope='session')
-def torch_device(cpu):
-    if cpu:
+def torch_device():
         return torch.device('cpu')
-    else:
-        return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 
 ### runslow flag configured according to response from Manu CJ here:
 # https://stackoverflow.com/questions/47559524/pytest-how-to-skip-tests-unless-you-declare-an-option-flag
 def pytest_addoption(parser):
-    parser.addoption(
-        "--cpu", action="store_true", default=False, help="only use CPU, not GPU"
-    )
     parser.addoption(
         "--runslow", action="store_true", default=False, help="run slow tests"
     )
@@ -76,7 +66,14 @@ def data_directory(download):
         if results_path.is_dir():
             shutil.rmtree(results_path)
     if not results_path.is_dir():
+        # Downloaded folder extracts here, get rid of any existing results
+        # from running tests.
+        ks_path = data_path / 'Kilosort4'
+        if ks_path.is_dir():
+            shutil.rmtree(ks_path)
         download_data(results_path, results_url)
+        # Rename folder
+        shutil.move(ks_path, results_path)
 
     # Download default probe files if they don't already exist.
     download_probes()
