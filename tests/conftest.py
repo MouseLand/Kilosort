@@ -64,7 +64,7 @@ def data_directory(download):
     results_url = 'https://www.kilosort.org/downloads/pytest.zip'
     if ((download == 'results') or (download == 'both')):
         if results_path.is_dir():
-            shutil.rmtree(results_path)
+            shutil.rmtree(results_path.as_posix())
     if not results_path.is_dir():
         # Downloaded folder extracts here, get rid of any existing results
         # from running tests.
@@ -74,7 +74,7 @@ def data_directory(download):
         results_path.mkdir(exist_ok=True, parents=True)
         download_data(results_path, results_url)
         # Rename folder
-        shutil.move(ks_path, results_path)
+        shutil.move(ks_path.as_posix(), results_path.as_posix())
 
     # Download default probe files if they don't already exist.
     download_probes()
