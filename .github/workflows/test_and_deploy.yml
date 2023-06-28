@@ -33,6 +33,7 @@ jobs:
       - name: Install dependencies
         shell: bash -l {0}
         run: |
+          conda install -c anaconda openssl
           python -m pip install --upgrade pip
           python -m pip install tox tox-gh-actions
       # this runs the platform-specific tests declared in tox.ini
