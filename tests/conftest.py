@@ -71,6 +71,7 @@ def data_directory(download):
         ks_path = data_path / 'Kilosort4'
         if ks_path.is_dir():
             shutil.rmtree(ks_path)
+        results_path.mkdir(exist_ok=True, parents=True)
         download_data(results_path, results_url)
         # Rename folder
         shutil.move(ks_path, results_path)
