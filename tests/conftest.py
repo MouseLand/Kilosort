@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from kilosort import io
-from kilosort.utils import download_probes
+from kilosort.utils import download_probes, DOWNLOADS_DIR
 
 
 @pytest.fixture(scope='session')
@@ -15,6 +15,12 @@ def download(request):
 @pytest.fixture(scope='session')
 def torch_device():
         return torch.device('cpu')
+
+@pytest.fixture(scope='session')
+def capture_mgr(request):
+    # For disabling output capture for specific lines of code.
+    # https://github.com/pytest-dev/pytest/issues/2704
+    return request.config.pluginmanager.getplugin("capturemanager")
 
 
 ### runslow flag configured according to response from Manu CJ here:
@@ -45,11 +51,11 @@ def pytest_collection_modifyitems(config, items):
 ### Configure data paths, download data if not already present.
 # Adapted from https://github.com/MouseLand/suite2p/blob/main/conftest.py
 @pytest.fixture(scope='session')
-def data_directory(download):
+def data_directory(download, capture_mgr):
     """Specifies directory for test data and results, downloads if needed."""
 
     # Set path to directory within tests/ folder dynamically
-    data_path = Path.home() / '.kilosort/.test_data/'
+    data_path = DOWNLOADS_DIR / '.test_data/'
     data_path.mkdir(parents=True, exist_ok=True)
 
     binary_path = data_path / 'ZFM-02370_mini.imec0.ap.bin'
@@ -58,7 +64,8 @@ def data_directory(download):
         if binary_path.is_file():
             binary_path.unlink()
     if not binary_path.is_file():
-        download_data(binary_path, binary_url)
+        with capture_mgr.global_and_fixture_disabled():
+            download_data(binary_path, binary_url)
 
     results_path = data_path / 'saved_results/'
     results_url = 'https://www.kilosort.org/downloads/pytest.zip'
@@ -71,10 +78,10 @@ def data_directory(download):
         ks_path = data_path / 'Kilosort4'
         if ks_path.is_dir():
             shutil.rmtree(ks_path)
-        results_path.mkdir(exist_ok=True, parents=True)
-        download_data(results_path, results_url)
+        with capture_mgr.global_and_fixture_disabled():
+            download_data(results_path, results_url)
         # Rename folder
-        shutil.move(ks_path.as_posix(), results_path.as_posix())
+        ks_path.rename(results_path)
 
     # Download default probe files if they don't already exist.
     download_probes()
@@ -169,7 +176,7 @@ def saved_ops(results_directory, torch_device):
     ops = io.load_ops(results_directory / 'ops.npy', device=torch_device)
     return ops
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def bfile(saved_ops, torch_device, data_directory):
     # TODO: add option to load BinaryFiltered from ops dict, move this code
     #       to that function

@@ -9,12 +9,15 @@ from kilosort import run_kilosort, default_settings
 
 # Use `pytest --runslow` option to include this in tests.
 @pytest.mark.slow
-def test_pipeline(data_directory, results_directory, saved_ops, torch_device):
+def test_pipeline(data_directory, results_directory, saved_ops, torch_device, capture_mgr):
 
-    ops, st, clu, _, _, _, _, _ = run_kilosort(
-        data_dir=data_directory, probe_name='neuropixPhase3B1_kilosortChanMap.mat',
-        device=torch_device
-        )
+    with capture_mgr.global_and_fixture_disabled():
+        print('\nStarting run_kilosort test...')
+        ops, st, clu, _, _, _, _, _ = run_kilosort(
+            data_dir=data_directory, device=torch_device,
+            probe_name='neuropixPhase3B1_kilosortChanMap.mat',
+            )
+
     st = st[:,0]  # only first column is spike times, that's all that gets saved
         
     # Check that spike times and spike cluster assignments match
