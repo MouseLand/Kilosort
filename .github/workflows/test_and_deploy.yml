@@ -17,25 +17,19 @@ on:
 jobs:
   test:
     name: ${{ matrix.platform }} py${{ matrix.python }}
-    timeout-minutes: 180
     runs-on: ${{ matrix.platform }}
     strategy:
-      fail-fast: false
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
         python: ["3.8", "3.9", "3.10"]
 
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-
       - uses: actions/checkout@v3
 
       - name: Set up Python ${{ matrix.python }}
-        uses: actions/setup-python@v4
+        uses: conda-incubator/setup-miniconda@v2
         with:
+          auto-activate-base: true
           python-version: ${{ matrix.python }}
 
       - name: Install dependencies
@@ -43,16 +37,8 @@ jobs:
           pip install --upgrade pip
           pip install setuptools tox tox-gh-actions
 
-      # here we pass off control of environment creation and running of tests to tox
-      # tox-gh-actions, installed above, helps to convert environment variables into
-      # tox "factors" ... limiting the scope of what gets tested on each platform
-      # The one exception is if the "toxenv" environment variable has been set,
-      # in which case we are declaring one specific tox environment to run.
-      # see tox.ini for more
       - name: Test with tox
-        uses: aganders3/headless-gui@v1
-        with:
-          run: python -m tox
+        run: tox
         env:
           PLATFORM: ${{ matrix.platform }}
 
