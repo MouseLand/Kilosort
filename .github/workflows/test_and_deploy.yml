@@ -7,16 +7,16 @@ on:
       - "v*x"
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
-  # Allows you to run this workflow manually from the Actions tab
   pull_request:
     branches:
       - main
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 
 jobs:
   test:
-    name: ${{ matrix.platform }} py${{ matrix.python }} ${{ matrix.toxenv }} ${{ matrix.backend }} ${{ matrix.MIN_REQ && 'min_req' }}
+    name: ${{ matrix.platform }} py${{ matrix.python }}
     timeout-minutes: 180
     runs-on: ${{ matrix.platform }}
     strategy:
