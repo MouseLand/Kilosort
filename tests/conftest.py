@@ -77,9 +77,8 @@ def data_directory(download, capture_mgr):
     if not results_path.is_dir():
         # Downloaded folder extracts here, get rid of any existing results
         # from running tests.
-        ks_path = data_path / 'Kilosort4'
-        if ks_path.is_dir():
-            shutil.rmtree(ks_path)
+        ks_path_windows = data_path / 'Kilosort4'
+        ks_path_unix = data_path / 'kilosort4'
         with capture_mgr.global_and_fixture_disabled():
             print(f'\nDownloading saved results to {results_path}.zip')
             download_data(results_path, results_url)
@@ -90,7 +89,10 @@ def data_directory(download, capture_mgr):
         print(list_files(data_path.as_posix()))
 
         # Rename folder
-        ks_path.rename(results_path)
+        if ks_path_windows.is_dir():
+            ks_path_windows.rename(results_path)
+        else:
+            ks_path_unix.rename(results_path)
 
     # Download default probe files if they don't already exist.
     download_probes()
