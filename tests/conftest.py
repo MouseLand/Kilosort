@@ -1,5 +1,6 @@
 from pathlib import Path
 import shutil
+import os
 
 import pytest
 import torch
@@ -65,6 +66,7 @@ def data_directory(download, capture_mgr):
             binary_path.unlink()
     if not binary_path.is_file():
         with capture_mgr.global_and_fixture_disabled():
+            print('\nDownloading test data ...')
             download_data(binary_path, binary_url)
 
     results_path = data_path / 'saved_results/'
@@ -79,7 +81,14 @@ def data_directory(download, capture_mgr):
         if ks_path.is_dir():
             shutil.rmtree(ks_path)
         with capture_mgr.global_and_fixture_disabled():
+            print(f'\nDownloading saved results to {results_path}.zip')
             download_data(results_path, results_url)
+
+        # For debugging, display directory tree after downloading results.
+        # Should contain a 'Kilosort4' folder with the results inside it, since
+        # it hasn't been renamed yet at this step.
+        print(list_files(data_path.as_posix()))
+
         # Rename folder
         ks_path.rename(results_path)
 
@@ -162,6 +171,26 @@ def download_url_to_file(url, dst, progress=True):
         p = Path(f.name)
         if p.is_file():
             p.unlink()
+
+
+def list_files(startpath):
+    '''Print directories and contained files starting from a root path.
+    
+    References
+    ----------
+    https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python
+    
+    '''
+    string = ""
+    for root, dirs, files in os.walk(startpath):
+        level = root.replace(startpath, '').count(os.sep)
+        indent = ' ' * 4 * (level)
+        string += '\n{}{}/'.format(indent, os.path.basename(root))
+        subindent = ' ' * 4 * (level + 1)
+        for f in files:
+            string += '\n{}{}'.format(subindent, f)
+
+    return string
 
 
 @pytest.fixture(scope='session')
