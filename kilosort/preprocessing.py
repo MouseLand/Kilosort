@@ -47,8 +47,11 @@ def get_drift_matrix(ops, dshift, device=torch.device('cuda')):
 
     # first, interpolate drifts to every channel
     yblk = ops['yblk']
-    finterp = interp1d(yblk, dshift, fill_value="extrapolate", kind = 'linear')
-    shifts = finterp(ops['probe']['yc'])
+    if ops['nblocks'] == 1:
+        shifts = dshift
+    else:
+        finterp = interp1d(yblk, dshift, fill_value="extrapolate", kind = 'linear')
+        shifts = finterp(ops['probe']['yc'])
 
     # compute coordinates of desired interpolation
     xp = np.vstack((ops['probe']['xc'],ops['probe']['yc'])).T
