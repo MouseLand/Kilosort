@@ -35,15 +35,17 @@ def test_pipeline(data_directory, results_directory, saved_ops, torch_device, ca
     # Less than 2.5% difference in spike count, 5% difference in number of units
     # TODO: Make sure these are reasonable error bounds
     spikes_error = np.abs(st.size - st_load.size)/np.max([st.size, st_load.size])
-    print(f'Proportion difference in total spike count: {spikes_error}')
-    print(f'Count from run_kilosort: {st.size}')
-    print(f'Count from saved test results: {st_load.size}')
+    with capture_mgr.global_and_fixture_disabled():
+        print(f'Proportion difference in total spike count: {spikes_error}')
+        print(f'Count from run_kilosort: {st.size}')
+        print(f'Count from saved test results: {st_load.size}')
     assert spikes_error <= 0.025
 
     n = np.unique(clu).size
     n_load = np.unique(clu_load).size
     unit_count_error = np.abs(n - n_load)/np.max([n, n_load])
-    print(f'Proportion difference in number of units: {unit_count_error}')
-    print(f'Number of units from run_kilosort: {n}')
-    print(f'Number of units from saved test results: {n_load}')
+    with capture_mgr.global_and_fixture_disabled():
+        print(f'Proportion difference in number of units: {unit_count_error}')
+        print(f'Number of units from run_kilosort: {n}')
+        print(f'Number of units from saved test results: {n_load}')
     assert unit_count_error <= 0.05
