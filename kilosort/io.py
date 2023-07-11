@@ -207,6 +207,53 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None, data_dtype=None
     return results_dir, similar_templates, is_ref, est_contam_rate
 
 
+def save_ops(ops, results_dir=None):
+    """Save intermediate `ops` dictionary to `results_dir/ops.npy`."""
+
+    if results_dir is None:
+        results_dir = Path(ops['data_dir']) / 'kilosort4'
+    else:
+        results_dir = Path(results_dir)
+    results_dir.mkdir(exist_ok=True)
+
+    ops = ops.copy()
+    # Convert paths to strings before saving, otherwise ops can only be loaded
+    # on the system that originally ran the code (causes problems for tests).
+    ops['settings']['results_dir'] = str(results_dir)
+    # TODO: why do these get saved twice?
+    ops['filename'] = str(ops['filename'])
+    ops['data_dir'] = str(ops['data_dir'])
+    ops['settings']['filename'] = str(ops['settings']['filename'])
+    ops['settings']['data_dir'] = str(ops['settings']['data_dir'])
+
+    # Convert pytorch tensors to numpy arrays before saving, otherwise loading
+    # ops on a different system may not work (if saved from GPU, but loaded
+    # on a system with only CPU).
+    ops['is_tensor'] = []
+    for k, v in ops.items():
+        if isinstance(v, torch.Tensor):
+            ops[k] = v.cpu().numpy()
+            ops['is_tensor'].append(k)
+    ops['preprocessing'] = {k: v.cpu().numpy()
+                            for k, v in ops['preprocessing'].items()}
+
+    np.save(results_dir / 'ops.npy', np.array(ops))
+
+
+def load_ops(ops_path, device=torch.device('cuda')):
+    """Load a saved `ops` dictionary and convert some arrays to tensors."""
+
+    ops = np.load(ops_path, allow_pickle=True).item()
+    for k, v in ops.items():
+        if k in ops['is_tensor']:
+            ops[k] = torch.from_numpy(v).to(device)
+    # TODO: Why do we have one copy of this saved as numpy, one as tensor,
+    #       at different levels?
+    ops['preprocessing'] = {k: torch.from_numpy(v).to(device)
+                            for k,v in ops['preprocessing'].items()}
+
+    return ops
+
 
 class BinaryRWFile:
 
@@ -215,7 +262,7 @@ class BinaryRWFile:
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = torch.device('cpu'), write: bool = False,
-                 dtype=None):
+                 dtype: str = None):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -242,7 +289,7 @@ class BinaryRWFile:
             dtype = 'int16'
         self.dtype = dtype
 
-        if self.dtype not in self.supported_dtypes:
+        if str(self.dtype) not in self.supported_dtypes:
             message = f"""
                 {self.dtype} is not supported and may result in unexpected
                 behavior or errors. Supported types are:\n
@@ -329,7 +376,7 @@ class BinaryRWFile:
         data = self.file[bstart : bend]
         data = data.T
         nsamp = data.shape[-1]
-        X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device = self.device)
+        X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device=self.device)
         # fix the data at the edges for the first and last batch
         if ibatch==0:
             X[:, self.nt : self.nt+nsamp] = torch.from_numpy(data).to(self.device).float()
@@ -353,8 +400,8 @@ class BinaryFiltered(BinaryRWFile):
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  chan_map: np.ndarray = None, hp_filter: torch.Tensor = None,
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
-                 device: torch.device = torch.device('cuda'), do_CAR=True,
-                 invert_sign=False, dtype=None):
+                 device: torch.device = torch.device('cuda'), do_CAR: bool = True,
+                 invert_sign: bool = False, dtype=None):
 
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device, dtype=dtype) 
         self.chan_map = chan_map
@@ -386,7 +433,7 @@ class BinaryFiltered(BinaryRWFile):
         # whitening, with optional drift correction
         if self.whiten_mat is not None:
             if self.dshift is not None and ops is not None and ibatch is not None:
-                M = get_drift_matrix(ops, self.dshift[ibatch])
+                M = get_drift_matrix(ops, self.dshift[ibatch], device=self.device)
                 #print(M.dtype, X.dtype, self.whiten_mat.dtype)
                 X = (M @ self.whiten_mat) @ X
             else:

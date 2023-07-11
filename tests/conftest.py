@@ -1,11 +1,27 @@
 from pathlib import Path
+import shutil
+import os
 
-import numpy as np
 import pytest
 import torch
 
 from kilosort import io
-from kilosort.utils import download_probes
+from kilosort.utils import download_probes, DOWNLOADS_DIR
+
+
+@pytest.fixture(scope='session')
+def download(request):
+    return request.config.getoption('--download')
+
+@pytest.fixture(scope='session')
+def torch_device():
+        return torch.device('cpu')
+
+@pytest.fixture(scope='session')
+def capture_mgr(request):
+    # For disabling output capture for specific lines of code.
+    # https://github.com/pytest-dev/pytest/issues/2704
+    return request.config.pluginmanager.getplugin("capturemanager")
 
 
 ### runslow flag configured according to response from Manu CJ here:
@@ -13,6 +29,9 @@ from kilosort.utils import download_probes
 def pytest_addoption(parser):
     parser.addoption(
         "--runslow", action="store_true", default=False, help="run slow tests"
+    )
+    parser.addoption(
+        "--download", action="store", default='', help="binary, results, or both"
     )
 
 def pytest_configure(config):
@@ -32,28 +51,48 @@ def pytest_collection_modifyitems(config, items):
 
 ### Configure data paths, download data if not already present.
 # Adapted from https://github.com/MouseLand/suite2p/blob/main/conftest.py
-# TODO: also download probe file if not already present
 @pytest.fixture(scope='session')
-def data_directory():
+def data_directory(download, capture_mgr):
     """Specifies directory for test data and results, downloads if needed."""
 
     # Set path to directory within tests/ folder dynamically
-    data_path = Path.home() / '.kilosort/.test_data/'
-    data_path.mkdir(exist_ok=True)
+    data_path = DOWNLOADS_DIR / '.test_data/'
+    data_path.mkdir(parents=True, exist_ok=True)
 
     binary_path = data_path / 'ZFM-02370_mini.imec0.ap.bin'
     binary_url = 'https://www.kilosort.org/downloads/ZFM-02370_mini.imec0.ap.zip'
+    if (download == 'binary') or (download == 'both'):
+        if binary_path.is_file():
+            binary_path.unlink()
     if not binary_path.is_file():
-        download_data(binary_path, binary_url)
+        with capture_mgr.global_and_fixture_disabled():
+            print('\nDownloading test data ...')
+            download_data(binary_path, binary_url)
 
     results_path = data_path / 'saved_results/'
     results_url = 'https://www.kilosort.org/downloads/pytest.zip'
+    if ((download == 'results') or (download == 'both')):
+        if results_path.is_dir():
+            shutil.rmtree(results_path.as_posix())
     if not results_path.is_dir():
-        download_data(results_path, results_url)
-        # Extracts to folder 'pytest' by default, rename to make it clear what
-        # goes in the folder.
-        p = data_path / 'pytest'
-        p.rename(results_path)
+        # Downloaded folder extracts here, get rid of any existing results
+        # from running tests.
+        ks_path_windows = data_path / 'Kilosort4'
+        ks_path_unix = data_path / 'kilosort4'
+        with capture_mgr.global_and_fixture_disabled():
+            print(f'\nDownloading saved results to {results_path}.zip')
+            download_data(results_path, results_url)
+
+        # For debugging, display directory tree after downloading results.
+        # Should contain a 'Kilosort4' folder with the results inside it, since
+        # it hasn't been renamed yet at this step.
+        print(list_files(data_path.as_posix()))
+
+        # Rename folder
+        if ks_path_windows.is_dir():
+            ks_path_windows.rename(results_path)
+        else:
+            ks_path_unix.rename(results_path)
 
     # Download default probe files if they don't already exist.
     download_probes()
@@ -136,28 +175,39 @@ def download_url_to_file(url, dst, progress=True):
             p.unlink()
 
 
+def list_files(startpath):
+    '''Print directories and contained files starting from a root path.
+    
+    References
+    ----------
+    https://stackoverflow.com/questions/9727673/list-directory-tree-structure-in-python
+    
+    '''
+    string = ""
+    for root, dirs, files in os.walk(startpath):
+        level = root.replace(startpath, '').count(os.sep)
+        indent = ' ' * 4 * (level)
+        string += '\n{}{}/'.format(indent, os.path.basename(root))
+        subindent = ' ' * 4 * (level + 1)
+        for f in files:
+            string += '\n{}{}'.format(subindent, f)
+
+    return string
+
+
 @pytest.fixture(scope='session')
 def results_directory(data_directory):
-    return data_directory.joinpath("saved_results/")
+    return data_directory / "saved_results"
 
 ### End
 
 
-### Load data for use by unit and regression tests
 @pytest.fixture(scope='session')
-def torch_device():
-    return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-
-@pytest.fixture(scope='session')
-def saved_ops(results_directory):
-    ops = np.load(results_directory / 'ops.npy', allow_pickle=True).item()
+def saved_ops(results_directory, torch_device):
+    ops = io.load_ops(results_directory / 'ops.npy', device=torch_device)
     return ops
 
-@pytest.fixture(scope='session')
-def torch_device():
-    return torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def bfile(saved_ops, torch_device, data_directory):
     # TODO: add option to load BinaryFiltered from ops dict, move this code
     #       to that function

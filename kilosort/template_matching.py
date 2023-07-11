@@ -85,10 +85,11 @@ def align_U(U, ops, device=torch.device('cuda')):
     return Unew, imax
 
 
-def postprocess_templates(Wall, ops, clu, st, device = torch.device('cuda')):
-    Wall2, _ = align_U(Wall, ops)
+def postprocess_templates(Wall, ops, clu, st, device=torch.device('cuda')):
+    Wall2, _ = align_U(Wall, ops, device=device)
     #Wall3, _= remove_duplicates(ops, Wall2)
-    Wall3, _, _ = merging_function(ops, Wall2.transpose(1,2), clu, st[:,0], 0.9, 'mu')
+    Wall3, _, _ = merging_function(ops, Wall2.transpose(1,2), clu, st[:,0],
+                                   0.9, 'mu', device=device)
     Wall3 = Wall3.transpose(1,2).to(device)
     return Wall3
 
@@ -177,11 +178,11 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
     return  st, amps, Xres
 
 
-def merging_function(ops, Wall, clu, st, r_thresh = 0.5, mode = 'ccg', dev = torch.device('cuda')):
+def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.device('cuda')):
     clu2 = clu.copy()
     clu_unq, ns = np.unique(clu2, return_counts = True)
 
-    Ww = Wall.to(dev)
+    Ww = Wall.to(device)
     NN = len(Ww)
 
     isort = np.argsort(ns)[::-1]

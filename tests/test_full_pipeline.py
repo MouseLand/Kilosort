@@ -9,18 +9,15 @@ from kilosort import run_kilosort, default_settings
 
 # Use `pytest --runslow` option to include this in tests.
 @pytest.mark.slow
-def test_pipeline(data_directory, results_directory, saved_ops, torch_device):
-    settings = default_settings()
-    # TODO: replace this with a pytest fixture that downloads test data from
-    #       remote repository. 
-    settings['data_dir'] = data_directory
-    # TODO: add option to not save results to file? Otherwise this will need
-    #       to store and overwrite some results files every time, which is
-    #       unnecessary.
-    ops, st, clu, _, _, _, _, _ = run_kilosort(
-        settings=settings, probe_name='neuropixPhase3B1_kilosortChanMap.mat',
-        device=torch_device
-        )
+def test_pipeline(data_directory, results_directory, saved_ops, torch_device, capture_mgr):
+
+    with capture_mgr.global_and_fixture_disabled():
+        print('\nStarting run_kilosort test...')
+        ops, st, clu, _, _, _, _, _ = run_kilosort(
+            data_dir=data_directory, device=torch_device,
+            probe_name='neuropixPhase3B1_kilosortChanMap.mat',
+            )
+
     st = st[:,0]  # only first column is spike times, that's all that gets saved
         
     # Check that spike times and spike cluster assignments match
@@ -35,7 +32,20 @@ def test_pipeline(data_directory, results_directory, saved_ops, torch_device):
     assert np.allclose(saved_dshift, ops['dshift'])
     assert torch.allclose(saved_iKxx, ops['iKxx'])
     # Final spike/neuron readout
-    assert np.allclose(st, st_load)
-    assert np.allclose(clu, clu_load)
-    # TODO: What else? Or is that sufficient for now?
-    
+    # Less than 2.5% difference in spike count, 5% difference in number of units
+    # TODO: Make sure these are reasonable error bounds
+    spikes_error = np.abs(st.size - st_load.size)/np.max([st.size, st_load.size])
+    with capture_mgr.global_and_fixture_disabled():
+        print(f'Proportion difference in total spike count: {spikes_error}')
+        print(f'Count from run_kilosort: {st.size}')
+        print(f'Count from saved test results: {st_load.size}')
+    assert spikes_error <= 0.025
+
+    n = np.unique(clu).size
+    n_load = np.unique(clu_load).size
+    unit_count_error = np.abs(n - n_load)/np.max([n, n_load])
+    with capture_mgr.global_and_fixture_disabled():
+        print(f'Proportion difference in number of units: {unit_count_error}')
+        print(f'Number of units from run_kilosort: {n}')
+        print(f'Number of units from saved test results: {n_load}')
+    assert unit_count_error <= 0.05

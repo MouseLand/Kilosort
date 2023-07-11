@@ -143,8 +143,8 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     Nfilt = len(ys)
 
     nC, nC2 = 10, 100
-    iC, ds = nearest_chans(ys, yc, xs, xc, nC)
-    iC2, ds2 = nearest_chans(ys, ys, xs, xs, nC2)
+    iC, ds = nearest_chans(ys, yc, xs, xc, nC, device=device)
+    iC2, ds2 = nearest_chans(ys, ys, xs, xs, nC2, device=device)
 
     ds_torch = torch.from_numpy(ds).to(device).float()
     weigh = torch.exp(- ds_torch.unsqueeze(-1) / (sig * (1+torch.arange(nsizes, device = device)))**2)
