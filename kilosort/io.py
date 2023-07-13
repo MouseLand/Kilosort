@@ -262,7 +262,7 @@ class BinaryRWFile:
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = torch.device('cpu'), write: bool = False,
-                 dtype: str = None):
+                 dtype: str = None, tmin: float = None, tmax: float = None):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -276,6 +276,7 @@ class BinaryRWFile:
             The filename of the file to read from or write to
         n_chan_bin: int
             number of channels
+
         """
         self.fs = fs
         self.n_chan_bin = n_chan_bin
@@ -297,7 +298,11 @@ class BinaryRWFile:
                 """
             warnings.warn(message, RuntimeWarning)
 
-        # Must come after dtype since dtype is necessary for computing n_samples
+        # Must come after dtype since dtype is necessary for nbytesread
+        total_samples = int(self.nbytes // self.nbytesread)
+        self.imin = 0 if tmin is None else tmin/fs
+        self.imax = total_samples if tmax is None else tmax/fs
+
         self.n_batches = int(np.ceil(self.n_samples / self.NT))
 
         mode = 'w+' if write else 'r'
@@ -319,7 +324,7 @@ class BinaryRWFile:
     @property
     def n_samples(self) -> int:
         """total number of samples in the file."""
-        return int(self.nbytes // self.nbytesread)
+        return self.imax - self.imin
 
     @property
     def shape(self) -> Tuple[int, int]:
@@ -368,11 +373,11 @@ class BinaryRWFile:
     def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
         if ibatch==0:
-            bstart = 0
-            bend = self.NT + self.nt
+            bstart = self.imin
+            bend = self.imin + self.NT + self.nt
         else:
-            bstart = ibatch * self.NT - self.nt
-            bend = min(self.n_samples, bstart + self.NT + 2*self.nt)
+            bstart = self.imin + (ibatch * self.NT) - self.nt
+            bend = min(self.imax, self.imin + bstart + self.NT + 2*self.nt)
         data = self.file[bstart : bend]
         data = data.T
         nsamp = data.shape[-1]
