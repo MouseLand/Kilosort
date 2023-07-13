@@ -300,8 +300,8 @@ class BinaryRWFile:
 
         # Must come after dtype since dtype is necessary for nbytesread
         total_samples = int(self.nbytes // self.nbytesread)
-        self.imin = 0 if tmin is None else tmin/fs
-        self.imax = total_samples if tmax is None else tmax/fs
+        self.imin = 0 if tmin is None else max(tmin/fs, 0)
+        self.imax = total_samples if tmax is None else min(tmax/fs, total_samples)
 
         self.n_batches = int(np.ceil(self.n_samples / self.NT))
 
