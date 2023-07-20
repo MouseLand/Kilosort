@@ -79,6 +79,8 @@ def default_settings():
     settings['sig_interp']    = 20
     settings['n_chan_bin']    = settings['NchanTOT']
     settings['probe_name']    = 'neuropixPhase3B1_kilosortChanMap.mat'
+    settings['tmin'] = 0.0
+    settings['tmax'] = np.inf
     return settings
 
 
@@ -200,7 +202,9 @@ def get_run_parameters(ops) -> list:
         ops['do_CAR'],
         ops['invert_sign'],
         ops['probe']['xc'],
-        ops['probe']['yc']
+        ops['probe']['yc'],
+        ops['settings']['tmin'],
+        ops['settings']['tmax']
     ]
 
     return parameters
@@ -225,8 +229,8 @@ def compute_preprocessing(ops, device, tic0=np.nan):
     """
 
     tic = time.time()
-    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, xc, yc = \
-        get_run_parameters(ops)
+    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, \
+        xc, yc, tmin, tmax = get_run_parameters(ops)
     nskip = ops['settings']['nskip']
     
     # Compute high pass filter
@@ -234,7 +238,8 @@ def compute_preprocessing(ops, device, tic0=np.nan):
     # Compute whitening matrix
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min,
                               chan_map, hp_filter, device=device, do_CAR=do_CAR,
-                              invert_sign=invert, dtype=dtype)
+                              invert_sign=invert, dtype=dtype, tmin=tmin,
+                              tmax=tmax)
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip)
 
     bfile.close()
@@ -277,15 +282,15 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
     tic = time.time()
     print('\ncomputing drift')
 
-    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, _, _ = \
-        get_run_parameters(ops)
+    n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, \
+        _, _, tmin, tmax = get_run_parameters(ops)
     hp_filter = ops['preprocessing']['hp_filter']
     whiten_mat = ops['preprocessing']['whiten_mat']
 
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
                               hp_filter=hp_filter, whiten_mat=whiten_mat,
                               device=device, do_CAR=do_CAR, invert_sign=invert,
-                              dtype=dtype)
+                              dtype=dtype, tmin=tmin, tmax=tmax)
 
     ops = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()
@@ -295,7 +300,8 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
     # binary file with drift correction
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
                               hp_filter=hp_filter, whiten_mat=whiten_mat, device=device,
-                              dshift=ops['dshift'], do_CAR=do_CAR, dtype=dtype)
+                              dshift=ops['dshift'], do_CAR=do_CAR, dtype=dtype,
+                              tmin=tmin, tmax=tmax)
 
     return ops, bfile
 

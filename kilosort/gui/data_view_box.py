@@ -11,6 +11,7 @@ class DataViewBox(QtWidgets.QGroupBox):
     channelChanged = QtCore.pyqtSignal(int, int)
     modeChanged = QtCore.pyqtSignal(str, int)
     updateContext = QtCore.pyqtSignal(object)
+    intervalUpdated = QtCore.pyqtSignal()
 
     def __init__(self, parent):
         QtWidgets.QGroupBox.__init__(self, parent=parent)
@@ -34,6 +35,14 @@ class DataViewBox(QtWidgets.QGroupBox):
         # self.colormap_button = QtWidgets.QPushButton("Colormap")
         self.raw_button = QtWidgets.QPushButton("Raw")
         self.whitened_button = QtWidgets.QPushButton("Whitened")
+        # Set minimum and maximum time in seconds for spike sorting.
+        # This should truncate the data view if specified.
+        self.tmin_text = QtWidgets.QLabel("tmin (s)")
+        self.tmin_input = QtWidgets.QLineEdit()
+        self.tmin = 0.0
+        self.tmax_text = QtWidgets.QLabel("tmax (s)")
+        self.tmax_input = QtWidgets.QLineEdit()
+        self.tmax = np.inf
         # self.prediction_button = QtWidgets.QPushButton("Prediction")
         # self.residual_button = QtWidgets.QPushButton("Residual")
 
@@ -46,6 +55,8 @@ class DataViewBox(QtWidgets.QGroupBox):
             # "prediction": self.prediction_button,
             # "residual": self.residual_button,
         }
+
+        self.input_fields = [self.tmin_input, self.tmax_input]
 
         # self.mode_buttons = [self.traces_button, self.colormap_button]
 
@@ -191,6 +202,15 @@ class DataViewBox(QtWidgets.QGroupBox):
 
         # data_controls_layout.addWidget(self.traces_button)
         # data_controls_layout.addWidget(self.colormap_button)
+
+        # Add controls for time interval
+        data_controls_layout.addWidget(self.tmin_text)
+        data_controls_layout.addWidget(self.tmin_input)
+        self.tmin_input.editingFinished.connect(self.on_tmin_edited)
+        data_controls_layout.addWidget(self.tmax_text)
+        data_controls_layout.addWidget(self.tmax_input)
+        self.tmax_input.editingFinished.connect(self.on_tmax_edited)
+
         data_controls_layout.addStretch(0)
         data_controls_layout.addWidget(self.raw_button)
         data_controls_layout.addWidget(self.whitened_button)
@@ -205,6 +225,35 @@ class DataViewBox(QtWidgets.QGroupBox):
         layout.addLayout(data_seek_layout, 10)
 
         self.setLayout(layout)
+        self.tmin_input.setText(str(0.0))
+        self.tmax_input.setText(str(np.inf))
+
+    @QtCore.pyqtSlot()
+    def on_tmin_edited(self):
+        try:
+            self.tmin = float(self.tmin_input.text())
+            self.check_time_interval()
+            self.intervalUpdated.emit()
+        except ValueError:
+            logger.exception('Could not convert tmin to float.')
+        except AssertionError:
+            logger.exception('Invalid tmin,tmax: must have 0 <= tmin < tmax')
+
+    @QtCore.pyqtSlot()
+    def on_tmax_edited(self):
+        try:
+            self.tmax = float(self.tmax_input.text())
+            self.check_time_interval()
+            self.intervalUpdated.emit()
+        except ValueError:
+            logger.exception('Could not convert tmax to float.')
+        except AssertionError:
+            logger.exception('Invalid tmin,tmax: must have 0 <= tmin < tmax')
+
+    def check_time_interval(self):
+        # TODO: any other checks needed?
+        assert self.tmin >= 0
+        assert self.tmin < self.tmax
 
     @QtCore.pyqtSlot()
     def on_views_clicked(self):
@@ -475,16 +524,17 @@ class DataViewBox(QtWidgets.QGroupBox):
         sample_rate = context.params["fs"]
 
         timepoints = binary_file.shape[0]
-        max_time = timepoints / sample_rate
+        min_time = max(0, self.tmin)
+        max_time = (timepoints / sample_rate) + min_time
 
         self.data_seek_widget.setXRange(
-            min=0,
+            min=min_time,
             max=max_time,
             padding=0.02
         )
-        self.time_seek.setPos(0)
-        self.time_seek.setBounds((0, max_time))
-        self.seek_range = (0, max_time)
+        self.time_seek.setPos(min_time)
+        self.time_seek.setBounds((min_time, max_time))
+        self.seek_range = (min_time, max_time)
 
     def update_seek_text(self, seek):
         position = seek.pos()[0]
@@ -492,7 +542,7 @@ class DataViewBox(QtWidgets.QGroupBox):
 
     def update_seek_position(self, seek):
         position = seek.pos()[0]
-        self.current_time = position
+        self.current_time = position - self.tmin
         # self.clear_cached_traces()
         try:
             self.update_plot()
@@ -766,10 +816,11 @@ class DataViewBox(QtWidgets.QGroupBox):
                     end_time=end_time,
                 )
 
+            min_tick = start_time + (self.tmin * sample_rate)
             self.data_x_axis.setTicks(
                 [
                     [
-                        (pos, f"{(start_time + pos) / sample_rate:.3f}")
+                        (pos, f"{(min_tick + pos) / sample_rate:.3f}")
                         for pos in np.linspace(0, time_range, 20)
                     ]
                 ]
