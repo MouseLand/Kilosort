@@ -285,6 +285,7 @@ class BinaryRWFile:
         self.nt = nt 
         self.nt0min = nt0min
         self.device = device
+        self.uint_set_warning = True
 
         if dtype is None:
             dtype = 'int16'
@@ -365,22 +366,38 @@ class BinaryRWFile:
         self.close()
 
     def __setitem__(self, *items):
-        sample_indices, data = items
+        idx, data = items
+        # Shift indices by minimum sample index
+        sample_indices = self._get_shifted_indices(idx)
+        # Shift data to pos-only
+        if self.dtype == 'uint16':
+            data = data + 2**15
+            if self.uint_set_warning:
+                # Inform user of shift to hopefully avoid confusion, but only
+                # do this once per bfile.
+                print("NOTE: When setting new values for uint16 data, 2**15 will "
+                      "be added to the given values before writing to file.")
+                self.uint_set_warning = False
+        # Convert back from float to file dtype
+        data = data.astype(self.dtype)
         self.file[sample_indices] = data
         
     def __getitem__(self, *items):
         idx, *crop = items
         # Shift indices by minimum sample index.
-        start = self.imin if idx.start is None else idx.start + self.imin
-        stop = self.imax if idx.stop is None else min(idx.stop + self.imin, self.imax)
-        sample_indices = slice(start, stop, idx.step)
+        sample_indices = self._get_shifted_indices(idx)
         samples = self.file[sample_indices]
-        # Shift data to one sign
+        # Shift data to +/- 2**15
         if self.dtype == 'uint16':
             samples = samples - 2**15
             samples = samples.astype('int16')
 
         return samples
+    
+    def _get_shifted_indices(self, idx):
+        start = self.imin if idx.start is None else idx.start + self.imin
+        stop = self.imax if idx.stop is None else min(idx.stop + self.imin, self.imax)
+        return slice(start, stop, idx.step)
 
     def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
@@ -391,18 +408,15 @@ class BinaryRWFile:
             bstart = self.imin + (ibatch * self.NT) - self.nt
             bend = min(self.imax, bstart + self.NT + 2*self.nt)
         data = self.file[bstart : bend]
-        # Shift data to one sign
+        data = data.T
+        # Shift data to +/- 2**15
         if self.dtype == 'uint16':
             data = data - 2**15
             data = data.astype('int16')
-        data = data.T
 
         nsamp = data.shape[-1]
         X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device=self.device)
         # fix the data at the edges for the first and last batch
-        # TODO: separate conditions for if imin is nonzero, imax less than max?
-        #       don't actually need to duplicate data at the ends in those cases,
-        #       can use the real data before/after min/max sample.
         if ibatch == 0:
             X[:, self.nt : self.nt+nsamp] = torch.from_numpy(data).to(self.device).float()
             X[:, :self.nt] = X[:, self.nt : self.nt+1]
