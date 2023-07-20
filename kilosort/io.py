@@ -391,6 +391,10 @@ class BinaryRWFile:
             bstart = self.imin + (ibatch * self.NT) - self.nt
             bend = min(self.imax, bstart + self.NT + 2*self.nt)
         data = self.file[bstart : bend]
+        # Shift data to one sign
+        if self.dtype == 'uint16':
+            data = data - 2**15
+            data = data.astype('int16')
         data = data.T
 
         nsamp = data.shape[-1]
