@@ -10,11 +10,20 @@ from kilosort.utils import download_probes, DOWNLOADS_DIR
 
 
 @pytest.fixture(scope='session')
+def gpu(request):
+    return request.config.getoption('--gpu')
+
+@pytest.fixture(scope='session')
 def download(request):
     return request.config.getoption('--download')
 
 @pytest.fixture(scope='session')
-def torch_device():
+def torch_device(gpu):
+    if gpu:
+        if not torch.cuda.is_available():
+            raise ValueError('GPU tests requested, but no CUDA device available.')
+        return torch.device('cuda')
+    else:
         return torch.device('cpu')
 
 @pytest.fixture(scope='session')
@@ -27,6 +36,9 @@ def capture_mgr(request):
 ### runslow flag configured according to response from Manu CJ here:
 # https://stackoverflow.com/questions/47559524/pytest-how-to-skip-tests-unless-you-declare-an-option-flag
 def pytest_addoption(parser):
+    parser.addoption(
+        "--gpu", action="store_true", default=False, help="use GPU for tests"
+    )
     parser.addoption(
         "--runslow", action="store_true", default=False, help="run slow tests"
     )
@@ -52,7 +64,7 @@ def pytest_collection_modifyitems(config, items):
 ### Configure data paths, download data if not already present.
 # Adapted from https://github.com/MouseLand/suite2p/blob/main/conftest.py
 @pytest.fixture(scope='session')
-def data_directory(download, capture_mgr):
+def data_directory(download, capture_mgr, gpu):
     """Specifies directory for test data and results, downloads if needed."""
 
     # Set path to directory within tests/ folder dynamically
@@ -69,8 +81,12 @@ def data_directory(download, capture_mgr):
             print('\nDownloading test data ...')
             download_data(binary_path, binary_url)
 
-    results_path = data_path / 'saved_results/'
-    results_url = 'https://www.kilosort.org/downloads/pytest.zip'
+    if gpu:
+        results_path = data_path / 'saved_results_gpu/'
+        results_url = 'https://www.kilosort.org/downloads/pytest_gpu.zip'
+    else:
+        results_path = data_path / 'saved_results/'
+        results_url = 'https://www.kilosort.org/downloads/pytest.zip'
     if ((download == 'results') or (download == 'both')):
         if results_path.is_dir():
             shutil.rmtree(results_path.as_posix())
