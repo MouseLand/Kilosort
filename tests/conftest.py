@@ -213,7 +213,9 @@ def list_files(startpath):
 
 @pytest.fixture(scope='session')
 def results_directory(data_directory):
-    return data_directory / "saved_results"
+    if gpu: results_path = data_directory / 'saved_results_gpu/'
+    else: results_path = data_directory / 'saved_results/'
+    return results_path
 
 ### End
 
