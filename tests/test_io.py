@@ -115,3 +115,114 @@ def test_dat_extension(torch_device, data_directory):
     finally:
         # Delete memmap file and re-raise exception
         path.unlink()
+
+
+def test_tmin_tmax(torch_device, data_directory):
+    N, C = (1000, 10)
+    NT = 300
+    nt = 61
+    data = np.repeat(np.arange(N)[...,np.newaxis], repeats=C, axis=1)
+    fs = 10
+    path = data_directory / 'time_interval_test' / 'temp_memmap.dat'
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        a = np.memmap(path, mode='w+', shape=(N,C), dtype=np.int16)
+        a[:] = data[:]
+        a.flush()
+        del(a)
+
+        bfile = io.BinaryRWFile(path, n_chan_bin=C, fs=fs, device=torch_device,
+                                tmin=10, tmax=85, NT=NT, nt=nt)
+
+        assert bfile.imin == 100
+        assert bfile.imax == 850
+        assert bfile.n_samples == 750
+        assert bfile[0:50].min() == 100
+        assert bfile[700:750].max() == 849
+        assert bfile.n_batches == 3
+
+        X0 = bfile.padded_batch_to_torch(ibatch=0)
+        assert X0.min() == 100
+        assert X0.max() == 100 + NT + nt - 1
+
+        X1 = bfile.padded_batch_to_torch(ibatch=1)
+        assert X1.min() == 100 + NT - nt
+        assert X1.max() == 100 + 2*NT + nt - 1
+
+        X2 = bfile.padded_batch_to_torch(ibatch=2)
+        assert X2.min() == 100 + 2*NT - nt
+        assert X2.max() == 849
+
+        bfile.close()
+
+    finally:
+        # Delete memmap file and re-raise exception
+        bfile.close()
+        path.unlink()
+
+
+def test_tmin_only(torch_device, data_directory):
+    N, C = (1000, 10)
+    NT = 300
+    nt = 61
+    data = np.repeat(np.arange(N)[...,np.newaxis], repeats=C, axis=1)
+    fs = 10
+    path = data_directory / 'time_interval_test' / 'temp_memmap2.dat'
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        a = np.memmap(path, mode='w+', shape=(N,C), dtype=np.int16)
+        a[:] = data[:]
+        a.flush()
+        del(a)
+
+        bfile = io.BinaryRWFile(path, n_chan_bin=C, fs=fs, device=torch_device,
+                                tmin=43, NT=NT, nt=nt)
+
+        assert bfile.imin == 430
+        assert bfile.imax == 1000
+        assert bfile.n_samples == 570
+        assert bfile[0:10].min() == 430
+        assert bfile[400:].max() == 999
+        assert bfile.n_batches == 2
+
+        bfile.close()
+
+    finally:
+        # Delete memmap file and re-raise exception
+        bfile.close()
+        path.unlink()
+
+
+def test_tmax_only(torch_device, data_directory):
+    N, C = (1000, 10)
+    NT = 300
+    nt = 61
+    data = np.repeat(np.arange(N)[...,np.newaxis], repeats=C, axis=1)
+    fs = 10
+    path = data_directory / 'time_interval_test' / 'temp_memmap3.dat'
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        a = np.memmap(path, mode='w+', shape=(N,C), dtype=np.int16)
+        a[:] = data[:]
+        a.flush()
+        del(a)
+
+        bfile = io.BinaryRWFile(path, n_chan_bin=C, fs=fs, device=torch_device,
+                                tmax=78, NT=NT, nt=nt)
+
+        assert bfile.imin == 0
+        assert bfile.imax == 780
+        assert bfile.n_samples == 780
+        assert bfile[0:100].min() == 0
+        assert bfile[700:].max() == 779
+        assert bfile.n_batches == 3
+
+        bfile.close()
+
+    finally:
+        # Delete memmap file and re-raise exception
+        bfile.close()
+        path.unlink()
