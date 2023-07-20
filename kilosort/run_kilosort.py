@@ -117,7 +117,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     st, clu, tF, Wall = sort_spikes(ops, device, bfile, tic0=tic0,
                                     progress_bar=progress_bar)
     ops, similar_templates, is_ref, est_contam_rate = \
-        save_sorting(ops, results_dir, st, clu, tF, Wall, tic0)
+        save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
 
     return ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
 
@@ -372,7 +372,7 @@ def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     return st, clu, tF, Wall
 
 
-def save_sorting(ops, results_dir, st, clu, tF, Wall, tic0=np.nan):  
+def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan):  
     """Save sorting results, and format them for use with Phy
 
     Parameters
@@ -390,6 +390,9 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, tic0=np.nan):
         TODO
     Wall : np.ndarray
         TODO
+    imin : int
+        Minimum sample index used by BinaryRWFile, exported spike times will
+        be shifted forward by this number.
     tic0 : float; default=np.nan.
         Start time of `run_kilosort`.
 
@@ -404,7 +407,7 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, tic0=np.nan):
 
     print('\nSaving to phy and computing refractory periods')
     results_dir, similar_templates, is_ref, est_contam_rate = io.save_to_phy(
-            st, clu, tF, Wall, ops['probe'], ops, results_dir=results_dir,
+            st, clu, tF, Wall, ops['probe'], ops, imin, results_dir=results_dir,
             data_dtype=ops['data_dtype']
             )
     print(f'{int(is_ref.sum())} units found with good refractory periods')

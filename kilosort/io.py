@@ -133,7 +133,7 @@ def save_probe(probe_dict, filepath):
         f.write(json.dumps(d))
 
 
-def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None, data_dtype=None):
+def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtype=None):
 
     if results_dir is None:
         results_dir = ops['data_dir'].joinpath('kilosort4')
@@ -154,7 +154,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, results_dir=None, data_dtype=None
     np.save((results_dir / 'whitening_mat_inv.npy'), whitening_mat_inv)
 
     # spike properties
-    spike_times = st[:,0]
+    spike_times = st[:,0] + imin  # shift by minimum sample index
     spike_clusters = clu
     amplitudes = ((tF**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
     np.save((results_dir / 'spike_times.npy'), spike_times)
@@ -262,7 +262,7 @@ class BinaryRWFile:
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = torch.device('cpu'), write: bool = False,
-                 dtype: str = None, tmin: float = None, tmax: float = None):
+                 dtype: str = None, tmin: float = 0.0, tmax: float = np.inf):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -300,14 +300,16 @@ class BinaryRWFile:
 
         # Must come after dtype since dtype is necessary for nbytesread
         total_samples = int(self.nbytes // self.nbytesread)
-        self.imin = 0 if tmin is None else max(tmin/fs, 0)
-        self.imax = total_samples if tmax is None else min(tmax/fs, total_samples)
+        self.imin = max(int(tmin*fs), 0)
+        self.imax = total_samples if tmax==np.inf else min(int(tmax*fs), total_samples)
 
         self.n_batches = int(np.ceil(self.n_samples / self.NT))
 
         mode = 'w+' if write else 'r'
+        # Must use total samples for file shape, otherwise the end of the data
+        # gets cut off if tmin,tmax are set.
         self.file = np.memmap(self.filename, mode=mode, dtype=self.dtype,
-                              shape=self.shape)
+                              shape=(total_samples, self.n_chan_bin))
 
 
     @property
@@ -367,8 +369,18 @@ class BinaryRWFile:
         self.file[sample_indices] = data
         
     def __getitem__(self, *items):
-        sample_indices, *crop = items
-        return self.file[sample_indices]
+        idx, *crop = items
+        # Shift indices by minimum sample index.
+        start = self.imin if idx.start is None else idx.start + self.imin
+        stop = self.imax if idx.stop is None else min(idx.stop + self.imin, self.imax)
+        sample_indices = slice(start, stop, idx.step)
+        samples = self.file[sample_indices]
+        # Shift data to one sign
+        if self.dtype == 'uint16':
+            samples = samples - 2**15
+            samples = samples.astype('int16')
+
+        return samples
 
     def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
@@ -377,17 +389,21 @@ class BinaryRWFile:
             bend = self.imin + self.NT + self.nt
         else:
             bstart = self.imin + (ibatch * self.NT) - self.nt
-            bend = min(self.imax, self.imin + bstart + self.NT + 2*self.nt)
+            bend = min(self.imax, bstart + self.NT + 2*self.nt)
         data = self.file[bstart : bend]
         data = data.T
+
         nsamp = data.shape[-1]
         X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device=self.device)
         # fix the data at the edges for the first and last batch
-        if ibatch==0:
+        # TODO: separate conditions for if imin is nonzero, imax less than max?
+        #       don't actually need to duplicate data at the ends in those cases,
+        #       can use the real data before/after min/max sample.
+        if ibatch == 0:
             X[:, self.nt : self.nt+nsamp] = torch.from_numpy(data).to(self.device).float()
             X[:, :self.nt] = X[:, self.nt : self.nt+1]
-            bstart = - self.nt
-        elif ibatch==self.n_batches-1:
+            bstart = self.imin - self.nt
+        elif ibatch == self.n_batches-1:
             X[:, :nsamp] = torch.from_numpy(data).to(self.device).float()
             X[:, nsamp:] = X[:, nsamp-1:nsamp]
             bend += self.nt
@@ -406,9 +422,11 @@ class BinaryFiltered(BinaryRWFile):
                  chan_map: np.ndarray = None, hp_filter: torch.Tensor = None,
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
                  device: torch.device = torch.device('cuda'), do_CAR: bool = True,
-                 invert_sign: bool = False, dtype=None):
+                 invert_sign: bool = False, dtype=None, tmin: float = 0.0,
+                 tmax: float = np.inf):
 
-        super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device, dtype=dtype) 
+        super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device,
+                         dtype=dtype, tmin=tmin, tmax=tmax) 
         self.chan_map = chan_map
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter
@@ -446,13 +464,7 @@ class BinaryFiltered(BinaryRWFile):
         return X
 
     def __getitem__(self, *items):
-        sample_indices, *crop = items
-        samples = self.file[sample_indices]
-        # Shift data to one sign
-        if self.dtype == 'uint16':
-            samples = samples - 2**15
-            samples = samples.astype('int16')
-
+        samples = super().__getitem__(*items)
         X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
         
