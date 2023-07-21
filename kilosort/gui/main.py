@@ -184,6 +184,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.data_view_box.modeChanged.connect(
             self.probe_view_box.synchronize_data_view_mode
         )
+        self.data_view_box.intervalUpdated.connect(self.load_data)
 
         self.probe_view_box.channelSelected.connect(
             self.data_view_box.change_primary_channel
@@ -240,11 +241,13 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def set_parameters(self):
         settings = self.settings_box.settings
+        settings['tmin'] = self.data_view_box.tmin
+        settings['tmax'] = self.data_view_box.tmax
         # advanced_options = self.settings_box.advanced_options
 
-        self.data_path = settings.pop("data_file_path")
-        self.results_directory = settings.pop("results_dir")
-        self.probe_layout = settings.pop("probe_layout")
+        self.data_path = settings["data_file_path"]
+        self.results_directory = settings["results_dir"]
+        self.probe_layout = settings["probe_layout"]
         # self.time_range = settings.pop("time_range")
         self.num_channels = settings["n_chan_bin"]
 
@@ -278,6 +281,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         yc = self.probe_layout["yc"]
         nskip = self.params["nskip"]
         data_dtype = self.params["data_dtype"]
+        tmin = self.params['tmin']
+        tmax = self.params['tmax']
 
         binary_file = BinaryFiltered(
             filename=self.data_path,
@@ -286,6 +291,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             chan_map=chan_map,
             device=torch.device("cpu"),
             dtype=data_dtype,
+            tmin=tmin,
+            tmax=tmax
         )
 
         self.context.binary_file = binary_file
@@ -303,6 +310,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             hp_filter=self.context.highpass_filter,
             device=torch.device("cpu"),
             dtype=data_dtype,
+            tmin=tmin,
+            tmax=tmax
         ) as bin_file:
             self.context.whitening_matrix = preprocessing.get_whitening_matrix(
                 f=bin_file,
@@ -320,6 +329,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             whiten_mat=self.context.whitening_matrix,
             device=torch.device("cpu"),
             dtype=data_dtype,
+            tmin=tmin,
+            tmax=tmax
         )
 
         self.context.filt_binary_file = filt_binary_file

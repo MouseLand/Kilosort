@@ -22,11 +22,13 @@ def make_bfile_with_dtype(dtype, fill, directory, device):
 
         bfile = io.BinaryFiltered(path, C, device=device, dtype=dtype)
         x = bfile[0:100]
+        y = bfile.padded_batch_to_torch(0)
 
         # Memmap should be loaded as the specified dtype, but the Tensor used for
         # computations in BinaryFiltered should always be converted to float32.
         assert bfile.file.dtype == dtype
         assert x.dtype == torch.float32
+        assert y.dtype == torch.float32
 
         bfile.close()
 
