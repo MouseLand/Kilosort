@@ -262,7 +262,8 @@ class BinaryRWFile:
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = torch.device('cpu'), write: bool = False,
-                 dtype: str = None, tmin: float = 0.0, tmax: float = np.inf):
+                 dtype: str = None, tmin: float = 0.0, tmax: float = np.inf,
+                 file_object=None):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -272,10 +273,14 @@ class BinaryRWFile:
         
         Parameters
         ----------
-        filename: str
+        filename : str
             The filename of the file to read from or write to
-        n_chan_bin: int
+        n_chan_bin : int
             number of channels
+        file_object : array-like file object
+            Must have 'shape' and 'dtype' attributes and support array-like
+            indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
+            array or memmap.
 
         """
         self.fs = fs
@@ -289,7 +294,7 @@ class BinaryRWFile:
         self.writable = write
 
         if dtype is None:
-            dtype = 'int16'
+            dtype = 'int16' if file_object is None else file_object.dtype
         self.dtype = dtype
 
         if str(self.dtype) not in self.supported_dtypes:
@@ -301,7 +306,13 @@ class BinaryRWFile:
             warnings.warn(message, RuntimeWarning)
 
         # Must come after dtype since dtype is necessary for nbytesread
-        total_samples = int(self.nbytes // self.nbytesread)
+        if file_object is None:
+            total_samples = int(self.nbytes // self.nbytesread)
+        else:
+            n, c = file_object.shape
+            assert c == n_chan_bin
+            total_samples = n
+
         self.imin = max(int(tmin*fs), 0)
         self.imax = total_samples if tmax==np.inf else min(int(tmax*fs), total_samples)
 
@@ -310,8 +321,13 @@ class BinaryRWFile:
         mode = 'w+' if write else 'r'
         # Must use total samples for file shape, otherwise the end of the data
         # gets cut off if tmin,tmax are set.
-        self.file = np.memmap(self.filename, mode=mode, dtype=self.dtype,
-                              shape=(total_samples, self.n_chan_bin))
+        if file_object is not None:
+            # For an already-loaded array-like file object,
+            # such as a NumPy memmap
+            self.file = file_object
+        else:
+            self.file = np.memmap(self.filename, mode=mode, dtype=self.dtype,
+                                  shape=(total_samples, self.n_chan_bin))
 
 
     @property
@@ -405,13 +421,20 @@ class BinaryRWFile:
     def _get_shifted_indices(self, idx):
         if not isinstance(idx, tuple): idx = tuple([idx])
         new_idx = []
-        for i in idx:
-            if isinstance(i, slice):
-                start = self.imin if i.start is None else i.start + self.imin
-                stop = self.imax if i.stop is None else min(i.stop + self.imin, self.imax)
-                new_idx.append(slice(start, stop, i.step))
-            else:
-                new_idx.append(i)
+
+        i = idx[0]
+        if isinstance(i, slice):
+            # Time dimension
+            start = self.imin if i.start is None else i.start + self.imin
+            stop = self.imax if i.stop is None else min(i.stop + self.imin, self.imax)
+            new_idx.append(slice(start, stop, i.step))
+        else:
+            new_idx.append(i)
+
+        if len(idx) == 2:
+            # Channel dimension, should be no others after this.
+            # No adjustments needed.
+            new_idx.append(idx[1])
 
         return tuple(new_idx)
 
@@ -460,10 +483,10 @@ class BinaryFiltered(BinaryRWFile):
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
                  device: torch.device = torch.device('cuda'), do_CAR: bool = True,
                  invert_sign: bool = False, dtype=None, tmin: float = 0.0,
-                 tmax: float = np.inf):
+                 tmax: float = np.inf, file_object=None):
 
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device,
-                         dtype=dtype, tmin=tmin, tmax=tmax) 
+                         dtype=dtype, tmin=tmin, tmax=tmax, file_object=file_object) 
         self.chan_map = chan_map
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter
