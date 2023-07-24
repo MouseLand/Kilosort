@@ -286,6 +286,7 @@ class BinaryRWFile:
         self.nt0min = nt0min
         self.device = device
         self.uint_set_warning = True
+        self.writable = write
 
         if dtype is None:
             dtype = 'int16'
@@ -357,7 +358,8 @@ class BinaryRWFile:
         """
         Closes the file.
         """
-        self.file._mmap.close()
+        del(self.file)
+        self.file = None
         
     def __enter__(self):
         return self
@@ -366,6 +368,9 @@ class BinaryRWFile:
         self.close()
 
     def __setitem__(self, *items):
+        if not self.writable:
+            raise ValueError('Binary file was loaded as read-only.')
+
         idx, data = items
         # Shift indices by minimum sample index
         sample_indices = self._get_shifted_indices(idx)
@@ -383,6 +388,9 @@ class BinaryRWFile:
         self.file[sample_indices] = data
         
     def __getitem__(self, *items):
+        if self.file is None:
+            raise ValueError('Binary file has been closed, data not accessible.')
+
         idx, *crop = items
         # Shift indices by minimum sample index.
         sample_indices = self._get_shifted_indices(idx)
@@ -409,6 +417,9 @@ class BinaryRWFile:
 
     def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
+        if self.file is None:
+            raise ValueError('Binary file has been closed, data not accessible.')
+
         if ibatch==0:
             bstart = self.imin
             bend = self.imin + self.NT + self.nt
