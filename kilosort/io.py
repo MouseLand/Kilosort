@@ -395,9 +395,17 @@ class BinaryRWFile:
         return samples
     
     def _get_shifted_indices(self, idx):
-        start = self.imin if idx.start is None else idx.start + self.imin
-        stop = self.imax if idx.stop is None else min(idx.stop + self.imin, self.imax)
-        return slice(start, stop, idx.step)
+        if not isinstance(idx, tuple): idx = tuple([idx])
+        new_idx = []
+        for i in idx:
+            if isinstance(i, slice):
+                start = self.imin if i.start is None else i.start + self.imin
+                stop = self.imax if i.stop is None else min(i.stop + self.imin, self.imax)
+                new_idx.append(slice(start, stop, i.step))
+            else:
+                new_idx.append(i)
+
+        return tuple(new_idx)
 
     def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
