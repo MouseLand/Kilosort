@@ -277,7 +277,7 @@ class BinaryRWFile:
             The filename of the file to read from or write to
         n_chan_bin : int
             number of channels
-        file_object : array-like file object
+        file_object : array-like file object; optional.
             Must have 'shape' and 'dtype' attributes and support array-like
             indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
             array or memmap.
@@ -293,8 +293,12 @@ class BinaryRWFile:
         self.uint_set_warning = True
         self.writable = write
 
+        if file_object is not None:
+            dtype = file_object.dtype
         if dtype is None:
-            dtype = 'int16' if file_object is None else file_object.dtype
+            dtype = 'int16'
+            print("Interpreting binary file as default dtype='int16'. If data was "
+                    "saved in a different format, specify `data_dtype`.")
         self.dtype = dtype
 
         if str(self.dtype) not in self.supported_dtypes:
