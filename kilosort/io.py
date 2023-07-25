@@ -482,20 +482,71 @@ class BinaryRWFile:
 
 class BinaryFileGroup:
     def __init__(self, file_objects):
-        self.objects = file_objects
+        # NOTE: Assumes list order of files matches temporal order for
+        #       concatenation.
+        self.file_objects = file_objects
         self.dtype = file_objects[0].dtype
+        self.n_chans = file_objects[0].shape[1]
         for f in file_objects[1:]:
             assert f.dtype == self.dtype, 'All files must have the same dtype'
+            assert f.shape[1] == self.n_chans, \
+                'All files must have the same number of channels'
+
+        # Track indices that represent boundary between files. Each entry
+        # is the starting index of the subsequent file.
+        i = 0
+        self.split_indices = []
+        for f in file_objects:
+            i += f.shape[0]
+            self.split_indices.append(i)
 
     def __getitem__(self, *items):
         # Index into appropriate individual object based on index.
         # For indices that span multiple files, index all then concatenate result.
-        pass
+        idx, *crop = items
+        if not isinstance(idx, tuple): idx = tuple([idx])
+        channel_idx = idx[1] if len(idx) > 1 else slice(None)
+        time_idx = idx[0]
+
+        # To simplify for loop logic, convert integer index to slice and
+        # convert NoneTypes to boundaries of data, and convert negative
+        # indices to positive indices.
+        if not isinstance(time_idx, slice):
+            time_idx = slice(time_idx, time_idx+1)
+        i = time_idx.start
+        j = time_idx.stop
+
+        if i is None: i = 0
+        if i < 0: i = self.shape[0] + i
+        if j is None: j = self.shape[0]
+        if j < 0: j = self.shape[0] + j
+        time_idx = slice(i, j)
+
+        data = []
+        shift = 0
+        for k,f in zip(self.split_indices, self.file_objects):
+            n_samples = f.shape[0]
+            if time_idx.start < k:
+                # At least part of the data is in this file
+                t = slice(time_idx.start - shift, time_idx.stop - shift)
+                data.append(f[t, channel_idx])
+                if time_idx.stop <= k:
+                    # This is the end of the data to be retrieved
+                    break
+            shift += n_samples
+
+        if len(data) == 0:
+            d = None
+        elif len(data) == 1:
+            d = data[0]
+        else:
+            d = np.concatenate(data, axis=0)
+    
+        return d
 
     @property
     def shape(self):
-        # Concatenate individual shapes along time-axis
-        pass
+        return self.split_indices[-1], self.n_chans
 
 
 class BinaryFiltered(BinaryRWFile):
