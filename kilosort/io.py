@@ -478,6 +478,24 @@ class BinaryRWFile:
             return X, inds
         else:
             return X
+        
+
+class BinaryFileGroup:
+    def __init__(self, file_objects):
+        self.objects = file_objects
+        self.dtype = file_objects[0].dtype
+        for f in file_objects[1:]:
+            assert f.dtype == self.dtype, 'All files must have the same dtype'
+
+    def __getitem__(self, *items):
+        # Index into appropriate individual object based on index.
+        # For indices that span multiple files, index all then concatenate result.
+        pass
+
+    @property
+    def shape(self):
+        # Concatenate individual shapes along time-axis
+        pass
 
 
 class BinaryFiltered(BinaryRWFile):
