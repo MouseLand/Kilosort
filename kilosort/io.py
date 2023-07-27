@@ -480,6 +480,8 @@ class BinaryRWFile:
             return X
         
 
+# TODO: add option to provide multiple filenames, use same logic as BinaryRWFile
+#       to load memmaps, provide those loaded memmaps here.
 class BinaryFileGroup:
     def __init__(self, file_objects):
         # NOTE: Assumes list order of files matches temporal order for
@@ -547,6 +549,11 @@ class BinaryFileGroup:
     @property
     def shape(self):
         return self.split_indices[-1], self.n_chans
+    
+    @staticmethod
+    def from_files(filenames):
+        # TODO
+        pass
 
 
 class BinaryFiltered(BinaryRWFile):
