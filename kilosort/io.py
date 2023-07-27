@@ -311,7 +311,7 @@ class BinaryRWFile:
 
         # Must come after dtype since dtype is necessary for nbytesread
         if file_object is None:
-            total_samples = int(self.nbytes // self.nbytesread)
+            total_samples = get_total_samples(filename, n_chan_bin, dtype)
         else:
             n, c = file_object.shape
             assert c == n_chan_bin
@@ -333,18 +333,6 @@ class BinaryRWFile:
             self.file = np.memmap(self.filename, mode=mode, dtype=self.dtype,
                                   shape=(total_samples, self.n_chan_bin))
 
-
-    @property
-    def nbytesread(self):
-        """number of bytes per sample (FIXED for given file)"""
-        n_bytes = np.dtype(self.dtype).itemsize
-        return np.int64(n_bytes * self.n_chan_bin)
-
-    @property
-    def nbytes(self):
-        """total number of bytes in the file."""
-        return os.path.getsize(self.filename)
-        
     @property
     def n_samples(self) -> int:
         """total number of samples in the file."""
@@ -480,8 +468,15 @@ class BinaryRWFile:
             return X
         
 
-# TODO: add option to provide multiple filenames, use same logic as BinaryRWFile
-#       to load memmaps, provide those loaded memmaps here.
+def get_total_samples(filename, n_channels, dtype=np.int16):
+    """Count samples in binary file given dtype and number of channels."""
+    bytes_per_value = np.dtype(dtype).itemsize
+    bytes_per_sample = np.int64(bytes_per_value * n_channels)
+    total_bytes = os.path.getsize(filename)
+
+    return total_bytes / bytes_per_sample
+
+
 class BinaryFileGroup:
     def __init__(self, file_objects):
         # NOTE: Assumes list order of files matches temporal order for
@@ -551,9 +546,16 @@ class BinaryFileGroup:
         return self.split_indices[-1], self.n_chans
     
     @staticmethod
-    def from_files(filenames):
-        # TODO
-        pass
+    def from_filenames(filenames, n_channels, dtype=np.int16, mode='r'):
+        files = []
+        for name in filenames:
+            n_samples = get_total_samples(name, n_channels, dtype)
+            f = np.memmap(name, mode=mode, dtype=dtype,
+                          shape=(n_samples, n_channels))
+            files.append(f)
+        
+        return files
+
 
 
 class BinaryFiltered(BinaryRWFile):
