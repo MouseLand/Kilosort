@@ -474,7 +474,7 @@ def get_total_samples(filename, n_channels, dtype=np.int16):
     bytes_per_sample = np.int64(bytes_per_value * n_channels)
     total_bytes = os.path.getsize(filename)
 
-    return total_bytes / bytes_per_sample
+    return int(total_bytes / bytes_per_sample)
 
 
 class BinaryFileGroup:
