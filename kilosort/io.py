@@ -18,9 +18,12 @@ def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
 
     data_dir = Path(data_dir)
     filenames = list(data_dir.glob('*.bin')) + list(data_dir.glob('*.bat')) \
-                + list(data_dir.glob('*.dat'))
+                + list(data_dir.glob('*.dat')) + list(data_dir.glob('*.raw'))
     if len(filenames) == 0:
-        raise FileNotFoundError('No binary file (*.bin or *.bat) found in folder')
+        raise FileNotFoundError(
+            'No binary file found in folder. Expected extensions are:\n'
+            '*.bin, *.bat, *.dat, or *.raw.'
+            )
 
     # TODO: Why give this preference? Not all binary files will have this tag.
     # If there are multiple binary files, find one with "ap" tag
@@ -555,7 +558,6 @@ class BinaryFileGroup:
             files.append(f)
         
         return files
-
 
 
 class BinaryFiltered(BinaryRWFile):
