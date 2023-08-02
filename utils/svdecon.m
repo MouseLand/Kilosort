@@ -20,8 +20,14 @@ end
 
 if  m <= n
     C = X*X';
-    [U,D] = eig(C);
-    
+
+    try
+        [U,D] = eig(C);
+    catch ME
+        % warning(ME.message);
+        [U,D] = eig(gather(C), 'nobalance');
+    end
+
     clear C;
     
     [d,ix] = sort(abs(diag(D)),'descend');
@@ -39,8 +45,15 @@ if  m <= n
         V = gather(V);
     end
 else
-    C = X'*X; 
-    [V,D] = eig(C);
+    C = X'*X;
+
+    try
+        [V,D] = eig(C);
+    catch ME
+        % warning(ME.message);
+        [V,D] = eig(gather(C), 'nobalance');
+    end
+
     D = gather(D);
     V = gather(V);
     clear C;

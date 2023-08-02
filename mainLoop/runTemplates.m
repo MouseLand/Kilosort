@@ -95,7 +95,14 @@ for j = 1:Nfilt
     
     UA = reshape(rez.UA(:, j, :, :), [], Nbatches);
     UA = gpuArray(UA);
-    [A, B, C] = svdecon(UA);
+
+    try
+        [A, B, C] = svdecon(UA);
+    catch ME
+        % warning(ME.message);
+        [A, B, C] = svd(UA, 'econ');
+    end
+    
     % U_a times U_b results in a reconstruction of the time components
     rez.U_a(:,:,j) = gather(A(:, 1:nKeep) * B(1:nKeep, 1:nKeep));
     rez.U_b(:,:,j) = gather(C(:, 1:nKeep));
