@@ -4,7 +4,7 @@ import torch
 from torch.fft import fft, ifft, fftshift
 
 import kilosort.preprocessing as kpp
-from kilosort import datashift
+from kilosort import datashift, io
 
 
 np.random.seed(123)
@@ -61,6 +61,29 @@ class TestFiltering:
         # but neither case is exact.
         assert torch.max(x100) < 0.01
         assert torch.max(x500) > 0.9
+
+
+class TestArtifactRemoval:
+    
+    def test_threshold(self, torch_device):
+        a = np.random.randint(-1000, 1000, (1000,10)).astype(np.float32)
+        a[900,4] = 30001
+
+        bfile1 = io.BinaryFiltered(
+            filename='dummy', n_chan_bin=10, NT=500, device=torch_device,
+            file_object=a, artifact_threshold=30000
+        )
+        bfile2 = io.BinaryFiltered(
+            filename='dummy', n_chan_bin=10, NT=500, device=torch_device,
+            file_object=a
+            )
+
+        # No threshold crossings in the first half, so these should match.
+        assert torch.allclose(bfile1[:500,:], bfile2[:500,:])
+        # Second half should be zeroed out for bfile1 only.
+        zeros = torch.zeros(500,10).to(torch_device).float()
+        assert torch.allclose(bfile1[500:,:], zeros.T)
+        assert not torch.allclose(bfile2[500:,:], zeros.T)
 
 
 class TestWhitening:
