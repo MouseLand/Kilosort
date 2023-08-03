@@ -666,7 +666,7 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
     filepath = Path(filepath)
     filepath.mkdir(exist_ok=True, parents=True)
     binary_filename = filepath / f'{data_name}'
-    probe_filename = filepath / f'{probe_name}.prb'
+    probe_filename = filepath / f'{probe_name}'
 
     # Using actual data shape is less fragile than relying on .get_num_channels()
     N = recording.get_total_samples()
