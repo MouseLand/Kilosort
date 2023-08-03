@@ -670,7 +670,7 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
 
     # Using actual data shape is less fragile than relying on .get_num_channels()
     N = recording.get_total_samples()
-    c = recording.get_traces(start_sample=0, end_sample=1, segment_index=0).shape[1]
+    c = recording.get_traces(start_frame=0, end_frame=1, segment_index=0).shape[1]
     s = recording.get_num_segments()
     fs = recording.get_sampling_frequency()
     dtype = recording.get_dtype()
