@@ -60,6 +60,16 @@ def default_settings():
     probe_name:
         Name of probe to load from Kilosort4's probe directory. This will only
         be used if no `probe` kwarg is specified for `run_kilosort`.
+    tmin:
+        Time in seconds where data reference should begin from. By default,
+        begins at 0 seconds.
+    tmax:
+        Time in seconds where data reference should end. By default, ends
+        at the end of the recording.
+    artifact_threshold:
+        If a batch contains absolute values above this number, it will be zeroed
+        out under the assumption that a recording artifact is present.
+        By default, the threshold is infinite (so that no zeroing occurs).
     
     """
 
@@ -81,6 +91,7 @@ def default_settings():
     settings['probe_name']    = 'neuropixPhase3B1_kilosortChanMap.mat'
     settings['tmin'] = 0.0
     settings['tmax'] = np.inf
+    settings['artifact_threshold'] = np.inf
     return settings
 
 
@@ -216,7 +227,8 @@ def get_run_parameters(ops) -> list:
         ops['probe']['xc'],
         ops['probe']['yc'],
         ops['settings']['tmin'],
-        ops['settings']['tmax']
+        ops['settings']['tmax'],
+        ops['settings']['artifact_threshold']
     ]
 
     return parameters
@@ -246,7 +258,7 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
 
     tic = time.time()
     n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, \
-        xc, yc, tmin, tmax = get_run_parameters(ops)
+        xc, yc, tmin, tmax, artifact = get_run_parameters(ops)
     nskip = ops['settings']['nskip']
     
     # Compute high pass filter
@@ -255,7 +267,8 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min,
                               chan_map, hp_filter, device=device, do_CAR=do_CAR,
                               invert_sign=invert, dtype=dtype, tmin=tmin,
-                              tmax=tmax, file_object=file_object)
+                              tmax=tmax, artifact_threshold=artifact,
+                              file_object=file_object)
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip)
 
     bfile.close()
@@ -304,7 +317,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
     print('\ncomputing drift')
 
     n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, \
-        _, _, tmin, tmax = get_run_parameters(ops)
+        _, _, tmin, tmax, artifact = get_run_parameters(ops)
     hp_filter = ops['preprocessing']['hp_filter']
     whiten_mat = ops['preprocessing']['whiten_mat']
 
@@ -312,7 +325,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
         hp_filter=hp_filter, whiten_mat=whiten_mat, device=device, do_CAR=do_CAR,
         invert_sign=invert, dtype=dtype, tmin=tmin, tmax=tmax,
-        file_object=file_object
+        artifact_threshold=artifact, file_object=file_object
         )
 
     ops = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
@@ -325,7 +338,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
         hp_filter=hp_filter, whiten_mat=whiten_mat, device=device,
         dshift=ops['dshift'], do_CAR=do_CAR, dtype=dtype, tmin=tmin, tmax=tmax,
-        file_object=file_object
+        artifact_threshold=artifact, file_object=file_object
         )
 
     return ops, bfile
