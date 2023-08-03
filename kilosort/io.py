@@ -619,3 +619,198 @@ class BinaryFiltered(BinaryRWFile):
         else:
             X = super().padded_batch_to_torch(ibatch)
             return self.filter(X, ops, ibatch)
+
+
+def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
+                             dtype=np.int16, chunksize=60000, export_probe=True,
+                             probe_name='probe.prb'):
+    """Save data from a SpikeInterface RecordingExtractor to a binary file.
+
+    This function is provided to assist with converting data from other file
+    formats to the raw binary format supported by Kilosort4. We do not explicitly
+    support any other file format, nor is SpikeInterface a required package for
+    using Kilosort4, so future updates to SpikeInterface may not be reflected here.
+    If you run into errors and would like help loading your data into Kilosort4,
+    please post an issue on the Kilosort4 github.
+
+    Parameters
+    ----------
+    recording : RecordingExtractor
+        A SpikeInterface object containing the recording to be copied.
+    filepath : str or Path-like.
+        Path to the directory where the binary file (and possibly prb file)
+        should be saved.
+    data_name : str; default='data.bin'
+        Name for the new binary file.
+    dtype : type; default=np.int16
+        Data type for the new binary file.
+    chunksize : int; default=60000.
+        Number of samples to copy on each loop. A higher number may speed up
+        copying, but will use more memory.
+    export_probe : bool; default=True.
+        If True, attempt to extract probe information from the recording and
+        write it to a .prb file.
+    probe_name : str; default='probe.prb'
+        Name for the new probe file.
+        
+    Notes
+    -----
+    SpikeInterface has its own `recording.save()` method for this purpose
+    that supports parallelization. This simpler utility is provided for
+    better control over filepath structure, minimal output, and fewer
+    dependencies on file format details. However, for very large files, you
+    may want to investigate `recording.save` to speed up data copying.
+    
+    """
+
+    filepath = Path(filepath)
+    filepath.mkdir(exist_ok=True, parents=True)
+    binary_filename = filepath / f'{data_name}'
+    probe_filename = filepath / f'{probe_name}.prb'
+
+    # Using actual data shape is less fragile than relying on .get_num_channels()
+    N = recording.get_total_samples()
+    c = recording.get_traces(start_sample=0, end_sample=1, segment_index=0).shape[1]
+    s = recording.get_num_segments()
+    fs = recording.get_sampling_frequency()
+    dtype = recording.get_dtype()
+
+    y = np.memmap(binary_filename, dtype=dtype, mode='w+', shape=(N,c))
+    total_chunks = int(np.ceil(N/chunksize))
+
+    # Copy data to binary file, 60000 samples at a time
+    # (same as Kilosort's default batch size).
+    chunk = 0
+    for k in range(s):
+        n = recording.get_num_samples(segment_index=k)
+        i = 0 + k*chunksize
+        while i < n:
+            if chunk % 50 == 0:
+                print(f'Copying chunk {chunk}/{total_chunks} ...')
+            j = i + chunksize if (i + chunksize) < n else n
+            t = recording.get_traces(segment_index=k, start_frame=i, end_frame=j)
+            y[i:j,:] = t
+            y.flush()
+            i += chunksize
+            chunk += 1
+
+    del(y)  # Close memmap after copying
+
+    if export_probe:
+        try:
+            from probeinterface import write_prb
+            pg = recording.get_probegroup()
+            write_prb(probe_filename, pg)
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError(
+                'Could not import `write_prb` from probeinterface when exporting '
+                'probe, please run `pip install spikeinterface`.'
+            )
+    else:
+        probe_filename = None
+
+    return binary_filename, N, c, s, fs, probe_filename
+
+
+class RecordingExtractorAsArray:
+
+    def __init__(self, recording_extractor):
+        """An array-like wrapper for a RecordingExtractor.
+
+        This class is provided to assist with loading data from other file 
+        formats besides the raw binary format supported by Kilosort4. We do not
+        explicitly support any other file format, nor is SpikeInterface a
+        required package for using Kilosort4, so future updates to SpikeInterface
+        may not be reflected here. If you run into errors and would like help
+        loading your data into Kilosort4, please post an issue on the Kilosort4
+        github.
+
+        Parameters
+        ----------
+        recording_extractor : RecordingExtractor
+            A SpikeInterface recording extractor. When the wrapper object is
+            indexed, `recording_extractor.get_traces()` will be invoked to
+            retrieve data from disk.
+
+        Attributes
+        ----------
+        shape
+        dtype
+
+        Examples
+        --------
+        >>> from spikeinterface.extractors import read_nwb_recording
+        >>> recording = read_nwb_recording('/home/my_file_path/arange.nwb')
+        >>> as_array = RecordingExtractorAsArray(recording)
+        >>> as_array[:5, 2]
+        array([[0],
+               [1],
+               [2],
+               [3],
+               [4],
+               [5]])
+
+        """
+
+        if recording_extractor.get_num_segments() > 1:
+            try:
+                import spikeinterface as si
+                self.recording = si.concatenate_recordings([recording_extractor])
+                print('SpikeInterface recording contains more than one segment, '
+                      'segments will be concatenated as if contiguous.')
+            except ModuleNotFoundError:
+                raise ModuleNotFoundError(
+                    'SpikeInterface could not be imported, but is needed for '
+                    'loading multi-segment SpikeInterface recordings. Please '
+                    'run `pip install spikeinterface`.'
+                )
+        self.recording = recording_extractor
+
+    def __getitem__(self, *items):
+        idx, *crop = items
+        if not isinstance(idx, tuple): idx = tuple([idx])
+        sample_idx = idx[0]
+        channel_ids = None if len(idx) == 1 else idx[1]
+
+        # Convert integer index to slice and convert NoneTypes to boundaries of
+        # data, and convert negative indices to positive indices.
+        if not isinstance(sample_idx, slice):
+            sample_idx = slice(sample_idx, sample_idx+1)
+        i = sample_idx.start
+        j = sample_idx.stop
+
+        if i is None: i = 0
+        if i < 0: i = self.shape[0] + i
+        if j is None: j = self.shape[0]
+        if j < 0: j = self.shape[0] + j
+
+        # Convert channel slice to list of indices.
+        if isinstance(channel_ids, slice):
+            c = channel_ids.start
+            d = channel_ids.stop
+            if c is None: c = 0
+            if d is None: d = self.shape[1]
+            channel_ids = list(range(c, d))
+        elif channel_ids is not None:
+            assert isinstance(channel_ids, int)
+            channel_ids = [channel_ids]
+
+        samples = self.recording.get_traces(start_frame=i, end_frame=j,
+                                            channel_ids=channel_ids)
+        
+        return samples
+
+    def __setitem__(self):
+        raise ValueError('RecordingExtractorAsBinary is read-only.')
+    
+    @property
+    def shape(self):
+        # `get_traces()` is necessary to get true number of channels, to handle
+        # mismatch for some files, pending a fix from spikeinterface.
+        n_channels = self.recording.get_traces(segment_index=0, start_frame=0,
+                                               end_frame=1).shape[1]
+        return self.recording.get_total_samples(), n_channels
+
+    @property
+    def dtype(self):
+        return self.recording.get_dtype()
