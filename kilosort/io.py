@@ -699,7 +699,13 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
     if export_probe:
         try:
             from probeinterface import write_prb
-            pg = recording.get_probegroup()
+            try:
+                pg = recording.get_probegroup()
+            except ValueError:
+                print(
+                    'SpikeInterface recording contains no probe information,\n'
+                    'could not write .prb file.'
+                )
             write_prb(probe_filename, pg)
         except ModuleNotFoundError:
             raise ModuleNotFoundError(
