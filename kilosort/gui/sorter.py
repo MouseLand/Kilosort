@@ -45,7 +45,8 @@ class KiloSortWorker(QtCore.QThread):
                 probe=probe,
                 results_dir=results_directory,
                 device=torch.device("cuda"),
-                progress_bar=self.progress_bar
+                progress_bar=self.progress_bar,
+                dtype=settings['data_dtype']
             )
 
             logger.info(f"Spike sorting output saved in\n{results_directory}")
