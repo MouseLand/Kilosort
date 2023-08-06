@@ -487,10 +487,11 @@ class SettingsBox(QtWidgets.QGroupBox):
             probe_path, _ = QtWidgets.QFileDialog.getOpenFileName(
                 parent=self,
                 caption="Choose probe file...",
-                filter="Probe Files (*.mat *.prb)",
-                directory=os.path.expanduser("~"),
+                filter="Probe Files (*.mat *.prb *.json)",
+                #directory=os.path.expanduser("~"),
                 options=file_dialog_options,
             )
+            print(probe_path)
             if probe_path:
                 try:
                     probe_path = Path(probe_path)
@@ -542,7 +543,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
                 except AssertionError:
                     logger.exception(
-                        "Please select a valid probe file (accepted types: *.prb, *.mat)!"
+                        "Please select a valid probe file (accepted types: *.prb, *.mat *.json)!"
                     )
                     self.disable_load()
                     self.disable_preview_probe()
