@@ -1,12 +1,14 @@
 name: tests
 
 on:
-  push:
-    branches:
-      - main
-      - "v*x"
-    tags:
-      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+  # NOTE: disabled tests on push because this causes PRs to be tested twice,
+  #       need to figure out how to have both without duplicating tests.
+  # push:
+  #   branches:
+  #     - main
+  #     - "v*x"
+  #   tags:
+  #     - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
   pull_request:
     branches:
       - main

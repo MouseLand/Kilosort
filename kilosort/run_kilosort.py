@@ -85,13 +85,21 @@ def default_settings():
 
 
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
-                 filename=None, data_dtype=None, results_dir=None, do_CAR=True,
-                 invert_sign=False, device=torch.device('cuda'),
-                 progress_bar=None):
+                 filename=None, file_object=None, data_dtype=None,
+                 results_dir=None, do_CAR=True, invert_sign=False,
+                 device=torch.device('cuda'), progress_bar=None):
+    """Spike sort the given dataset.
+    
+    Parameters
+    ----------
+    TODO
 
-    if data_dtype is None:
-        print("Interpreting binary file as default dtype='int16'. If data was "
-              "saved in a different format, specify `data_dtype`.")
+    file_object : array-like file object; optional.
+        Must have 'shape' and 'dtype' attributes and support array-like
+        indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
+        array or memmap. Must specify a valid `filename` as well.
+    
+    """
 
     if not do_CAR:
         print("Skipping common average reference.")
@@ -99,18 +107,22 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     tic0 = time.time()
 
     # Configure settings, ops, and file paths
-    if settings is None: settings = default_settings()
+    d = default_settings()
+    settings = {**d, **settings} if settings is not None else d
+    # NOTE: Also modifies settings in-place
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir)
     ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign)
 
     # Set preprocessing and drift correction parameters
-    ops = compute_preprocessing(ops, device, tic0=tic0)
+    ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
     np.random.seed(1)
     torch.cuda.manual_seed_all(1)
     torch.random.manual_seed(1)
-    ops, bfile = compute_drift_correction(ops, device, tic0=tic0,
-                                          progress_bar=progress_bar)
+    ops, bfile = compute_drift_correction(
+        ops, device, tic0=tic0, progress_bar=progress_bar,
+        file_object=file_object
+        )
     
     # Save intermediate `ops` for use by GUI plots
     io.save_ops(ops, results_dir)
@@ -210,7 +222,7 @@ def get_run_parameters(ops) -> list:
     return parameters
 
 
-def compute_preprocessing(ops, device, tic0=np.nan):
+def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     """Compute preprocessing parameters and save them to `ops`.
 
     Parameters
@@ -221,6 +233,10 @@ def compute_preprocessing(ops, device, tic0=np.nan):
         Indicates whether `pytorch` operations should be run on cpu or gpu.
     tic0 : float; default=np.nan
         Start time of `run_kilosort`.
+    file_object : array-like file object; optional.
+        Must have 'shape' and 'dtype' attributes and support array-like
+        indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
+        array or memmap.
 
     Returns
     -------
@@ -239,7 +255,7 @@ def compute_preprocessing(ops, device, tic0=np.nan):
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min,
                               chan_map, hp_filter, device=device, do_CAR=do_CAR,
                               invert_sign=invert, dtype=dtype, tmin=tmin,
-                              tmax=tmax)
+                              tmax=tmax, file_object=file_object)
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip)
 
     bfile.close()
@@ -258,7 +274,8 @@ def compute_preprocessing(ops, device, tic0=np.nan):
     return ops
 
 
-def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
+def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
+                             file_object=None):
     """Compute drift correction parameters and save them to `ops`.
 
     Parameters
@@ -271,6 +288,10 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
         Start time of `run_kilosort`.
     progress_bar : TODO; optional.
         Informs `tqdm` package how to report progress, type unclear.
+    file_object : array-like file object; optional.
+        Must have 'shape' and 'dtype' attributes and support array-like
+        indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
+        array or memmap.
 
     Returns
     -------
@@ -287,10 +308,12 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
     hp_filter = ops['preprocessing']['hp_filter']
     whiten_mat = ops['preprocessing']['whiten_mat']
 
-    bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
-                              hp_filter=hp_filter, whiten_mat=whiten_mat,
-                              device=device, do_CAR=do_CAR, invert_sign=invert,
-                              dtype=dtype, tmin=tmin, tmax=tmax)
+    bfile = io.BinaryFiltered(
+        ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
+        hp_filter=hp_filter, whiten_mat=whiten_mat, device=device, do_CAR=do_CAR,
+        invert_sign=invert, dtype=dtype, tmin=tmin, tmax=tmax,
+        file_object=file_object
+        )
 
     ops = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()
@@ -298,10 +321,12 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None):
             f'total {time.time()-tic0 : .2f}s')
     
     # binary file with drift correction
-    bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
-                              hp_filter=hp_filter, whiten_mat=whiten_mat, device=device,
-                              dshift=ops['dshift'], do_CAR=do_CAR, dtype=dtype,
-                              tmin=tmin, tmax=tmax)
+    bfile = io.BinaryFiltered(
+        ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
+        hp_filter=hp_filter, whiten_mat=whiten_mat, device=device,
+        dshift=ops['dshift'], do_CAR=do_CAR, dtype=dtype, tmin=tmin, tmax=tmax,
+        file_object=file_object
+        )
 
     return ops, bfile
 

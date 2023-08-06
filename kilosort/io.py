@@ -18,9 +18,12 @@ def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
 
     data_dir = Path(data_dir)
     filenames = list(data_dir.glob('*.bin')) + list(data_dir.glob('*.bat')) \
-                + list(data_dir.glob('*.dat'))
+                + list(data_dir.glob('*.dat')) + list(data_dir.glob('*.raw'))
     if len(filenames) == 0:
-        raise FileNotFoundError('No binary file (*.bin or *.bat) found in folder')
+        raise FileNotFoundError(
+            'No binary file found in folder. Expected extensions are:\n'
+            '*.bin, *.bat, *.dat, or *.raw.'
+            )
 
     # TODO: Why give this preference? Not all binary files will have this tag.
     # If there are multiple binary files, find one with "ap" tag
@@ -195,7 +198,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtyp
     # params.py
     dtype = "'int16'" if data_dtype is None else f"'{data_dtype}'"
     params = {'dat_path': f"'{Path(ops['settings']['filename']).as_posix()}'",
-            'n_channels_dat': len(chan_map),
+            'n_channels_dat': ops['settings']['NchanTOT'],
             'dtype': dtype,
             'offset': 0,
             'sample_rate': ops['settings']['fs'],
@@ -262,7 +265,8 @@ class BinaryRWFile:
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = torch.device('cpu'), write: bool = False,
-                 dtype: str = None, tmin: float = 0.0, tmax: float = np.inf):
+                 dtype: str = None, tmin: float = 0.0, tmax: float = np.inf,
+                 file_object=None):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -272,10 +276,14 @@ class BinaryRWFile:
         
         Parameters
         ----------
-        filename: str
+        filename : str
             The filename of the file to read from or write to
-        n_chan_bin: int
+        n_chan_bin : int
             number of channels
+        file_object : array-like file object; optional.
+            Must have 'shape' and 'dtype' attributes and support array-like
+            indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
+            array or memmap.
 
         """
         self.fs = fs
@@ -286,9 +294,14 @@ class BinaryRWFile:
         self.nt0min = nt0min
         self.device = device
         self.uint_set_warning = True
+        self.writable = write
 
+        if file_object is not None:
+            dtype = file_object.dtype
         if dtype is None:
             dtype = 'int16'
+            print("Interpreting binary file as default dtype='int16'. If data was "
+                    "saved in a different format, specify `data_dtype`.")
         self.dtype = dtype
 
         if str(self.dtype) not in self.supported_dtypes:
@@ -300,7 +313,13 @@ class BinaryRWFile:
             warnings.warn(message, RuntimeWarning)
 
         # Must come after dtype since dtype is necessary for nbytesread
-        total_samples = int(self.nbytes // self.nbytesread)
+        if file_object is None:
+            total_samples = get_total_samples(filename, n_chan_bin, dtype)
+        else:
+            n, c = file_object.shape
+            assert c == n_chan_bin
+            total_samples = n
+
         self.imin = max(int(tmin*fs), 0)
         self.imax = total_samples if tmax==np.inf else min(int(tmax*fs), total_samples)
 
@@ -309,21 +328,14 @@ class BinaryRWFile:
         mode = 'w+' if write else 'r'
         # Must use total samples for file shape, otherwise the end of the data
         # gets cut off if tmin,tmax are set.
-        self.file = np.memmap(self.filename, mode=mode, dtype=self.dtype,
-                              shape=(total_samples, self.n_chan_bin))
+        if file_object is not None:
+            # For an already-loaded array-like file object,
+            # such as a NumPy memmap
+            self.file = file_object
+        else:
+            self.file = np.memmap(self.filename, mode=mode, dtype=self.dtype,
+                                  shape=(total_samples, self.n_chan_bin))
 
-
-    @property
-    def nbytesread(self):
-        """number of bytes per sample (FIXED for given file)"""
-        n_bytes = np.dtype(self.dtype).itemsize
-        return np.int64(n_bytes * self.n_chan_bin)
-
-    @property
-    def nbytes(self):
-        """total number of bytes in the file."""
-        return os.path.getsize(self.filename)
-        
     @property
     def n_samples(self) -> int:
         """total number of samples in the file."""
@@ -357,7 +369,8 @@ class BinaryRWFile:
         """
         Closes the file.
         """
-        self.file._mmap.close()
+        del(self.file)
+        self.file = None
         
     def __enter__(self):
         return self
@@ -366,6 +379,9 @@ class BinaryRWFile:
         self.close()
 
     def __setitem__(self, *items):
+        if not self.writable:
+            raise ValueError('Binary file was loaded as read-only.')
+
         idx, data = items
         # Shift indices by minimum sample index
         sample_indices = self._get_shifted_indices(idx)
@@ -383,6 +399,9 @@ class BinaryRWFile:
         self.file[sample_indices] = data
         
     def __getitem__(self, *items):
+        if self.file is None:
+            raise ValueError('Binary file has been closed, data not accessible.')
+
         idx, *crop = items
         # Shift indices by minimum sample index.
         sample_indices = self._get_shifted_indices(idx)
@@ -395,12 +414,30 @@ class BinaryRWFile:
         return samples
     
     def _get_shifted_indices(self, idx):
-        start = self.imin if idx.start is None else idx.start + self.imin
-        stop = self.imax if idx.stop is None else min(idx.stop + self.imin, self.imax)
-        return slice(start, stop, idx.step)
+        if not isinstance(idx, tuple): idx = tuple([idx])
+        new_idx = []
+
+        i = idx[0]
+        if isinstance(i, slice):
+            # Time dimension
+            start = self.imin if i.start is None else i.start + self.imin
+            stop = self.imax if i.stop is None else min(i.stop + self.imin, self.imax)
+            new_idx.append(slice(start, stop, i.step))
+        else:
+            new_idx.append(i)
+
+        if len(idx) == 2:
+            # Channel dimension, should be no others after this.
+            # No adjustments needed.
+            new_idx.append(idx[1])
+
+        return tuple(new_idx)
 
     def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
+        if self.file is None:
+            raise ValueError('Binary file has been closed, data not accessible.')
+
         if ibatch==0:
             bstart = self.imin
             bend = self.imin + self.NT + self.nt
@@ -432,6 +469,95 @@ class BinaryRWFile:
             return X, inds
         else:
             return X
+        
+
+def get_total_samples(filename, n_channels, dtype=np.int16):
+    """Count samples in binary file given dtype and number of channels."""
+    bytes_per_value = np.dtype(dtype).itemsize
+    bytes_per_sample = np.int64(bytes_per_value * n_channels)
+    total_bytes = os.path.getsize(filename)
+
+    return int(total_bytes / bytes_per_sample)
+
+
+class BinaryFileGroup:
+    def __init__(self, file_objects):
+        # NOTE: Assumes list order of files matches temporal order for
+        #       concatenation.
+        self.file_objects = file_objects
+        self.dtype = file_objects[0].dtype
+        self.n_chans = file_objects[0].shape[1]
+        for f in file_objects[1:]:
+            assert f.dtype == self.dtype, 'All files must have the same dtype'
+            assert f.shape[1] == self.n_chans, \
+                'All files must have the same number of channels'
+
+        # Track indices that represent boundary between files. Each entry
+        # is the starting index of the subsequent file.
+        i = 0
+        self.split_indices = []
+        for f in file_objects:
+            i += f.shape[0]
+            self.split_indices.append(i)
+
+    def __getitem__(self, *items):
+        # Index into appropriate individual object based on index.
+        # For indices that span multiple files, index all then concatenate result.
+        idx, *crop = items
+        if not isinstance(idx, tuple): idx = tuple([idx])
+        channel_idx = idx[1] if len(idx) > 1 else slice(None)
+        time_idx = idx[0]
+
+        # To simplify for loop logic, convert integer index to slice and
+        # convert NoneTypes to boundaries of data, and convert negative
+        # indices to positive indices.
+        if not isinstance(time_idx, slice):
+            time_idx = slice(time_idx, time_idx+1)
+        i = time_idx.start
+        j = time_idx.stop
+
+        if i is None: i = 0
+        if i < 0: i = self.shape[0] + i
+        if j is None: j = self.shape[0]
+        if j < 0: j = self.shape[0] + j
+        time_idx = slice(i, j)
+
+        data = []
+        shift = 0
+        for k,f in zip(self.split_indices, self.file_objects):
+            n_samples = f.shape[0]
+            if time_idx.start < k:
+                # At least part of the data is in this file
+                t = slice(time_idx.start - shift, time_idx.stop - shift)
+                data.append(f[t, channel_idx])
+                if time_idx.stop <= k:
+                    # This is the end of the data to be retrieved
+                    break
+            shift += n_samples
+
+        if len(data) == 0:
+            d = None
+        elif len(data) == 1:
+            d = data[0]
+        else:
+            d = np.concatenate(data, axis=0)
+    
+        return d
+
+    @property
+    def shape(self):
+        return self.split_indices[-1], self.n_chans
+    
+    @staticmethod
+    def from_filenames(filenames, n_channels, dtype=np.int16, mode='r'):
+        files = []
+        for name in filenames:
+            n_samples = get_total_samples(name, n_channels, dtype)
+            f = np.memmap(name, mode=mode, dtype=dtype,
+                          shape=(n_samples, n_channels))
+            files.append(f)
+        
+        return files
 
 
 class BinaryFiltered(BinaryRWFile):
@@ -441,10 +567,10 @@ class BinaryFiltered(BinaryRWFile):
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
                  device: torch.device = torch.device('cuda'), do_CAR: bool = True,
                  invert_sign: bool = False, dtype=None, tmin: float = 0.0,
-                 tmax: float = np.inf):
+                 tmax: float = np.inf, file_object=None):
 
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device,
-                         dtype=dtype, tmin=tmin, tmax=tmax) 
+                         dtype=dtype, tmin=tmin, tmax=tmax, file_object=file_object) 
         self.chan_map = chan_map
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter
@@ -493,3 +619,198 @@ class BinaryFiltered(BinaryRWFile):
         else:
             X = super().padded_batch_to_torch(ibatch)
             return self.filter(X, ops, ibatch)
+
+
+def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
+                             dtype=np.int16, chunksize=60000, export_probe=True,
+                             probe_name='probe.prb'):
+    """Save data from a SpikeInterface RecordingExtractor to a binary file.
+
+    This function is provided to assist with converting data from other file
+    formats to the raw binary format supported by Kilosort4. We do not explicitly
+    support any other file format, nor is SpikeInterface a required package for
+    using Kilosort4, so future updates to SpikeInterface may not be reflected here.
+    If you run into errors and would like help loading your data into Kilosort4,
+    please post an issue on the Kilosort4 github.
+
+    Parameters
+    ----------
+    recording : RecordingExtractor
+        A SpikeInterface object containing the recording to be copied.
+    filepath : str or Path-like.
+        Path to the directory where the binary file (and possibly prb file)
+        should be saved.
+    data_name : str; default='data.bin'
+        Name for the new binary file.
+    dtype : type; default=np.int16
+        Data type for the new binary file.
+    chunksize : int; default=60000.
+        Number of samples to copy on each loop. A higher number may speed up
+        copying, but will use more memory.
+    export_probe : bool; default=True.
+        If True, attempt to extract probe information from the recording and
+        write it to a .prb file.
+    probe_name : str; default='probe.prb'
+        Name for the new probe file.
+        
+    Notes
+    -----
+    SpikeInterface has its own `recording.save()` method for this purpose
+    that supports parallelization. This simpler utility is provided for
+    better control over filepath structure, minimal output, and fewer
+    dependencies on file format details. However, for very large files, you
+    may want to investigate `recording.save` to speed up data copying.
+    
+    """
+
+    filepath = Path(filepath)
+    filepath.mkdir(exist_ok=True, parents=True)
+    binary_filename = filepath / f'{data_name}'
+    probe_filename = filepath / f'{probe_name}'
+
+    # Using actual data shape is less fragile than relying on .get_num_channels()
+    N = recording.get_total_samples()
+    c = recording.get_traces(start_frame=0, end_frame=1, segment_index=0).shape[1]
+    s = recording.get_num_segments()
+    fs = recording.get_sampling_frequency()
+    dtype = recording.get_dtype()
+
+    y = np.memmap(binary_filename, dtype=dtype, mode='w+', shape=(N,c))
+    total_chunks = int(np.ceil(N/chunksize))
+
+    # Copy data to binary file, 60000 samples at a time
+    # (same as Kilosort's default batch size).
+    chunk = 0
+    for k in range(s):
+        n = recording.get_num_samples(segment_index=k)
+        i = 0 + k*chunksize
+        while i < n:
+            if chunk % 50 == 0:
+                print(f'Copying chunk {chunk}/{total_chunks} ...')
+            j = i + chunksize if (i + chunksize) < n else n
+            t = recording.get_traces(segment_index=k, start_frame=i, end_frame=j)
+            y[i:j,:] = t
+            y.flush()
+            i += chunksize
+            chunk += 1
+
+    del(y)  # Close memmap after copying
+
+    if export_probe:
+        try:
+            from probeinterface import write_prb
+            pg = recording.get_probegroup()
+            write_prb(probe_filename, pg)
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError(
+                'Could not import `write_prb` from probeinterface when exporting '
+                'probe, please run `pip install spikeinterface`.'
+            )
+    else:
+        probe_filename = None
+
+    return binary_filename, N, c, s, fs, probe_filename
+
+
+class RecordingExtractorAsArray:
+
+    def __init__(self, recording_extractor):
+        """An array-like wrapper for a RecordingExtractor.
+
+        This class is provided to assist with loading data from other file 
+        formats besides the raw binary format supported by Kilosort4. We do not
+        explicitly support any other file format, nor is SpikeInterface a
+        required package for using Kilosort4, so future updates to SpikeInterface
+        may not be reflected here. If you run into errors and would like help
+        loading your data into Kilosort4, please post an issue on the Kilosort4
+        github.
+
+        Parameters
+        ----------
+        recording_extractor : RecordingExtractor
+            A SpikeInterface recording extractor. When the wrapper object is
+            indexed, `recording_extractor.get_traces()` will be invoked to
+            retrieve data from disk.
+
+        Attributes
+        ----------
+        shape
+        dtype
+
+        Examples
+        --------
+        >>> from spikeinterface.extractors import read_nwb_recording
+        >>> recording = read_nwb_recording('/home/my_file_path/arange.nwb')
+        >>> as_array = RecordingExtractorAsArray(recording)
+        >>> as_array[:5, 2]
+        array([[0],
+               [1],
+               [2],
+               [3],
+               [4],
+               [5]])
+
+        """
+
+        if recording_extractor.get_num_segments() > 1:
+            try:
+                import spikeinterface as si
+                self.recording = si.concatenate_recordings([recording_extractor])
+                print('SpikeInterface recording contains more than one segment, '
+                      'segments will be concatenated as if contiguous.')
+            except ModuleNotFoundError:
+                raise ModuleNotFoundError(
+                    'SpikeInterface could not be imported, but is needed for '
+                    'loading multi-segment SpikeInterface recordings. Please '
+                    'run `pip install spikeinterface`.'
+                )
+        self.recording = recording_extractor
+
+    def __getitem__(self, *items):
+        idx, *crop = items
+        if not isinstance(idx, tuple): idx = tuple([idx])
+        sample_idx = idx[0]
+        channel_ids = None if len(idx) == 1 else idx[1]
+
+        # Convert integer index to slice and convert NoneTypes to boundaries of
+        # data, and convert negative indices to positive indices.
+        if not isinstance(sample_idx, slice):
+            sample_idx = slice(sample_idx, sample_idx+1)
+        i = sample_idx.start
+        j = sample_idx.stop
+
+        if i is None: i = 0
+        if i < 0: i = self.shape[0] + i
+        if j is None: j = self.shape[0]
+        if j < 0: j = self.shape[0] + j
+
+        # Convert channel slice to list of indices.
+        if isinstance(channel_ids, slice):
+            c = channel_ids.start
+            d = channel_ids.stop
+            if c is None: c = 0
+            if d is None: d = self.shape[1]
+            channel_ids = list(range(c, d))
+        elif channel_ids is not None:
+            assert isinstance(channel_ids, int)
+            channel_ids = [channel_ids]
+
+        samples = self.recording.get_traces(start_frame=i, end_frame=j,
+                                            channel_ids=channel_ids)
+        
+        return samples
+
+    def __setitem__(self):
+        raise ValueError('RecordingExtractorAsBinary is read-only.')
+    
+    @property
+    def shape(self):
+        # `get_traces()` is necessary to get true number of channels, to handle
+        # mismatch for some files, pending a fix from spikeinterface.
+        n_channels = self.recording.get_traces(segment_index=0, start_frame=0,
+                                               end_frame=1).shape[1]
+        return self.recording.get_total_samples(), n_channels
+
+    @property
+    def dtype(self):
+        return self.recording.get_dtype()
