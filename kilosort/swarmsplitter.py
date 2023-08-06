@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit
 import math
+from kilosort.CCG import compute_CCG, CCG_metrics
 
 def count_elements(kk, iclust, my_clus, xtree):
     n1 = np.isin(iclust, my_clus[xtree[kk, 0]]).sum()
@@ -48,74 +49,6 @@ def bimod_score(xproj):
 
     score = 1 - np.maximum(xmin/xm1, xmin/xm2)
     return score
-
-@njit()
-def compute_CCG(st1, st2, tbin = 1/1000, nbins = 500):
-
-    st1 = np.sort(st1)
-    st2 = np.sort(st2)
-
-    dt = nbins * tbin
-    T = np.maximum(st1.max(), st2.max()) - np.minimum(st1.min(), st2.min())
-
-    ilow = 0
-    ihigh = 0
-    j = 0
-
-    K = np.zeros(2*nbins+1,)
-    while j<len(st2):
-        while (ihigh<len(st1)) and (st1[ihigh] <= st2[j]+dt):
-            ihigh += 1
-        while (ilow<len(st1))  and (st1[ilow] <= st2[j]-dt):
-            ilow += 1
-        if ilow >=len(st1):
-            break
-        if st1[ilow]>st2[j]+dt:
-            j += 1
-            continue;
-        for k in range(ilow, ihigh):
-            ibin = int(np.round((st2[j] - st1[k])/tbin))
-            K[ibin+nbins] += 1
-        j += 1
-    return K, T
-
-#@njit()
-def CCG_metrics(st1, st2, K, T, nbins=None, tbin=None):
-    irange1 = np.hstack((np.arange(1,nbins//2), np.arange(3*nbins//2, 2*nbins)))
-    irange2 = np.arange(nbins-50, nbins-10)
-    irange3 = np.arange(nbins+10, nbins+50)
-
-    Q00 = K[irange1].sum() / (len(irange1) * tbin * len(st1) * len(st2) /T)
-    Q1 = K[irange2].sum() / (len(irange2) * tbin * len(st1) * len(st2) /T)
-    Q2 = K[irange3].sum() / (len(irange3) * tbin * len(st1) * len(st2) /T)
-    Q01 = np.maximum(Q1, Q2)
-
-    R00 = np.maximum(K[irange2].mean(), K[irange3].mean())
-    R00 = np.maximum(R00, K[irange1].mean())
-
-    a = K[nbins]
-    K[nbins] = 0
-
-    Qi = np.zeros(10,)
-    Ri = np.zeros(10,)
-    for i in range(1,11):
-        irange = np.arange(nbins-i, nbins+i+1)
-        Qi0 = K[irange].sum() / (2*i*tbin*len(st1)*len(st2)/T)
-        Qi[i-1] = Qi0
-
-        n = K[irange].sum()/2
-        lam = R00 * i
-
-        p = 1/2 * (1 + math.erf((n-lam)/(1e-10 + 2*lam)**.5))
-
-        Ri[i-1] = p
-
-    K[nbins] = a
-    Q12 = np.min(Qi) / (1e-10 + np.maximum(Q00, Q01))
-    R12 = np.min(Ri)
-
-    #print('%4.2f, %4.2f, %4.2f'%(R00, Q12, R12))
-    return Q12, R12, R00
 
 def check_CCG(st1, st2=None, nbins = 500, tbin  = 1/1000):
     if st2 is None:

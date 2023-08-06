@@ -104,7 +104,7 @@ def refract(iclust2, st0):
         ix = iclust2==kk
         st1 = st0[ix]
         if len(st1)>10:
-            is_refractory[kk], cross_refractory[kk], Q12[kk] = check_CCG(st1,  nbins = 500, tbin  = 1/1000)
+            is_refractory[kk], cross_refractory[kk], Q12[kk] = check_CCG(st1)
 
         #if kk%100==0:
         #    print(kk, is_refractory.sum())
