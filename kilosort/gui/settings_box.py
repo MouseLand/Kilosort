@@ -106,6 +106,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
 
         self.probe_layout = None
+        self.probe_name = None
         self.data_dtype = None
         self.num_channels = None
         self.sampling_frequency = None
@@ -396,7 +397,8 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.settings = {
             "data_file_path": self.data_file_path,
             "results_dir": self.results_directory_path,
-            "probe_layout": self.probe_layout,
+            "probe": self.probe_layout,
+            "probe_name": self.probe_name,
             "data_dtype": self.data_dtype,
             "n_chan_bin": self.num_channels,
             "fs": self.sampling_frequency,
@@ -441,6 +443,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                 probe_layout = load_probe(probe_path)
 
                 self.probe_layout = probe_layout
+                self.probe_name = probe_path.name
                 total_channels = self.probe_layout["n_chan"]
 
                 total_channels = self.estimate_total_channels(total_channels)
@@ -475,7 +478,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                 assert probe_path.exists()
 
                 self.populate_probe_selector()
-
+                self.probe_name = probe_path.name
                 self.probe_layout_selector.setCurrentText(probe_name)
             else:
                 self.probe_layout_selector.setCurrentIndex(0)
@@ -540,7 +543,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
                         if self.check_settings():
                             self.enable_load()
-
+                    self.probe_name = probe_path.name
                 except AssertionError:
                     logger.exception(
                         "Please select a valid probe file (accepted types: *.prb, *.mat *.json)!"

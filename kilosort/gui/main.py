@@ -25,6 +25,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.data_path = filename
         self.probe_layout = None
+        self.probe_name = None
         self.params = None
         self.results_directory = None
 
@@ -247,7 +248,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.data_path = settings["data_file_path"]
         self.results_directory = settings["results_dir"]
-        self.probe_layout = settings["probe_layout"]
+        self.probe_layout = settings["probe"]
+        self.probe_name = settings["probe_name"]
         # self.time_range = settings.pop("time_range")
         self.num_channels = settings["n_chan_bin"]
 
@@ -347,6 +349,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.context = Context(
             context_path = self.results_directory,
             probe=self.probe_layout,
+            probe_name=self.probe_name,
             raw_probe=self.probe_layout.copy(),
             params=self.params,
             data_path=self.data_path,
