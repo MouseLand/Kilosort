@@ -287,7 +287,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         row_count += 1
         layout.addWidget(self.artifact_threshold_text, row_count, 0, 1, 3)
         layout.addWidget(self.artifact_threshold_input, row_count, 3, 1, 2)
-        self.artifact_threshold.textChanged.connect(self.on_artifact_threshold_changed)
+        self.artifact_threshold_input.textChanged.connect(self.on_artifact_threshold_changed)
 
         self.setLayout(layout)
 
@@ -423,6 +423,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             "nblocks": self.nblocks,
             "binning_depth": self.binning_depth,
             "sig_interp": self.sig_interp,
+            "artifact_threshold": self.artifact_threshold
         }
 
         return None not in self.settings.values()
