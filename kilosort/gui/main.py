@@ -285,6 +285,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         data_dtype = self.params["data_dtype"]
         tmin = self.params['tmin']
         tmax = self.params['tmax']
+        artifact = self.params['artifact_threshold']
 
         binary_file = BinaryFiltered(
             filename=self.data_path,
@@ -294,7 +295,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             device=torch.device("cpu"),
             dtype=data_dtype,
             tmin=tmin,
-            tmax=tmax
+            tmax=tmax,
+            artifact_threshold=artifact
         )
 
         self.context.binary_file = binary_file
@@ -313,7 +315,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             device=torch.device("cpu"),
             dtype=data_dtype,
             tmin=tmin,
-            tmax=tmax
+            tmax=tmax,
+            artifact_threshold=artifact
         ) as bin_file:
             self.context.whitening_matrix = preprocessing.get_whitening_matrix(
                 f=bin_file,
@@ -332,7 +335,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             device=torch.device("cpu"),
             dtype=data_dtype,
             tmin=tmin,
-            tmax=tmax
+            tmax=tmax,
+            artifact_threshold=artifact
         )
 
         self.context.filt_binary_file = filt_binary_file

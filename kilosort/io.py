@@ -566,8 +566,8 @@ class BinaryFiltered(BinaryRWFile):
                  chan_map: np.ndarray = None, hp_filter: torch.Tensor = None,
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
                  device: torch.device = torch.device('cuda'), do_CAR: bool = True,
-                 invert_sign: bool = False, dtype=None, tmin: float = 0.0,
-                 tmax: float = np.inf, file_object=None):
+                 artifact_threshold: float = np.inf, invert_sign: bool = False,
+                 dtype=None, tmin: float = 0.0, tmax: float = np.inf, file_object=None):
 
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device,
                          dtype=dtype, tmin=tmin, tmax=tmax, file_object=file_object) 
@@ -577,6 +577,7 @@ class BinaryFiltered(BinaryRWFile):
         self.dshift = dshift
         self.do_CAR = do_CAR
         self.invert_sign=invert_sign
+        self.artifact_threshold = artifact_threshold
 
     def filter(self, X, ops=None, ibatch=None):
         # pick only the channels specified in the chanMap
@@ -596,6 +597,12 @@ class BinaryFiltered(BinaryRWFile):
             fwav = fft_highpass(self.hp_filter, NT=X.shape[1])
             X = torch.real(ifft(fft(X) * torch.conj(fwav)))
             X = fftshift(X, dim = -1)
+
+        if self.artifact_threshold < np.inf:
+            if torch.any(torch.abs(X) >= self.artifact_threshold):
+                # Assume the batch contains a recording artifact.
+                # Skip subsequent preprocessing, zero-out the batch.
+                return torch.zeros_like(X)
 
         # whitening, with optional drift correction
         if self.whiten_mat is not None:

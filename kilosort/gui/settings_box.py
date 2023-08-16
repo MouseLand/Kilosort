@@ -28,6 +28,7 @@ DEFAULT_PARAMS = {
     "binning_depth" : 5,
     "sig_interp"    : 20,
     "data_dtype"    : "int16",
+    "artifact_threshold" : np.inf
 }
 
 
@@ -102,6 +103,9 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.sig_interp_text = QtWidgets.QLabel("sig interp")
         self.sig_interp_input = QtWidgets.QLineEdit()
 
+        self.artifact_threshold_text = QtWidgets.QLabel('artifact threshold')
+        self.artifact_threshold_input = QtWidgets.QLineEdit()
+
         self.load_settings_button = QtWidgets.QPushButton("LOAD")
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
 
@@ -121,6 +125,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.nblocks = None
         self.binning_depth = None
         self.sig_interp = None
+        self.artifact_threshold = None
 
         self.input_fields = [
             self.data_file_path_input,
@@ -140,6 +145,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.nblocks_input,
             self.binning_depth_input,
             self.sig_interp_input,
+            self.artifact_threshold_input
         ]
 
         self.buttons = [
@@ -279,6 +285,11 @@ class SettingsBox(QtWidgets.QGroupBox):
         layout.addWidget(self.sig_interp_input, row_count, 3, 1, 2)
         self.sig_interp_input.textChanged.connect(self.on_sig_interp_changed)
 
+        row_count += 1
+        layout.addWidget(self.artifact_threshold_text, row_count, 0, 1, 3)
+        layout.addWidget(self.artifact_threshold_input, row_count, 3, 1, 2)
+        self.artifact_threshold_input.textChanged.connect(self.on_artifact_threshold_changed)
+
         self.setLayout(layout)
 
         self.set_default_field_values(DEFAULT_PARAMS)
@@ -303,6 +314,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.nblocks_input.setText(str(default_params["nblocks"]))
         self.binning_depth_input.setText(str(default_params["binning_depth"]))
         self.sig_interp_input.setText(str(default_params["sig_interp"]))
+        self.artifact_threshold_input.setText(str(default_params['artifact_threshold']))
 
     def on_select_data_file_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
@@ -413,6 +425,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             "nblocks": self.nblocks,
             "binning_depth": self.binning_depth,
             "sig_interp": self.sig_interp,
+            "artifact_threshold": self.artifact_threshold
         }
 
         return None not in self.settings.values()
@@ -835,6 +848,22 @@ class SettingsBox(QtWidgets.QGroupBox):
                 "Check that sig_interp > 0!"
             )
             self.disable_load()
+
+    @QtCore.pyqtSlot()
+    def on_artifact_threshold_changed(self):
+        try:
+            artifact = float(self.artifact_threshold_input.text())
+            self.artifact_threshold = artifact
+            if self.check_settings():
+                self.enable_load()
+
+        except Exception as e:
+            logger.exception(
+                'Invalid artifact threshold, must be float.'
+            )
+            logger.exception(e)
+            self.disable_load()
+
 
     def populate_probe_selector(self):
         self.probe_layout_selector.clear()
