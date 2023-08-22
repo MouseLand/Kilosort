@@ -48,9 +48,14 @@ def template_centers(ops):
         xc = ops['xc'][ops['yc']==yunq[j]]
         if len(xc)>1:
             mxc[j] = np.median(np.diff(np.sort(xc)))
+        else:
+            mxc[j] = 0
     dminx = np.nanmedian(mxc)
     ops['dminx'] = dminx
-    nx = np.round((xmax - xmin) / (dminx/2)) + 1
+    if dminx>0:
+        nx = np.round((xmax - xmin) / (dminx/2)) + 1
+    else:
+        nx = 1
     ops['xup'] = np.linspace(xmin, xmax, int(nx))
     return ops
 
