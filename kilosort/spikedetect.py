@@ -51,12 +51,10 @@ def template_centers(ops):
         else:
             mxc[j] = 0
     dminx = np.nanmedian(mxc)
+    dminx = np.maximum(1, dminx)
     ops['dminx'] = dminx
-    if dminx>0:
-        nx = np.round((xmax - xmin) / (dminx/2)) + 1
-    else:
-        dmix = 10
-        nx = 1
+    nx = np.round((xmax - xmin) / (dminx/2)) + 1
+    
     ops['xup'] = np.linspace(xmin, xmax, int(nx))
     return ops
 
