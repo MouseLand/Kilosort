@@ -55,6 +55,7 @@ def template_centers(ops):
     if dminx>0:
         nx = np.round((xmax - xmin) / (dminx/2)) + 1
     else:
+        dmix = 10
         nx = 1
     ops['xup'] = np.linspace(xmin, xmax, int(nx))
     return ops
