@@ -70,7 +70,10 @@ def default_settings():
         If a batch contains absolute values above this number, it will be zeroed
         out under the assumption that a recording artifact is present.
         By default, the threshold is infinite (so that no zeroing occurs).
-    
+    whitening_range:
+        Number of channels used to estimate the whitening matrix during
+        preprocessing.
+        
     """
 
     settings = {}
@@ -92,6 +95,7 @@ def default_settings():
     settings['tmin'] = 0.0
     settings['tmax'] = np.inf
     settings['artifact_threshold'] = np.inf
+    settings['whitening_range'] = 32
     return settings
 
 
@@ -260,6 +264,7 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, \
         xc, yc, tmin, tmax, artifact = get_run_parameters(ops)
     nskip = ops['settings']['nskip']
+    whitening_range = ops['settings']['whitening_range']
     
     # Compute high pass filter
     hp_filter = preprocessing.get_highpass_filter(ops['settings']['fs'], device=device)
@@ -269,7 +274,8 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
                               invert_sign=invert, dtype=dtype, tmin=tmin,
                               tmax=tmax, artifact_threshold=artifact,
                               file_object=file_object)
-    whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip)
+    whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip,
+                                                    nrange=whitening_range)
 
     bfile.close()
 

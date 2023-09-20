@@ -14,7 +14,7 @@ def whitening_from_covariance(CC):
     Wrot =(E / (D+eps)**.5) @ E.T
     return Wrot
 
-def whitening_local(CC, xc, yc, nrange = 32, device=torch.device('cuda')):
+def whitening_local(CC, xc, yc, nrange=32, device=torch.device('cuda')):
     """ loop through each channel and compute its whitening filter based on nearest channels
     """
     Nchan = CC.shape[0]
@@ -91,7 +91,7 @@ def get_fwav(NT = 30122, fs = 30000, device=torch.device('cuda')):
 
     return fwav
 
-def get_whitening_matrix(f, xc, yc, nskip = 25):
+def get_whitening_matrix(f, xc, yc, nskip=25, nrange=32):
     """ get the whitening matrix, use every nskip batches
     """
     n_chan = len(f.chan_map)
@@ -113,7 +113,7 @@ def get_whitening_matrix(f, xc, yc, nskip = 25):
     CC = CC / k
 
     # compute the local whitening filters and collect back into Wrot
-    Wrot = whitening_local(CC, xc, yc, device=f.device)
+    Wrot = whitening_local(CC, xc, yc, nrange=nrange, device=f.device)
 
     return Wrot
 
