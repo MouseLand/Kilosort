@@ -249,8 +249,6 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         iclust_template = st[:,5].astype('int32')
         xcup, ycup = ops['xcup'], ops['ycup']
 
-    
-
     d0 = ops['dmin']
     ycent = np.arange(ycup.min()+d0-1, ycup.max()+d0+1, 2*d0)
 
@@ -259,6 +257,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     nmax = 0
 
     nskip = ops['settings']['cluster_downsampling']
+    ncomps = ops['settings']['cluster_pcs']
 
     Wall = torch.zeros((0, ops['Nchan'], ops['nwaves']))
     t0 = time.time()
@@ -266,8 +265,10 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         # get the data
         #iclust_template = st[:,1].astype('int32')
 
-        Xd, ch_min, ch_max, igood  = get_data_cpu(ops, xy, iC, iclust_template, tF, ycent[kk],  
-                                    xcup.mean(), dmin = d0, dminx = ops['dminx'], ncomps = 64)
+        Xd, ch_min, ch_max, igood  = get_data_cpu(
+            ops, xy, iC, iclust_template, tF, ycent[kk], xcup.mean(), dmin=d0,
+            dminx = ops['dminx'], ncomps=ncomps
+            )
 
         if Xd is None:            
             continue

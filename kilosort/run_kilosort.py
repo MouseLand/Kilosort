@@ -87,7 +87,9 @@ def default_settings():
     cluster_downsampling
         For example, if `cluster_downsampling = 10`, then every 10th spike
         is used for clustering.
-
+    cluster_pcs
+        Number of PC features used for clustering.
+        
     """
 
     settings = {}
@@ -114,6 +116,7 @@ def default_settings():
     settings['ccg_threshold']        = 0.2
     settings['ccg_x_threshold']      = 0.25
     settings['cluster_downsampling'] = 20
+    settings['cluster_pcs']          = 64
     
     return settings
 
