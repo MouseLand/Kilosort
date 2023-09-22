@@ -11,10 +11,18 @@ from kilosort import run_kilosort, default_settings
 @pytest.mark.slow
 def test_pipeline(data_directory, results_directory, saved_ops, torch_device, capture_mgr):
 
+    with pytest.raises(ValueError):
+        # Should result in an error, since `n_chan_bin` isn't specified.
+        ops, st, clu, _, _, _, _, _ = run_kilosort(
+            data_dir=data_directory, device=torch_device,
+            probe_name='neuropixPhase3B1_kilosortChanMap.mat',
+            )
+
     with capture_mgr.global_and_fixture_disabled():
         print('\nStarting run_kilosort test...')
         ops, st, clu, _, _, _, _, _ = run_kilosort(
             data_dir=data_directory, device=torch_device,
+            settings={'n_chan_bin': 385},
             probe_name='neuropixPhase3B1_kilosortChanMap.mat',
             )
 

@@ -27,8 +27,11 @@ def default_settings():
     -----
     The returned settings dictionary contains the follow keys:
 
-    NchanTOT
-        Total number of channels on probe.
+    n_chan_bin
+        Total number of channels in the binary file, which may be different
+        from the number of channels containing ephys data. The value of this
+        parameter *must* be specified by the user, or `run_kilosort` will
+        raise a ValueError.
     fs
         Sampling frequency of probe.
     nt
@@ -55,47 +58,53 @@ def default_settings():
     sig_interp:
         Sigma for interpolation (spatial standard deviation). Indicates scale
         of waveform's smoothness for drift correction, in units of microns.
-    n_chan_bin:
-        Same as NchanTOT. TODO: Why use both?
-    probe_name:
+    probe_name
         Name of probe to load from Kilosort4's probe directory. This will only
         be used if no `probe` kwarg is specified for `run_kilosort`.
-    tmin:
+    tmin
         Time in seconds where data reference should begin from. By default,
         begins at 0 seconds.
-    tmax:
+    tmax
         Time in seconds where data reference should end. By default, ends
         at the end of the recording.
-    artifact_threshold:
+    artifact_threshold
         If a batch contains absolute values above this number, it will be zeroed
         out under the assumption that a recording artifact is present.
         By default, the threshold is infinite (so that no zeroing occurs).
-    whitening_range:
+    whitening_range
         Number of channels used to estimate the whitening matrix during
         preprocessing.
+    dmin
+        Vertical spacing of template centers used for spike detection,
+        in microns.
+    dminx
+        Horizontal spacing of template centers used for spike detection,
+        in microns.
         
     """
 
     settings = {}
-    settings['NchanTOT']      = 385
-    settings['fs']            = 30000
-    settings['nt']            = 61
-    settings['Th']            = 8
-    settings['spkTh']         = 8
-    settings['Th_detect']     = 9
-    settings['nwaves']        = 6
-    settings['nskip']         = 25
-    settings['nt0min']        = int(20 * settings['nt']/61)
-    settings['NT']            = 2 * settings['fs']
-    settings['nblocks']       = 5
-    settings['binning_depth'] = 5
-    settings['sig_interp']    = 20
-    settings['n_chan_bin']    = settings['NchanTOT']
-    settings['probe_name']    = 'neuropixPhase3B1_kilosortChanMap.mat'
-    settings['tmin'] = 0.0
-    settings['tmax'] = np.inf
+    settings['n_chan_bin']         = None   # Required, user must specify 
+    settings['fs']                 = 30000
+    settings['nt']                 = 61
+    settings['Th']                 = 8
+    settings['spkTh']              = 8
+    settings['Th_detect']          = 9
+    settings['nwaves']             = 6
+    settings['nskip']              = 25
+    settings['nt0min']             = int(20 * settings['nt']/61)
+    settings['NT']                 = 2 * settings['fs']
+    settings['nblocks']            = 5
+    settings['binning_depth']      = 5
+    settings['sig_interp']         = 20
+    settings['probe_name']         = 'neuropixPhase3B1_kilosortChanMap.mat'
+    settings['tmin']               = 0.0
+    settings['tmax']               = np.inf
     settings['artifact_threshold'] = np.inf
-    settings['whitening_range'] = 32
+    settings['whitening_range']    = 32
+    settings['dmin']               = None   # determine automatically
+    settings['dminx']              = None   # determine automatically
+    
     return settings
 
 
@@ -114,6 +123,12 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
         indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
         array or memmap. Must specify a valid `filename` as well.
     
+    Raises
+    ------
+    ValueError
+        If settings[`n_chan_bin`] is None (default). User must specify, for
+        example:  `run_kilosort(settings={'n_chan_bin': 385})`.
+
     """
 
     if not do_CAR:
@@ -124,6 +139,12 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     # Configure settings, ops, and file paths
     d = default_settings()
     settings = {**d, **settings} if settings is not None else d
+    if settings['n_chan_bin'] is None:
+        raise ValueError(
+            '`n_chan_bin` is a required setting. This is the total number of '
+            'channels in the binary file, which may or may not be equal to the '
+            'number of channels specified by the probe.'
+            )
     # NOTE: Also modifies settings in-place
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir)
@@ -210,7 +231,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign) -> dict:
     ops['invert_sign'] = invert_sign
     ops['NTbuff'] = ops['NT'] + 2 * ops['nt']
     ops['Nchan'] = len(probe['chanMap'])
-    ops['NchanTOT'] = ops['settings']['n_chan_bin']
+    ops['n_chan_bin'] = settings['n_chan_bin']
     ops = {**ops, **probe}
 
     return ops

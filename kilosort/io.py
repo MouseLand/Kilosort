@@ -198,7 +198,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtyp
     # params.py
     dtype = "'int16'" if data_dtype is None else f"'{data_dtype}'"
     params = {'dat_path': f"'{Path(ops['settings']['filename']).as_posix()}'",
-            'n_channels_dat': ops['settings']['NchanTOT'],
+            'n_channels_dat': ops['settings']['n_chan_bin'],
             'dtype': dtype,
             'offset': 0,
             'sample_rate': ops['settings']['fs'],
