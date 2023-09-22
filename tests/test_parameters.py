@@ -6,7 +6,7 @@ from kilosort.spikedetect import template_centers
 
 def test_dmin():
     settings = {'dmin': None, 'dminx': None}
-    ops = {'xc': np.array([1, 2, 3]), 'yc': np.array([4, 5, 6]),
+    ops = {'xc': np.array([10, 20, 30]), 'yc': np.array([40, 40, 60]),
            'settings': settings}
     ops = template_centers(ops)
     assert ops['dmin'] is not None  # set based on xc, yc
@@ -15,7 +15,7 @@ def test_dmin():
     assert ops['settings']['dminx'] is None
 
     settings = {'dmin': 5, 'dminx': 7}
-    ops = {'xc': np.array([1, 2, 3]), 'yc': np.array([4, 5, 6]),
+    ops = {'xc': np.array([10, 20, 30]), 'yc': np.array([40, 40, 60]),
            'settings': settings}
     ops = template_centers(ops)
     assert ops['dmin'] == 5
