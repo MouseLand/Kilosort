@@ -38,18 +38,25 @@ def get_waves(ops, device=torch.device('cuda')):
 
 def template_centers(ops):
     xmin, xmax, ymin, ymax = ops['xc'].min(), ops['xc'].max(), ops['yc'].min(), ops['yc'].max()
-    dmin = np.median(np.diff(np.unique(ops['yc'])))
+    dmin = ops['settings'].get('dmin', None)
+    if dmin is None:
+        # Try to determine a good value automatically based on contact positions.
+        dmin = np.median(np.diff(np.unique(ops['yc'])))
+    ops['dmin'] = dmin
     ops['yup'] = np.arange(ymin, ymax+.00001, dmin//2)
-    ops['dmin'] = dmin 
 
-    yunq = np.unique(ops['yc'])
-    mxc = np.NaN * np.ones(len(yunq))
-    for j in range(len(yunq)):
-        xc = ops['xc'][ops['yc']==yunq[j]]
-        if len(xc)>1:
-            mxc[j] = np.median(np.diff(np.sort(xc)))
-    dminx = np.nanmedian(mxc)
+    dminx = ops['settings'].get('dminx', None)
+    if dminx is None:
+        # Try to determine a good value automatically.
+        yunq = np.unique(ops['yc'])
+        mxc = np.NaN * np.ones(len(yunq))
+        for j in range(len(yunq)):
+            xc = ops['xc'][ops['yc']==yunq[j]]
+            if len(xc)>1:
+                mxc[j] = np.median(np.diff(np.sort(xc)))
+        dminx = np.nanmedian(mxc)
     ops['dminx'] = dminx
+
     nx = np.round((xmax - xmin) / (dminx/2)) + 1
     ops['xup'] = np.linspace(xmin, xmax, int(nx))
     return ops
