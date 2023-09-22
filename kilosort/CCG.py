@@ -73,13 +73,14 @@ def CCG_metrics(st1, st2, K, T, nbins=None, tbin=None):
     #print('%4.2f, %4.2f, %4.2f'%(R00, Q12, R12))
     return Q12, R12, R00
 
-def check_CCG(st1, st2=None, nbins = 500, tbin  = 1/1000):
+def check_CCG(st1, st2=None, nbins = 500, tbin  = 1/1000, threshold=0.2,
+              x_threshold=0.25):
     if st2 is None:
         st2 = st1.copy()
     K , T= compute_CCG(st1, st2, nbins = nbins, tbin = tbin)
     Q12, R12, R00 = CCG_metrics(st1, st2, K, T,  nbins = nbins, tbin = tbin)
-    is_refractory    = Q12<.1  and (R12<.2)#  or R00<.25)
-    cross_refractory = Q12<.25 and (R12<.05)# or R00<.25)
+    is_refractory    = Q12<threshold  and (R12<.2)#  or R00<.25)
+    cross_refractory = Q12<x_threshold and (R12<.05)# or R00<.25)
     return is_refractory, cross_refractory, Q12
 
 def similarity(Wall, W, nt=61):
@@ -92,7 +93,7 @@ def similarity(Wall, W, nt=61):
     similar_templates = similar_templates.max(axis=-1)
     return similar_templates
 
-def refract(iclust2, st0):
+def refract(iclust2, st0, threshold=0.2, x_threshold=0.25):
     
     Nfilt = iclust2.max()+1
 
@@ -104,7 +105,9 @@ def refract(iclust2, st0):
         ix = iclust2==kk
         st1 = st0[ix]
         if len(st1)>10:
-            is_refractory[kk], cross_refractory[kk], Q12[kk] = check_CCG(st1)
+            is_refractory[kk], cross_refractory[kk], Q12[kk] = check_CCG(
+                st1, ratio=threshold, x_ratio=x_threshold
+                )
 
         #if kk%100==0:
         #    print(kk, is_refractory.sum())

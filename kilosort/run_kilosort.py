@@ -80,7 +80,11 @@ def default_settings():
     dminx
         Horizontal spacing of template centers used for spike detection,
         in microns.
-        
+    ccg_threshold
+        TODO
+    ccg_x_threshold
+        TODO
+
     """
 
     settings = {}
@@ -104,6 +108,8 @@ def default_settings():
     settings['whitening_range']    = 32
     settings['dmin']               = None   # determine automatically
     settings['dminx']              = None   # determine automatically
+    settings['ccg_threshold']      = 0.2
+    settings['ccg_x_threshold']    = 0.25
     
     return settings
 
