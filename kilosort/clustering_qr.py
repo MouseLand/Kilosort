@@ -7,7 +7,7 @@ import faiss
 from tqdm import tqdm 
 from kilosort import hierarchical, swarmsplitter 
 
-def neigh_mat(Xd, nskip = 10, n_neigh=30):
+def neigh_mat(Xd, nskip=10, n_neigh=30):
     Xsub = Xd[::nskip]
     n_samples, dim = Xd.shape
     n_nodes = Xsub.shape[0]
@@ -258,7 +258,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     clu = np.zeros(nsp, 'int32')
     nmax = 0
 
-    nskip = 20
+    nskip = ops['settings']['cluster_downsampling']
 
     Wall = torch.zeros((0, ops['Nchan'], ops['nwaves']))
     t0 = time.time()
@@ -283,7 +283,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
                 st0 = None
 
             # find new clusters
-            iclust, iclust0, M, iclust_init = cluster(Xd,nskip = nskip, lam = 1, seed = 5, device=device)
+            iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
+                                                      seed=5, device=device)
 
             xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 

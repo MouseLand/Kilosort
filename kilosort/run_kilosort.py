@@ -84,32 +84,36 @@ def default_settings():
         TODO
     ccg_x_threshold
         TODO
+    cluster_downsampling
+        For example, if `cluster_downsampling = 10`, then every 10th spike
+        is used for clustering.
 
     """
 
     settings = {}
-    settings['n_chan_bin']         = None   # Required, user must specify 
-    settings['fs']                 = 30000
-    settings['nt']                 = 61
-    settings['Th']                 = 8
-    settings['spkTh']              = 8
-    settings['Th_detect']          = 9
-    settings['nwaves']             = 6
-    settings['nskip']              = 25
-    settings['nt0min']             = int(20 * settings['nt']/61)
-    settings['NT']                 = 2 * settings['fs']
-    settings['nblocks']            = 5
-    settings['binning_depth']      = 5
-    settings['sig_interp']         = 20
-    settings['probe_name']         = 'neuropixPhase3B1_kilosortChanMap.mat'
-    settings['tmin']               = 0.0
-    settings['tmax']               = np.inf
-    settings['artifact_threshold'] = np.inf
-    settings['whitening_range']    = 32
-    settings['dmin']               = None   # determine automatically
-    settings['dminx']              = None   # determine automatically
-    settings['ccg_threshold']      = 0.2
-    settings['ccg_x_threshold']    = 0.25
+    settings['n_chan_bin']           = None   # Required, user must specify 
+    settings['fs']                   = 30000
+    settings['nt']                   = 61
+    settings['Th']                   = 8
+    settings['spkTh']                = 8
+    settings['Th_detect']            = 9
+    settings['nwaves']               = 6
+    settings['nskip']                = 25
+    settings['nt0min']               = int(20 * settings['nt']/61)
+    settings['NT']                   = 2 * settings['fs']
+    settings['nblocks']              = 5
+    settings['binning_depth']        = 5
+    settings['sig_interp']           = 20
+    settings['probe_name']           = 'neuropixPhase3B1_kilosortChanMap.mat'
+    settings['tmin']                 = 0.0
+    settings['tmax']                 = np.inf
+    settings['artifact_threshold']   = np.inf
+    settings['whitening_range']      = 32
+    settings['dmin']                 = None   # determine automatically
+    settings['dminx']                = None   # determine automatically
+    settings['ccg_threshold']        = 0.2
+    settings['ccg_x_threshold']      = 0.25
+    settings['cluster_downsampling'] = 20
     
     return settings
 
