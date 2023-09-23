@@ -89,7 +89,17 @@ def default_settings():
         is used for clustering.
     cluster_pcs
         Number of PC features used for clustering.
-        
+    min_template_size
+        Smallest size of universal spike template.
+    template_sizes
+        Number of sizes for universal spike templates.
+    nearest_chans
+        Number of nearest channels to consider when finding local maxima
+        during spike detection.
+    nearest_templates
+        Number of nearest spike template locations to consider when finding
+        local maxima during spike detection.
+
     """
 
     settings = {}
@@ -117,6 +127,10 @@ def default_settings():
     settings['ccg_x_threshold']      = 0.25
     settings['cluster_downsampling'] = 20
     settings['cluster_pcs']          = 64
+    settings['min_template_size']    = 10
+    settings['n_template_sizes']     = 5
+    settings['nearest_chans']        = 10
+    settings['nearest_templates']    = 100
     
     return settings
 

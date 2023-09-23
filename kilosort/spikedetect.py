@@ -134,8 +134,8 @@ def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):
     return yct
 
 def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):        
-    sig = 10
-    nsizes = 5
+    sig = ops['settings']['min_template_size']
+    nsizes = ops['settings']['template_sizes'] 
 
     ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
     #print(ops['wTEMP'].shape, ops['wPCA'].shape)
@@ -149,7 +149,8 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     xc, yc = ops['xc'], ops['yc']
     Nfilt = len(ys)
 
-    nC, nC2 = 10, 100
+    nC = ops['settings']['nearest_chans']
+    nC2 = ops['settings']['nearest_templates']
     iC, ds = nearest_chans(ys, yc, xs, xc, nC, device=device)
     iC2, ds2 = nearest_chans(ys, ys, xs, xs, nC2, device=device)
 
