@@ -106,7 +106,7 @@ def refract(iclust2, st0, threshold=0.2, x_threshold=0.25):
         st1 = st0[ix]
         if len(st1)>10:
             is_refractory[kk], cross_refractory[kk], Q12[kk] = check_CCG(
-                st1, ratio=threshold, x_ratio=x_threshold
+                st1, threshold=threshold, x_threshold=x_threshold
                 )
 
         #if kk%100==0:
