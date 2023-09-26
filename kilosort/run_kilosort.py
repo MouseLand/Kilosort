@@ -128,7 +128,7 @@ def default_settings():
     settings['cluster_downsampling'] = 20
     settings['cluster_pcs']          = 64
     settings['min_template_size']    = 10
-    settings['n_template_sizes']     = 5
+    settings['template_sizes']     = 5
     settings['nearest_chans']        = 10
     settings['nearest_templates']    = 100
     
