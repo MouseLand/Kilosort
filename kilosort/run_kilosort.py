@@ -123,7 +123,7 @@ def default_settings():
     settings['whitening_range']      = 32
     settings['dmin']                 = None   # determine automatically
     settings['dminx']                = None   # determine automatically
-    settings['ccg_threshold']        = 0.2
+    settings['ccg_threshold']        = 0.1
     settings['ccg_x_threshold']      = 0.25
     settings['cluster_downsampling'] = 20
     settings['cluster_pcs']          = 64
