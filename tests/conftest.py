@@ -230,8 +230,8 @@ def saved_ops(results_directory, torch_device):
     ops['settings']['whitening_range']      = 32
     ops['settings']['dmin']                 = None   # determine automatically
     ops['settings']['dminx']                = None   # determine automatically
-    ops['settings']['ccg_threshold']        = 0.1
-    ops['settings']['ccg_x_threshold']      = 0.25
+    ops['settings']['acg_threshold']        = 0.1
+    ops['settings']['ccg_threshold']        = 0.25
     ops['settings']['cluster_downsampling'] = 20
     ops['settings']['cluster_pcs']          = 64
     ops['settings']['min_template_size']    = 10
