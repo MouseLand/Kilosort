@@ -190,12 +190,12 @@ def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.
     is_merged = np.zeros(NN, 'bool')
     is_good = np.zeros(NN,)
 
-    ccg_thresh = ops['settings']['ccg_threshold']
-    ccg_x_thresh = ops['settings']['ccg_x_threshold']
+    acg_threshold = ops['settings']['acg_threshold']
+    ccg_threshold = ops['settings']['ccg_threshold']
     if mode == 'ccg':
         is_ref, est_contam_rate = CCG.refract(clu, st/ops['fs'],
-                                              threshold=ccg_thresh,
-                                              x_threshold=ccg_x_thresh)
+                                              acg_threshold=acg_threshold,
+                                              ccg_threshold=ccg_threshold)
 
     nt = ops['nt']
     W = ops['wPCA'].contiguous()
@@ -240,8 +240,8 @@ def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.
             # compare with CCG
             if mode == 'ccg':
                 st1 = st[clu2==jj] / ops['fs']
-                _, is_ccg, _ = CCG.check_CCG(st0, st1, threshold=ccg_thresh,
-                                             x_threshold=ccg_x_thresh)        
+                _, is_ccg, _ = CCG.check_CCG(st0, st1, acg_threshold=acg_threshold,
+                                             ccg_threshold=ccg_threshold)        
             else:
                 dmu = 2 * (mu[kk] - mu[jj]) / (mu[kk] + mu[jj])
                 is_ccg = dmu.abs() < 0.2

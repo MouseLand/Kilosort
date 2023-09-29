@@ -35,7 +35,7 @@ def default_settings():
     fs
         Sampling frequency of probe.
     nt
-        Number of samples per waveform.
+        Number of samples per waveform. Also determines padding for filtering.
     Th
         TODO, some other threshold.
     spkTh
@@ -123,12 +123,12 @@ def default_settings():
     settings['whitening_range']      = 32
     settings['dmin']                 = None   # determine automatically
     settings['dminx']                = None   # determine automatically
-    settings['ccg_threshold']        = 0.1
-    settings['ccg_x_threshold']      = 0.25
+    settings['acg_threshold']        = 0.1
+    settings['ccg_threshold']        = 0.25
     settings['cluster_downsampling'] = 20
     settings['cluster_pcs']          = 64
     settings['min_template_size']    = 10
-    settings['template_sizes']     = 5
+    settings['template_sizes']       = 5
     settings['nearest_chans']        = 10
     settings['nearest_templates']    = 100
     
