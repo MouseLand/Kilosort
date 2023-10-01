@@ -9,7 +9,63 @@ from tqdm import tqdm
 
 from kilosort.utils import template_path
 
-dev = torch.device('cuda')
+device = torch.device('cuda')
+
+def my_max2d(X, dt):
+    Xmax = max_pool2d(X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1], stride = [1, 1], padding  = [dt[0], dt[1]])    
+    return Xmax[0]
+
+def my_sum2d(X, dt):
+    Xsum = avg_pool2d(X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1], stride = [1, 1], padding  = [dt[0], dt[1]])    
+    Xsum *= (2*dt[0]+1) * (2*dt[1]+1)
+    return Xsum[0]
+
+def extract_snippets(ops, X, nt, twav_min, th_for_wPCA, loc_range = [4, 5], long_range = [6, 30]):
+    Xabs   = X.abs()
+    Xmax   = my_max2d(Xabs, loc_range)
+    ispeak = torch.logical_and(Xmax==Xabs, Xabs > th_for_wPCA).float()
+
+    ispeak_sum  = my_sum2d(ispeak, long_range)
+    is_peak_iso = ((ispeak_sum==1) * (ispeak==1))
+
+    is_peak_iso[:, :nt] = 0
+    is_peak_iso[:, -nt:] = 0
+
+    xy = is_peak_iso.nonzero()
+
+    clips = X[xy[:,:1], xy[:,1:2] - twav_min + torch.arange(nt, device = device)]
+
+    return clips
+
+def extract_wPCA_wTEMP(ops, bfile, nt = 61, twav_min = 20, th_for_wPCA = 6, nskip = 25):
+
+    clips = np.zeros((500000,nt), 'float32')
+    i = 0
+    for j in range(0, bfile.n_batches, nskip):
+        X = bfile.padded_batch_to_torch(j, ops)
+        
+        clips_new = extract_snippets(ops, X, nt = nt, twav_min = twav_min, th_for_wPCA = th_for_wPCA)
+
+        nnew = len(clips_new)
+
+        if i+nnew>clips.shape[0]:
+            break
+
+        clips[i:i+nnew] = clips_new.cpu().numpy()
+        i+= nnew 
+
+    clips = clips[:i]
+    clips /= (clips**2).sum(1, keepdims=True)**.5
+
+    model = TruncatedSVD(n_components = 6).fit(clips)
+    wPCA = torch.from_numpy(model.components_).to(device).float()
+
+    model = KMeans(n_clusters = 6, n_init = 10).fit(clips)
+    wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
+    wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
+
+    return wPCA, wTEMP
+
 
 def find_peaks(X, ops, loc_range = [5,5], long_range = [7,31]):
     nt = ops['nt']
@@ -130,11 +186,14 @@ def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):
     yct = (cF0 * yy[:,xy[:,0]]).sum(0)
     return yct
 
-def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):        
+def run(ops, bfile, device=torch.device('cuda'), progress_bar=None, from_data = False):        
     sig = 10
     nsizes = 5
 
-    ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
+    if from_data:
+        ops['wPCA'], ops['wTEMP'] = extract_wPCA_wTEMP(ops, bfile, nt = ops['nt'], twav_min = ops['nt0min'], th_for_wPCA = 6, nskip = 25)
+    else:
+        ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
     #print(ops['wTEMP'].shape, ops['wPCA'].shape)
 
     ops = template_centers(ops)   
