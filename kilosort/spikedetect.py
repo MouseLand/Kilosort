@@ -11,16 +11,24 @@ from kilosort.utils import template_path
 
 device = torch.device('cuda')
 
+
 def my_max2d(X, dt):
-    Xmax = max_pool2d(X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1], stride = [1, 1], padding  = [dt[0], dt[1]])    
+    Xmax = max_pool2d(
+        X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1],
+        stride=[1,1], padding=[dt[0],dt[1]]
+        )    
     return Xmax[0]
 
 def my_sum2d(X, dt):
-    Xsum = avg_pool2d(X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1], stride = [1, 1], padding  = [dt[0], dt[1]])    
+    Xsum = avg_pool2d(
+        X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1],
+        stride=[1,1], padding=[dt[0],dt[1]]
+        )    
     Xsum *= (2*dt[0]+1) * (2*dt[1]+1)
     return Xsum[0]
 
-def extract_snippets(ops, X, nt, twav_min, th_for_wPCA, loc_range = [4, 5], long_range = [6, 30]):
+def extract_snippets(X, nt, twav_min, th_for_wPCA, loc_range=[4,5],
+                     long_range=[6,30], device=torch.device('cuda')):
     Xabs   = X.abs()
     Xmax   = my_max2d(Xabs, loc_range)
     ispeak = torch.logical_and(Xmax==Xabs, Xabs > th_for_wPCA).float()
@@ -33,18 +41,20 @@ def extract_snippets(ops, X, nt, twav_min, th_for_wPCA, loc_range = [4, 5], long
 
     xy = is_peak_iso.nonzero()
 
-    clips = X[xy[:,:1], xy[:,1:2] - twav_min + torch.arange(nt, device = device)]
+    clips = X[xy[:,:1], xy[:,1:2] - twav_min + torch.arange(nt, device=device)]
 
     return clips
 
-def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, th_for_wPCA=6, nskip=25):
+def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, th_for_wPCA=6, nskip=25,
+                       device=torch.device('cuda')):
 
     clips = np.zeros((500000,nt), 'float32')
     i = 0
     for j in range(0, bfile.n_batches, nskip):
         X = bfile.padded_batch_to_torch(j, ops)
         
-        clips_new = extract_snippets(ops, X, nt = nt, twav_min = twav_min, th_for_wPCA = th_for_wPCA)
+        clips_new = extract_snippets(X, nt=nt, twav_min=twav_min,
+                                     th_for_wPCA=th_for_wPCA, device=device)
 
         nnew = len(clips_new)
 
@@ -60,7 +70,7 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, th_for_wPCA=6, nskip=25):
     model = TruncatedSVD(n_components=ops['settings']['n_pcs']).fit(clips)
     wPCA = torch.from_numpy(model.components_).to(device).float()
 
-    model = KMeans(n_clusters=ops['settings']['n_clusters'], n_init = 10).fit(clips)
+    model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
     wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
     wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
 
