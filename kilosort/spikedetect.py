@@ -237,7 +237,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     weigh = weigh / (weigh**2).sum(1).unsqueeze(1)**.5
 
     st = np.zeros((10**6, 6), 'float64')
-    tF = np.zeros((10**6, nC , ops['nwaves']), 'float32')
+    tF = np.zeros((10**6, nC , ops['n_pcs']), 'float32')
 
     k = 0
     nt = ops['nt']
