@@ -235,9 +235,12 @@ def saved_ops(results_directory, torch_device):
     ops['settings']['cluster_downsampling'] = 20
     ops['settings']['cluster_pcs']          = 64
     ops['settings']['min_template_size']    = 10
-    ops['settings']['template_sizes']     = 5
+    ops['settings']['template_sizes']       = 5
     ops['settings']['nearest_chans']        = 10
     ops['settings']['nearest_templates']    = 100
+    ops['settings']['templates_from_data']  = False
+    ops['settings']['n_templates']          = 6
+    ops['settings']['n_pcs']                = 6
 
     return ops
 

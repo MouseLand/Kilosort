@@ -37,7 +37,7 @@ def extract_snippets(ops, X, nt, twav_min, th_for_wPCA, loc_range = [4, 5], long
 
     return clips
 
-def extract_wPCA_wTEMP(ops, bfile, nt = 61, twav_min = 20, th_for_wPCA = 6, nskip = 25):
+def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, th_for_wPCA=6, nskip=25):
 
     clips = np.zeros((500000,nt), 'float32')
     i = 0
@@ -57,10 +57,10 @@ def extract_wPCA_wTEMP(ops, bfile, nt = 61, twav_min = 20, th_for_wPCA = 6, nski
     clips = clips[:i]
     clips /= (clips**2).sum(1, keepdims=True)**.5
 
-    model = TruncatedSVD(n_components = 6).fit(clips)
+    model = TruncatedSVD(n_components=ops['settings']['n_pcs']).fit(clips)
     wPCA = torch.from_numpy(model.components_).to(device).float()
 
-    model = KMeans(n_clusters = 6, n_init = 10).fit(clips)
+    model = KMeans(n_clusters=ops['settings']['n_clusters'], n_init = 10).fit(clips)
     wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
     wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
 
@@ -135,7 +135,7 @@ def template_match(X, ops, iC, iC2, weigh, device=torch.device('cuda')):
     B = conv1d(X.unsqueeze(1), W, padding=nt//2)
 
     nt0 = 20
-    nk = ops['wTEMP'].shape[0] #ops['nwaves']
+    nk = ops['settings']['n_pcs']
 
     niter = 40
     nb = (NT-1)//niter+1
@@ -197,11 +197,15 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     sig = ops['settings']['min_template_size']
     nsizes = ops['settings']['template_sizes'] 
 
-    if from_data:
-        ops['wPCA'], ops['wTEMP'] = extract_wPCA_wTEMP(ops, bfile, nt = ops['nt'], twav_min = ops['nt0min'], th_for_wPCA = 6, nskip = 25)
+    if ops['settings']['templates_from_data']:
+        # Determine templates and PC features from data.
+        ops['wPCA'], ops['wTEMP'] = extract_wPCA_wTEMP(
+            ops, bfile, nt=ops['nt'], twav_min=ops['nt0min'], 
+            th_for_wPCA=6, nskip=25
+            )
     else:
+        # Use pre-computed templates.
         ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
-    #print(ops['wTEMP'].shape, ops['wPCA'].shape)
 
     ops = template_centers(ops)   
 

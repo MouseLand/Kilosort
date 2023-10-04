@@ -99,7 +99,13 @@ def default_settings():
     nearest_templates
         Number of nearest spike template locations to consider when finding
         local maxima during spike detection.
-
+    templates_from_data
+        TODO
+    n_templates
+        TODO
+    n_pcs
+        TODO
+        
     """
 
     settings = {}
@@ -131,6 +137,9 @@ def default_settings():
     settings['template_sizes']       = 5
     settings['nearest_chans']        = 10
     settings['nearest_templates']    = 100
+    settings['templates_from_data']  = False
+    settings['n_templates']          = 6
+    settings['n_pcs']                = 6
     
     return settings
 
