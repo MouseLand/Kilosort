@@ -1,8 +1,12 @@
 # Kilosort4 pre-release
 
-You can run Kilosort4 without installing it locally using google colab. An example colab notebook is available [here](https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing). It will download some test data, run kilosort4 on it, and show some plots.
+<!--You can run Kilosort4 without installing it locally using google colab. An example colab notebook is available [here](https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing). It will download some test data, run kilosort4 on it, and show some plots. -->
 
-Example notebooks are also provided in the docs/source/tutorials folder and will be later published to readthedocs. The notebooks include: basic_example (same as the colab notebook above), load_data (example data format conversion through SpikeInterface), make_probe (making a custom probe configuration). 
+Example notebooks are provided in the `docs/source/tutorials` folder and will be later published to readthedocs. The notebooks include: 
+
+  1. `basic_example`:  sets up run on example data and shows how to modify parameters  
+  2. `load_data`:  example data format conversion through SpikeInterface  
+  3. `make_probe`:  making a custom probe configuration. 
 
 # Installation
 
