@@ -42,8 +42,6 @@ def default_settings():
         Spike detection threshold for learned templates.
     Th_detect
         Spike detection threshold for universal templates.
-    nwaves
-        Number of universal templates to use.
     nskip
         Batch striding for computing whitening matrix.
     nt0min
@@ -102,7 +100,7 @@ def default_settings():
     templates_from_data
         TODO
     n_templates
-        TODO
+        Number of universal templates to use.
     n_pcs
         TODO
         
@@ -115,7 +113,6 @@ def default_settings():
     settings['Th']                   = 8
     settings['spkTh']                = 8
     settings['Th_detect']            = 9
-    settings['nwaves']               = 6
     settings['nskip']                = 25
     settings['nt0min']               = int(20 * settings['nt']/61)
     settings['NT']                   = 2 * settings['fs']

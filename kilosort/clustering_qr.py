@@ -259,7 +259,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     nskip = ops['settings']['cluster_downsampling']
     ncomps = ops['settings']['cluster_pcs']
 
-    Wall = torch.zeros((0, ops['Nchan'], ops['nwaves']))
+    Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
     t0 = time.time()
     for kk in tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None, mininterval=10 if progress_bar else None):
         # get the data
@@ -298,10 +298,10 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         nmax += Nfilt
 
         # we need the new templates here         
-        W = torch.zeros((Nfilt, ops['Nchan'], ops['nwaves']))
+        W = torch.zeros((Nfilt, ops['Nchan'], ops['settings']['n_pcs']))
         for j in range(Nfilt):
             w = Xd[iclust==j].mean(0)
-            W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['nwaves'])).cpu()
+            W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['n_pcs'])).cpu()
         
         Wall = torch.cat((Wall, W), 0)
 
