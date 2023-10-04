@@ -25,8 +25,8 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
 
     ctc = prepare_matching(ops, U)
     st = np.zeros((10**6, 3), 'float64')
-    tF  = torch.zeros((10**6, nC , ops['nwaves']))
-    tF2 = torch.zeros((10**6, nC , ops['nwaves']))
+    tF  = torch.zeros((10**6, nC , ops['settings']['n_pcs']))
+    tF2 = torch.zeros((10**6, nC , ops['settings']['n_pcs']))
 
     k = 0
 
