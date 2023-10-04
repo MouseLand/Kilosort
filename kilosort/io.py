@@ -177,7 +177,11 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtyp
     np.save((results_dir / 'templates_ind.npy'), templates_ind)
     
     # contamination ratio
-    is_ref, est_contam_rate = CCG.refract(clu, spike_times / ops['fs'])
+    acg_threshold = ops['settings']['acg_threshold']
+    ccg_threshold = ops['settings']['ccg_threshold']
+    is_ref, est_contam_rate = CCG.refract(clu, spike_times / ops['fs'],
+                                          acg_threshold=acg_threshold,
+                                          ccg_threshold=ccg_threshold)
 
     # write properties to *.tsv
     stypes = ['ContamPct', 'Amplitude', 'KSLabel']
@@ -198,7 +202,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtyp
     # params.py
     dtype = "'int16'" if data_dtype is None else f"'{data_dtype}'"
     params = {'dat_path': f"'{Path(ops['settings']['filename']).as_posix()}'",
-            'n_channels_dat': ops['settings']['NchanTOT'],
+            'n_channels_dat': ops['settings']['n_chan_bin'],
             'dtype': dtype,
             'offset': 0,
             'sample_rate': ops['settings']['fs'],

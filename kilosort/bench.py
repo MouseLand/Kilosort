@@ -42,28 +42,28 @@ def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None)
     NT = ops['NT']
     NTbuff   = ops['NTbuff']
     chanMap  = ops['chanMap']
-    NchanTOT = ops['NchanTOT']
+    n_chan_bin = ops['n_chan_bin']
     iKxx = ops['iKxx']
     yblk = ops['yblk']
 
     with open(filename, mode='rb') as f: 
         # seek the beginning of the batch
-        f.seek(2*NT*NchanTOT*ibatch , 0)
+        f.seek(2*NT*n_chan_bin*ibatch , 0)
 
         # go back "NTbuff" samples, unless this is the first batch
         if ibatch==0:
-            buff = f.read((NTbuff-nt) * NchanTOT * 2)
+            buff = f.read((NTbuff-nt) * n_chan_bin * 2)
         else:    
-            f.seek(- 2*nt*NchanTOT , 1)
-            buff = f.read(NTbuff * NchanTOT * 2)          
+            f.seek(- 2*nt*n_chan_bin , 1)
+            buff = f.read(NTbuff * n_chan_bin * 2)          
 
         # read and transpose data
         # this gives a warning, but it's much faster than the alternatives... 
         data = np.frombuffer(buff, dtype=np.int16, offset=0)
-        data = np.reshape(data, (-1, NchanTOT)).T
+        data = np.reshape(data, (-1, n_chan_bin)).T
 
     nsamp = data.shape[-1]
-    X = torch.zeros((NchanTOT, NTbuff), device = dev)
+    X = torch.zeros((n_chan_bin, NTbuff), device = dev)
 
     # fix the data at the edges for the first and last batch
     if ibatch==0:

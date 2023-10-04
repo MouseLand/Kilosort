@@ -223,6 +223,25 @@ def results_directory(gpu, data_directory):
 @pytest.fixture(scope='session')
 def saved_ops(results_directory, torch_device):
     ops = io.load_ops(results_directory / 'ops.npy', device=torch_device)
+
+    # TODO: These are only necessary because the current saved results don't
+    #       include the new parameters. At some point, need to update the remote
+    #       results again to reflect these changes, then this can be removed.
+    ops['settings']['whitening_range']      = 32
+    ops['settings']['dmin']                 = None   # determine automatically
+    ops['settings']['dminx']                = None   # determine automatically
+    ops['settings']['acg_threshold']        = 0.1
+    ops['settings']['ccg_threshold']        = 0.25
+    ops['settings']['cluster_downsampling'] = 20
+    ops['settings']['cluster_pcs']          = 64
+    ops['settings']['min_template_size']    = 10
+    ops['settings']['template_sizes']       = 5
+    ops['settings']['nearest_chans']        = 10
+    ops['settings']['nearest_templates']    = 100
+    ops['settings']['templates_from_data']  = False
+    ops['settings']['n_templates']          = 6
+    ops['settings']['n_pcs']                = 6
+
     return ops
 
 @pytest.fixture()

@@ -7,7 +7,7 @@ import faiss
 from tqdm import tqdm 
 from kilosort import hierarchical, swarmsplitter 
 
-def neigh_mat(Xd, nskip = 10, n_neigh=30):
+def neigh_mat(Xd, nskip=10, n_neigh=30):
     Xsub = Xd[::nskip]
     n_samples, dim = Xd.shape
     n_nodes = Xsub.shape[0]
@@ -249,8 +249,6 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         iclust_template = st[:,5].astype('int32')
         xcup, ycup = ops['xcup'], ops['ycup']
 
-    
-
     d0 = ops['dmin']
     ycent = np.arange(ycup.min()+d0-1, ycup.max()+d0+1, 2*d0)
 
@@ -258,7 +256,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     clu = np.zeros(nsp, 'int32')
     nmax = 0
 
-    nskip = 20
+    nskip = ops['settings']['cluster_downsampling']
+    ncomps = ops['settings']['cluster_pcs']
 
     Wall = torch.zeros((0, ops['Nchan'], ops['nwaves']))
     t0 = time.time()
@@ -266,8 +265,10 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         # get the data
         #iclust_template = st[:,1].astype('int32')
 
-        Xd, ch_min, ch_max, igood  = get_data_cpu(ops, xy, iC, iclust_template, tF, ycent[kk],  
-                                    xcup.mean(), dmin = d0, dminx = ops['dminx'], ncomps = 64)
+        Xd, ch_min, ch_max, igood  = get_data_cpu(
+            ops, xy, iC, iclust_template, tF, ycent[kk], xcup.mean(), dmin=d0,
+            dminx = ops['dminx'], ncomps=ncomps
+            )
 
         if Xd is None:            
             continue
@@ -283,7 +284,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
                 st0 = None
 
             # find new clusters
-            iclust, iclust0, M, iclust_init = cluster(Xd,nskip = nskip, lam = 1, seed = 5, device=device)
+            iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
+                                                      seed=5, device=device)
 
             xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 

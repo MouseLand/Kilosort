@@ -11,16 +11,24 @@ from kilosort.utils import template_path
 
 device = torch.device('cuda')
 
+
 def my_max2d(X, dt):
-    Xmax = max_pool2d(X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1], stride = [1, 1], padding  = [dt[0], dt[1]])    
+    Xmax = max_pool2d(
+        X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1],
+        stride=[1,1], padding=[dt[0],dt[1]]
+        )    
     return Xmax[0]
 
 def my_sum2d(X, dt):
-    Xsum = avg_pool2d(X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1], stride = [1, 1], padding  = [dt[0], dt[1]])    
+    Xsum = avg_pool2d(
+        X.unsqueeze(0), [2*dt[0]+1, 2*dt[1]+1],
+        stride=[1,1], padding=[dt[0],dt[1]]
+        )    
     Xsum *= (2*dt[0]+1) * (2*dt[1]+1)
     return Xsum[0]
 
-def extract_snippets(ops, X, nt, twav_min, th_for_wPCA, loc_range = [4, 5], long_range = [6, 30]):
+def extract_snippets(X, nt, twav_min, th_for_wPCA, loc_range=[4,5],
+                     long_range=[6,30], device=torch.device('cuda')):
     Xabs   = X.abs()
     Xmax   = my_max2d(Xabs, loc_range)
     ispeak = torch.logical_and(Xmax==Xabs, Xabs > th_for_wPCA).float()
@@ -33,18 +41,20 @@ def extract_snippets(ops, X, nt, twav_min, th_for_wPCA, loc_range = [4, 5], long
 
     xy = is_peak_iso.nonzero()
 
-    clips = X[xy[:,:1], xy[:,1:2] - twav_min + torch.arange(nt, device = device)]
+    clips = X[xy[:,:1], xy[:,1:2] - twav_min + torch.arange(nt, device=device)]
 
     return clips
 
-def extract_wPCA_wTEMP(ops, bfile, nt = 61, twav_min = 20, th_for_wPCA = 6, nskip = 25):
+def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, th_for_wPCA=6, nskip=25,
+                       device=torch.device('cuda')):
 
     clips = np.zeros((500000,nt), 'float32')
     i = 0
     for j in range(0, bfile.n_batches, nskip):
         X = bfile.padded_batch_to_torch(j, ops)
         
-        clips_new = extract_snippets(ops, X, nt = nt, twav_min = twav_min, th_for_wPCA = th_for_wPCA)
+        clips_new = extract_snippets(X, nt=nt, twav_min=twav_min,
+                                     th_for_wPCA=th_for_wPCA, device=device)
 
         nnew = len(clips_new)
 
@@ -57,10 +67,10 @@ def extract_wPCA_wTEMP(ops, bfile, nt = 61, twav_min = 20, th_for_wPCA = 6, nski
     clips = clips[:i]
     clips /= (clips**2).sum(1, keepdims=True)**.5
 
-    model = TruncatedSVD(n_components = 6).fit(clips)
+    model = TruncatedSVD(n_components=ops['settings']['n_pcs']).fit(clips)
     wPCA = torch.from_numpy(model.components_).to(device).float()
 
-    model = KMeans(n_clusters = 6, n_init = 10).fit(clips)
+    model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
     wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
     wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
 
@@ -94,21 +104,28 @@ def get_waves(ops, device=torch.device('cuda')):
 
 def template_centers(ops):
     xmin, xmax, ymin, ymax = ops['xc'].min(), ops['xc'].max(), ops['yc'].min(), ops['yc'].max()
-    dmin = np.median(np.diff(np.unique(ops['yc'])))
+    dmin = ops['settings'].get('dmin', None)
+    if dmin is None:
+        # Try to determine a good value automatically based on contact positions.
+        dmin = np.median(np.diff(np.unique(ops['yc'])))
+    ops['dmin'] = dmin
     ops['yup'] = np.arange(ymin, ymax+.00001, dmin//2)
-    ops['dmin'] = dmin 
 
-    yunq = np.unique(ops['yc'])
-    mxc = np.NaN * np.ones(len(yunq))
-    for j in range(len(yunq)):
-        xc = ops['xc'][ops['yc']==yunq[j]]
-        if len(xc)>1:
-            mxc[j] = np.median(np.diff(np.sort(xc)))
-        else:
-            mxc[j] = 0
-    dminx = np.nanmedian(mxc)
-    dminx = np.maximum(1, dminx)
+    dminx = ops['settings'].get('dminx', None)
+    if dminx is None:
+        # Try to determine a good value automatically.
+        yunq = np.unique(ops['yc'])
+        mxc = np.NaN * np.ones(len(yunq))
+        for j in range(len(yunq)):
+            xc = ops['xc'][ops['yc']==yunq[j]]
+            if len(xc)>1:
+                mxc[j] = np.median(np.diff(np.sort(xc)))
+            else:
+                mxc[j] = 0
+        dminx = np.nanmedian(mxc)
+        dminx = np.maximum(1, dminx)
     ops['dminx'] = dminx
+
     nx = np.round((xmax - xmin) / (dminx/2)) + 1
     
     ops['xup'] = np.linspace(xmin, xmax, int(nx))
@@ -128,7 +145,7 @@ def template_match(X, ops, iC, iC2, weigh, device=torch.device('cuda')):
     B = conv1d(X.unsqueeze(1), W, padding=nt//2)
 
     nt0 = 20
-    nk = ops['wTEMP'].shape[0] #ops['nwaves']
+    nk = ops['settings']['n_pcs']
 
     niter = 40
     nb = (NT-1)//niter+1
@@ -186,15 +203,19 @@ def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):
     yct = (cF0 * yy[:,xy[:,0]]).sum(0)
     return yct
 
-def run(ops, bfile, device=torch.device('cuda'), progress_bar=None, from_data = False):        
-    sig = 10
-    nsizes = 5
+def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):        
+    sig = ops['settings']['min_template_size']
+    nsizes = ops['settings']['template_sizes'] 
 
-    if from_data:
-        ops['wPCA'], ops['wTEMP'] = extract_wPCA_wTEMP(ops, bfile, nt = ops['nt'], twav_min = ops['nt0min'], th_for_wPCA = 6, nskip = 25)
+    if ops['settings']['templates_from_data']:
+        # Determine templates and PC features from data.
+        ops['wPCA'], ops['wTEMP'] = extract_wPCA_wTEMP(
+            ops, bfile, nt=ops['nt'], twav_min=ops['nt0min'], 
+            th_for_wPCA=6, nskip=25
+            )
     else:
+        # Use pre-computed templates.
         ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
-    #print(ops['wTEMP'].shape, ops['wPCA'].shape)
 
     ops = template_centers(ops)   
 
@@ -205,7 +226,8 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None, from_data = 
     xc, yc = ops['xc'], ops['yc']
     Nfilt = len(ys)
 
-    nC, nC2 = 10, 100
+    nC = ops['settings']['nearest_chans']
+    nC2 = ops['settings']['nearest_templates']
     iC, ds = nearest_chans(ys, yc, xs, xc, nC, device=device)
     iC2, ds2 = nearest_chans(ys, ys, xs, xs, nC2, device=device)
 
