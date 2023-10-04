@@ -103,6 +103,8 @@ def default_settings():
         Number of universal templates to use.
     n_pcs
         TODO
+    th_for_wPCA
+        TODO
         
     """
 
@@ -137,6 +139,7 @@ def default_settings():
     settings['templates_from_data']  = False
     settings['n_templates']          = 6
     settings['n_pcs']                = 6
+    settings['th_for_wPCA']          = 6
     
     return settings
 
