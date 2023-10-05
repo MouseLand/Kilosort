@@ -185,7 +185,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtyp
     # contamination ratio
     acg_threshold = ops['settings']['acg_threshold']
     ccg_threshold = ops['settings']['ccg_threshold']
-    is_ref, est_contam_rate = CCG.refract(clu, spike_times / ops['fs'],
+    is_ref, est_contam_rate = CCG.refract(spike_clusters, spike_times / ops['fs'],
                                           acg_threshold=acg_threshold,
                                           ccg_threshold=ccg_threshold)
 
