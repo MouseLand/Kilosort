@@ -36,8 +36,6 @@ def default_settings():
         Sampling frequency of probe.
     nt
         Number of samples per waveform. Also determines padding for filtering.
-    Th
-        TODO, some other threshold.
     spkTh
         Spike detection threshold for learned templates.
     Th_detect
