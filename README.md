@@ -1,6 +1,6 @@
 # Kilosort4 pre-release
 
-<!--You can run Kilosort4 without installing it locally using google colab. An example colab notebook is available [here](https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing). It will download some test data, run kilosort4 on it, and show some plots. -->
+You can run Kilosort4 without installing it locally using google colab. An example colab notebook is available [here](https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing). It will download some test data, run kilosort4 on it, and show some plots.
 
 Example notebooks are provided in the `docs/source/tutorials` folder and will be later published to readthedocs. The notebooks include: 
 
@@ -51,11 +51,16 @@ Note you will always have to run `conda activate kilosort` before you run kiloso
 4. Hit `LOAD`. The data should now be visible.
 5. Hit `Run`. This will run the pipeline and output the results in a format compatible with Phy, the most popular spike sorting curating software.
 
+There is a warning that will always pop up when running Kilosort and/or using the BinaryFile class, but it's nothing to worry about:
+```
+UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at C:\cb\pytorch_1000000000000\work\torch\csrc\utils\tensor_numpy.cpp:205.)
+```
+
 ## Integration with Phy GUI
 
 [Phy](https://github.com/kwikteam/phy) provides a manual clustering interface for refining the results of the algorithm. Kilosort4 automatically sets the "good" units in Phy based on a <10% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
 
-Check out the [Phy](https://github.com/kwikteam/phy) repo for full install instructions, but briefly, activate the kilosort environment (`conda activate kilosort`), and then
+Check out the [Phy](https://github.com/kwikteam/phy) repo for more in-depth install instructions, but in most cases the following should work: activate the kilosort environment (`conda activate kilosort`), and then
 ~~~
 pip install phy --pre --upgrade
 ~~~
