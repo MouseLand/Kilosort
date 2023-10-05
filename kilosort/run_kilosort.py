@@ -27,7 +27,7 @@ def default_settings():
     -----
     The returned settings dictionary contains the follow keys:
 
-    n_chan_bin
+    n_chan_bin (required)
         Total number of channels in the binary file, which may be different
         from the number of channels containing ephys data. The value of this
         parameter *must* be specified by the user, or `run_kilosort` will
@@ -35,30 +35,31 @@ def default_settings():
     fs
         Sampling frequency of probe.
     nt
-        Number of samples per waveform. Also determines padding for filtering.
+        Number of samples per waveform. Also size of symmetric padding for filtering.
     spkTh
         Spike detection threshold for learned templates.
     Th_detect
         Spike detection threshold for universal templates.
     nskip
-        Batch striding for computing whitening matrix.
+        Batch stride for computing whitening matrix.
     nt0min
         Sample index for aligning waveforms, so that their minimum value happens
-        here. Default of 20 roughly aligns to the sodium peak.
+        here. Default of 20 roughly aligns to the peak.
     NT
         Number of samples included in each batch of data.
     nblocks
-        Number of non-overlapping blocks for drift correction.
+        Number of non-overlapping blocks for drift correction (additional nblocks-1 
+        blocks are created in the overlaps).
     binning_depth
-        TODO, something to do with drift correction.
-    sig_interp:
-        Sigma for interpolation (spatial standard deviation). Indicates scale
-        of waveform's smoothness for drift correction, in units of microns.
+        Vertical bin size in microns used for 2D histogram in drift correction. 
+    sig_interp
+        Sigma for interpolation (spatial standard deviation). Approximate smoothness scale
+        for drift correction, in units of microns.
     probe_name
         Name of probe to load from Kilosort4's probe directory. This will only
         be used if no `probe` kwarg is specified for `run_kilosort`.
     tmin
-        Time in seconds where data reference should begin from. By default,
+        Time in seconds where data reference should begin. By default,
         begins at 0 seconds.
     tmax
         Time in seconds where data reference should end. By default, ends
@@ -68,7 +69,7 @@ def default_settings():
         out under the assumption that a recording artifact is present.
         By default, the threshold is infinite (so that no zeroing occurs).
     whitening_range
-        Number of channels used to estimate the whitening matrix during
+        Number of nearby channels used to estimate the whitening matrix during
         preprocessing.
     dmin
         Vertical spacing of template centers used for spike detection,
@@ -76,19 +77,22 @@ def default_settings():
     dminx
         Horizontal spacing of template centers used for spike detection,
         in microns.
+    acg_threshold
+        fraction of refractory period violations that are allowed in the ACG 
+        compared to baseline; used to assign "good" units. 
     ccg_threshold
-        TODO
-    ccg_x_threshold
-        TODO
+        fraction of refractory period violations that are allowed in the CCG
+        compared to baseline; used to perform splits and merges during clustering. 
     cluster_downsampling
-        For example, if `cluster_downsampling = 10`, then every 10th spike
-        is used for clustering.
+        inverse fraction of nodes used as landmarks during clustering (can be 1, but 
+        that slows down the optimization). 
     cluster_pcs
-        Number of PC features used for clustering.
+        Maximum number of spatiotemporal PC features used for clustering.
     min_template_size
-        Smallest size of universal spike template.
+        Standard deviation of the smallest, spatial envelope Gaussian used for 
+        universal templates
     template_sizes
-        Number of sizes for universal spike templates.
+        Number of sizes for universal spike templates (multiples of the min_template_size).
     nearest_chans
         Number of nearest channels to consider when finding local maxima
         during spike detection.
@@ -96,13 +100,16 @@ def default_settings():
         Number of nearest spike template locations to consider when finding
         local maxima during spike detection.
     templates_from_data
-        TODO
+        boolean flag indicating whether spike shapes used in universal templates should be 
+        estimated from the data or loaded from the predefined templates
     n_templates
-        Number of universal templates to use.
+        Number of single-channel templates to use for the universal templates (only if 
+        templates_from_data is True).
     n_pcs
-        TODO
+        Number of single-channel PCs to use for extracting spike features (only if 
+        templates_from_data is True).
     th_for_wPCA
-        TODO
+        threshold for threshold crossings for estimating single-channel PCs and templates 
         
     """
 
@@ -126,7 +133,7 @@ def default_settings():
     settings['whitening_range']      = 32
     settings['dmin']                 = None   # determine automatically
     settings['dminx']                = None   # determine automatically
-    settings['acg_threshold']        = 0.1
+    settings['acg_threshold']        = 0.2
     settings['ccg_threshold']        = 0.25
     settings['cluster_downsampling'] = 20
     settings['cluster_pcs']          = 64
