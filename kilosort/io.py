@@ -11,6 +11,7 @@ from torch.fft import fft, ifft, fftshift
 
 from kilosort import CCG
 from kilosort.preprocessing import get_drift_matrix, fft_highpass
+from kilosort.postprocessing import remove_duplicates
 
 
 def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
@@ -160,6 +161,11 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtyp
     spike_times = st[:,0] + imin  # shift by minimum sample index
     spike_clusters = clu
     amplitudes = ((tF**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
+    # remove duplicate (artifact) spikes
+    spike_times, spike_clusters, kept_spikes = remove_duplicates(
+        spike_times, spike_clusters, dt=ops['settings']['duplicate_spike_bins']
+    )
+    amplitudes = amplitudes[kept_spikes]
     np.save((results_dir / 'spike_times.npy'), spike_times)
     np.save((results_dir / 'spike_templates.npy'), spike_clusters)
     np.save((results_dir / 'spike_clusters.npy'), spike_clusters)
@@ -179,7 +185,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtyp
     # contamination ratio
     acg_threshold = ops['settings']['acg_threshold']
     ccg_threshold = ops['settings']['ccg_threshold']
-    is_ref, est_contam_rate = CCG.refract(clu, spike_times / ops['fs'],
+    is_ref, est_contam_rate = CCG.refract(spike_clusters, spike_times / ops['fs'],
                                           acg_threshold=acg_threshold,
                                           ccg_threshold=ccg_threshold)
 

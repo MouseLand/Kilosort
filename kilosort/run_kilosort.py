@@ -110,6 +110,9 @@ def default_settings():
         templates_from_data is True).
     th_for_wPCA
         threshold for threshold crossings for estimating single-channel PCs and templates 
+    duplicate_spike_bins
+        Number of bins for which subsequent spikes from the same cluster are
+        assumed to be artifacts.
         
     """
 
@@ -145,6 +148,7 @@ def default_settings():
     settings['n_templates']          = 6
     settings['n_pcs']                = 6
     settings['th_for_wPCA']          = 6
+    settings['duplicate_spike_bins'] = 15
     
     return settings
 
