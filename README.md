@@ -23,8 +23,9 @@ If you have an older `kilosort` environment you can remove it with `conda env re
 3. Create a new environment with `conda create --name kilosort python=3.8`. We recommend python 3.8 or python 3.9 but 3.10 should work as well.
 4. To activate this new environment, run `conda activate kilosort`
 5. Change into the directory containing the code, it should have a `setup.py` file in it.
-6. To install the minimal version of kilosort, run `python -m pip install .`.  
-7. To install kilosort and the GUI, run `python -m pip install .[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install '.[gui]'.
+6. To install kilosort and the GUI, run `python -m pip install .[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install '.[gui]'.
+7. Instead of 6, you can install the minimal version of kilosort with `python -m pip install .`.  
+
 
 This will install the CPU version of torch in the environment, we need the **GPU** version. First remove the CPU version:
 ~~~
