@@ -43,15 +43,15 @@ setup(
     author="Marius Pachitariu",
     author_email="pachitarium@janelia.hhmi.org",
     description="spike sorting pipeline",
+    version="0.1",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/MouseLand/kilosort",
     setup_requires=[
         'pytest-runner',
-        'setuptools_scm',
     ],
     packages=setuptools.find_packages(),
-    use_scm_version=False,#True,
+    use_scm_version=False,
     install_requires=install_deps,
     tests_require=[
         'pytest'

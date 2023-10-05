@@ -76,26 +76,6 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, th_for_wPCA=6, nskip=25,
 
     return wPCA, wTEMP
 
-
-def find_peaks(X, ops, loc_range = [5,5], long_range = [7,31]):
-    nt = ops['nt']
-    Th = ops['Th']
-    Xneg = -X.unsqueeze(0)
-    Xmax = max_pool2d(Xneg, (loc_range[0], 1), stride=1, padding=(loc_range[0]//2, 0))
-    Xmax = max_pool2d(Xmax, (1, loc_range[1]), stride=1, padding=(0, loc_range[1]//2))
-
-    peaks = torch.logical_and(Xmax == Xneg, Xmax > Th).float()
-    peaks[0, :,:nt] = 0
-    peaks[0, :,-nt:] = 0
-
-    Pmax = avg_pool2d(peaks, (long_range[0], 1), stride=1, padding=(long_range[0]//2, 0))
-    Pmax = avg_pool2d(Pmax, (1, long_range[1]), stride=1, padding=(0, long_range[1]//2))
-    Pmax = Pmax * np.prod(long_range)
-
-    is_peak = torch.logical_and(peaks[0], Pmax[0] < 1.2)
-    xs = torch.nonzero(is_peak)
-    return xs
-
 def get_waves(ops, device=torch.device('cuda')):
     dd = np.load(template_path())
     wTEMP = torch.from_numpy(dd['wTEMP']).to(device)
