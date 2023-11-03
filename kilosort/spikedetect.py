@@ -124,7 +124,7 @@ def template_match(X, ops, iC, iC2, weigh, device=torch.device('cuda')):
     W = ops['wTEMP'].unsqueeze(1)
     B = conv1d(X.unsqueeze(1), W, padding=nt//2)
 
-    nt0 = 20
+    nt0 = ops['settings']['nt0min']
     nk = ops['settings']['n_pcs']
 
     niter = 40

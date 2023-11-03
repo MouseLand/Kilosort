@@ -124,7 +124,7 @@ def default_settings():
     settings['spkTh']                = 8
     settings['Th_detect']            = 9
     settings['nskip']                = 25
-    settings['nt0min']               = int(20 * settings['nt']/61)
+    settings['nt0min']               = None   # If None, will change to int(20*nt/61)
     settings['NT']                   = 2 * settings['fs']
     settings['nblocks']              = 5
     settings['binning_depth']        = 5
@@ -190,6 +190,9 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
             'channels in the binary file, which may or may not be equal to the '
             'number of channels specified by the probe.'
             )
+    if settings['nt0min'] is None:
+        settings['nt0min'] = int(20 * settings['nt']/61)
+
     # NOTE: Also modifies settings in-place
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir)
@@ -277,6 +280,11 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign) -> dict:
     ops['NTbuff'] = ops['NT'] + 2 * ops['nt']
     ops['Nchan'] = len(probe['chanMap'])
     ops['n_chan_bin'] = settings['n_chan_bin']
+
+    if not settings['templates_from_data'] and settings['nt'] != 61:
+        raise ValueError('If using pre-computed universal templates '
+                         '(templates_from_data=False), nt must be 61')
+
     ops = {**ops, **probe}
 
     return ops
