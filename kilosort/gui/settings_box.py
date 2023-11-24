@@ -74,14 +74,13 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.populate_device_selector()
 
         generated_inputs = []
-        for var, name, _, _, _, _, default in _MAIN_PARAMETERS:
+        for i, (var, name, _, _, _, _, default) in enumerate(_MAIN_PARAMETERS):
             setattr(self, f'{var}_text', QtWidgets.QLabel(f'{name}'))
             setattr(self, f'{var}_input', QtWidgets.QLineEdit())
+            getattr(self, f'{var}_input').parameter_index = i
             setattr(self, f'{var}', default)
             generated_inputs.append(getattr(self, f'{var}_input'))
         self.data_dtype = _DEFAULT_DTYPE
-        # TODO: shouldn't need to set defaults again in setup() now, after
-        #       on_changed slots of have been fixed.
 
         self.load_settings_button = QtWidgets.QPushButton("LOAD")
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
@@ -191,8 +190,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             var = parameter_info[0]
             layout.addWidget(getattr(self, f'{var}_text'), row_count, 0, 1, 3)
             layout.addWidget(getattr(self, f'{var}_input'), row_count, 3, 1, 2)
-            updater = lambda value: self.update_parameter(value, parameter_info)
-            getattr(self, f'{var}_input').textChanged.connect(updater)
+            getattr(self, f'{var}_input').textChanged.connect(self.update_parameter)
 
         self.setLayout(layout)
         self.set_default_field_values()
@@ -307,10 +305,11 @@ class SettingsBox(QtWidgets.QGroupBox):
         return None not in self.settings.values()
     
     @QtCore.pyqtSlot()
-    def update_parameter(self, value, parameter_info):
-        var, name, ptype, pmin, pmax, excl, _ = parameter_info
+    def update_parameter(self):
+        parameter_index = self.sender().parameter_index
+        var, name, ptype, pmin, pmax, excl, _ = _MAIN_PARAMETERS[parameter_index]
         try:
-            v = ptype(value)
+            v = ptype(getattr(self, f'{var}_input').text())
             assert v >= pmin
             assert v <= pmax
             assert v not in excl
