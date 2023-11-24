@@ -12,7 +12,7 @@ from scipy.io.matlab.miobase import MatReadError
 
 logger = setup_logger(__name__)
 
-
+_DEFAULT_DTYPE = 'int16'
 _MAIN_PARAMETERS = [
     # variable name, display name, type, minimum, maximum, exclusions, default
     # min, max are inclusive, so have to specify exclude 0 to get > 0 for example
@@ -65,18 +65,18 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.populate_dtype_selector()
 
         generated_inputs = []
-        for var, name, _, _, _, _, _ in _MAIN_PARAMETERS:
+        for var, name, _, _, _, _, default in _MAIN_PARAMETERS:
             setattr(self, f'{var}_text', QtWidgets.QLabel(f'{name}'))
             setattr(self, f'{var}_input', QtWidgets.QLineEdit())
-            setattr(self, f'{var}', None)
+            setattr(self, f'{var}', default)
             generated_inputs.append(getattr(self, f'{var}_input'))
+        self.data_dtype = _DEFAULT_DTYPE
 
         self.load_settings_button = QtWidgets.QPushButton("LOAD")
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
         self.probe_layout = self.gui.probe_layout
         self.probe_name = self.gui.probe_name
-        self.data_dtype = None
-
+  
         self.input_fields = [
             self.data_file_path_input,
             self.results_directory_input,
@@ -178,8 +178,8 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.update_settings()
 
     def set_default_field_values(self):
-        self.dtype_selector.setCurrentText('int16')
-        for var, name, _, _, _, _, default in _MAIN_PARAMETERS:
+        self.dtype_selector.setCurrentText(_DEFAULT_DTYPE)
+        for var, _, _,  _, _, _, default in _MAIN_PARAMETERS:
             getattr(self, f'{var}_input').setText(str(default))
 
     def on_select_data_file_clicked(self):
