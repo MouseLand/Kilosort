@@ -15,12 +15,16 @@ class MessageLogBox(QtWidgets.QGroupBox):
         self.log_box.setReadOnly(True)
         self.log_box.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
         self.log_box.setFont(QtGui.QFont("Monospace"))
-        self.layout.addWidget(self.log_box, 0, 0, 1, 1)
+        self.layout.addWidget(self.log_box, 0, 0, 1, 2)
 
         self.popout_button = QtWidgets.QPushButton('Show More')
         self.popout_button.clicked.connect(self.show_log_popout)
-        self.layout.addWidget(self.popout_button, 1, 0)
+        self.layout.addWidget(self.popout_button, 1, 0, 1, 1)
         self.popout_window = ExpandedLog()
+
+        self.dump_button = QtWidgets.QPushButton('Dump Settings')
+        self.dump_button.clicked.connect(self.dump_settings)
+        self.layout.addWidget(self.dump_button, 1, 1, 1, 1)
 
         log_box_document = self.log_box.document()
         default_font = log_box_document.defaultFont()
@@ -41,6 +45,13 @@ class MessageLogBox(QtWidgets.QGroupBox):
     @QtCore.pyqtSlot()
     def show_log_popout(self):
         self.popout_window.show()
+
+    @QtCore.pyqtSlot()
+    def dump_settings(self):
+        # For debugging purposes, check for mismatch between displayed parameter
+        # values and the values that are actually being used.
+        settings_text = str(self.gui.settings_box.settings)
+        self.update_text(settings_text)
 
     def prepare_for_new_context(self):
         self.save_log_file()
