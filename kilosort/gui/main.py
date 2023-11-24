@@ -82,7 +82,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.message_log_box = MessageLogBox(self)
 
         self.setAcceptDrops(True)
-
         self.setup()
 
     def keyPressEvent(self, event):
@@ -459,6 +458,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         self.message_log_box.save_log_file()
+        self.message_log_box.popout_window.close()
         self.close_binary_files()
         event.accept()
 
