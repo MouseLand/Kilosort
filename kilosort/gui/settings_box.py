@@ -6,9 +6,6 @@ import numpy as np
 import torch
 from PyQt5 import QtCore, QtWidgets
 from scipy.io.matlab.miobase import MatReadError
-# TODO: replace this, adds an extra dependency and only gets used to sort
-#       one list in the entire repo.
-from natsort import natsorted  
 
 from kilosort.gui.logger import setup_logger
 from kilosort.gui.minor_gui_elements import ProbeBuilder, create_prb
@@ -490,7 +487,6 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def populate_probe_selector(self):
         self.probe_layout_selector.clear()
-
         probe_folders = [self.gui.new_probe_files_path]
         
         probes_list = []
@@ -502,7 +498,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                 if probe.endswith(".mat") or probe.endswith(".prb")
             ]
             probes_list.extend(probes)
-        probes_list = natsorted(probes_list)
+
         probes_list.sort(key=lambda f: os.path.splitext(f)[1])
         self.probe_layout_selector.addItems([""] + probes_list + ["[new]", "other..."])
         self._probes = probes_list
