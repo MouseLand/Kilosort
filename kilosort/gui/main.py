@@ -18,11 +18,18 @@ logger = setup_logger(__name__)
 
 
 class KiloSortGUI(QtWidgets.QMainWindow):
-    def __init__(self, application, filename=None, **kwargs):
+    def __init__(self, application, filename=None, device=None,
+                 **kwargs):
         super(KiloSortGUI, self).__init__(**kwargs)
 
         self.app = application
         self.qt_settings = QtCore.QSettings('Janelia', 'Kilosort4')
+        if device is None:
+            if torch.cuda.is_available():
+                device = torch.device('cuda')
+            else:
+                device = torch.device('cpu')
+        self.device = device
 
         if self.qt_settings.contains('data_file_path'):
             if filename is None or filename == '':
@@ -38,7 +45,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             self.probe_name = self.qt_settings.value('probe_name')
         else:
             self.probe_name = None
-            
+
         if self.qt_settings.contains('results_dir'):
             self.results_directory = self.qt_settings.value('results_dir')
         else:
@@ -304,7 +311,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             n_chan_bin=n_channels,
             fs=sample_rate,
             chan_map=chan_map,
-            device=torch.device("cpu"),
+            device=self.device,
             dtype=data_dtype,
             tmin=tmin,
             tmax=tmax,
@@ -315,7 +322,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.context.highpass_filter = preprocessing.get_highpass_filter(
             fs=sample_rate,
-            device=torch.device("cpu")
+            device=self.device
         )
 
         with BinaryFiltered(
@@ -324,7 +331,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             fs=sample_rate,
             chan_map=chan_map,
             hp_filter=self.context.highpass_filter,
-            device=torch.device("cpu"),
+            device=self.device,
             dtype=data_dtype,
             tmin=tmin,
             tmax=tmax,
@@ -344,7 +351,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             chan_map=chan_map,
             hp_filter=self.context.highpass_filter,
             whiten_mat=self.context.whitening_matrix,
-            device=torch.device("cpu"),
+            device=self.device,
             dtype=data_dtype,
             tmin=tmin,
             tmax=tmax,

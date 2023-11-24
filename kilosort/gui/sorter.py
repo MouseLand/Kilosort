@@ -16,19 +16,15 @@ class KiloSortWorker(QtCore.QThread):
     finishedAll = QtCore.pyqtSignal(object)
     progress_bar = pyqtSignal(int)
 
-    def __init__(
-            self,
-            context,
-            results_directory,
-            steps,
-            *args,
-            **kwargs):
+    def __init__(self, context, results_directory, steps,
+                 device=torch.device('cuda'), *args, **kwargs):
         super(KiloSortWorker, self).__init__(*args, **kwargs)
         self.context = context
         self.data_path = context.data_path
         self.results_directory = results_directory
         assert isinstance(steps, list) or isinstance(steps, str)
         self.steps = steps if isinstance(steps, list) else [steps]
+        self.device = device
 
     def run(self):
         if "spikesort" in self.steps:
@@ -44,7 +40,7 @@ class KiloSortWorker(QtCore.QThread):
                 settings=settings,
                 probe=probe,
                 results_dir=results_directory,
-                device=torch.device("cuda"),
+                device=self.device,
                 progress_bar=self.progress_bar,
                 data_dtype=settings['data_dtype']
             )

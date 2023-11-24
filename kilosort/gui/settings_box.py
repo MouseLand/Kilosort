@@ -1,14 +1,19 @@
 import os
 import pprint
-import warnings
 from pathlib import Path
-from natsort import natsorted
+
 import numpy as np
+import torch
+from PyQt5 import QtCore, QtWidgets
+from scipy.io.matlab.miobase import MatReadError
+# TODO: replace this, adds an extra dependency and only gets used to sort
+#       one list in the entire repo.
+from natsort import natsorted  
+
 from kilosort.gui.logger import setup_logger
 from kilosort.gui.minor_gui_elements import ProbeBuilder, create_prb
 from kilosort.io import load_probe, BinaryRWFile
-from PyQt5 import QtCore, QtWidgets
-from scipy.io.matlab.miobase import MatReadError
+
 
 logger = setup_logger(__name__)
 
@@ -64,6 +69,10 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.dtype_selector = QtWidgets.QComboBox()
         self.populate_dtype_selector()
 
+        self.device_selector_text = QtWidgets.QLabel('PyTorch device:')
+        self.device_selector = QtWidgets.QComboBox()
+        self.populate_device_selector()
+
         generated_inputs = []
         for var, name, _, _, _, _, default in _MAIN_PARAMETERS:
             setattr(self, f'{var}_text', QtWidgets.QLabel(f'{name}'))
@@ -71,6 +80,8 @@ class SettingsBox(QtWidgets.QGroupBox):
             setattr(self, f'{var}', default)
             generated_inputs.append(getattr(self, f'{var}_input'))
         self.data_dtype = _DEFAULT_DTYPE
+        # TODO: shouldn't need to set defaults again in setup() now, after
+        #       on_changed slots of have been fixed.
 
         self.load_settings_button = QtWidgets.QPushButton("LOAD")
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
@@ -163,6 +174,16 @@ class SettingsBox(QtWidgets.QGroupBox):
         )
         self.dtype_selector.currentTextChanged.connect(
             self.on_data_dtype_selected
+        )
+
+        row_count += 1
+        layout.addWidget(self.device_selector_text, row_count, 0, 1, 3)
+        layout.addWidget(self.device_selector, row_count, 3, 1, 2)
+        self.device_selector.setSizeAdjustPolicy(
+            QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
+        )
+        self.device_selector.currentTextChanged.connect(
+            self.on_device_selected
         )
 
         for parameter_info in _MAIN_PARAMETERS:
@@ -457,6 +478,17 @@ class SettingsBox(QtWidgets.QGroupBox):
         if self.check_settings():
             self.enable_load()
 
+    def on_device_selected(self, device):
+        num_gpus = torch.cuda.device_count()
+        selector_index = self.device_selector.getCurrentIndex()
+        if selector_index >= num_gpus:
+            device_id = 'cpu'
+        else:
+            device_id = f'cuda:{selector_index}'
+        self.gui.device = torch.device(device_id)
+        if self.check_settings():
+            self.enable_load()
+
     def populate_probe_selector(self):
         self.probe_layout_selector.clear()
 
@@ -478,9 +510,18 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def populate_dtype_selector(self):
         self.dtype_selector.clear()
-
         supported_dtypes = BinaryRWFile.supported_dtypes
         self.dtype_selector.addItems(supported_dtypes)
+
+    def populate_device_selector(self):
+        self.device_selector.clear()
+        # Add gpus first, so that index in selector matches index in torch's
+        # list of gpus.
+        gpus = [
+            torch.cuda.get_device_name(i) 
+            for i in range(torch.cuda.device_count())
+            ]
+        self.device_selector.addItems(gpus + ['cpu'])
 
     def estimate_total_channels(self, num_channels):
         if self.data_file_path is not None:

@@ -167,7 +167,7 @@ class RunBox(QtWidgets.QGroupBox):
         worker = KiloSortWorker(
             context=self.get_current_context(),
             results_directory=self.results_directory,
-            steps=steps,
+            steps=steps, device=self.parent.device
         )
         
         worker.progress_bar.connect(self.set_progress_val)
