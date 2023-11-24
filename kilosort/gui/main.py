@@ -22,16 +22,29 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         super(KiloSortGUI, self).__init__(**kwargs)
 
         self.app = application
+        self.qt_settings = QtCore.QSettings('Janelia', 'Kilosort4')
 
+        if self.qt_settings.contains('data_file_path'):
+            if filename is None or filename == '':
+                filename = self.qt_settings.value('data_file_path')
         self.data_path = filename
-        self.probe_layout = None
-        self.probe_name = None
+
+        if self.qt_settings.contains('probe_layout'):
+            self.probe_layout = self.qt_settings.value('probe_layout')
+        else:
+            self.probe_layout = None
+        
+        if self.qt_settings.contains('probe_name'):
+            self.probe_name = self.qt_settings.value('probe_name')
+        else:
+            self.probe_name = None
+            
+        if self.qt_settings.contains('results_dir'):
+            self.results_directory = self.qt_settings.value('results_dir')
+        else:
+            self.results_directory = None
+
         self.params = None
-        self.results_directory = None
-
-        # self.probe_files_path = Path(probes.__file__).parent
-        # assert self.probe_files_path.exists()
-
         self.local_config_path = DOWNLOADS_DIR
         self.local_config_path.mkdir(parents=True, exist_ok=True)
 
@@ -39,7 +52,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.new_probe_files_path.mkdir(exist_ok=True)
         download_probes(self.new_probe_files_path)
 
-        # self.time_range = None
         self.num_channels = None
 
         self.context = None

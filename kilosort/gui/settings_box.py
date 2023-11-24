@@ -13,24 +13,24 @@ from scipy.io.matlab.miobase import MatReadError
 logger = setup_logger(__name__)
 
 
-DEFAULT_PARAMS = {
-    "n_chan_bin"    : 385,
-    "fs"            : 30000,
-    "nt"            : 61,
-    "Th"            : 6,
-    "spkTh"         : 8,
-    "Th_detect"     : 9,
-    "nwaves"        : 6,
-    "nskip"         : 25,
-    "nt0min"        : 20,
-    "NT"            : 60000,
-    "nblocks"       : 5,
-    "binning_depth" : 5,
-    "sig_interp"    : 20,
-    "data_dtype"    : "int16",
-    "artifact_threshold" : np.inf
-}
-
+_MAIN_PARAMETERS = [
+    # variable name, display name, type, minimum, maximum, exclusions, default
+    # min, max are inclusive, so have to specify exclude 0 to get > 0 for example
+    ('n_chan_bin', 'number of channels', int, 0, np.inf, [0], 385),
+    ('fs', 'sampling frequency', float, 0, np.inf, [0], 30000),
+    ('nt', 'nt', int, 1, np.inf, [], 61),
+    ('Th', 'Th', float, 0, np.inf, [0], 6),
+    ('spkTh', 'spkTh', float, 0, np.inf, [0], 8),
+    ('Th_detect', 'Th_detect', float, 0, np.inf, [0], 9),
+    ('nwaves', 'nwaves', int, 1, np.inf, [], 6),
+    ('nskip', 'nskip', int, 1, np.inf, [], 25),
+    ('nt0min', 'nt0min', int, 0, np.inf, [], 20),
+    ('NT', 'NT', int, 1, np.inf, [], 60000),
+    ('nblocks', 'nblocks', int, 0, np.inf, [], 5),
+    ('binning_depth', 'binning depth', float, 0, np.inf, [0], 5),
+    ('sig_interp', 'sig_interp', float, 0, np.inf, [0], 20),
+    ('artifact_threshold', 'artifact threshold', float, 0, np.inf, [], np.inf)
+]
 
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.pyqtSignal()
@@ -64,89 +64,26 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.dtype_selector = QtWidgets.QComboBox()
         self.populate_dtype_selector()
 
-        self.num_channels_text = QtWidgets.QLabel("number of channels")
-        self.num_channels_input = QtWidgets.QLineEdit()
-
-        self.sampling_frequency_text = QtWidgets.QLabel("sampling frequency")
-        self.sampling_frequency_input = QtWidgets.QLineEdit()
-
-        self.nt_text = QtWidgets.QLabel("nt")
-        self.nt_input = QtWidgets.QLineEdit()
-
-        self.NT_text = QtWidgets.QLabel("NT")
-        self.NT_input = QtWidgets.QLineEdit()
-
-        self.Th_text = QtWidgets.QLabel("Th")
-        self.Th_input = QtWidgets.QLineEdit()
-
-        self.spkTh_text = QtWidgets.QLabel("spkTh")
-        self.spkTh_input = QtWidgets.QLineEdit()
-
-        self.Th_detect_text = QtWidgets.QLabel("Th_detect")
-        self.Th_detect_input = QtWidgets.QLineEdit()
-
-        self.nwaves_text = QtWidgets.QLabel("nwaves")
-        self.nwaves_input = QtWidgets.QLineEdit()
-
-        self.nskip_text = QtWidgets.QLabel("nskip")
-        self.nskip_input = QtWidgets.QLineEdit()
-
-        self.nt0min_text = QtWidgets.QLabel("nt0min")
-        self.nt0min_input = QtWidgets.QLineEdit()
-
-        self.nblocks_text = QtWidgets.QLabel("nblocks")
-        self.nblocks_input = QtWidgets.QLineEdit()
-
-        self.binning_depth_text = QtWidgets.QLabel("binning depth")
-        self.binning_depth_input = QtWidgets.QLineEdit()
-
-        self.sig_interp_text = QtWidgets.QLabel("sig interp")
-        self.sig_interp_input = QtWidgets.QLineEdit()
-
-        self.artifact_threshold_text = QtWidgets.QLabel('artifact threshold')
-        self.artifact_threshold_input = QtWidgets.QLineEdit()
+        generated_inputs = []
+        for var, name, _, _, _, _, _ in _MAIN_PARAMETERS:
+            setattr(self, f'{var}_text', QtWidgets.QLabel(f'{name}'))
+            setattr(self, f'{var}_input', QtWidgets.QLineEdit())
+            setattr(self, f'{var}', None)
+            generated_inputs.append(getattr(self, f'{var}_input'))
 
         self.load_settings_button = QtWidgets.QPushButton("LOAD")
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
-
-        self.probe_layout = None
-        self.probe_name = None
+        self.probe_layout = self.gui.probe_layout
+        self.probe_name = self.gui.probe_name
         self.data_dtype = None
-        self.num_channels = None
-        self.sampling_frequency = None
-        self.nt = None
-        self.NT = None
-        self.Th = None
-        self.spkTh = None
-        self.Th_detect = None
-        self.nwaves = None
-        self.nskip = None
-        self.nt0min = None
-        self.nblocks = None
-        self.binning_depth = None
-        self.sig_interp = None
-        self.artifact_threshold = None
 
         self.input_fields = [
             self.data_file_path_input,
             self.results_directory_input,
             self.probe_layout_selector,
-            self.dtype_selector,
-            self.num_channels_input,
-            self.sampling_frequency_input,
-            self.nt_input,
-            self.NT_input,
-            self.Th_input,
-            self.spkTh_input,
-            self.Th_detect_input,
-            self.nwaves_input,
-            self.nskip_input,
-            self.nt0min_input,
-            self.nblocks_input,
-            self.binning_depth_input,
-            self.sig_interp_input,
-            self.artifact_threshold_input
-        ]
+            self.dtype_selector
+            ]
+        self.input_fields.extend(generated_inputs)
 
         self.buttons = [
             self.load_settings_button,
@@ -158,6 +95,14 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.settings = {}
 
         self.setup()
+
+        if self.probe_name is not None:
+            self.probe_layout_selector.setCurrentText(self.probe_name)
+        if self.probe_layout is not None:
+            self.enable_preview_probe()
+        if self.data_file_path is not None and self.data_file_path != '':
+            if self.check_settings():
+                self.enable_load()
 
     def setup(self):
         self.setTitle("Settings")
@@ -220,101 +165,22 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.on_data_dtype_selected
         )
 
-        row_count += 1
-        layout.addWidget(self.num_channels_text, row_count, 0, 1, 3)
-        layout.addWidget(self.num_channels_input, row_count, 3, 1, 2)
-        self.num_channels_input.textChanged.connect(self.on_number_of_channels_changed)
-
-        row_count += 1
-        layout.addWidget(self.sampling_frequency_text, row_count, 0, 1, 3)
-        layout.addWidget(self.sampling_frequency_input, row_count, 3, 1, 2)
-        self.sampling_frequency_input.textChanged.connect(self.on_sampling_frequency_changed)
-
-        row_count += 1
-        layout.addWidget(self.nt_text, row_count, 0, 1, 3)
-        layout.addWidget(self.nt_input, row_count, 3, 1, 2)
-        self.nt_input.textChanged.connect(self.on_nt_changed)
-
-        row_count += 1
-        layout.addWidget(self.NT_text, row_count, 0, 1, 3)
-        layout.addWidget(self.NT_input, row_count, 3, 1, 2)
-        self.NT_input.textChanged.connect(self.on_NT_changed)
-
-        row_count += 1
-        layout.addWidget(self.Th_text, row_count, 0, 1, 3)
-        layout.addWidget(self.Th_input, row_count, 3, 1, 2)
-        self.Th_input.textChanged.connect(self.on_Th_changed)
-
-        row_count += 1
-        layout.addWidget(self.spkTh_text, row_count, 0, 1, 3)
-        layout.addWidget(self.spkTh_input, row_count, 3, 1, 2)
-        self.spkTh_input.textChanged.connect(self.on_spkTh_changed)
-
-        row_count += 1
-        layout.addWidget(self.Th_detect_text, row_count, 0, 1, 3)
-        layout.addWidget(self.Th_detect_input, row_count, 3, 1, 2)
-        self.Th_detect_input.textChanged.connect(self.on_Th_detect_changed)
-
-        row_count += 1
-        layout.addWidget(self.nwaves_text, row_count, 0, 1, 3)
-        layout.addWidget(self.nwaves_input, row_count, 3, 1, 2)
-        self.nwaves_input.textChanged.connect(self.on_nwaves_changed)
-
-        row_count += 1
-        layout.addWidget(self.nskip_text, row_count, 0, 1, 3)
-        layout.addWidget(self.nskip_input, row_count, 3, 1, 2)
-        self.nskip_input.textChanged.connect(self.on_nskip_changed)
-
-        row_count += 1
-        layout.addWidget(self.nt0min_text, row_count, 0, 1, 3)
-        layout.addWidget(self.nt0min_input, row_count, 3, 1, 2)
-        self.nt0min_input.textChanged.connect(self.on_nt0min_changed)
-
-        row_count += 1
-        layout.addWidget(self.nblocks_text, row_count, 0, 1, 3)
-        layout.addWidget(self.nblocks_input, row_count, 3, 1, 2)
-        self.nblocks_input.textChanged.connect(self.on_nblocks_changed)
-
-        row_count += 1
-        layout.addWidget(self.binning_depth_text, row_count, 0, 1, 3)
-        layout.addWidget(self.binning_depth_input, row_count, 3, 1, 2)
-        self.binning_depth_input.textChanged.connect(self.on_binning_depth_changed)
-
-        row_count += 1
-        layout.addWidget(self.sig_interp_text, row_count, 0, 1, 3)
-        layout.addWidget(self.sig_interp_input, row_count, 3, 1, 2)
-        self.sig_interp_input.textChanged.connect(self.on_sig_interp_changed)
-
-        row_count += 1
-        layout.addWidget(self.artifact_threshold_text, row_count, 0, 1, 3)
-        layout.addWidget(self.artifact_threshold_input, row_count, 3, 1, 2)
-        self.artifact_threshold_input.textChanged.connect(self.on_artifact_threshold_changed)
+        for parameter_info in _MAIN_PARAMETERS:
+            row_count += 1
+            var = parameter_info[0]
+            layout.addWidget(getattr(self, f'{var}_text'), row_count, 0, 1, 3)
+            layout.addWidget(getattr(self, f'{var}_input'), row_count, 3, 1, 2)
+            updater = lambda value: self.update_parameter(value, parameter_info)
+            getattr(self, f'{var}_input').textChanged.connect(updater)
 
         self.setLayout(layout)
-
-        self.set_default_field_values(DEFAULT_PARAMS)
-
+        self.set_default_field_values()
         self.update_settings()
 
-    def set_default_field_values(self, default_params):
-        if default_params is None:
-            default_params = DEFAULT_PARAMS
-
-        self.num_channels_input.setText(str(default_params["n_chan_bin"]))
-        self.sampling_frequency_input.setText(str(default_params["fs"]))
-        self.dtype_selector.setCurrentText(default_params["data_dtype"])
-        self.nt_input.setText(str(default_params["nt"]))
-        self.NT_input.setText(str(default_params["NT"]))
-        self.Th_input.setText(str(default_params["Th"]))
-        self.spkTh_input.setText(str(default_params["spkTh"]))
-        self.Th_detect_input.setText(str(default_params["Th_detect"]))
-        self.nwaves_input.setText(str(default_params["nwaves"]))
-        self.nskip_input.setText(str(default_params["nskip"]))
-        self.nt0min_input.setText(str(default_params["nt0min"]))
-        self.nblocks_input.setText(str(default_params["nblocks"]))
-        self.binning_depth_input.setText(str(default_params["binning_depth"]))
-        self.sig_interp_input.setText(str(default_params["sig_interp"]))
-        self.artifact_threshold_input.setText(str(default_params['artifact_threshold']))
+    def set_default_field_values(self):
+        self.dtype_selector.setCurrentText('int16')
+        for var, name, _, _, _, _, default in _MAIN_PARAMETERS:
+            getattr(self, f'{var}_input').setText(str(default))
 
     def on_select_data_file_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
@@ -363,6 +229,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             logger.warning("It will be (recursively) created upon data load.")
 
         self.results_directory_path = results_directory
+        self.gui.qt_settings.setValue('results_dir', results_directory)
 
         if self.check_settings():
             self.enable_load()
@@ -379,7 +246,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.results_directory_input.setText(results_folder.as_posix())
 
             self.data_file_path = data_file_path
-            self.results_directory_path = results_folder
+            self.gui.qt_settings.setValue('data_file_path', data_file_path)
 
             if self.check_settings():
                 self.enable_load()
@@ -412,23 +279,37 @@ class SettingsBox(QtWidgets.QGroupBox):
             "probe": self.probe_layout,
             "probe_name": self.probe_name,
             "data_dtype": self.data_dtype,
-            "n_chan_bin": self.num_channels,
-            "fs": self.sampling_frequency,
-            "nt": self.nt,
-            "NT": self.NT,
-            "spkTh": self.spkTh,
-            "Th": self.Th,
-            "Th_detect": self.Th_detect,
-            "nwaves": self.nwaves,
-            "nskip": self.nskip,
-            "nt0min": self.nt0min,
-            "nblocks": self.nblocks,
-            "binning_depth": self.binning_depth,
-            "sig_interp": self.sig_interp,
-            "artifact_threshold": self.artifact_threshold
-        }
+            }
+        for p in _MAIN_PARAMETERS:
+            self.settings[p[0]] = getattr(self, p[0])
 
         return None not in self.settings.values()
+    
+    @QtCore.pyqtSlot()
+    def update_parameter(self, value, parameter_info):
+        var, name, ptype, pmin, pmax, excl, _ = parameter_info
+        try:
+            v = ptype(value)
+            assert v >= pmin
+            assert v <= pmax
+            assert v not in excl
+            setattr(self, var, v)
+
+            if self.check_settings():
+                self.enable_load()
+
+        except ValueError:
+            logger.exception(
+                f"Invalid input!\n {name} must be of type: {ptype}."
+            )
+            self.disable_load()
+
+        except AssertionError:
+            logger.exception(
+                f"Invalid inputs!\n {name} must be in the range:\n"
+                f"{pmin} <= {name} <= {pmax}, {name} != {excl}"
+            )
+            self.disable_load()
 
     @QtCore.pyqtSlot()
     def update_settings(self):
@@ -454,14 +335,11 @@ class SettingsBox(QtWidgets.QGroupBox):
             probe_path = Path(self.gui.new_probe_files_path).joinpath(name)
             try:
                 probe_layout = load_probe(probe_path)
+                self.save_probe_selection(probe_layout, probe_path.name)
 
-                self.probe_layout = probe_layout
-                self.probe_name = probe_path.name
                 total_channels = self.probe_layout["n_chan"]
-
                 total_channels = self.estimate_total_channels(total_channels)
-
-                self.num_channels_input.setText(str(total_channels))
+                self.n_chan_bin_input.setText(str(total_channels))
 
                 self.enable_preview_probe()
 
@@ -541,22 +419,22 @@ class SettingsBox(QtWidgets.QGroupBox):
 
                             self.populate_probe_selector()
                             self.probe_layout_selector.setCurrentText(probe_name)
-
+                            self.probe_name = probe_path.name
                         else:
                             logger.exception("Probe with the same name already exists.")
 
                     else:
-                        self.probe_layout = probe_layout
+                        self.save_probe_selection(probe_layout, probe_path.name)
 
                         total_channels = self.probe_layout["n_chan"]
                         total_channels = self.estimate_total_channels(total_channels)
-                        self.num_channels_input.setText(str(total_channels))
+                        self.n_chan_bin_input.setText(str(total_channels))
 
                         self.enable_preview_probe()
 
                         if self.check_settings():
                             self.enable_load()
-                    self.probe_name = probe_path.name
+
                 except AssertionError:
                     logger.exception(
                         "Please select a valid probe file (accepted types: *.prb, *.mat *.json)!"
@@ -568,302 +446,16 @@ class SettingsBox(QtWidgets.QGroupBox):
                 self.disable_load()
                 self.disable_preview_probe()
 
+    def save_probe_selection(self, layout, name):
+        self.probe_layout = layout
+        self.probe_name = name
+        self.gui.qt_settings.setValue('probe_layout', layout)
+        self.gui.qt_settings.setValue('probe_name', name)
+
     def on_data_dtype_selected(self, data_dtype):
         self.data_dtype = data_dtype
         if self.check_settings():
             self.enable_load()
-
-    def on_number_of_channels_changed(self):
-        try:
-            number_of_channels = int(self.num_channels_input.text())
-            assert number_of_channels > 0
-
-            self.num_channels = number_of_channels
-
-            if self.check_settings():
-                self.enable_load()
-        except ValueError:
-            logger.exception("Invalid input!\nNo. of channels must be an integer!")
-            self.disable_load()
-        except AssertionError:
-            logger.exception("Invalid input!\nNo. of channels must be > 0!")
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_sampling_frequency_changed(self):
-        try:
-            fs = int(self.sampling_frequency_input.text())
-            assert fs > 0.0
-
-            self.sampling_frequency = fs
-
-            if self.check_settings():
-                self.enable_load()
-
-        except ValueError:
-            logger.exception(
-                "Invalid input!\n"
-                "sampling frequency must be an integer!"
-            )
-            self.disable_load()
-
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that fs > 0.0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_nt_changed(self):
-        try:
-            nt = int(self.nt_input.text())
-            assert nt > 0
-
-            self.nt = nt
-
-            if self.check_settings():
-                self.enable_load()
-
-        except ValueError:
-            logger.exception(
-                "Invalid input!\n"
-                "nt must be an integer!"
-            )
-            self.disable_load()
-
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that nt > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_NT_changed(self):
-        try:
-            NT = int(self.NT_input.text())
-            assert NT > 0
-
-            self.NT = NT
-
-            if self.check_settings():
-                self.enable_load()
-
-        except ValueError:
-            logger.exception(
-                "Invalid input!\n"
-                "NT must be an integer!"
-            )
-            self.disable_load()
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that NT > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_spkTh_changed(self):
-        try:
-            spkTh = float(self.spkTh_input.text())
-            assert spkTh > 0.0
-
-            self.spkTh = spkTh
-
-            if self.check_settings():
-                self.enable_load()
-
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that spkTh > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_Th_detect_changed(self):
-        try:
-            Th_detect = float(self.Th_detect_input.text())
-            assert Th_detect > 0.0
-
-            self.Th_detect = Th_detect
-
-            if self.check_settings():
-                self.enable_load()
-
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that Th_detect > 0.0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_Th_changed(self):
-        try:
-            Th = float(self.Th_input.text())
-            assert Th > 0.0
-
-            self.Th = Th
-
-            if self.check_settings():
-                self.enable_load()
-
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that Th > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_nwaves_changed(self):
-        try:
-            nwaves = int(self.nwaves_input.text())
-            assert nwaves > 0
-
-            self.nwaves = nwaves
-
-            if self.check_settings():
-                self.enable_load()
-
-        except ValueError:
-            logger.exception(
-                "Invalid input!\n"
-                "nwaves must be an integer!"
-            )
-            self.disable_load()
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that nwaves > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_nskip_changed(self):
-        try:
-            nskip = int(self.nskip_input.text())
-            assert nskip > 0
-
-            self.nskip = nskip
-
-            if self.check_settings():
-                self.enable_load()
-
-        except ValueError:
-            logger.exception(
-                "Invalid input!\n"
-                "nskip must be an integer!"
-            )
-            self.disable_load()
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that nskip > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_nt0min_changed(self):
-        try:
-            nt0min = int(self.nt0min_input.text())
-            assert nt0min > 0
-
-            self.nt0min = nt0min
-
-            if self.check_settings():
-                self.enable_load()
-
-        except ValueError:
-            logger.exception(
-                "Invalid input!\n"
-                "nt0min must be an integer!"
-            )
-            self.disable_load()
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that nt0min > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_nblocks_changed(self):
-        try:
-            nblocks = int(self.nblocks_input.text())
-            assert nblocks >= 0
-
-            self.nblocks = nblocks
-
-            if self.check_settings():
-                self.enable_load()
-
-        except ValueError:
-            logger.exception(
-                "Invalid input!\n"
-                "nblocks must be an integer!"
-            )
-            self.disable_load()
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that nblocks > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_binning_depth_changed(self):
-        try:
-            binning_depth = float(self.binning_depth_input.text())
-            assert binning_depth > 0.0
-
-            self.binning_depth = binning_depth
-
-            if self.check_settings():
-                self.enable_load()
-
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that binning_depth > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_sig_interp_changed(self):
-        try:
-            sig_interp = float(self.sig_interp_input.text())
-            assert sig_interp > 0.0
-
-            self.sig_interp = sig_interp
-
-            if self.check_settings():
-                self.enable_load()
-
-        except AssertionError:
-            logger.exception(
-                "Invalid inputs!\n"
-                "Check that sig_interp > 0!"
-            )
-            self.disable_load()
-
-    @QtCore.pyqtSlot()
-    def on_artifact_threshold_changed(self):
-        try:
-            artifact = float(self.artifact_threshold_input.text())
-            self.artifact_threshold = artifact
-            if self.check_settings():
-                self.enable_load()
-
-        except Exception as e:
-            logger.exception(
-                'Invalid artifact threshold, must be float.'
-            )
-            logger.exception(e)
-            self.disable_load()
-
 
     def populate_probe_selector(self):
         self.probe_layout_selector.clear()
@@ -923,6 +515,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.data_file_path_input.clear()
         self.results_directory_input.clear()
         self.probe_layout_selector.setCurrentIndex(0)
-        self.set_default_field_values(None)
+        self.set_default_field_values()
         self.disable_preview_probe()
         self.disable_load()
