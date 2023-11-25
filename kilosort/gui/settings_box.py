@@ -34,6 +34,26 @@ _MAIN_PARAMETERS = [
     ('artifact_threshold', 'artifact threshold', float, 0, np.inf, [], np.inf)
 ]
 
+_EXTRA_PARAMETERS = [
+    ('whitening_range', 'whitening range', int, 1, np.inf, [], 32),
+    ('dmin', 'dmin', float, 0, np.inf, [0], None),
+    ('dminx', 'dminx', float, 0, np.inf, [0], None),
+    ('acg_threshold', 'acg threshold', float, 0, np.inf, [0], 0.2),
+    ('ccg_threshold', 'ccg_threshold', float, 0, np.inf, [0], 0.25),
+    ('cluster_downsampling', 'cluster downsampling', int, 1, np.inf, [], 20),
+    ('cluster_pcs', 'cluster pcs', int, 1, np.inf, [], 64),
+    ('min_template_size', 'min template size', int, 1, np.inf, [], 10),
+    ('template_sizes', 'num template sizes', int, 1, np.inf, [], 5),
+    ('nearest_chans', 'nearest chans', int, 1, np.inf, [], 10),
+    ('nearest_templates', 'nearest templates', int, 1, np.inf, [], 100),
+    ('templates_from_data', 'templates from data', bool, None, None, [], False),
+    ('n_templates', 'n templates', int, 1, np.inf, [], 6),
+    ('n_pcs', 'n pcs', int, 1, np.inf, [], 6),
+    ('th_for_wPCA', 'th for wPCA', float, 0, np.inf, [0], 6),
+    ('duplicate_spike_bins', 'duplicate spike bins', int, 0, np.inf, [], 15)
+]
+
+
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.pyqtSignal()
     previewProbe = QtCore.pyqtSignal(object)
@@ -79,6 +99,9 @@ class SettingsBox(QtWidgets.QGroupBox):
             generated_inputs.append(getattr(self, f'{var}_input'))
         self.data_dtype = _DEFAULT_DTYPE
 
+        self.extra_parameters_window = ExtraParametersWindow(self)
+        self.extra_parameters_button = QtWidgets.QPushButton('Extra settings')
+
         self.load_settings_button = QtWidgets.QPushButton("LOAD")
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
         self.probe_layout = self.gui.probe_layout
@@ -100,7 +123,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         ]
 
         self.settings = {}
-
         self.setup()
 
         if self.probe_name is not None:
@@ -110,6 +132,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         if self.data_file_path is not None and self.data_file_path != '':
             if self.check_settings():
                 self.enable_load()
+
 
     def setup(self):
         self.setTitle("Settings")
@@ -189,6 +212,12 @@ class SettingsBox(QtWidgets.QGroupBox):
             layout.addWidget(getattr(self, f'{var}_input'), row_count, 3, 1, 2)
             getattr(self, f'{var}_input').textChanged.connect(self.update_parameter)
 
+        row_count +=1
+        layout.addWidget(self.extra_parameters_button, row_count, 0, 1, 5)
+        self.extra_parameters_button.clicked.connect(
+            lambda x: self.extra_parameters_window.show()
+            )
+
         self.setLayout(layout)
         self.set_default_field_values()
         self.update_settings()
@@ -197,6 +226,9 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.dtype_selector.setCurrentText(_DEFAULT_DTYPE)
         for var, _, _,  _, _, _, default in _MAIN_PARAMETERS:
             getattr(self, f'{var}_input').setText(str(default))
+        for var, _, _,  _, _, _, default in _EXTRA_PARAMETERS:
+            epw = self.extra_parameters_window
+            getattr(epw, f'{var}_input').setText(str(default))
 
     def on_select_data_file_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
@@ -298,6 +330,8 @@ class SettingsBox(QtWidgets.QGroupBox):
             }
         for p in _MAIN_PARAMETERS:
             self.settings[p[0]] = getattr(self, p[0])
+        for p in _EXTRA_PARAMETERS:
+            self.settings[p[0]] = getattr(self.extra_parameters_window, p[0])
 
         return None not in self.settings.values()
     
@@ -306,10 +340,15 @@ class SettingsBox(QtWidgets.QGroupBox):
         parameter_index = self.sender().parameter_index
         var, name, ptype, pmin, pmax, excl, _ = _MAIN_PARAMETERS[parameter_index]
         try:
-            v = ptype(getattr(self, f'{var}_input').text())
-            assert v >= pmin
-            assert v <= pmax
-            assert v not in excl
+            value = getattr(self, f'{var}_input').text()
+            if (value is None):
+                v = value
+            else:
+                v = ptype(value)
+            if not isinstance(v, bool):
+                assert v >= pmin
+                assert v <= pmax
+                assert v not in excl
             setattr(self, var, v)
 
             if self.check_settings():
@@ -554,3 +593,64 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.set_default_field_values()
         self.disable_preview_probe()
         self.disable_load()
+
+
+class ExtraParametersWindow(QtWidgets.QWidget):
+    def __init__(self, parent):
+        super().__init__()
+        self.main_settings = parent
+        self.input_fields = []
+        for i, (var, name, _, _, _, _, default) in enumerate(_EXTRA_PARAMETERS):
+            setattr(self, f'{var}_text', QtWidgets.QLabel(f'{name}'))
+            setattr(self, f'{var}_input', QtWidgets.QLineEdit())
+            getattr(self, f'{var}_input').parameter_index = i
+            setattr(self, f'{var}', default)
+            self.input_fields.append(getattr(self, f'{var}_input'))
+        
+        layout = QtWidgets.QGridLayout()
+        row_count = 0
+        for parameter_info in _EXTRA_PARAMETERS:
+            row_count += 1
+            var = parameter_info[0]
+            layout.addWidget(getattr(self, f'{var}_text'), row_count, 0, 1, 3)
+            layout.addWidget(getattr(self, f'{var}_input'), row_count, 3, 1, 2)
+            getattr(self, f'{var}_input').textChanged.connect(self.update_parameter)
+
+        self.setLayout(layout)
+
+        center = QtWidgets.QDesktopWidget().availableGeometry().center()
+        geo = self.frameGeometry()
+        geo.moveCenter(center)
+        self.move(geo.topLeft())
+
+    @QtCore.pyqtSlot()
+    def update_parameter(self):
+        parameter_index = self.sender().parameter_index
+        var, name, ptype, pmin, pmax, excl, _ = _EXTRA_PARAMETERS[parameter_index]
+        try:
+            value = getattr(self, f'{var}_input').text()
+            if (value is None):
+                v = value
+            else:
+                v = ptype(value)
+            if not isinstance(v, bool):
+                assert v >= pmin
+                assert v <= pmax
+                assert v not in excl
+            setattr(self, var, v)
+
+            if self.main_settings.check_settings():
+                self.main_settings.enable_load()
+
+        except ValueError:
+            logger.exception(
+                f"Invalid input!\n {name} must be of type: {ptype}."
+            )
+            self.main_settings.disable_load()
+
+        except AssertionError:
+            logger.exception(
+                f"Invalid inputs!\n {name} must be in the range:\n"
+                f"{pmin} <= {name} <= {pmax}, {name} != {excl}"
+            )
+            self.main_settings.disable_load()
