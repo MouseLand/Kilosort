@@ -333,9 +333,11 @@ class SettingsBox(QtWidgets.QGroupBox):
         for p in _EXTRA_PARAMETERS:
             self.settings[p[0]] = getattr(self.extra_parameters_window, p[0])
 
-        # TODO: need to do something different here, because some of the additional settings
-        #       have None as a valid value.
-        return None not in self.settings.values()
+        none_allowed = ['dmin', 'dminx']
+        for k, v in self.settings.items():
+            if v is None and k not in none_allowed:
+                return False
+        return True
     
     @QtCore.pyqtSlot()
     def update_parameter(self):
