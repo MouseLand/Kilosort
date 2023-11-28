@@ -333,6 +333,8 @@ class SettingsBox(QtWidgets.QGroupBox):
         for p in _EXTRA_PARAMETERS:
             self.settings[p[0]] = getattr(self.extra_parameters_window, p[0])
 
+        # TODO: need to do something different here, because some of the additional settings
+        #       have None as a valid value.
         return None not in self.settings.values()
     
     @QtCore.pyqtSlot()
@@ -515,7 +517,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def on_device_selected(self, device):
         num_gpus = torch.cuda.device_count()
-        selector_index = self.device_selector.getCurrentIndex()
+        selector_index = self.device_selector.currentIndex()
         if selector_index >= num_gpus:
             device_id = 'cpu'
         else:
