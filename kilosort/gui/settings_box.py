@@ -20,21 +20,21 @@ _MAIN_PARAMETERS = [
     # min, max are inclusive, so have to specify exclude 0 to get > 0 for example
     ('n_chan_bin', 'number of channels', int, 0, np.inf, [0], 385),
     ('fs', 'sampling frequency', float, 0, np.inf, [0], 30000),
-    ('nt', 'nt', int, 1, np.inf, [], 61),
     ('Th', 'Th', float, 0, np.inf, [0], 6),
     ('spkTh', 'spkTh', float, 0, np.inf, [0], 8),
     ('Th_detect', 'Th_detect', float, 0, np.inf, [0], 9),
-    ('nwaves', 'nwaves', int, 1, np.inf, [], 6),
-    ('nskip', 'nskip', int, 1, np.inf, [], 25),
-    ('nt0min', 'nt0min', int, 0, np.inf, [], 20),
     ('NT', 'NT', int, 1, np.inf, [], 60000),
     ('nblocks', 'nblocks', int, 0, np.inf, [], 5),
-    ('binning_depth', 'binning depth', float, 0, np.inf, [0], 5),
-    ('sig_interp', 'sig_interp', float, 0, np.inf, [0], 20),
-    ('artifact_threshold', 'artifact threshold', float, 0, np.inf, [], np.inf)
 ]
 
 _EXTRA_PARAMETERS = [
+    ('nt', 'nt', int, 1, np.inf, [], 61),
+    ('nwaves', 'nwaves', int, 1, np.inf, [], 6),
+    ('nskip', 'nskip', int, 1, np.inf, [], 25),
+    ('nt0min', 'nt0min', int, 0, np.inf, [], 20),
+    ('binning_depth', 'binning depth', float, 0, np.inf, [0], 5),
+    ('sig_interp', 'sig_interp', float, 0, np.inf, [0], 20),
+    ('artifact_threshold', 'artifact threshold', float, 0, np.inf, [], np.inf),
     ('whitening_range', 'whitening range', int, 1, np.inf, [], 32),
     ('dmin', 'dmin', float, 0, np.inf, [0], None),
     ('dminx', 'dminx', float, 0, np.inf, [0], None),
