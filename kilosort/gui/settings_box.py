@@ -342,34 +342,8 @@ class SettingsBox(QtWidgets.QGroupBox):
     @QtCore.pyqtSlot()
     def update_parameter(self):
         parameter_index = self.sender().parameter_index
-        var, name, ptype, pmin, pmax, excl, _ = _MAIN_PARAMETERS[parameter_index]
-        try:
-            value = getattr(self, f'{var}_input').text()
-            if (value is None):
-                v = value
-            else:
-                v = ptype(value)
-            if not isinstance(v, bool):
-                assert v >= pmin
-                assert v <= pmax
-                assert v not in excl
-            setattr(self, var, v)
-
-            if self.check_settings():
-                self.enable_load()
-
-        except ValueError:
-            logger.exception(
-                f"Invalid input!\n {name} must be of type: {ptype}."
-            )
-            self.disable_load()
-
-        except AssertionError:
-            logger.exception(
-                f"Invalid inputs!\n {name} must be in the range:\n"
-                f"{pmin} <= {name} <= {pmax}, {name} != {excl}"
-            )
-            self.disable_load()
+        parameter_info = _MAIN_PARAMETERS[parameter_index]
+        _check_parameter(self, self, parameter_info)
 
     @QtCore.pyqtSlot()
     def update_settings(self):
@@ -630,31 +604,45 @@ class ExtraParametersWindow(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def update_parameter(self):
         parameter_index = self.sender().parameter_index
-        var, name, ptype, pmin, pmax, excl, _ = _EXTRA_PARAMETERS[parameter_index]
-        try:
-            value = getattr(self, f'{var}_input').text()
-            if (value is None):
-                v = value
+        parameter_info = _EXTRA_PARAMETERS[parameter_index]
+        _check_parameter(self, self.main_settings, parameter_info)
+
+
+def _check_parameter(sender_obj, main_obj, parameter_info):
+    var, name, ptype, pmin, pmax, excl, _ = parameter_info
+    try:
+        value = getattr(sender_obj, f'{var}_input').text()
+        if (value is None):
+            v = value
+        elif ptype is bool:
+            print('inside bool check')
+            if value.lower() == 'false':
+                v = False
+            elif value.lower() == 'true':
+                v = True
             else:
-                v = ptype(value)
-            if not isinstance(v, bool):
-                assert v >= pmin
-                assert v <= pmax
-                assert v not in excl
-            setattr(self, var, v)
+                raise TypeError(f'{var} should be True or False.')
+            print(f'value is: {value}, and v is: {v}')
+        else:
+            v = ptype(value)
+        if not isinstance(v, bool):
+            assert v >= pmin
+            assert v <= pmax
+            assert v not in excl
+        setattr(sender_obj, var, v)
 
-            if self.main_settings.check_settings():
-                self.main_settings.enable_load()
+        if main_obj.check_settings():
+            main_obj.enable_load()
 
-        except ValueError:
-            logger.exception(
-                f"Invalid input!\n {name} must be of type: {ptype}."
-            )
-            self.main_settings.disable_load()
+    except ValueError:
+        logger.exception(
+            f"Invalid input!\n {name} must be of type: {ptype}."
+        )
+        main_obj.disable_load()
 
-        except AssertionError:
-            logger.exception(
-                f"Invalid inputs!\n {name} must be in the range:\n"
-                f"{pmin} <= {name} <= {pmax}, {name} != {excl}"
-            )
-            self.main_settings.disable_load()
+    except AssertionError:
+        logger.exception(
+            f"Invalid inputs!\n {name} must be in the range:\n"
+            f"{pmin} <= {name} <= {pmax}, {name} != {excl}"
+        )
+        main_obj.disable_load()

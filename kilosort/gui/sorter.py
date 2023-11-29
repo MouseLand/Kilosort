@@ -36,6 +36,7 @@ class KiloSortWorker(QtCore.QThread):
             if not results_directory.exists():
                 logger.info(f"Results dir at {results_directory} does not exist. The folder will be created.")
                 results_directory.mkdir(parents=True)
+
             run_kilosort(
                 settings=settings,
                 probe=probe,
