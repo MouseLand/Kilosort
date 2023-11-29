@@ -13,7 +13,8 @@ class MessageLogBox(QtWidgets.QGroupBox):
         self.setLayout(self.layout)
         self.log_box = QtWidgets.QPlainTextEdit()
         self.log_box.setReadOnly(True)
-        self.log_box.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+        #self.log_box.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+        self.log_box.setLineWrapMode(200)
         self.log_box.setFont(QtGui.QFont("Monospace"))
         self.layout.addWidget(self.log_box, 0, 0, 1, 2)
 
