@@ -90,7 +90,7 @@ class ExpandedLog(QtWidgets.QWidget):
         self.layout.addWidget(self.log_box, 0, 0, 1, 1)
         
         center = QtWidgets.QDesktopWidget().availableGeometry().center()
-        self.setGeometry(0, 0, 1200, 800)
+        self.setGeometry(0, 0, 800, 500)
         geo = self.frameGeometry()
         geo.moveCenter(center)
         self.move(geo.topLeft())
