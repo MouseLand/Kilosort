@@ -25,8 +25,8 @@ _MAIN_PARAMETERS = [
     ('Th_detect', 'Th_detect', float, 0, np.inf, [0], 9),
     ('NT', 'NT', int, 1, np.inf, [], 60000),
     ('nblocks', 'nblocks', int, 0, np.inf, [], 5),
-    ('tmin', 'tmin', 'float', 0, np.inf, [], 0),
-    ('tmax', 'tmax', 'float', 0, np.inf, [0], np.inf),
+    ('tmin', 'tmin', float, 0, np.inf, [], 0),
+    ('tmax', 'tmax', float, 0, np.inf, [0], np.inf),
 ]
 
 _EXTRA_PARAMETERS = [

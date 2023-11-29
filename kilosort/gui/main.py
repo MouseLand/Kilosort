@@ -265,8 +265,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def set_parameters(self):
         settings = self.settings_box.settings
-        settings['tmin'] = self.data_view_box.tmin
-        settings['tmax'] = self.data_view_box.tmax
         # advanced_options = self.settings_box.advanced_options
 
         self.data_path = settings["data_file_path"]
