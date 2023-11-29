@@ -25,6 +25,8 @@ _MAIN_PARAMETERS = [
     ('Th_detect', 'Th_detect', float, 0, np.inf, [0], 9),
     ('NT', 'NT', int, 1, np.inf, [], 60000),
     ('nblocks', 'nblocks', int, 0, np.inf, [], 5),
+    ('tmin', 'tmin', 'float', 0, np.inf, [], 0),
+    ('tmax', 'tmax', 'float', 0, np.inf, [0], np.inf),
 ]
 
 _EXTRA_PARAMETERS = [
@@ -210,7 +212,8 @@ class SettingsBox(QtWidgets.QGroupBox):
             var = parameter_info[0]
             layout.addWidget(getattr(self, f'{var}_text'), row_count, 0, 1, 3)
             layout.addWidget(getattr(self, f'{var}_input'), row_count, 3, 1, 2)
-            getattr(self, f'{var}_input').textChanged.connect(self.update_parameter)
+            inp = getattr(self, f'{var}_input')
+            inp.editingFinished.connect(self.update_parameter)
 
         row_count +=1
         layout.addWidget(self.extra_parameters_button, row_count, 0, 1, 5)
@@ -592,7 +595,8 @@ class ExtraParametersWindow(QtWidgets.QWidget):
             var = parameter_info[0]
             layout.addWidget(getattr(self, f'{var}_text'), row_count, 0, 1, 3)
             layout.addWidget(getattr(self, f'{var}_input'), row_count, 3, 1, 2)
-            getattr(self, f'{var}_input').textChanged.connect(self.update_parameter)
+            inp = getattr(self, f'{var}_input')
+            inp.editingFinished.connect(self.update_parameter)
 
         self.setLayout(layout)
 
