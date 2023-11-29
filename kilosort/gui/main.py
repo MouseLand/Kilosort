@@ -83,6 +83,11 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.setAcceptDrops(True)
         self.setup()
+        
+        # Offset a bit from top-left corner of screen. Centering isn't working
+        # for some reason, probably related to the dynamic geometry from the
+        # sub-widgets.
+        self.move(100, 100)
 
     def keyPressEvent(self, event):
         QtWidgets.QMainWindow.keyPressEvent(self, event)
