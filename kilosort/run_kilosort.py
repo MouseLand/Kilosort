@@ -455,7 +455,7 @@ def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     """
 
     tic = time.time()
-    print(f'\nExtracting spikes using built-in templates')
+    print(f'\nExtracting spikes using templates')
     st0, tF, ops = spikedetect.run(ops, bfile, device=device, progress_bar=progress_bar)
     tF = torch.from_numpy(tF)
     print(f'{len(st0)} spikes extracted in {time.time()-tic : .2f}s; ' + 
