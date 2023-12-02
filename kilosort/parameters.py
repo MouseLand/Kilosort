@@ -51,7 +51,7 @@ _MAIN_PARAMETERS = {
 
     'nblocks': {
         'gui_name': 'nblocks', 'type': int, 'min': 0, 'max': np.inf,
-        'exclude': [], 'default': 5, 'step': 'preprocessing',
+        'exclude': [], 'default': 1, 'step': 'preprocessing',
         'description':
             """
             Number of non-overlapping blocks for drift correction
@@ -65,7 +65,8 @@ _MAIN_PARAMETERS = {
         'exclude': [0], 'default': 6, 'step': 'spike detection',
         'description':
             """
-            ???
+            For single channel threshold crossings to compute universal templates. 
+            In units of whitened data standard deviations. 
             """
     # TODO: fill in description (guess it never had one)
     },
@@ -177,8 +178,8 @@ _EXTRA_PARAMETERS = {
         'exclude': [], 'default': 20, 'step': 'spike detection',
         'description': 
             """
-            Sample index for aligning waveforms, so that their minimum value
-            happens here. Default of 20 roughly aligns to the peak.
+            Sample index for aligning waveforms, so that their minimum 
+            or maximum value happens here. Default of 20.
             """
     },
 
