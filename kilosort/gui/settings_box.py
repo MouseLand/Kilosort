@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtWidgets, QtGui
 from scipy.io.matlab.miobase import MatReadError
 
 from kilosort.gui.logger import setup_logger
@@ -545,6 +545,7 @@ class ExtraParametersWindow(QtWidgets.QWidget):
         generated_inputs = []
         for k, p in EXTRA_PARAMETERS.items():
             setattr(self, f'{k}_text', QtWidgets.QLabel(f'{p["gui_name"]}'))
+            getattr(self, f'{k}_text').setToolTip(f'{p["description"]}')
             setattr(self, f'{k}_input', QtWidgets.QLineEdit())
             getattr(self, f'{k}_input').var_name = k
             setattr(self, f'{k}', p['default'])
@@ -552,10 +553,29 @@ class ExtraParametersWindow(QtWidgets.QWidget):
         
         layout = QtWidgets.QGridLayout()
         row_count = 0
-        for k in list(EXTRA_PARAMETERS.keys()):
+        col = 0
+        heading = None
+        self.heading_labels = []
+        for k, p in EXTRA_PARAMETERS.items():
+            if p['step'] != heading:
+                heading = p['step']
+                heading_label = QtWidgets.QLabel(heading)
+                heading_label.setFont(QtGui.QFont('Arial', 14))
+                self.heading_labels.append(heading_label)
+                if len(self.heading_labels) % 4 == 0:
+                    hgap = QtWidgets.QLabel('         ')
+                    layout.addWidget(hgap, row_count, 5, 1, 1)
+                    row_count = 0
+                    col = 6
+                row_count += 1
+                gap = QtWidgets.QLabel('')
+                gap.setFont(QtGui.QFont('Arial', 4))
+                layout.addWidget(gap, row_count, col, 1, 5)
+                row_count += 1
+                layout.addWidget(self.heading_labels[-1], row_count, col, 1, 5)
             row_count += 1
-            layout.addWidget(getattr(self, f'{k}_text'), row_count, 0, 1, 3)
-            layout.addWidget(getattr(self, f'{k}_input'), row_count, 3, 1, 2)
+            layout.addWidget(getattr(self, f'{k}_text'), row_count, col, 1, 3)
+            layout.addWidget(getattr(self, f'{k}_input'), row_count, col+3, 1, 2)
             inp = getattr(self, f'{k}_input')
             inp.editingFinished.connect(self.update_parameter)
 

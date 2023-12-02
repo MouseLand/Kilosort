@@ -111,6 +111,7 @@ MAIN_PARAMETERS = {
 
 
 EXTRA_PARAMETERS = {
+    ### DATA
     'nt': {
         'gui_name': 'nt', 'type': int, 'min': 1, 'max': np.inf,
         'exclude': [], 'default': 61, 'step': 'data',
@@ -162,7 +163,7 @@ EXTRA_PARAMETERS = {
 
     'sig_interp': {
         'gui_name': 'sig_interp', 'type': float, 'min': 0, 'max': np.inf,
-        'exclude': [0], 'default': 20, 'step': '',
+        'exclude': [0], 'default': 20, 'step': 'preprocessing',
         'description':
             """
             Sigma for interpolation (spatial standard deviation). Approximate
