@@ -17,7 +17,6 @@ logger = setup_logger(__name__)
 
 _DEFAULT_DTYPE = 'int16'
 
-
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.pyqtSignal()
     previewProbe = QtCore.pyqtSignal(object)
@@ -57,6 +56,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         generated_inputs = []
         for k, p in MAIN_PARAMETERS.items():
             setattr(self, f'{k}_text', QtWidgets.QLabel(f'{p["gui_name"]}'))
+            getattr(self, f'{k}_text').setToolTip(f'{p["description"]}')
             setattr(self, f'{k}_input', QtWidgets.QLineEdit())
             getattr(self, f'{k}_input').var_name = k
             setattr(self, f'{k}', p['default'])
