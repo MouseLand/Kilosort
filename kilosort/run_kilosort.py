@@ -14,143 +14,7 @@ from kilosort import (
     spikedetect,
     PROBE_DIR
 )
-
-
-def default_settings():
-    """Get default settings dict for `run_kilosort`.
-
-    Returns
-    -------
-    settings : dict
-
-    Notes
-    -----
-    The returned settings dictionary contains the follow keys:
-
-    n_chan_bin (required)
-        Total number of channels in the binary file, which may be different
-        from the number of channels containing ephys data. The value of this
-        parameter *must* be specified by the user, or `run_kilosort` will
-        raise a ValueError.
-    fs
-        Sampling frequency of probe.
-    nt
-        Number of samples per waveform. Also size of symmetric padding for filtering.
-    spkTh
-        Spike detection threshold for learned templates.
-    Th_detect
-        Spike detection threshold for universal templates.
-    nskip
-        Batch stride for computing whitening matrix.
-    nt0min
-        Sample index for aligning waveforms, so that their minimum value happens
-        here. Default of 20 roughly aligns to the peak.
-    NT
-        Number of samples included in each batch of data.
-    nblocks
-        Number of non-overlapping blocks for drift correction (additional nblocks-1 
-        blocks are created in the overlaps).
-    binning_depth
-        Vertical bin size in microns used for 2D histogram in drift correction. 
-    sig_interp
-        Sigma for interpolation (spatial standard deviation). Approximate smoothness scale
-        for drift correction, in units of microns.
-    probe_name
-        Name of probe to load from Kilosort4's probe directory. This will only
-        be used if no `probe` kwarg is specified for `run_kilosort`.
-    tmin
-        Time in seconds where data reference should begin. By default,
-        begins at 0 seconds.
-    tmax
-        Time in seconds where data reference should end. By default, ends
-        at the end of the recording.
-    artifact_threshold
-        If a batch contains absolute values above this number, it will be zeroed
-        out under the assumption that a recording artifact is present.
-        By default, the threshold is infinite (so that no zeroing occurs).
-    whitening_range
-        Number of nearby channels used to estimate the whitening matrix during
-        preprocessing.
-    dmin
-        Vertical spacing of template centers used for spike detection,
-        in microns.
-    dminx
-        Horizontal spacing of template centers used for spike detection,
-        in microns.
-    acg_threshold
-        fraction of refractory period violations that are allowed in the ACG 
-        compared to baseline; used to assign "good" units. 
-    ccg_threshold
-        fraction of refractory period violations that are allowed in the CCG
-        compared to baseline; used to perform splits and merges during clustering. 
-    cluster_downsampling
-        inverse fraction of nodes used as landmarks during clustering (can be 1, but 
-        that slows down the optimization). 
-    cluster_pcs
-        Maximum number of spatiotemporal PC features used for clustering.
-    min_template_size
-        Standard deviation of the smallest, spatial envelope Gaussian used for 
-        universal templates
-    template_sizes
-        Number of sizes for universal spike templates (multiples of the min_template_size).
-    nearest_chans
-        Number of nearest channels to consider when finding local maxima
-        during spike detection.
-    nearest_templates
-        Number of nearest spike template locations to consider when finding
-        local maxima during spike detection.
-    templates_from_data
-        boolean flag indicating whether spike shapes used in universal templates should be 
-        estimated from the data or loaded from the predefined templates
-    n_templates
-        Number of single-channel templates to use for the universal templates (only if 
-        templates_from_data is True).
-    n_pcs
-        Number of single-channel PCs to use for extracting spike features (only if 
-        templates_from_data is True).
-    th_for_wPCA
-        threshold for threshold crossings for estimating single-channel PCs and templates 
-    duplicate_spike_bins
-        Number of bins for which subsequent spikes from the same cluster are
-        assumed to be artifacts.
-        
-    """
-
-    settings = {}
-    settings['n_chan_bin']           = None   # Required, user must specify 
-    settings['fs']                   = 30000
-    settings['nt']                   = 61
-    settings['Th']                   = 8
-    settings['spkTh']                = 8
-    settings['Th_detect']            = 9
-    settings['nskip']                = 25
-    settings['nt0min']               = None   # If None, will change to int(20*nt/61)
-    settings['NT']                   = 2 * settings['fs']
-    settings['nblocks']              = 5
-    settings['binning_depth']        = 5
-    settings['sig_interp']           = 20
-    settings['probe_name']           = 'neuropixPhase3B1_kilosortChanMap.mat'
-    settings['tmin']                 = 0.0
-    settings['tmax']                 = np.inf
-    settings['artifact_threshold']   = np.inf
-    settings['whitening_range']      = 32
-    settings['dmin']                 = None   # determine automatically
-    settings['dminx']                = None   # determine automatically
-    settings['acg_threshold']        = 0.2
-    settings['ccg_threshold']        = 0.25
-    settings['cluster_downsampling'] = 20
-    settings['cluster_pcs']          = 64
-    settings['min_template_size']    = 10
-    settings['template_sizes']       = 5
-    settings['nearest_chans']        = 10
-    settings['nearest_templates']    = 100
-    settings['templates_from_data']  = False
-    settings['n_templates']          = 6
-    settings['n_pcs']                = 6
-    settings['th_for_wPCA']          = 6
-    settings['duplicate_spike_bins'] = 15
-    
-    return settings
+from kilosort.parameters import DEFAULT_SETTINGS
 
 
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
@@ -182,14 +46,14 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     tic0 = time.time()
 
     # Configure settings, ops, and file paths
-    d = default_settings()
-    settings = {**d, **settings} if settings is not None else d
-    if settings['n_chan_bin'] is None:
+    if settings is None or settings['n_chan_bin'] is None:
         raise ValueError(
             '`n_chan_bin` is a required setting. This is the total number of '
             'channels in the binary file, which may or may not be equal to the '
             'number of channels specified by the probe.'
             )
+    settings = {**DEFAULT_SETTINGS, **settings}
+
     if settings['nt0min'] is None:
         settings['nt0min'] = int(20 * settings['nt']/61)
 

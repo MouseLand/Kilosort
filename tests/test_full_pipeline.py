@@ -1,10 +1,8 @@
-from pathlib import Path
-
 import numpy as np
 import pytest
 import torch
 
-from kilosort import run_kilosort, default_settings
+from kilosort import run_kilosort
 
 
 # Use `pytest --runslow` option to include this in tests.

@@ -10,50 +10,12 @@ from scipy.io.matlab.miobase import MatReadError
 from kilosort.gui.logger import setup_logger
 from kilosort.gui.minor_gui_elements import ProbeBuilder, create_prb
 from kilosort.io import load_probe, BinaryRWFile
+from kilosort.parameters import MAIN_PARAMETERS, EXTRA_PARAMETERS
 
 
 logger = setup_logger(__name__)
 
 _DEFAULT_DTYPE = 'int16'
-_MAIN_PARAMETERS = [
-    # variable name, display name, type, minimum, maximum, exclusions, default
-    # min, max are inclusive, so have to specify exclude 0 to get > 0 for example
-    ('n_chan_bin', 'number of channels', int, 0, np.inf, [0], 385),
-    ('fs', 'sampling frequency', float, 0, np.inf, [0], 30000),
-    ('Th', 'Th', float, 0, np.inf, [0], 6),
-    ('spkTh', 'spkTh', float, 0, np.inf, [0], 8),
-    ('Th_detect', 'Th_detect', float, 0, np.inf, [0], 9),
-    ('NT', 'NT', int, 1, np.inf, [], 60000),
-    ('nblocks', 'nblocks', int, 0, np.inf, [], 5),
-    ('tmin', 'tmin', float, 0, np.inf, [], 0),
-    ('tmax', 'tmax', float, 0, np.inf, [0], np.inf),
-]
-
-_EXTRA_PARAMETERS = [
-    ('nt', 'nt', int, 1, np.inf, [], 61),
-    ('nwaves', 'nwaves', int, 1, np.inf, [], 6),
-    ('nskip', 'nskip', int, 1, np.inf, [], 25),
-    ('nt0min', 'nt0min', int, 0, np.inf, [], 20),
-    ('binning_depth', 'binning depth', float, 0, np.inf, [0], 5),
-    ('sig_interp', 'sig_interp', float, 0, np.inf, [0], 20),
-    ('artifact_threshold', 'artifact threshold', float, 0, np.inf, [], np.inf),
-    ('whitening_range', 'whitening range', int, 1, np.inf, [], 32),
-    ('dmin', 'dmin', float, 0, np.inf, [0], None),
-    ('dminx', 'dminx', float, 0, np.inf, [0], None),
-    ('acg_threshold', 'acg threshold', float, 0, np.inf, [0], 0.2),
-    ('ccg_threshold', 'ccg_threshold', float, 0, np.inf, [0], 0.25),
-    ('cluster_downsampling', 'cluster downsampling', int, 1, np.inf, [], 20),
-    ('cluster_pcs', 'cluster pcs', int, 1, np.inf, [], 64),
-    ('min_template_size', 'min template size', int, 1, np.inf, [], 10),
-    ('template_sizes', 'num template sizes', int, 1, np.inf, [], 5),
-    ('nearest_chans', 'nearest chans', int, 1, np.inf, [], 10),
-    ('nearest_templates', 'nearest templates', int, 1, np.inf, [], 100),
-    ('templates_from_data', 'templates from data', bool, None, None, [], False),
-    ('n_templates', 'n templates', int, 1, np.inf, [], 6),
-    ('n_pcs', 'n pcs', int, 1, np.inf, [], 6),
-    ('th_for_wPCA', 'th for wPCA', float, 0, np.inf, [0], 6),
-    ('duplicate_spike_bins', 'duplicate spike bins', int, 0, np.inf, [], 15)
-]
 
 
 class SettingsBox(QtWidgets.QGroupBox):
@@ -93,12 +55,12 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.populate_device_selector()
 
         generated_inputs = []
-        for i, (var, name, _, _, _, _, default) in enumerate(_MAIN_PARAMETERS):
-            setattr(self, f'{var}_text', QtWidgets.QLabel(f'{name}'))
-            setattr(self, f'{var}_input', QtWidgets.QLineEdit())
-            getattr(self, f'{var}_input').parameter_index = i
-            setattr(self, f'{var}', default)
-            generated_inputs.append(getattr(self, f'{var}_input'))
+        for k, p in MAIN_PARAMETERS.items():
+            setattr(self, f'{k}_text', QtWidgets.QLabel(f'{p["gui_name"]}'))
+            setattr(self, f'{k}_input', QtWidgets.QLineEdit())
+            getattr(self, f'{k}_input').var_name = k
+            setattr(self, f'{k}', p['default'])
+            generated_inputs.append(getattr(self, f'{k}_input'))
         self.data_dtype = _DEFAULT_DTYPE
 
         self.extra_parameters_window = ExtraParametersWindow(self)
@@ -207,12 +169,11 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.on_device_selected
         )
 
-        for parameter_info in _MAIN_PARAMETERS:
+        for k in list(MAIN_PARAMETERS.keys()):
             row_count += 1
-            var = parameter_info[0]
-            layout.addWidget(getattr(self, f'{var}_text'), row_count, 0, 1, 3)
-            layout.addWidget(getattr(self, f'{var}_input'), row_count, 3, 1, 2)
-            inp = getattr(self, f'{var}_input')
+            layout.addWidget(getattr(self, f'{k}_text'), row_count, 0, 1, 3)
+            layout.addWidget(getattr(self, f'{k}_input'), row_count, 3, 1, 2)
+            inp = getattr(self, f'{k}_input')
             inp.editingFinished.connect(self.update_parameter)
 
         row_count +=1
@@ -227,11 +188,11 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def set_default_field_values(self):
         self.dtype_selector.setCurrentText(_DEFAULT_DTYPE)
-        for var, _, _,  _, _, _, default in _MAIN_PARAMETERS:
-            getattr(self, f'{var}_input').setText(str(default))
-        for var, _, _,  _, _, _, default in _EXTRA_PARAMETERS:
+        for k, p in MAIN_PARAMETERS.items():
+            getattr(self, f'{k}_input').setText(str(p['default']))
+        for k, p in EXTRA_PARAMETERS.items():
             epw = self.extra_parameters_window
-            getattr(epw, f'{var}_input').setText(str(default))
+            getattr(epw, f'{k}_input').setText(str(p['default']))
 
     def on_select_data_file_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
@@ -331,10 +292,10 @@ class SettingsBox(QtWidgets.QGroupBox):
             "probe_name": self.probe_name,
             "data_dtype": self.data_dtype,
             }
-        for p in _MAIN_PARAMETERS:
-            self.settings[p[0]] = getattr(self, p[0])
-        for p in _EXTRA_PARAMETERS:
-            self.settings[p[0]] = getattr(self.extra_parameters_window, p[0])
+        for k in list(MAIN_PARAMETERS.keys()):
+            self.settings[k] = getattr(self, k)
+        for k in list(EXTRA_PARAMETERS.keys()):
+            self.settings[k] = getattr(self.extra_parameters_window, k)
 
         none_allowed = ['dmin', 'dminx']
         for k, v in self.settings.items():
@@ -344,9 +305,9 @@ class SettingsBox(QtWidgets.QGroupBox):
     
     @QtCore.pyqtSlot()
     def update_parameter(self):
-        parameter_index = self.sender().parameter_index
-        parameter_info = _MAIN_PARAMETERS[parameter_index]
-        _check_parameter(self, self, parameter_info)
+        parameter_key = self.sender().var_name
+        parameter_info = MAIN_PARAMETERS[parameter_key]
+        _check_parameter(self, self, parameter_key, parameter_info)
 
     @QtCore.pyqtSlot()
     def update_settings(self):
@@ -581,21 +542,21 @@ class ExtraParametersWindow(QtWidgets.QWidget):
         super().__init__()
         self.main_settings = parent
         self.input_fields = []
-        for i, (var, name, _, _, _, _, default) in enumerate(_EXTRA_PARAMETERS):
-            setattr(self, f'{var}_text', QtWidgets.QLabel(f'{name}'))
-            setattr(self, f'{var}_input', QtWidgets.QLineEdit())
-            getattr(self, f'{var}_input').parameter_index = i
-            setattr(self, f'{var}', default)
-            self.input_fields.append(getattr(self, f'{var}_input'))
+        generated_inputs = []
+        for k, p in EXTRA_PARAMETERS.items():
+            setattr(self, f'{k}_text', QtWidgets.QLabel(f'{p["gui_name"]}'))
+            setattr(self, f'{k}_input', QtWidgets.QLineEdit())
+            getattr(self, f'{k}_input').var_name = k
+            setattr(self, f'{k}', p['default'])
+            generated_inputs.append(getattr(self, f'{k}_input'))
         
         layout = QtWidgets.QGridLayout()
         row_count = 0
-        for parameter_info in _EXTRA_PARAMETERS:
+        for k in list(EXTRA_PARAMETERS.keys()):
             row_count += 1
-            var = parameter_info[0]
-            layout.addWidget(getattr(self, f'{var}_text'), row_count, 0, 1, 3)
-            layout.addWidget(getattr(self, f'{var}_input'), row_count, 3, 1, 2)
-            inp = getattr(self, f'{var}_input')
+            layout.addWidget(getattr(self, f'{k}_text'), row_count, 0, 1, 3)
+            layout.addWidget(getattr(self, f'{k}_input'), row_count, 3, 1, 2)
+            inp = getattr(self, f'{k}_input')
             inp.editingFinished.connect(self.update_parameter)
 
         self.setLayout(layout)
@@ -607,46 +568,46 @@ class ExtraParametersWindow(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def update_parameter(self):
-        parameter_index = self.sender().parameter_index
-        parameter_info = _EXTRA_PARAMETERS[parameter_index]
-        _check_parameter(self, self.main_settings, parameter_info)
+        parameter_key = self.sender().var_name
+        parameter_info = EXTRA_PARAMETERS[parameter_key]
+        _check_parameter(self, self.main_settings, parameter_key, parameter_info)
 
 
-def _check_parameter(sender_obj, main_obj, parameter_info):
-    var, name, ptype, pmin, pmax, excl, _ = parameter_info
+def _check_parameter(sender_obj, main_obj, k, p):
     try:
-        value = getattr(sender_obj, f'{var}_input').text()
+        value = getattr(sender_obj, f'{k}_input').text()
         if (value is None):
             v = value
-        elif ptype is bool:
+        elif p['type'] is bool:
             print('inside bool check')
             if value.lower() == 'false':
                 v = False
             elif value.lower() == 'true':
                 v = True
             else:
-                raise TypeError(f'{var} should be True or False.')
+                raise TypeError(f'{k} should be True or False.')
             print(f'value is: {value}, and v is: {v}')
         else:
-            v = ptype(value)
+            v = p['type'](value)
         if not isinstance(v, bool):
-            assert v >= pmin
-            assert v <= pmax
-            assert v not in excl
-        setattr(sender_obj, var, v)
+            assert v >= p['min']
+            assert v <= p['max']
+            assert v not in p['exclude']
+        setattr(sender_obj, k, v)
 
         if main_obj.check_settings():
             main_obj.enable_load()
 
     except ValueError:
         logger.exception(
-            f"Invalid input!\n {name} must be of type: {ptype}."
+            f"Invalid input!\n {p['gui_name']} must be of type: {p['type']}."
         )
         main_obj.disable_load()
 
     except AssertionError:
         logger.exception(
-            f"Invalid inputs!\n {name} must be in the range:\n"
-            f"{pmin} <= {name} <= {pmax}, {name} != {excl}"
+            f"Invalid inputs!\n {p['gui_name']} must be in the range:\n"
+            f"{p['min']} <= {p['gui_name']} <= {p['max']},\n"
+            f"{p['gui_name']} != {p['exclude']}"
         )
         main_obj.disable_load()

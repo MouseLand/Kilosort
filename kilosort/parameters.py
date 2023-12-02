@@ -17,7 +17,7 @@ import numpy as np
 #                    in GUI.
 # }
 
-_MAIN_PARAMETERS = {
+MAIN_PARAMETERS = {
     # NOTE: n_chan_bin must be specified by user when running through API
     'n_chan_bin': {  
         'gui_name': 'number of channels', 'type': int, 'min': 0, 'max': np.inf,
@@ -68,7 +68,6 @@ _MAIN_PARAMETERS = {
             For single channel threshold crossings to compute universal templates. 
             In units of whitened data standard deviations. 
             """
-    # TODO: fill in description (guess it never had one)
     },
 
     'spkTh': {
@@ -111,7 +110,7 @@ _MAIN_PARAMETERS = {
 }
 
 
-_EXTRA_PARAMETERS = {
+EXTRA_PARAMETERS = {
     'nt': {
         'gui_name': 'nt', 'type': int, 'min': 1, 'max': np.inf,
         'exclude': [], 'default': 61, 'step': 'data',
@@ -245,7 +244,7 @@ _EXTRA_PARAMETERS = {
 
     'templates_from_data': {
         'gui_name': 'templates from data', 'type': bool, 'min': None, 'max': None,
-        'exclude': [], 'default': False, 'step': 'spike detection',
+        'exclude': [], 'default': True, 'step': 'spike detection',
         'description':
             """
             Indicates whether spike shapes used in universal templates should be 
@@ -338,7 +337,7 @@ _EXTRA_PARAMETERS = {
 }
 
 
-main_defaults = {k: v['default'] for k, v in _MAIN_PARAMETERS.items()}
-extra_defaults = {k: v['default'] for k, v in _EXTRA_PARAMETERS.items()}
+main_defaults = {k: v['default'] for k, v in MAIN_PARAMETERS.items()}
+extra_defaults = {k: v['default'] for k, v in EXTRA_PARAMETERS.items()}
 # In the format expected by `run_kilosort`
-_DEFAULT_SETTINGS = {**main_defaults, **extra_defaults}
+DEFAULT_SETTINGS = {**main_defaults, **extra_defaults}
