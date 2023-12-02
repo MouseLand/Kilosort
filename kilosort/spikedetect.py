@@ -192,7 +192,8 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
         # Determine templates and PC features from data.
         ops['wPCA'], ops['wTEMP'] = extract_wPCA_wTEMP(
             ops, bfile, nt=ops['nt'], twav_min=ops['nt0min'], 
-            th_for_wPCA=ops['settings']['th_for_wPCA'], nskip=25
+            th_for_wPCA=ops['settings']['th_for_wPCA'], nskip=25,
+            device=device
             )
     else:
         print('Using built-in universal templates.')
