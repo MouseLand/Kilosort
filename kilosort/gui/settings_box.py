@@ -594,6 +594,7 @@ class ExtraParametersWindow(QtWidgets.QWidget):
 
 
 def _check_parameter(sender_obj, main_obj, k, p):
+    reset = True
     try:
         value = getattr(sender_obj, f'{k}_input').text()
         if (value is None):
@@ -614,6 +615,7 @@ def _check_parameter(sender_obj, main_obj, k, p):
             assert v <= p['max']
             assert v not in p['exclude']
         setattr(sender_obj, k, v)
+        reset = False
 
         if main_obj.check_settings():
             main_obj.enable_load()
@@ -631,3 +633,9 @@ def _check_parameter(sender_obj, main_obj, k, p):
             f"{p['gui_name']} != {p['exclude']}"
         )
         main_obj.disable_load()
+
+    finally:
+        if reset:
+            # Invalid input, change back to what it was before.
+            v = getattr(sender_obj, k)
+            getattr(sender_obj, f'{k}_input').setText(str(v))
