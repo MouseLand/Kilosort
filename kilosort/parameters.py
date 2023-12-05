@@ -328,6 +328,11 @@ EXTRA_PARAMETERS = {
     },
 }
 
+# Add default values to descriptions
+for k, v in MAIN_PARAMETERS.items():
+    v['description'] += f'Default value: {str(v["default"])}.'
+for k, v in EXTRA_PARAMETERS.items():
+    v['description'] += f'Default value: {str(v["default"])}.'
 
 main_defaults = {k: v['default'] for k, v in MAIN_PARAMETERS.items()}
 extra_defaults = {k: v['default'] for k, v in EXTRA_PARAMETERS.items()}
