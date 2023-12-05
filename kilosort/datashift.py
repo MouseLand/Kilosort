@@ -33,11 +33,11 @@ def bin_spikes(ops, st):
         # their depth relative to the minimum
         dep = sst[:,1] - dmin
 
-        # the amplitude binnning is logarithmic, goes from the Th_detect minimum value to 100. 
-        amp = np.log10(np.minimum(99, sst[:,2])) - np.log10(ops['Th_detect'])
+        # the amplitude binnning is logarithmic, goes from the Th_universal minimum value to 100. 
+        amp = np.log10(np.minimum(99, sst[:,2])) - np.log10(ops['Th_universal'])
 
         # amplitudes get normalized from 0 to 1
-        amp = amp / (np.log10(100)-np.log10(ops['Th_detect']))
+        amp = amp / (np.log10(100)-np.log10(ops['Th_universal']))
 
         # rows are divided by the vertical binning depth
         rows = (dep/dd).astype('int32')

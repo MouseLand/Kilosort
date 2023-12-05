@@ -12,7 +12,6 @@ import numpy as np
 #     'step': which step of the pipeline the parameter is used in, from:
 #             ['data', 'preprocessing', 'spike detection',
 #              'clustering', 'postprocessing']
-#           TODO: any others? should drift correction be separate? rename any?
 #     'description': Explanation of parameter's use. Populates parameter help
 #                    in GUI.
 # }
@@ -59,32 +58,23 @@ MAIN_PARAMETERS = {
             """
     },
 
-    # TODO: better names for the three threshold parameters
-    'Th': {
-        'gui_name': 'Th', 'type': float, 'min': 0, 'max': np.inf,
-        'exclude': [0], 'default': 6, 'step': 'spike detection',
-        'description':
-            """
-            For single channel threshold crossings to compute universal templates. 
-            In units of whitened data standard deviations. 
-            """
-    },
-
-    'spkTh': {
-        'gui_name': 'spkTh', 'type': float, 'min': 0, 'max': np.inf,
-        'exclude': [0], 'default': 8, 'step': 'spike detection',
-        'description':
-            """
-            Spike detection threshold for learned templates.
-            """
-    },
-
-    'Th_detect': {
-        'gui_name': 'Th_detect', 'type': float, 'min': 0, 'max': np.inf,
+    'Th_universal': {
+        'gui_name': 'Th (universal)', 'type': float, 'min': 0, 'max': np.inf,
         'exclude': [0], 'default': 9, 'step': 'spike detection',
         'description':
             """
             Spike detection threshold for universal templates.
+            Th(1) in previous versions of Kilosort.
+            """
+    },
+
+    'Th_learned': {
+        'gui_name': 'Th (learned)', 'type': float, 'min': 0, 'max': np.inf,
+        'exclude': [0], 'default': 8, 'step': 'spike detection',
+        'description':
+            """
+            Spike detection threshold for learned templates.
+            Th(2) in previous versions of Kilosort.
             """
     },
 
@@ -157,7 +147,8 @@ EXTRA_PARAMETERS = {
         'exclude': [0], 'default': 5, 'step': 'preprocessing',
         'description':
             """
-            Vertical bin size in microns used for 2D histogram in drift correction. 
+            For drift correction, vertical bin size in microns used for
+            2D histogram.
             """
     },
 
@@ -166,8 +157,8 @@ EXTRA_PARAMETERS = {
         'exclude': [0], 'default': 20, 'step': 'preprocessing',
         'description':
             """
-            Sigma for interpolation (spatial standard deviation). Approximate
-            smoothness scale for drift correction, in units of microns.
+            For drift correction, sigma for interpolation (spatial standard
+            deviation). Approximate smoothness scale in units of microns.
             """
     },
 
@@ -273,13 +264,13 @@ EXTRA_PARAMETERS = {
             """
     },
 
-    'th_for_wPCA': {
-        'gui_name': 'threshold for wPCA', 'type': float, 'min': 0, 'max': np.inf,
+    'Th_single_ch': {
+        'gui_name': 'Th (single channel)', 'type': float, 'min': 0, 'max': np.inf,
         'exclude': [0], 'default': 6, 'step': 'spike detection',
         'description':
             """
-            Threshold for threshold crossings for estimating single-channel
-            PCs and templates.
+            For single channel threshold crossings to compute universal-
+            templates. In units of whitened data standard deviations. 
             """
     },
 
