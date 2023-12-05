@@ -51,6 +51,15 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         else:
             self.results_directory = None
 
+        if self.qt_settings.contains('auto_load'):
+            auto_load = self.qt_settings.value('auto_load')
+            if auto_load.lower() == 'false':
+                self.auto_load = False
+            else:
+                self.auto_load = True
+        else:
+            self.auto_load = True
+
         self.params = None
         self.local_config_path = DOWNLOADS_DIR
         self.local_config_path.mkdir(parents=True, exist_ok=True)
@@ -88,6 +97,10 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         # for some reason, probably related to the dynamic geometry from the
         # sub-widgets.
         self.move(100, 100)
+
+        if self.auto_load:
+            self.settings_box.update_settings()
+
 
     def keyPressEvent(self, event):
         QtWidgets.QMainWindow.keyPressEvent(self, event)
