@@ -18,20 +18,49 @@ logger = setup_logger(__name__)
 
 
 class KiloSortGUI(QtWidgets.QMainWindow):
-    def __init__(self, application, filename=None, **kwargs):
+    def __init__(self, application, filename=None, device=None,
+                 **kwargs):
         super(KiloSortGUI, self).__init__(**kwargs)
 
         self.app = application
+        self.qt_settings = QtCore.QSettings('Janelia', 'Kilosort4')
+        if device is None:
+            if torch.cuda.is_available():
+                device = torch.device('cuda')
+            else:
+                device = torch.device('cpu')
+        self.device = device
 
+        if self.qt_settings.contains('data_file_path'):
+            if filename is None or filename == '':
+                filename = self.qt_settings.value('data_file_path')
         self.data_path = filename
-        self.probe_layout = None
-        self.probe_name = None
+
+        if self.qt_settings.contains('probe_layout'):
+            self.probe_layout = self.qt_settings.value('probe_layout')
+        else:
+            self.probe_layout = None
+        
+        if self.qt_settings.contains('probe_name'):
+            self.probe_name = self.qt_settings.value('probe_name')
+        else:
+            self.probe_name = None
+
+        if self.qt_settings.contains('results_dir'):
+            self.results_directory = self.qt_settings.value('results_dir')
+        else:
+            self.results_directory = None
+
+        if self.qt_settings.contains('auto_load'):
+            auto_load = self.qt_settings.value('auto_load')
+            if auto_load.lower() == 'false':
+                self.auto_load = False
+            else:
+                self.auto_load = True
+        else:
+            self.auto_load = True
+
         self.params = None
-        self.results_directory = None
-
-        # self.probe_files_path = Path(probes.__file__).parent
-        # assert self.probe_files_path.exists()
-
         self.local_config_path = DOWNLOADS_DIR
         self.local_config_path.mkdir(parents=True, exist_ok=True)
 
@@ -39,7 +68,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.new_probe_files_path.mkdir(exist_ok=True)
         download_probes(self.new_probe_files_path)
 
-        # self.time_range = None
         self.num_channels = None
 
         self.context = None
@@ -63,8 +91,16 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.message_log_box = MessageLogBox(self)
 
         self.setAcceptDrops(True)
-
         self.setup()
+        
+        # Offset a bit from top-left corner of screen. Centering isn't working
+        # for some reason, probably related to the dynamic geometry from the
+        # sub-widgets.
+        self.move(100, 100)
+
+        if self.auto_load:
+            self.settings_box.update_settings()
+
 
     def keyPressEvent(self, event):
         QtWidgets.QMainWindow.keyPressEvent(self, event)
@@ -242,8 +278,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def set_parameters(self):
         settings = self.settings_box.settings
-        settings['tmin'] = self.data_view_box.tmin
-        settings['tmax'] = self.data_view_box.tmax
         # advanced_options = self.settings_box.advanced_options
 
         self.data_path = settings["data_file_path"]
@@ -292,7 +326,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             n_chan_bin=n_channels,
             fs=sample_rate,
             chan_map=chan_map,
-            device=torch.device("cpu"),
+            device=self.device,
             dtype=data_dtype,
             tmin=tmin,
             tmax=tmax,
@@ -303,7 +337,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.context.highpass_filter = preprocessing.get_highpass_filter(
             fs=sample_rate,
-            device=torch.device("cpu")
+            device=self.device
         )
 
         with BinaryFiltered(
@@ -312,7 +346,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             fs=sample_rate,
             chan_map=chan_map,
             hp_filter=self.context.highpass_filter,
-            device=torch.device("cpu"),
+            device=self.device,
             dtype=data_dtype,
             tmin=tmin,
             tmax=tmax,
@@ -332,7 +366,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             chan_map=chan_map,
             hp_filter=self.context.highpass_filter,
             whiten_mat=self.context.whitening_matrix,
-            device=torch.device("cpu"),
+            device=self.device,
             dtype=data_dtype,
             tmin=tmin,
             tmax=tmax,
@@ -440,6 +474,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         self.message_log_box.save_log_file()
+        self.message_log_box.popout_window.close()
         self.close_binary_files()
         event.accept()
 

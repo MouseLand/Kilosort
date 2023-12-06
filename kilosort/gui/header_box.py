@@ -7,11 +7,19 @@ class HeaderBox(QtWidgets.QWidget):
     def __init__(self, parent):
         QtWidgets.QWidget.__init__(self, parent=parent)
 
+        self.gui = parent
         self.layout = QtWidgets.QHBoxLayout()
 
         # self.kilosort_text = QtWidgets.QLabel()
         # self.kilosort_text.setText(f"Kilosort {__version__[:3]}")
         # self.kilosort_text.setFont(QtGui.QFont("Arial", 20, QtGui.QFont.Black))
+
+        self.auto_load_check = QtWidgets.QCheckBox('Auto Load')
+        if self.gui.auto_load:
+            self.auto_load_check.setCheckState(2)
+        else:
+            self.auto_load_check.setCheckState(0)
+        self.auto_load_check.stateChanged.connect(self.check_auto_load)
 
         self.controls_button = QtWidgets.QPushButton("Controls")
         self.controls_button.clicked.connect(self.show_controls_popup)
@@ -23,11 +31,20 @@ class HeaderBox(QtWidgets.QWidget):
 
         # self.layout.addWidget(self.kilosort_text)
         self.layout.addStretch(0)
+        self.layout.addWidget(self.auto_load_check)
         self.layout.addWidget(self.controls_button)
         self.layout.addWidget(self.help_button)
         self.layout.addWidget(self.reset_gui_button)
 
         self.setLayout(self.layout)
+
+
+    @QtCore.pyqtSlot()
+    def check_auto_load(self):
+        self.gui.auto_load = self.auto_load_check.isChecked()
+        self.gui.qt_settings.setValue('auto_load', self.gui.auto_load)
+        if self.gui.auto_load:
+            self.gui.settings_box.update_settings()
 
     @QtCore.pyqtSlot()
     def show_help_popup(self):

@@ -37,12 +37,10 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.whitened_button = QtWidgets.QPushButton("Whitened")
         # Set minimum and maximum time in seconds for spike sorting.
         # This should truncate the data view if specified.
-        self.tmin_text = QtWidgets.QLabel("tmin (s)")
-        self.tmin_input = QtWidgets.QLineEdit()
-        self.tmin = 0.0
-        self.tmax_text = QtWidgets.QLabel("tmax (s)")
-        self.tmax_input = QtWidgets.QLineEdit()
-        self.tmax = np.inf
+        self.tmin_input = self.gui.settings_box.tmin_input
+        self.tmin = float(self.tmin_input.text())
+        self.tmax_input = self.gui.settings_box.tmax_input
+        self.tmax = float(self.tmax_input.text())
         # self.prediction_button = QtWidgets.QPushButton("Prediction")
         # self.residual_button = QtWidgets.QPushButton("Residual")
 
@@ -203,12 +201,8 @@ class DataViewBox(QtWidgets.QGroupBox):
         # data_controls_layout.addWidget(self.traces_button)
         # data_controls_layout.addWidget(self.colormap_button)
 
-        # Add controls for time interval
-        data_controls_layout.addWidget(self.tmin_text)
-        data_controls_layout.addWidget(self.tmin_input)
+        # Connect time controls
         self.tmin_input.editingFinished.connect(self.on_tmin_edited)
-        data_controls_layout.addWidget(self.tmax_text)
-        data_controls_layout.addWidget(self.tmax_input)
         self.tmax_input.editingFinished.connect(self.on_tmax_edited)
 
         data_controls_layout.addStretch(0)
@@ -225,8 +219,6 @@ class DataViewBox(QtWidgets.QGroupBox):
         layout.addLayout(data_seek_layout, 10)
 
         self.setLayout(layout)
-        self.tmin_input.setText(str(0.0))
-        self.tmax_input.setText(str(np.inf))
 
     @QtCore.pyqtSlot()
     def on_tmin_edited(self):
@@ -932,7 +924,7 @@ class DataViewBox(QtWidgets.QGroupBox):
 
         if self.raw_button.isChecked():
             colormap_min, colormap_max = -32.0, 32.0
-            raw_traces = binary_file[start_time:end_time].numpy()
+            raw_traces = binary_file[start_time:end_time].cpu().numpy()
             self.add_image_to_plot(
                 raw_traces[to_display, :].T,
                 colormap_min,
@@ -940,7 +932,7 @@ class DataViewBox(QtWidgets.QGroupBox):
             )
 
         elif self.whitened_button.isChecked():
-            whitened_traces = filt_binary_file[start_time:end_time].numpy()
+            whitened_traces = filt_binary_file[start_time:end_time].cpu().numpy()
 
             colormap_min, colormap_max = -4.0, 4.0
             self.add_image_to_plot(

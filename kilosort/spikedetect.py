@@ -27,11 +27,11 @@ def my_sum2d(X, dt):
     Xsum *= (2*dt[0]+1) * (2*dt[1]+1)
     return Xsum[0]
 
-def extract_snippets(X, nt, twav_min, th_for_wPCA, loc_range=[4,5],
+def extract_snippets(X, nt, twav_min, Th_single_ch, loc_range=[4,5],
                      long_range=[6,30], device=torch.device('cuda')):
     Xabs   = X.abs()
     Xmax   = my_max2d(Xabs, loc_range)
-    ispeak = torch.logical_and(Xmax==Xabs, Xabs > th_for_wPCA).float()
+    ispeak = torch.logical_and(Xmax==Xabs, Xabs > Th_single_ch).float()
 
     ispeak_sum  = my_sum2d(ispeak, long_range)
     is_peak_iso = ((ispeak_sum==1) * (ispeak==1))
@@ -45,7 +45,7 @@ def extract_snippets(X, nt, twav_min, th_for_wPCA, loc_range=[4,5],
 
     return clips
 
-def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, th_for_wPCA=6, nskip=25,
+def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, Th_single_ch=6, nskip=25,
                        device=torch.device('cuda')):
 
     clips = np.zeros((500000,nt), 'float32')
@@ -54,7 +54,7 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, th_for_wPCA=6, nskip=25,
         X = bfile.padded_batch_to_torch(j, ops)
         
         clips_new = extract_snippets(X, nt=nt, twav_min=twav_min,
-                                     th_for_wPCA=th_for_wPCA, device=device)
+                                     Th_single_ch=Th_single_ch, device=device)
 
         nnew = len(clips_new)
 
@@ -153,7 +153,7 @@ def template_match(X, ops, iC, iC2, weigh, device=torch.device('cuda')):
     Amaxs[:,:nt] = 0
     Amaxs[:,-nt:] = 0
     Amaxs  = max_pool1d(Amaxs.unsqueeze(0), (2*nt0+1), stride = 1, padding = nt0).squeeze(0)
-    xy = torch.logical_and(Amaxs==As, As > ops['Th_detect']).nonzero()
+    xy = torch.logical_and(Amaxs==As, As > ops['Th_universal']).nonzero()
     imax = imaxs[xy[:,0], xy[:,1]]
     amp = As[xy[:,0], xy[:,1]]
 
@@ -188,12 +188,15 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     nsizes = ops['settings']['template_sizes'] 
 
     if ops['settings']['templates_from_data']:
+        print('Re-computing universal templates from data.')
         # Determine templates and PC features from data.
         ops['wPCA'], ops['wTEMP'] = extract_wPCA_wTEMP(
             ops, bfile, nt=ops['nt'], twav_min=ops['nt0min'], 
-            th_for_wPCA=ops['settings']['th_for_wPCA'], nskip=25
+            Th_single_ch=ops['settings']['Th_single_ch'], nskip=25,
+            device=device
             )
     else:
+        print('Using built-in universal templates.')
         # Use pre-computed templates.
         ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
 

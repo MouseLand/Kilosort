@@ -108,7 +108,7 @@ def prepare_matching(ops, U):
     return ctc
 
 def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
-    Th = ops['spkTh']
+    Th = ops['Th_learned']
     nt = ops['nt']
     W = ops['wPCA'].contiguous()
 
