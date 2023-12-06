@@ -1,6 +1,7 @@
 import os
 import pprint
 from pathlib import Path
+import json
 
 import numpy as np
 import torch
@@ -65,6 +66,8 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         self.extra_parameters_window = ExtraParametersWindow(self)
         self.extra_parameters_button = QtWidgets.QPushButton('Extra settings')
+        self.import_settings_button = QtWidgets.QPushButton('Import')
+        self.export_settings_button = QtWidgets.QPushButton('Export')
 
         self.load_settings_button = QtWidgets.QPushButton("LOAD")
         self.probe_preview_button = QtWidgets.QPushButton("Preview Probe")
@@ -181,6 +184,12 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.extra_parameters_button.clicked.connect(
             lambda x: self.extra_parameters_window.show()
             )
+        
+        row_count += 1
+        layout.addWidget(self.import_settings_button, row_count, 0, 1, 3)
+        self.import_settings_button.clicked.connect(self.import_settings)
+        layout.addWidget(self.export_settings_button, row_count, 3, 1, 2)
+        self.export_settings_button.clicked.connect(self.export_settings)
 
         self.setLayout(layout)
         self.set_cached_field_values()
@@ -217,6 +226,55 @@ class SettingsBox(QtWidgets.QGroupBox):
                 d = str(p['default'])
             getattr(epw, f'{k}_input').setText(d)
             getattr(epw, f'{k}_input').editingFinished.emit()
+
+    @QtCore.pyqtSlot()
+    def import_settings(self):
+        # 1) open file dialog
+        file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
+        settings_file_name, _ = QtWidgets.QFileDialog.getOpenFileName(
+            parent=self,
+            caption="Choose .json file to load settings from...",
+            directory=os.path.expanduser("~"),
+            filter='*.json',
+            options=file_dialog_options,
+        )
+        # 2) load to dict through json
+        with open(settings_file_name, 'r') as f:
+            settings = json.load(f)
+
+        # 3) loop through settings to update values
+        epw = self.extra_parameters_window
+        for k, v in settings['main'].items():
+            getattr(self, f'{k}_input').setText(str(v))
+            getattr(self, f'{k}_input').editingFinished.emit()
+        for k, v in settings['extra'].items():
+            getattr(epw, f'{k}_input').setText(str(v))
+            getattr(epw, f'{k}_input').editingFinished.emit()
+
+    @QtCore.pyqtSlot()
+    def export_settings(self):
+        # 1) dump parameters to dict
+        #       don't save entire settings dict, other stuff is data-specific
+        settings = {'main': {}, 'extra': {}}
+        for k in list(MAIN_PARAMETERS.keys()):
+            settings['main'][k] = getattr(self, k)
+        for k in list(EXTRA_PARAMETERS.keys()):
+            settings['extra'][k] = getattr(self.extra_parameters_window, k)
+
+        # 3) open save dialog        
+        file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
+        settings_file_name, _ = QtWidgets.QFileDialog.getSaveFileName(
+            parent=self,
+            caption="Specify a .json file to save settings to...",
+            directory=os.path.expanduser("~"),
+            filter='*.json',
+            options=file_dialog_options,
+        )
+
+        # 2) format as .json
+        with open(settings_file_name, 'w+') as f:
+            f.write(json.dumps(settings))
+
 
     def on_select_data_file_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
@@ -621,14 +679,14 @@ def _check_parameter(sender_obj, main_obj, k, p):
     reset = True
     try:
         value = getattr(sender_obj, f'{k}_input').text()
-        if (value is None):
-            v = value
+        if (value is None) or (str(value).lower() == 'none'):
+            v = None
         else:
             v = _str_to_type(value, p['type'])
-        if not isinstance(v, bool):
-            assert v >= p['min']
-            assert v <= p['max']
-            assert v not in p['exclude']
+            if not isinstance(v, bool):
+                assert v >= p['min']
+                assert v <= p['max']
+                assert v not in p['exclude']
         setattr(sender_obj, k, v)
         main_obj.gui.qt_settings.setValue(k, v)
         reset = False
