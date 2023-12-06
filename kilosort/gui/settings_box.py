@@ -183,16 +183,40 @@ class SettingsBox(QtWidgets.QGroupBox):
             )
 
         self.setLayout(layout)
-        self.set_default_field_values()
+        self.set_cached_field_values()
         self.update_settings()
 
     def set_default_field_values(self):
         self.dtype_selector.setCurrentText(_DEFAULT_DTYPE)
+        epw = self.extra_parameters_window
         for k, p in MAIN_PARAMETERS.items():
             getattr(self, f'{k}_input').setText(str(p['default']))
+            getattr(self, f'{k}_input').editingFinished.emit()
         for k, p in EXTRA_PARAMETERS.items():
-            epw = self.extra_parameters_window
             getattr(epw, f'{k}_input').setText(str(p['default']))
+            getattr(epw, f'{k}_input').editingFinished.emit()
+
+    def set_cached_field_values(self):
+        # Only run during setup, so that resetting gui always goes to defaults.
+        epw = self.extra_parameters_window
+        for k, p in MAIN_PARAMETERS.items():
+            if self.gui.qt_settings.contains(k):
+                # Use cached value
+                d = str(self.gui.qt_settings.value(k))
+            else:
+                # Use default value
+                d = str(p['default'])
+            getattr(self, f'{k}_input').setText(d)
+            getattr(self, f'{k}_input').editingFinished.emit()
+        for k, p in EXTRA_PARAMETERS.items():
+            if self.gui.qt_settings.contains(k):
+                # Use cached value
+                d = str(self.gui.qt_settings.value(k))
+            else:
+                # Use default value
+                d = str(p['default'])
+            getattr(epw, f'{k}_input').setText(d)
+            getattr(epw, f'{k}_input').editingFinished.emit()
 
     def on_select_data_file_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
@@ -599,22 +623,14 @@ def _check_parameter(sender_obj, main_obj, k, p):
         value = getattr(sender_obj, f'{k}_input').text()
         if (value is None):
             v = value
-        elif p['type'] is bool:
-            print('inside bool check')
-            if value.lower() == 'false':
-                v = False
-            elif value.lower() == 'true':
-                v = True
-            else:
-                raise TypeError(f'{k} should be True or False.')
-            print(f'value is: {value}, and v is: {v}')
         else:
-            v = p['type'](value)
+            v = _str_to_type(value, p['type'])
         if not isinstance(v, bool):
             assert v >= p['min']
             assert v <= p['max']
             assert v not in p['exclude']
         setattr(sender_obj, k, v)
+        main_obj.gui.qt_settings.setValue(k, v)
         reset = False
 
         if main_obj.check_settings():
@@ -639,3 +655,16 @@ def _check_parameter(sender_obj, main_obj, k, p):
             # Invalid input, change back to what it was before.
             v = getattr(sender_obj, k)
             getattr(sender_obj, f'{k}_input').setText(str(v))
+
+
+def _str_to_type(string, dtype):
+    if dtype is bool:
+        if string.lower() == 'false':
+            v = False
+        elif string.lower() == 'true':
+            v = True
+        else:
+            raise TypeError(f'{string} should be True or False for bool.')
+    else:
+        v = dtype(string)
+    return v
