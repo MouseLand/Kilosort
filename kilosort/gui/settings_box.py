@@ -17,6 +17,7 @@ from kilosort.parameters import MAIN_PARAMETERS, EXTRA_PARAMETERS
 logger = setup_logger(__name__)
 
 _DEFAULT_DTYPE = 'int16'
+_ALLOWED_FILE_TYPES = ['.bin', '.dat', '.bat', '.raw']  # For binary data
 
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.pyqtSignal()
@@ -26,20 +27,29 @@ class SettingsBox(QtWidgets.QGroupBox):
         QtWidgets.QGroupBox.__init__(self, parent=parent)
 
         self.gui = parent
+        self.load_enabled = False
         
         self.select_data_file = QtWidgets.QPushButton("Select Binary File")
-        self.data_file_path = Path(self.gui.data_path).resolve()
-        self.data_file_path_input = QtWidgets.QLineEdit(os.fspath(self.data_file_path) 
-                                                        if self.data_file_path is not None else "")
+        self.data_file_path = self.gui.data_path
+        if self.data_file_path is not None:
+            self.data_file_path = self.data_file_path.resolve()
+        self.data_file_path_input = QtWidgets.QLineEdit(
+            self.data_file_path.as_posix()
+            if self.data_file_path is not None else None
+            )
 
         if self.data_file_path is not None:
             self.results_directory_path = self.data_file_path.parent.joinpath('kilosort4/')
+        else:
+            self.results_directory_path = None
         self.gui.results_directory = self.results_directory_path 
         self.select_results_directory = QtWidgets.QPushButton(
             "Select Results Dir."
         )
-        self.results_directory_input = QtWidgets.QLineEdit(os.fspath(self.results_directory_path) 
-                                                            if self.results_directory_path is not None else "")
+        self.results_directory_input = QtWidgets.QLineEdit(
+            self.results_directory_path.as_posix()
+            if self.results_directory_path is not None else None
+            )
 
         self.probe_layout_text = QtWidgets.QLabel("Select Probe Layout")
         self.probe_layout_selector = QtWidgets.QComboBox()
@@ -96,7 +106,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.probe_layout_selector.setCurrentText(self.probe_name)
         if self.probe_layout is not None:
             self.enable_preview_probe()
-        if self.data_file_path is not None and self.data_file_path != '':
+        if self.check_valid_binary_path(self.data_file_path):
             if self.check_settings():
                 self.enable_load()
 
@@ -333,7 +343,7 @@ class SettingsBox(QtWidgets.QGroupBox):
     def on_data_file_path_changed(self):
         data_file_path = Path(self.data_file_path_input.text())
         try:
-            assert data_file_path.exists()
+            assert self.check_valid_binary_path(data_file_path)
 
             parent_folder = data_file_path.parent
             results_folder = parent_folder / "kilosort4"
@@ -345,8 +355,18 @@ class SettingsBox(QtWidgets.QGroupBox):
             if self.check_settings():
                 self.enable_load()
         except AssertionError:
-            logger.exception("Please select a valid file path!")
+            logger.exception("Please select a valid binary file path.")
             self.disable_load()
+
+    def check_valid_binary_path(self, filename):
+        if filename is None:
+            return False
+        else:
+            f = Path(filename)
+            if f.exists() and f.is_file() and f.suffix in _ALLOWED_FILE_TYPES:
+                return True
+            else:
+                return False
 
     def disable_all_input(self, value):
         for button in self.buttons:
@@ -356,9 +376,11 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def enable_load(self):
         self.load_settings_button.setEnabled(True)
+        self.load_enabled = True
 
     def disable_load(self):
         self.load_settings_button.setDisabled(True)
+        self.load_disabled = True
 
     def enable_preview_probe(self):
         self.probe_preview_button.setEnabled(True)
@@ -367,6 +389,9 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.probe_preview_button.setDisabled(True)
 
     def check_settings(self):
+        if not self.check_valid_binary_path(self.data_file_path):
+            return False
+        
         self.settings = {
             "data_file_path": self.data_file_path,
             "results_dir": self.results_directory_path,
@@ -582,7 +607,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.device_selector.addItems(gpus + ['cpu'])
 
     def estimate_total_channels(self, num_channels):
-        if self.data_file_path is not None:
+        if self.check_valid_binary_path(self.data_file_path):
             memmap_data = np.memmap(self.data_file_path, dtype=np.int16)
             data_size = memmap_data.size
 
