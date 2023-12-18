@@ -28,6 +28,9 @@ class HeaderBox(QtWidgets.QWidget):
         self.help_button.clicked.connect(self.show_help_popup)
 
         self.reset_gui_button = QtWidgets.QPushButton("Reset GUI")
+        
+        self.clear_cache_button = QtWidgets.QPushButton("Clear Cache")
+        self.clear_cache_button.clicked.connect(self.clear_cache)
 
         # self.layout.addWidget(self.kilosort_text)
         self.layout.addStretch(0)
@@ -35,6 +38,7 @@ class HeaderBox(QtWidgets.QWidget):
         self.layout.addWidget(self.controls_button)
         self.layout.addWidget(self.help_button)
         self.layout.addWidget(self.reset_gui_button)
+        self.layout.addWidget(self.clear_cache_button)
 
         self.setLayout(self.layout)
 
@@ -43,7 +47,7 @@ class HeaderBox(QtWidgets.QWidget):
     def check_auto_load(self):
         self.gui.auto_load = self.auto_load_check.isChecked()
         self.gui.qt_settings.setValue('auto_load', self.gui.auto_load)
-        if self.gui.auto_load:
+        if self.gui.auto_load and self.gui.settings_box.load_enabled:
             self.gui.settings_box.update_settings()
 
     @QtCore.pyqtSlot()
@@ -65,3 +69,8 @@ class HeaderBox(QtWidgets.QWidget):
             QtWidgets.QMessageBox.Ok,
             QtWidgets.QMessageBox.Ok,
         )
+
+    @QtCore.pyqtSlot()
+    def clear_cache(self):
+        self.gui.qt_settings.clear()
+        
