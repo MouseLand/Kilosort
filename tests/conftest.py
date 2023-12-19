@@ -257,7 +257,7 @@ def bfile(saved_ops, torch_device, data_directory):
     #       to that function
     bfile = io.BinaryFiltered(
         filename, settings['n_chan_bin'], settings['fs'],
-        settings['NT'], settings['nt'], settings['nt0min'],
+        settings['batch_size'], settings['nt'], settings['nt0min'],
         saved_ops['probe']['chanMap'], hp_filter=saved_ops['fwav'],
         whiten_mat=saved_ops['Wrot'], dshift=saved_ops['dshift'],
         device=torch_device

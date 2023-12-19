@@ -39,8 +39,8 @@ MAIN_PARAMETERS = {
             """
     },
 
-    'NT': {
-        'gui_name': 'NT', 'type': int, 'min': 1, 'max': np.inf,
+    'batch_size': {
+        'gui_name': 'batch size', 'type': int, 'min': 1, 'max': np.inf,
         'exclude': [], 'default': 60000, 'step': 'data',
         'description':
             """

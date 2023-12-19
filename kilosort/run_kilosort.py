@@ -144,7 +144,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign) -> dict:
     ops['data_dtype'] = data_dtype
     ops['do_CAR'] = do_CAR
     ops['invert_sign'] = invert_sign
-    ops['NTbuff'] = ops['NT'] + 2 * ops['nt']
+    ops['NTbuff'] = ops['batch_size'] + 2 * ops['nt']
     ops['Nchan'] = len(probe['chanMap'])
     ops['n_chan_bin'] = settings['n_chan_bin']
 
@@ -162,7 +162,7 @@ def get_run_parameters(ops) -> list:
     parameters = [
         ops['settings']['n_chan_bin'],
         ops['settings']['fs'],
-        ops['settings']['NT'],
+        ops['settings']['batch_size'],
         ops['settings']['nt'],
         ops['settings']['nt0min'],  # also called twav_min
         ops['probe']['chanMap'],
