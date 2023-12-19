@@ -164,9 +164,10 @@ EXTRA_PARAMETERS = {
 
 
     ### SPIKE DETECTION
+    # NOTE: if left as None, will be set to `int(20 * settings['nt']/61)`
     'nt0min': {
         'gui_name': 'nt0min', 'type': int, 'min': 0, 'max': np.inf,
-        'exclude': [], 'default': 20, 'step': 'spike detection',
+        'exclude': [], 'default': None, 'step': 'spike detection',
         'description': 
             """
             Sample index for aligning waveforms, so that their minimum 
