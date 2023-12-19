@@ -67,17 +67,20 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     np.random.seed(1)
     torch.cuda.manual_seed_all(1)
     torch.random.manual_seed(1)
-    ops, bfile = compute_drift_correction(
+    ops, bfile, st0 = compute_drift_correction(
         ops, device, tic0=tic0, progress_bar=progress_bar,
         file_object=file_object
         )
     
+    # TODO: don't think we need to do this actually
     # Save intermediate `ops` for use by GUI plots
     io.save_ops(ops, results_dir)
 
     # Sort spikes and save results
-    st, clu, tF, Wall = sort_spikes(ops, device, bfile, tic0=tic0,
-                                    progress_bar=progress_bar)
+    st, tF = detect_spikes(ops, device, bfile, tic0=tic0,
+                            progress_bar=progress_bar)
+    clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
+                               progress_bar=progress_bar)
     ops, similar_templates, is_ref, est_contam_rate = \
         save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
 
@@ -272,7 +275,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         artifact_threshold=artifact, file_object=file_object
         )
 
-    ops = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
+    ops, st = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()
     print(f'drift computed in {time.time()-tic : .2f}s; ' + 
             f'total {time.time()-tic0 : .2f}s')
@@ -286,8 +289,6 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         )
 
 
-    # TODO: add flag for sanity plots
-
     # 1: ops['dshift'] (probably)
     # 2: st column 2(?) (from datashift.run, need to expose here)
     #    should be time, depth  (we want the depth column)
@@ -295,10 +296,10 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
     #    ask Carsen for help with code if needed, she made fig for KS paper
 
 
-    return ops, bfile
+    return ops, bfile, st
 
 
-def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
+def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     """Run spike sorting algorithm and save intermediate results to `ops`.
     
     Parameters
@@ -358,6 +359,10 @@ def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     #       -- see spatial features plot in PR
 
 
+    return st, tF
+
+
+def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None):
     tic = time.time()
     print('\nFinal clustering')
     clu, Wall = clustering_qr.run(ops, st, tF,  mode = 'template', device=device,
@@ -375,7 +380,7 @@ def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
 
     bfile.close()
 
-    return st, clu, tF, Wall
+    return clu, Wall
 
 
 def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan):  

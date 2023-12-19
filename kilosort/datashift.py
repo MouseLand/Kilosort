@@ -188,8 +188,6 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
         print('nblocks = 0, skipping drift correction')
         return ops
     
-    # TODO: this st needs to be exposed to run_kilosort
-    
     # the first step is to extract all spikes using the universal templates
     st, _, ops  = spikedetect.run(ops, bfile, device=device, progress_bar=progress_bar)
 
@@ -215,4 +213,4 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     # a small constant is added to the diagonal for stability of the matrix inversion
     ops['iKxx'] = torch.linalg.inv(Kxx + 0.01 * torch.eye(Kxx.shape[0], device=device))
 
-    return ops
+    return ops, st
