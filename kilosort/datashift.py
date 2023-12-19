@@ -188,7 +188,9 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
         print('nblocks = 0, skipping drift correction')
         return ops
     
-    # the first step is to extract all spikes using the universal templates 
+    # TODO: this st needs to be exposed to run_kilosort
+    
+    # the first step is to extract all spikes using the universal templates
     st, _, ops  = spikedetect.run(ops, bfile, device=device, progress_bar=progress_bar)
 
     # spikes are binned by amplitude and y-position to construct a "fingerprint" for each batch

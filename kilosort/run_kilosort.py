@@ -285,6 +285,16 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         artifact_threshold=artifact, file_object=file_object
         )
 
+
+    # TODO: add flag for sanity plots
+
+    # 1: ops['dshift'] (probably)
+    # 2: st column 2(?) (from datashift.run, need to expose here)
+    #    should be time, depth  (we want the depth column)
+    #    saturation = spike amplitude (3rd column?) cmap=grey_r (darker = more amp)
+    #    ask Carsen for help with code if needed, she made fig for KS paper
+
+
     return ops, bfile
 
 
@@ -339,6 +349,14 @@ def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
                                                  progress_bar=progress_bar)
     print(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
             f'total {time.time()-tic0 : .2f}s')
+
+
+    # TODO: add check for plotting templates here, and split this function here
+    #       into spike detection (above) and clustering (below)
+
+    # Plot L2 norm across 6 templates for (channel #, neuron #)
+    #       -- see spatial features plot in PR
+
 
     tic = time.time()
     print('\nFinal clustering')
