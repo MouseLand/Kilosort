@@ -389,9 +389,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.probe_preview_button.setDisabled(True)
 
     def check_settings(self):
-        if not self.check_valid_binary_path(self.data_file_path):
-            return False
-        
         self.settings = {
             "data_file_path": self.data_file_path,
             "results_dir": self.results_directory_path,
@@ -403,6 +400,9 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.settings[k] = getattr(self, k)
         for k in list(EXTRA_PARAMETERS.keys()):
             self.settings[k] = getattr(self.extra_parameters_window, k)
+
+        if not self.check_valid_binary_path(self.data_file_path):
+            return False
 
         none_allowed = ['dmin', 'dminx']
         for k, v in self.settings.items():
@@ -716,7 +716,7 @@ def _check_parameter(sender_obj, main_obj, k, p):
         main_obj.gui.qt_settings.setValue(k, v)
         reset = False
 
-        if main_obj.check_settings():
+        if main_obj.check_settings() and not main_obj.load_enabled:
             main_obj.enable_load()
 
     except ValueError:

@@ -47,8 +47,6 @@ class HeaderBox(QtWidgets.QWidget):
     def check_auto_load(self):
         self.gui.auto_load = self.auto_load_check.isChecked()
         self.gui.qt_settings.setValue('auto_load', self.gui.auto_load)
-        if self.gui.auto_load and self.gui.settings_box.load_enabled:
-            self.gui.settings_box.update_settings()
 
     @QtCore.pyqtSlot()
     def show_help_popup(self):
