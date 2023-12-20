@@ -11,8 +11,8 @@ from kilosort.gui import SANITY_PLOT_COLORS
 
 
 class SanityPlotWidget(LayoutWidget):
-    def __init__(self, parent, num_remote_plots, title):
-        super(SanityPlotWidget, self).__init__(parent=parent)
+    def __init__(self, num_remote_plots, title):
+        super(SanityPlotWidget, self).__init__(parent=None)
         self.num_remote_plots = num_remote_plots
         self.remote_plots = []
 
@@ -21,7 +21,7 @@ class SanityPlotWidget(LayoutWidget):
         self.create_remote_views()
         self.arrange_views()
 
-        self.hide()
+        #self.hide()
 
     def create_remote_views(self):
         for _ in range(self.num_remote_plots):
@@ -116,7 +116,10 @@ class SanityPlotWidget(LayoutWidget):
 
         remote_plot_item.setLogMode(x=semi_log_x, y=semi_log_y)
 
-        remote_plot_item.plot(x=x_data, y=y_data, clear=True)
+        if y_data.ndim == 1:
+            y_data = y_data[:, np.newaxis]
+        for i in range(y_data.shape[1]):
+            remote_plot_item.plot(x=x_data, y=y_data[:, i], clear=True)
 
         remote_plot_item.setRange(xRange=x_lim, yRange=y_lim)
 
@@ -267,6 +270,20 @@ def plot_diagnostics(temporal_comp, spatial_comp, mu, nsp, plot_widget):
     plot_widget.show()
 
 
-def plot_drift(ops, plot_widget):
-    # TODO
-    pass
+# TODO: looks like I need to ditch the sanity plot widget class and
+#       just use pyqtgraph directly, running into errors that some googling indicates
+#       are a result of outdated code.
+
+def plot_drift(ops):
+    plot = SanityPlotWidget(num_remote_plots=1, title="Drift Correction")
+    ymin = np.min(ops['dshift'])
+    ymax = np.max(ops['dshift'])
+    plot.add_curve(
+        x_data=np.arange(ops['dshift'].shape[0]),
+        y_data=ops['dshift'],
+        plot_pos=0,
+        labels={"left": "Depth (microns)",
+                "bottom": "Time (units TODO)",
+                "title": "Drift amount"},
+        y_lim=(ymin, ymax)
+    )
