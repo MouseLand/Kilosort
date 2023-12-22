@@ -15,7 +15,7 @@ from PyQt5 import QtWidgets
 class MplCanvas(FigureCanvasQTAgg):
     def __init__(self, parent, nrows, ncols, width=5, height=4, dpi=100):
         self.parent = parent
-        fig = Figure(figsize=(width,height), dpi=dpi)
+        fig = Figure(figsize=(width,height), dpi=dpi, layout='constrained')
         self.axes = fig.subplots(nrows, ncols)
         super().__init__(fig)
 
@@ -43,9 +43,8 @@ def plot_drift_amount(plot_window, dshift, settings):
     t = np.arange(dshift.shape[0])*(NT/fs)
 
     ax.plot(t, dshift)
-    ax.xaxis.set_label('Time (s)')
-    ax.yaxis.set_label('Depth shift (microns)')
-    plot_window.canvas.figure.tight_layout()
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Depth shift (microns)')
 
     plot_window.canvas.draw_idle()
     plot_window.show()
@@ -56,8 +55,8 @@ def plot_drift_scatter(plot_window, st0):
     ax = plot_window.canvas.axes
     s = ax.scatter(st0[:,0], st0[:,5], s=1, c=st0[:,2], cmap='Greys_r')
     plot_window.canvas.figure.colorbar(s, ax=ax)
-    ax.xaxis.set_label('Time (s)')
-    ax.yaxis.set_label('Depth (microns)')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Depth (microns)')
 
     plot_window.canvas.draw_idle()
     plot_window.show()
@@ -68,8 +67,8 @@ def plot_features(plot_window, Wall3):
     features = torch.linalg.norm(Wall3, ord=2, dim=1).cpu().numpy()
 
     ax.imshow(features.T)
-    ax.xaxis.set_label('Unit Number')
-    ax.yaxis.set_label('Channel Number')
+    ax.set_xlabel('Unit Number')
+    ax.set_ylabel('Channel Number')
     ax.set_title('Spatial Features')
 
     plot_window.canvas.draw_idle()
