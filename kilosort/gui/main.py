@@ -474,6 +474,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent):
         self.message_log_box.save_log_file()
         self.message_log_box.popout_window.close()
+        for _, p in self.run_box.plots.items():
+            p.close()
         self.close_binary_files()
         event.accept()
 

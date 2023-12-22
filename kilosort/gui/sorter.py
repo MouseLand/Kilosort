@@ -3,10 +3,8 @@ import time
 import numpy as np
 import torch
 from PyQt5 import QtCore
-from PyQt5.QtCore import pyqtSignal
 
 from kilosort.gui.logger import setup_logger
-from kilosort.gui.sanity_plots import plot_drift
 from kilosort.run_kilosort import (
     initialize_ops, compute_preprocessing, compute_drift_correction,
     detect_spikes, cluster_spikes, save_sorting
@@ -19,7 +17,8 @@ class KiloSortWorker(QtCore.QThread):
     finishedPreprocess = QtCore.pyqtSignal(object)
     finishedSpikesort = QtCore.pyqtSignal(object)
     finishedAll = QtCore.pyqtSignal(object)
-    progress_bar = pyqtSignal(int)
+    progress_bar = QtCore.pyqtSignal(int)
+    plotDataReady = QtCore.pyqtSignal(str)
 
     def __init__(self, context, results_directory, steps,
                  device=torch.device('cuda'), *args, **kwargs):
@@ -45,20 +44,10 @@ class KiloSortWorker(QtCore.QThread):
 
             tic0 = time.time()
 
-            # run_kilosort(
-            #     settings=settings,
-            #     probe=probe,
-            #     results_dir=results_directory,
-            #     device=self.device,
-            #     progress_bar=self.progress_bar,
-            #     data_dtype=settings['data_dtype']
-            # )
-
             # TODO: make these options in GUI
             do_CAR=True
             invert_sign=False
-            
-
+        
             if not do_CAR:
                 print("Skipping common average reference.")
 
@@ -76,29 +65,23 @@ class KiloSortWorker(QtCore.QThread):
             torch.cuda.manual_seed_all(1)
             torch.random.manual_seed(1)
             ops, bfile, st0 = compute_drift_correction(
-                ops, device, tic0=tic0,
+                ops, device, tic0=tic0, progress_bar=self.progress_bar
                 #file_object=file_object
                 )
 
-            plot_drift(ops)
-            # TODO: add drift plot
-            # 1: ops['dshift'] (probably)
-            # 2: st column 2(?) (from datashift.run, need to expose here)
-            #    should be time, depth  (we want the depth column)
-            #    saturation = spike amplitude (3rd column?) cmap=grey_r (darker = more amp)
-            #    ask Carsen for help with code if needed, she made fig for KS paper
-
+            self.dshift = ops['dshift']
+            self.st0 = st0
+            self.plotDataReady.emit('drift')
 
             # Sort spikes and save results
-            st, tF = detect_spikes(ops, device, bfile, tic0=tic0)
+            st, tF, Wall3 = detect_spikes(ops, device, bfile, tic0=tic0,
+                                          progress_bar=self.progress_bar)
 
-            # TODO: add check for plotting templates here, and split this function here
-            #       into spike detection (above) and clustering (below)
+            self.Wall3 = Wall3
+            self.plotDataReady.emit('features')
 
-            # Plot L2 norm across 6 templates for (channel #, neuron #)
-            #       -- see spatial features plot in PR
-
-            clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0)
+            clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
+                                       progress_bar=self.progress_bar)
             ops, similar_templates, is_ref, est_contam_rate = \
                 save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
 

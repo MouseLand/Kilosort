@@ -1,6 +1,9 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from kilosort.gui.sorter import KiloSortWorker
+from kilosort.gui.sanity_plots import (
+    PlotWindow, plot_drift_amount, plot_drift_scatter, plot_features
+    )
 
 
 class RunBox(QtWidgets.QGroupBox):
@@ -113,6 +116,7 @@ class RunBox(QtWidgets.QGroupBox):
     @QtCore.pyqtSlot(object)
     def finished_spikesort(self, context):
         self.updateContext.emit(context)
+        self.current_worker = None
         self.update_sorting_status("spikesort", True)
 
     # @QtCore.pyqtSlot()
@@ -174,6 +178,10 @@ class RunBox(QtWidgets.QGroupBox):
         # worker.finishedPreprocess.connect(self.finished_preprocess)
         worker.finishedSpikesort.connect(self.finished_spikesort)
         worker.finishedAll.connect(self.finished_spikesort)
+        # TODO: add option to disable sanity plots?
+        worker.plotDataReady.connect(self.add_plot_data)
+        self.current_worker = worker
+        self.setup_sanity_plots()
         
         QtWidgets.QApplication.restoreOverrideCursor()
 
@@ -192,3 +200,31 @@ class RunBox(QtWidgets.QGroupBox):
             "spikesort": False,
         })
         self.sortingStepStatusUpdate.emit(self.sorting_status)
+
+    def setup_sanity_plots(self):
+        self.plots = {
+            'drift_amount': PlotWindow(nrows=1, ncols=1, title='Drift Amount'),
+            'drift_scatter': PlotWindow(
+                nrows=1, ncols=1, title='Drift Scatter', width=10, height=6
+                ),
+            'features': PlotWindow(nrows=1, ncols=1, title='Features')
+        }
+
+    # TODO: have a separate process do the actual plotting, otherwise it
+    #       locks up the sorting process. Not a big deal for the sample data,
+    #       but on larger datasets the drift scatter could take a while, for example.
+    def add_plot_data(self, plot_type):
+        settings = self.get_current_context().params
+        if plot_type == 'drift':
+            # Drift amount over time for each block of probe
+            plot_window1 = self.plots['drift_amount']
+            plot_window2 = self.plots['drift_scatter']
+            dshift = self.current_worker.dshift
+            st0 = self.current_worker.st0
+            plot_drift_amount(plot_window1, dshift, settings)
+            plot_drift_scatter(plot_window2, st0)
+
+        elif plot_type == 'features':
+            plot_window = self.plots['features']
+            Wall3 = self.current_worker.Wall3
+            plot_features(plot_window, Wall3)
