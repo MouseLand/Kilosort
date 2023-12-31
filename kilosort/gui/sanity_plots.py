@@ -62,14 +62,45 @@ def plot_drift_scatter(plot_window, st0):
     plot_window.show()
 
 
-def plot_features(plot_window, Wall3):
-    ax = plot_window.canvas.axes
-    features = torch.linalg.norm(Wall3, ord=2, dim=1).cpu().numpy()
+def plot_diagnostics(plot_window, wPCA, Wall3, amplitudes, clu0, settings):
+    ax1, ax2, ax3, ax4 = plot_window.canvas.axes.flatten()
 
-    ax.imshow(features.T)
-    ax.set_xlabel('Unit Number')
-    ax.set_ylabel('Channel Number')
-    ax.set_title('Spatial Features')
+    # Temporal features (top left)
+    t = np.arange(wPCA.shape[1])/(settings['fs']/1000)
+    ax1.plot(t, wPCA.T, linewidth=1)
+    ax1.set_xlabel('Time (s)')
+    ax1.set_title('Temporal Features')
+
+    # Spatial features (top right)
+    features = torch.linalg.norm(Wall3, ord=2, dim=1).cpu().numpy()
+    ax2.imshow(features.T)
+    ax2.set_xlabel('Unit Number')
+    ax2.set_ylabel('Channel Number')
+    ax2.set_title('Spatial Features')
+
+    # TODO: problem is tF (--> amplitudes) has more spikes than clu, so there's
+    #       a dimension mismatch. Either missing a step to fix that, or need to
+    #       use final results instead of intermediate after spike detect.
+    # Comput spike counts and mean amplitudes
+    # uclu = np.unique(clu0)
+    # mean_amp = np.empty_like(uclu)
+    # spike_counts = np.empty_like(uclu)
+    # for i in range(uclu.size):
+    #     amps = amplitudes[clu0 == i]
+    #     mean_amp[i] = amps.mean()
+    #     spike_counts[i] = amps.size
+
+    # # Unit amplitudes (bottom left)
+    # ax3.plot(mean_amp)
+    # ax3.set_xlabel('Unit Number')
+    # ax3.set_ylabel('Amplitude (a.u.)')
+    # ax3.set_title('Unit Amplitudes')
+
+    # # # Amplitude vs Spike Count (bottom right)
+    # ax4.scatter(np.log(1 + spike_counts), mean_amp, s=1)
+    # ax4.set_xlabel('Spike Count')
+    # ax4.set_ylabel('Amplitude (a.u.)')
+    # ax4.set_title('Amplitude vs Spike Count')
 
     plot_window.canvas.draw_idle()
     plot_window.show()

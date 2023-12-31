@@ -2,7 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from kilosort.gui.sorter import KiloSortWorker
 from kilosort.gui.sanity_plots import (
-    PlotWindow, plot_drift_amount, plot_drift_scatter, plot_features
+    PlotWindow, plot_drift_amount, plot_drift_scatter, plot_diagnostics
     )
 
 
@@ -207,7 +207,9 @@ class RunBox(QtWidgets.QGroupBox):
             'drift_scatter': PlotWindow(
                 nrows=1, ncols=1, title='Drift Scatter', width=10, height=6
                 ),
-            'features': PlotWindow(nrows=1, ncols=1, title='Features')
+            'diagnostics': PlotWindow(
+                nrows=2, ncols=2, width=8, height=8, title='Diagnostics'
+                )
         }
 
     # TODO: have a separate process do the actual plotting, otherwise it
@@ -224,7 +226,10 @@ class RunBox(QtWidgets.QGroupBox):
             plot_drift_amount(plot_window1, dshift, settings)
             plot_drift_scatter(plot_window2, st0)
 
-        elif plot_type == 'features':
-            plot_window = self.plots['features']
+        elif plot_type == 'diagnostics':
+            plot_window = self.plots['diagnostics']
             Wall3 = self.current_worker.Wall3
-            plot_features(plot_window, Wall3)
+            wPCA = self.current_worker.wPCA
+            amplitudes = self.current_worker.amplitudes
+            clu0 = self.current_worker.clu0
+            plot_diagnostics(plot_window, wPCA, Wall3, amplitudes, clu0, settings)

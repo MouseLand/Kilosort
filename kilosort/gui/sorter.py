@@ -74,11 +74,14 @@ class KiloSortWorker(QtCore.QThread):
             self.plotDataReady.emit('drift')
 
             # Sort spikes and save results
-            st, tF, Wall3 = detect_spikes(ops, device, bfile, tic0=tic0,
+            st, tF, Wall3, clu0 = detect_spikes(ops, device, bfile, tic0=tic0,
                                           progress_bar=self.progress_bar)
 
             self.Wall3 = Wall3
-            self.plotDataReady.emit('features')
+            self.wPCA = torch.clone(ops['wPCA'].cpu()).numpy()
+            self.amplitudes = ((tF**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
+            self.clu0 = clu0
+            self.plotDataReady.emit('diagnostics')
 
             clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
                                        progress_bar=self.progress_bar)

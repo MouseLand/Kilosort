@@ -200,7 +200,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
         # Use pre-computed templates.
         ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
 
-    ops = template_centers(ops)   
+    ops = template_centers(ops)
 
     [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
     ys, xs = ys.flatten(), xs.flatten()
