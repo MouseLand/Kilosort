@@ -39,7 +39,7 @@ def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None)
      - if dshift is present, then the data is drift-corrected    
     """
     nt = ops['nt']
-    NT = ops['NT']
+    NT = ops['batch_size']
     NTbuff   = ops['NTbuff']
     chanMap  = ops['chanMap']
     n_chan_bin = ops['n_chan_bin']
@@ -108,7 +108,7 @@ def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None)
 
 def avg_wav(filename, Wsub, nn, ops, ibatch, st_i, clu, Nfilt):
     nt = ops['nt']
-    NT = ops['NT']
+    NT = ops['batch_size']
     if isinstance(ops['wPCA'], np.ndarray):
         ops['wPCA'] = torch.from_numpy(ops['wPCA']).to(dev)
 

@@ -1,11 +1,14 @@
-import os
+import time
+
 import numpy as np
 import torch
 from PyQt5 import QtCore
-from PyQt5.QtCore import pyqtSignal
 
 from kilosort.gui.logger import setup_logger
-from kilosort.run_kilosort import run_kilosort
+from kilosort.run_kilosort import (
+    initialize_ops, compute_preprocessing, compute_drift_correction,
+    detect_spikes, cluster_spikes, save_sorting
+    )
 
 logger = setup_logger(__name__)
 
@@ -14,7 +17,8 @@ class KiloSortWorker(QtCore.QThread):
     finishedPreprocess = QtCore.pyqtSignal(object)
     finishedSpikesort = QtCore.pyqtSignal(object)
     finishedAll = QtCore.pyqtSignal(object)
-    progress_bar = pyqtSignal(int)
+    progress_bar = QtCore.pyqtSignal(int)
+    plotDataReady = QtCore.pyqtSignal(str)
 
     def __init__(self, context, results_directory, steps,
                  device=torch.device('cuda'), *args, **kwargs):
@@ -32,19 +36,58 @@ class KiloSortWorker(QtCore.QThread):
             probe = self.context.probe
             settings["data_dir"] = self.data_path.parent
             settings["filename"] = self.data_path
-            results_directory = self.results_directory
-            if not results_directory.exists():
-                logger.info(f"Results dir at {results_directory} does not exist. The folder will be created.")
-                results_directory.mkdir(parents=True)
+            results_dir = self.results_directory
+            if not results_dir.exists():
+                logger.info(f"Results dir at {results_dir} does not exist."
+                             "The folder will be created.")
+                results_dir.mkdir(parents=True)
 
-            run_kilosort(
-                settings=settings,
-                probe=probe,
-                results_dir=results_directory,
-                device=self.device,
-                progress_bar=self.progress_bar,
-                data_dtype=settings['data_dtype']
-            )
+            tic0 = time.time()
 
-            logger.info(f"Spike sorting output saved in\n{results_directory}")
+            # TODO: make these options in GUI
+            do_CAR=True
+            invert_sign=False
+        
+            if not do_CAR:
+                print("Skipping common average reference.")
+
+            if settings['nt0min'] is None:
+                settings['nt0min'] = int(20 * settings['nt']/61)
+            data_dtype = settings['data_dtype']
+            device = self.device
+
+            ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign)
+
+            # TODO: add support for file object through data conversion
+            # Set preprocessing and drift correction parameters
+            ops = compute_preprocessing(ops, device, tic0=tic0)#, file_object=file_object)
+            np.random.seed(1)
+            torch.cuda.manual_seed_all(1)
+            torch.random.manual_seed(1)
+            ops, bfile, st0 = compute_drift_correction(
+                ops, device, tic0=tic0, progress_bar=self.progress_bar
+                #file_object=file_object
+                )
+
+            self.dshift = ops['dshift']
+            self.st0 = st0
+            self.plotDataReady.emit('drift')
+
+            # Sort spikes and save results
+            st, tF, Wall3, clu0 = detect_spikes(ops, device, bfile, tic0=tic0,
+                                          progress_bar=self.progress_bar)
+
+            self.Wall3 = Wall3
+            self.wPCA = torch.clone(ops['wPCA'].cpu()).numpy()
+            self.amplitudes = ((tF**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
+            self.clu0 = clu0
+            self.plotDataReady.emit('diagnostics')
+
+            clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
+                                       progress_bar=self.progress_bar)
+            ops, similar_templates, is_ref, est_contam_rate = \
+                save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
+
+
+            logger.info(f"Spike sorting output saved in\n{results_dir}")
             self.finishedSpikesort.emit(self.context)

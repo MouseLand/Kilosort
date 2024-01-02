@@ -67,17 +67,20 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     np.random.seed(1)
     torch.cuda.manual_seed_all(1)
     torch.random.manual_seed(1)
-    ops, bfile = compute_drift_correction(
+    ops, bfile, st0 = compute_drift_correction(
         ops, device, tic0=tic0, progress_bar=progress_bar,
         file_object=file_object
         )
     
+    # TODO: don't think we need to do this actually
     # Save intermediate `ops` for use by GUI plots
     io.save_ops(ops, results_dir)
 
     # Sort spikes and save results
-    st, clu, tF, Wall = sort_spikes(ops, device, bfile, tic0=tic0,
-                                    progress_bar=progress_bar)
+    st, tF, _, _ = detect_spikes(ops, device, bfile, tic0=tic0,
+                                 progress_bar=progress_bar)
+    clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
+                               progress_bar=progress_bar)
     ops, similar_templates, is_ref, est_contam_rate = \
         save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
 
@@ -141,7 +144,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign) -> dict:
     ops['data_dtype'] = data_dtype
     ops['do_CAR'] = do_CAR
     ops['invert_sign'] = invert_sign
-    ops['NTbuff'] = ops['NT'] + 2 * ops['nt']
+    ops['NTbuff'] = ops['batch_size'] + 2 * ops['nt']
     ops['Nchan'] = len(probe['chanMap'])
     ops['n_chan_bin'] = settings['n_chan_bin']
 
@@ -159,7 +162,7 @@ def get_run_parameters(ops) -> list:
     parameters = [
         ops['settings']['n_chan_bin'],
         ops['settings']['fs'],
-        ops['settings']['NT'],
+        ops['settings']['batch_size'],
         ops['settings']['nt'],
         ops['settings']['nt0min'],  # also called twav_min
         ops['probe']['chanMap'],
@@ -272,7 +275,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         artifact_threshold=artifact, file_object=file_object
         )
 
-    ops = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
+    ops, st = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
     bfile.close()
     print(f'drift computed in {time.time()-tic : .2f}s; ' + 
             f'total {time.time()-tic0 : .2f}s')
@@ -285,10 +288,10 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         artifact_threshold=artifact, file_object=file_object
         )
 
-    return ops, bfile
+    return ops, bfile, st
 
 
-def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
+def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     """Run spike sorting algorithm and save intermediate results to `ops`.
     
     Parameters
@@ -340,6 +343,10 @@ def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     print(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
             f'total {time.time()-tic0 : .2f}s')
 
+    return st, tF, Wall3, clu
+
+
+def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None):
     tic = time.time()
     print('\nFinal clustering')
     clu, Wall = clustering_qr.run(ops, st, tF,  mode = 'template', device=device,
@@ -357,7 +364,7 @@ def sort_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
 
     bfile.close()
 
-    return st, clu, tF, Wall
+    return clu, Wall
 
 
 def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan):  
