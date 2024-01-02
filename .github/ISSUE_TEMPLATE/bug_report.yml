@@ -53,15 +53,9 @@ body:
     placeholder: |
       << your explanation here >>
 
-body:
-- type: markdown
-  attributes:
-    value: >
-      If your bug relates to "strange results" rather than an error or code issue,
-      please include the following additional information if possible.
-
 - type: textarea
   attributes:
     label: "Experiment information:"
     description: >
-      Type of probe used, species and brain area recorded from, etc. 
+      Type of probe used, species and brain area recorded from, etc, if your bug
+      is related to "strange/unexpected results."
