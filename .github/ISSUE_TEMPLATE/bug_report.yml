@@ -22,9 +22,6 @@ body:
     description: >
       A short code example that reproduces the problem/missing feature,
       if applicable.
-    placeholder: |
-      from kilosort import run_kilosort
-      << your code here >>
     render: python
   
 - type: textarea
@@ -32,8 +29,6 @@ body:
     label: "Error message:"
     description: >
       Please include full error message, if any.
-    placeholder: |
-      << Full traceback starting from `Traceback: ...` >>
     render: shell
 
 - type: textarea
@@ -50,8 +45,6 @@ body:
     label: "Context for the issue:"
     description: |
       Please explain how this issue affects your work or why it should be prioritized.
-    placeholder: |
-      << your explanation here >>
 
 - type: textarea
   attributes:

@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an additional feature you'd like to see in Kilosort.
+title: "FEATURE: <Please write a comprehensive title after the 'FEATURE: ' prefix>"
+
+body:
+- type: textarea
+  attributes: 
+    label: "Feature you'd like to see:"
+    description: >
+        Provide a clear and concise description of the new feature you'd like to
+        see.
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Additional Context"
+    description: >
+        Add any other context or screenshots about the feature request here.
