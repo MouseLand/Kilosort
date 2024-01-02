@@ -261,15 +261,25 @@ class SettingsBox(QtWidgets.QGroupBox):
             getattr(epw, f'{k}_input').setText(str(v))
             getattr(epw, f'{k}_input').editingFinished.emit()
 
+        self.dtype_selector.setCurrentIndex(settings['misc']['dtype_idx'])
+        self.probe_layout_selector.setCurrentIndex(settings['misc']['probe_idx'])
+        self.device_selector.setCurrentIndex(settings['misc']['device_idx'])
+
+
     @QtCore.pyqtSlot()
     def export_settings(self):
         # 1) dump parameters to dict
         #       don't save entire settings dict, other stuff is data-specific
-        settings = {'main': {}, 'extra': {}}
+        settings = {'main': {}, 'extra': {}, 'misc': {}}
         for k in list(MAIN_PARAMETERS.keys()):
             settings['main'][k] = getattr(self, k)
         for k in list(EXTRA_PARAMETERS.keys()):
             settings['extra'][k] = getattr(self.extra_parameters_window, k)
+        
+        # Add dtype, probe, pytorch device
+        settings['misc']['dtype_idx'] = self.dtype_selector.currentIndex()
+        settings['misc']['probe_idx'] = self.probe_layout_selector.currentIndex()
+        settings['misc']['device_idx'] = self.device_selector.currentIndex()
 
         # 3) open save dialog        
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
@@ -565,7 +575,7 @@ class SettingsBox(QtWidgets.QGroupBox):
     def on_device_selected(self, device):
         num_gpus = torch.cuda.device_count()
         selector_index = self.device_selector.currentIndex()
-        if selector_index >= num_gpus:
+        if (selector_index >= num_gpus) or (selector_index < 0):
             device_id = 'cpu'
         else:
             device_id = f'cuda:{selector_index}'
