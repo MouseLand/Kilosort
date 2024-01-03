@@ -415,6 +415,3 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan):
     io.save_ops(ops, results_dir)
 
     return ops, similar_templates, is_ref, est_contam_rate
-
-
-

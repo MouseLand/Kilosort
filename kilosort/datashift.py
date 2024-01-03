@@ -186,7 +186,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     if ops['nblocks']<1:
         ops['dshift'] = None 
         print('nblocks = 0, skipping drift correction')
-        return ops
+        return ops, None
     
     # the first step is to extract all spikes using the universal templates
     st, _, ops  = spikedetect.run(ops, bfile, device=device, progress_bar=progress_bar)

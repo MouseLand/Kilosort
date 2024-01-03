@@ -69,9 +69,11 @@ class KiloSortWorker(QtCore.QThread):
                 #file_object=file_object
                 )
 
-            self.dshift = ops['dshift']
-            self.st0 = st0
-            self.plotDataReady.emit('drift')
+            # Will be None if nblocks = 0 (no drift correction)
+            if st0 is not None:
+                self.dshift = ops['dshift']
+                self.st0 = st0
+                self.plotDataReady.emit('drift')
 
             # Sort spikes and save results
             st, tF, Wall3, clu0 = detect_spikes(ops, device, bfile, tic0=tic0,
