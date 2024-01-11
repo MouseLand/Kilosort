@@ -230,6 +230,5 @@ class RunBox(QtWidgets.QGroupBox):
             plot_window = self.plots['diagnostics']
             Wall3 = self.current_worker.Wall3
             wPCA = self.current_worker.wPCA
-            amplitudes = self.current_worker.amplitudes
             clu0 = self.current_worker.clu0
-            plot_diagnostics(plot_window, wPCA, Wall3, amplitudes, clu0, settings)
+            plot_diagnostics(plot_window, wPCA, Wall3, clu0, settings)

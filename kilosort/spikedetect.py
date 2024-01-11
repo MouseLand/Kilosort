@@ -259,4 +259,4 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     ops['iC'] = iC
     ops['iC2'] = iC2
     ops['weigh'] = weigh
-    return st, tF,ops
+    return st, tF, ops
