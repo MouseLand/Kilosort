@@ -3,7 +3,9 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 #plt.style.use('dark_background')
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
+from matplotlib.backends.backend_qt5agg import (
+    FigureCanvasQTAgg, NavigationToolbar2QT
+    )
 from matplotlib.figure import Figure
 
 import numpy as np
@@ -26,8 +28,11 @@ class PlotWindow(QtWidgets.QWidget):
         if title is not None:
             self.setWindowTitle(title)
         self.canvas = MplCanvas(self, *args, **kwargs)
-        layout = QtWidgets.QHBoxLayout()
+        self.toolbar = NavigationToolbar2QT(self.canvas, self)
+
+        layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.canvas)
+        layout.addWidget(self.toolbar)
         self.setLayout(layout)
 
         self.hide()
