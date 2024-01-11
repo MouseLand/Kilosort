@@ -67,7 +67,7 @@ def plot_drift_scatter(plot_window, st0):
     plot_window.show()
 
 
-def plot_diagnostics(plot_window, wPCA, Wall3, clu0, settings):
+def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
     ax1, ax2, ax3, ax4 = plot_window.canvas.axes.flatten()
 
     # Temporal features (top left)
@@ -77,8 +77,8 @@ def plot_diagnostics(plot_window, wPCA, Wall3, clu0, settings):
     ax1.set_title('Temporal Features')
 
     # Spatial features (top right)
-    features = torch.linalg.norm(Wall3, dim=1).cpu().numpy()
-    ax2.imshow(features.T)
+    features = torch.linalg.norm(Wall0, dim=2).cpu().numpy()
+    ax2.imshow(features.T, aspect='auto')
     ax2.set_xlabel('Unit Number')
     ax2.set_ylabel('Channel Number')
     ax2.set_title('Spatial Features')
@@ -88,20 +88,20 @@ def plot_diagnostics(plot_window, wPCA, Wall3, clu0, settings):
     spike_counts = np.zeros(n_units)
     for i in range(n_units):
         spike_counts[i] = (clu0[clu0 == i]).size
-    mean_amp = torch.linalg.norm(Wall3, dim=(1,2)).cpu().numpy()
+    mean_amp = torch.linalg.norm(Wall0, dim=(1,2)).cpu().numpy()
 
-    # # Unit amplitudes (bottom left)
+    # Unit amplitudes (bottom left)
     ax3.plot(mean_amp)
     ax3.set_xlabel('Unit Number')
     ax3.set_ylabel('Amplitude (a.u.)')
     ax3.set_title('Unit Amplitudes')
 
     # TODO: Still a mismatch here between unit counts for clu0 vs Wall3
-    # # # Amplitude vs Spike Count (bottom right)
-    # ax4.scatter(np.log(1 + spike_counts), mean_amp, s=1)
-    # ax4.set_xlabel('Spike Count')
-    # ax4.set_ylabel('Amplitude (a.u.)')
-    # ax4.set_title('Amplitude vs Spike Count')
+    # Amplitude vs Spike Count (bottom right)
+    ax4.scatter(np.log(1 + spike_counts), mean_amp, s=1)
+    ax4.set_xlabel('Log(1 + Spike Count)')
+    ax4.set_ylabel('Amplitude (a.u.)')
+    ax4.set_title('Amplitude vs Spike Count')
 
     plot_window.canvas.draw_idle()
     plot_window.show()

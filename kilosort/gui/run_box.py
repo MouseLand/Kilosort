@@ -228,7 +228,7 @@ class RunBox(QtWidgets.QGroupBox):
 
         elif plot_type == 'diagnostics':
             plot_window = self.plots['diagnostics']
-            Wall3 = self.current_worker.Wall3
+            Wall0 = self.current_worker.Wall0
             wPCA = self.current_worker.wPCA
             clu0 = self.current_worker.clu0
-            plot_diagnostics(plot_window, wPCA, Wall3, clu0, settings)
+            plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings)

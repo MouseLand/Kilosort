@@ -343,7 +343,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     print(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
             f'total {time.time()-tic0 : .2f}s')
 
-    return st, tF, Wall3, clu
+    return st, tF, Wall, clu
 
 
 def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None):
