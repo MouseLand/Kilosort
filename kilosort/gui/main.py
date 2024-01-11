@@ -8,6 +8,7 @@ from kilosort.gui import (
     ProbeViewBox,
     RunBox,
     SettingsBox,
+    DataConversionBox
 )
 from kilosort.gui.logger import setup_logger
 from kilosort.io import BinaryFiltered
@@ -83,6 +84,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.third_boxes_layout = QtWidgets.QVBoxLayout()
         self.fourth_boxes_layout = QtWidgets.QVBoxLayout()
 
+        self.converter = DataConversionBox()
         self.settings_box = SettingsBox(self)
         self.probe_view_box = ProbeViewBox(self)
         self.data_view_box = DataViewBox(self)

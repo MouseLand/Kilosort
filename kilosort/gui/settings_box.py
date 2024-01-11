@@ -38,6 +38,8 @@ class SettingsBox(QtWidgets.QGroupBox):
             if self.data_file_path is not None else None
             )
 
+        self.convert_data_button = QtWidgets.QPushButton("Convert Other Data")
+
         if self.data_file_path is not None:
             self.results_directory_path = self.data_file_path.parent.joinpath('kilosort4/')
         else:
@@ -132,6 +134,10 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.data_file_path_input.editingFinished.connect(
             self.on_data_file_path_changed
         )
+
+        row_count += 1
+        layout.addWidget(self.convert_data_button, row_count, 0, 1, 3)
+        self.convert_data_button.clicked.connect(self.open_data_converter)
 
         row_count += 1
         layout.addWidget(self.select_results_directory, row_count, 0, 1, 3)
@@ -323,6 +329,9 @@ class SettingsBox(QtWidgets.QGroupBox):
             logger.warning(
                 "Drag and drop only works with .bin, .dat, .bat, and .raw files!"
                 )
+
+    def open_data_converter(self):
+        self.gui.converter.show()
 
     def on_select_results_dir_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
