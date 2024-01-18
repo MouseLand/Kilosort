@@ -15,7 +15,7 @@ def prepare_extract(ops, U, nC, device=torch.device('cuda')):
     return iCC, iU, Ucc
 
 def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
-    nC = 10
+    nC = ops['settings']['nearest_chans']
     iCC, iU, Ucc = prepare_extract(ops, U, nC, device=device)
     ops['iCC'] = iCC
     ops['iU'] = iU
@@ -263,10 +263,12 @@ def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.
             nmerge+=1
     
     imap = np.cumsum((~is_merged).astype('int32')) - 1
+    if imap.size > 0:
+        # Otherwise, everything has been merged into a single cluster
+        clu2 = imap[clu2]
 
     Ww = Ww[~is_merged]
 
-    clu2 = imap[clu2]
     if mode == 'ccg':
         is_ref = is_ref[~is_merged]
     else:
