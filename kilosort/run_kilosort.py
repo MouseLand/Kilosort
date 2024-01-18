@@ -327,6 +327,8 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     tF = torch.from_numpy(tF)
     print(f'{len(st0)} spikes extracted in {time.time()-tic : .2f}s; ' + 
             f'total {time.time()-tic0 : .2f}s')
+    if len(st0) == 0:
+        raise ValueError('No spikes detected, cannot continue sorting.')
 
     tic = time.time()
     print('\nFirst clustering')

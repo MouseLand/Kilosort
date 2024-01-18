@@ -84,7 +84,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.third_boxes_layout = QtWidgets.QVBoxLayout()
         self.fourth_boxes_layout = QtWidgets.QVBoxLayout()
 
-        self.converter = DataConversionBox()
+        self.converter = DataConversionBox(self)
         self.settings_box = SettingsBox(self)
         self.probe_view_box = ProbeViewBox(self)
         self.data_view_box = DataViewBox(self)

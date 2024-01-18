@@ -58,7 +58,10 @@ def plot_drift_amount(plot_window, dshift, settings):
 def plot_drift_scatter(plot_window, st0):
     # Scatter of depth of spike vs time, intensity = spike amplitude
     ax = plot_window.canvas.axes
-    s = ax.scatter(st0[:,0], st0[:,5], s=1, c=st0[:,2], cmap='Greys')
+    s = ax.scatter(
+        st0[:,0], st0[:,5], s=1, c=st0[:,2], cmap='Greys', vmin=10, vmax=100,
+        norm='log'
+        )
     plot_window.canvas.figure.colorbar(s, ax=ax)
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Depth (microns)')
