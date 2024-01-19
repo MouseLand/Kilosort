@@ -233,6 +233,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.run_box.sortingStepStatusUpdate.connect(self.update_sorting_status)
         self.run_box.setupContextForRun.connect(self.setup_context_for_run)
 
+        self.converter.disableInput.connect(self.disable_all_input)
+
     def change_channel_display(self, direction):
         if self.context is not None:
             self.data_view_box.shift_primary_channel(direction)

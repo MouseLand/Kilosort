@@ -270,7 +270,7 @@ def load_ops(ops_path, device=torch.device('cuda')):
 
 class BinaryRWFile:
 
-    supported_dtypes = ['uint16', 'int16', 'int32', 'float32']
+    supported_dtypes = ['int16', 'uint16', 'int32', 'float32']
 
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
