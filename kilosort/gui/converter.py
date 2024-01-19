@@ -29,7 +29,7 @@ class DataConversionBox(QtWidgets.QWidget):
         self.filetype = None
         self.stream_id = None
         self.stream_name = None
-        self.data_dtype = None
+        self.data_dtype = BinaryRWFile.supported_dtypes[0]
         self.dialog_path = Path('~').expanduser().as_posix()
         self.conversion_thread = ConversionThread(self)
 
@@ -54,10 +54,8 @@ class DataConversionBox(QtWidgets.QWidget):
 
         self.filetype_text = QtWidgets.QLabel('Select file type')
         self.filetype_selector = QtWidgets.QComboBox()
-        self.filetype_selector.addItem('')
-        self.filetype_selector.addItems(list(_SPIKEINTERFACE_IMPORTS.keys()))
+        self.filetype_selector.addItems([''] + list(_SPIKEINTERFACE_IMPORTS.keys()))
         self.filetype_selector.currentTextChanged.connect(self.select_filetype)
-        self.filetype_selector.setCurrentIndex(0)
         layout.addWidget(self.filetype_text, 2, 0, 1, 3)
         layout.addWidget(self.filetype_selector, 2, 3, 1, 3)
 
@@ -159,8 +157,7 @@ class DataConversionBox(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def convert_to_binary(self):
         # TODO: add option to specify chunksize for conversion
-        reqs = [self.filename, self.filetype, self.data_dtype]
-        if None in reqs:
+        if (self.filename is None) or (self.filetype is None):
             logger.exception(
                 'File name, file type, and data dtype must be specified.'
             )
