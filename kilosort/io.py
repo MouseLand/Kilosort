@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Tuple, Union
 import os, shutil
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 from scipy.io import loadmat
 import numpy as np
@@ -639,8 +640,8 @@ class BinaryFiltered(BinaryRWFile):
 
 
 def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
-                             dtype=np.int16, chunksize=60000, export_probe=True,
-                             probe_name='probe.prb'):
+                             dtype=np.int16, chunksize=300000, export_probe=True,
+                             probe_name='probe.prb', max_workers=None):
     """Save data from a SpikeInterface RecordingExtractor to a binary file.
 
     This function is provided to assist with converting data from other file
@@ -669,6 +670,10 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
         write it to a .prb file.
     probe_name : str; default='probe.prb'
         Name for the new probe file.
+    max_workers : int; optional.
+        Maximum number of threads used to execute file i/o.
+        Default: min(32, (os.process_cpu_count() or 1) + 4)
+        (https://github.com/python/cpython/blob/main/Lib/concurrent/futures/thread.py)
         
     Notes
     -----
@@ -692,24 +697,27 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
     fs = recording.get_sampling_frequency()
     dtype = recording.get_dtype()
 
-    y = np.memmap(binary_filename, dtype=dtype, mode='w+', shape=(N,c))
-    total_chunks = int(np.ceil(N/chunksize))
-
-    # Copy data to binary file, 60000 samples at a time
-    # (same as Kilosort's default batch size).
-    chunk = 0
+    # Determine start/end indices for each segment
+    indices = []
     for k in range(s):
         n = recording.get_num_samples(segment_index=k)
         i = 0 + k*chunksize
         while i < n:
-            if chunk % 50 == 0:
-                print(f'Copying chunk {chunk}/{total_chunks} ...')
             j = i + chunksize if (i + chunksize) < n else n
-            t = recording.get_traces(segment_index=k, start_frame=i, end_frame=j)
-            y[i:j,:] = t
-            y.flush()
+            indices.append((i, j, k))
             i += chunksize
-            chunk += 1
+
+    # Copy each chunk of data to memmory mapped binary file,
+    # use multithreading to speed it up.
+    def copy_chunk(memmap, i, j, k):
+        t = recording.get_traces(start_frame=i, end_frame=j, segment_index=k)
+        memmap[i:j,:] = t
+        memmap.flush()
+
+    y = np.memmap(binary_filename, dtype=dtype, mode='w+', shape=(N,c))
+    with ThreadPoolExecutor(max_workers=max_workers) as exe:
+        for i, j, k in indices:
+            exe.submit(copy_chunk, y, i, j, k)
 
     del(y)  # Close memmap after copying
 
