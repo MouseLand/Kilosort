@@ -4,6 +4,7 @@ from typing import Tuple, Union
 import os, shutil
 import warnings
 from concurrent.futures import ThreadPoolExecutor
+import time
 
 from scipy.io import loadmat
 import numpy as np
@@ -714,10 +715,22 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
         memmap[i:j,:] = t
         memmap.flush()
 
+
     y = np.memmap(binary_filename, dtype=dtype, mode='w+', shape=(N,c))
+    total_chunks = len(indices)
+    print('='*40)
+    print(f'Converting {total_chunks} data chunks '
+          f'with a chunksize of {chunksize} samples...')
     with ThreadPoolExecutor(max_workers=max_workers) as exe:
-        for i, j, k in indices:
-            exe.submit(copy_chunk, y, i, j, k)
+        futures = [exe.submit(copy_chunk, y, i, j, k) for i, j, k in indices]
+        # TODO: every some-amount-of-time, check list of futures
+        #       for completion
+        while exe._work_queue.qsize() > 0:
+            time.sleep(5)
+            print(f'{total_chunks - exe._work_queue.qsize()} of {total_chunks}'
+                   ' chunks converted...')
+    print(f'Data conversion finished.')
+    print('='*40)
 
     del(y)  # Close memmap after copying
 
