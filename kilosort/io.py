@@ -715,7 +715,6 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
         memmap[i:j,:] = t
         memmap.flush()
 
-
     y = np.memmap(binary_filename, dtype=dtype, mode='w+', shape=(N,c))
     total_chunks = len(indices)
     print('='*40)
@@ -726,7 +725,7 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
         # TODO: every some-amount-of-time, check list of futures
         #       for completion
         while exe._work_queue.qsize() > 0:
-            time.sleep(5)
+            time.sleep(10)
             print(f'{total_chunks - exe._work_queue.qsize()} of {total_chunks}'
                    ' chunks converted...')
     print(f'Data conversion finished.')
