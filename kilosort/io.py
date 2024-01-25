@@ -714,7 +714,7 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
         t = recording.get_traces(start_frame=i, end_frame=j, segment_index=k)
         memmap[i:j,:] = t
         memmap.flush()
-
+        del(t)
 
     y = np.memmap(binary_filename, dtype=dtype, mode='w+', shape=(N,c))
     total_chunks = len(indices)

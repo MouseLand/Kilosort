@@ -38,7 +38,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             if self.data_file_path is not None else None
             )
 
-        self.convert_data_button = QtWidgets.QPushButton("Convert Other Data")
+        self.convert_data_button = QtWidgets.QPushButton("Convert to Binary")
 
         if self.data_file_path is not None:
             self.results_directory_path = self.data_file_path.parent.joinpath('kilosort4/')

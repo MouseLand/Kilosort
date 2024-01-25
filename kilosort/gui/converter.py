@@ -29,7 +29,7 @@ class DataConversionBox(QtWidgets.QWidget):
         self.filetype = None
         self.stream_id = None
         self.stream_name = None
-        self.data_dtype = BinaryRWFile.supported_dtypes[0]
+        self.data_dtype = None  # BinaryRWFile.supported_dtypes[0]
         self.dialog_path = Path('~').expanduser().as_posix()
         self.conversion_thread = ConversionThread(self)
 
@@ -52,7 +52,7 @@ class DataConversionBox(QtWidgets.QWidget):
         layout.addWidget(self.folder_button, 0, 4, 1, 2)
         layout.addWidget(self.filename_input, 1, 0, 1, 6)
 
-        self.filetype_text = QtWidgets.QLabel('Select file type')
+        self.filetype_text = QtWidgets.QLabel('File type:')
         self.filetype_selector = QtWidgets.QComboBox()
         self.filetype_selector.addItems([''] + list(_SPIKEINTERFACE_IMPORTS.keys()))
         self.filetype_selector.currentTextChanged.connect(self.select_filetype)
@@ -60,17 +60,20 @@ class DataConversionBox(QtWidgets.QWidget):
         layout.addWidget(self.filetype_selector, 2, 3, 1, 3)
 
         # Top right: kwargs for spikeinterface loader, dtype
-        self.stream_id_text = QtWidgets.QLabel('stream_id')
+        self.stream_id_text = QtWidgets.QLabel('stream_id (optional)')
         self.stream_id_input = QtWidgets.QLineEdit()
         self.stream_id_input.textChanged.connect(self.set_stream_id)
-        self.stream_name_text = QtWidgets.QLabel('stream_name')
+        self.stream_name_text = QtWidgets.QLabel('stream_name (optional)')
         self.stream_name_input = QtWidgets.QLineEdit()
         self.stream_name_input.textChanged.connect(self.set_stream_name)
-        self.dtype_text = QtWidgets.QLabel("Data dtype:")
+        self.dtype_text = QtWidgets.QLabel("Data dtype (required):")
+        self.dtype_note = QtWidgets.QLabel(
+            "Note: this is the dtype for the new .bin file.\nIf the existing file"
+            " is not the same dtype, data may be altered."
+        )
         self.dtype_selector = QtWidgets.QComboBox()
-        self.dtype_selector.clear()
         supported_dtypes = BinaryRWFile.supported_dtypes
-        self.dtype_selector.addItems(supported_dtypes)
+        self.dtype_selector.addItems([''] + supported_dtypes)
         self.dtype_selector.setSizeAdjustPolicy(
             QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
         )
@@ -82,6 +85,7 @@ class DataConversionBox(QtWidgets.QWidget):
         layout.addWidget(self.stream_name_input, 1, 13, 1, 3)
         layout.addWidget(self.dtype_text, 2, 10, 1, 3)
         layout.addWidget(self.dtype_selector, 2, 13, 1, 3)
+        layout.addWidget(self.dtype_note, 3, 10, 2, 6)
 
         # Bottom: convert to binary or load with wrapper
         self.wrapper_button = QtWidgets.QPushButton('Load As Wrapper')
@@ -91,10 +95,10 @@ class DataConversionBox(QtWidgets.QWidget):
         self.convert_input = QtWidgets.QLineEdit()
         self.convert_input.setReadOnly(True)
         self.spacer = QtWidgets.QLabel('         ')
-        layout.addWidget(self.spacer, 3, 0, 1, 6)
-        layout.addWidget(self.wrapper_button, 4, 2, 1, 6)
-        layout.addWidget(self.convert_button, 5, 2, 1, 6)
-        layout.addWidget(self.convert_input, 5, 8, 1, 6)
+        layout.addWidget(self.spacer, 5, 0, 1, 6)
+        layout.addWidget(self.wrapper_button, 6, 0, 1, 6)
+        layout.addWidget(self.convert_button, 7, 0, 1, 6)
+        layout.addWidget(self.convert_input, 7, 6, 1, 10)
 
         self.setLayout(layout)
 
@@ -152,12 +156,16 @@ class DataConversionBox(QtWidgets.QWidget):
     @QtCore.pyqtSlot()
     def load_as_wrapper(self):
         # TODO
+        # Loading the wrapper here is easy, but need to update the rest
+        # of the GUI to not require a binary file to be selected. Should check
+        # if file_object is present instead (already set up to work with
+        # run_kilosort).
         pass
 
     @QtCore.pyqtSlot()
     def convert_to_binary(self):
         # TODO: add option to specify chunksize for conversion
-        if (self.filename is None) or (self.filetype is None):
+        if None in [self.filename, self.filetype, self.data_dtype]:
             logger.exception(
                 'File name, file type, and data dtype must be specified.'
             )
