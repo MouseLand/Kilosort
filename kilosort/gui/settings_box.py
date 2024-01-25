@@ -319,16 +319,20 @@ class SettingsBox(QtWidgets.QGroupBox):
             logger.info(f"File at location: {filename} is ready to load!")
 
         else:
+            message = (
+                "Only .bin, .dat, .bat, and .raw files accepted as binary, "
+                "the data conversion tool will be opened instead..."
+                )
             QtWidgets.QMessageBox.warning(
                 self.parent(),
-                "Wrong file type!",
-                "Drag and drop only works with .bin, .dat, .bat, and .raw files!",
+                "Unrecognized file type",
+                message,
                 QtWidgets.QMessageBox.StandardButton.Ok,
                 QtWidgets.QMessageBox.StandardButton.Ok,
             )
-            logger.warning(
-                "Drag and drop only works with .bin, .dat, .bat, and .raw files!"
-                )
+            self.gui.converter.filename = filename
+            self.gui.converter.filename_input.setText(filename)
+            self.gui.converter.show()
 
     def open_data_converter(self):
         self.gui.converter.show()

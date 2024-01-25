@@ -169,6 +169,10 @@ class DataConversionBox(QtWidgets.QWidget):
             logger.exception(
                 'File name, file type, and data dtype must be specified.'
             )
+            logger.exception(
+                f'File name: {self.filename}\nFile type: {self.filetype}\n'
+                f'Dtype: {self.data_dtype}'
+            )
             return
 
         options = QtWidgets.QFileDialog.DontUseNativeDialog
