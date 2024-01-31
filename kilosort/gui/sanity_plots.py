@@ -128,6 +128,7 @@ def plot_drift_scatter(plot_window, st0, settings):
     # nx = int(np.ceil((x.max() - x.min())/0.005))
     # _, x_bins = np.histogram(x, bins=nx)
     # a = _make_heatmap(x, y, z, x_bin=0.005, y_bin=5)
+    pass
 
 
 @njit
