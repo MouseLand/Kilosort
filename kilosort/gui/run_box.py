@@ -202,13 +202,15 @@ class RunBox(QtWidgets.QGroupBox):
         self.sortingStepStatusUpdate.emit(self.sorting_status)
 
     def setup_sanity_plots(self):
+        # TODO: remove row, col? looks like maybe just doing it at runtime is
+        #       how it works.
         self.plots = {
             'drift_amount': PlotWindow(nrows=1, ncols=1, title='Drift Amount'),
             'drift_scatter': PlotWindow(
-                nrows=1, ncols=1, title='Drift Scatter', width=10, height=6
+                nrows=1, ncols=1, title='Drift Scatter', width=1000, height=600
                 ),
             'diagnostics': PlotWindow(
-                nrows=2, ncols=2, width=8, height=8, title='Diagnostics'
+                nrows=2, ncols=2, width=800, height=800, title='Diagnostics'
                 )
         }
 
@@ -224,7 +226,7 @@ class RunBox(QtWidgets.QGroupBox):
             dshift = self.current_worker.dshift
             st0 = self.current_worker.st0
             plot_drift_amount(plot_window1, dshift, settings)
-            plot_drift_scatter(plot_window2, st0)
+            plot_drift_scatter(plot_window2, st0, settings)
 
         elif plot_type == 'diagnostics':
             plot_window = self.plots['diagnostics']
