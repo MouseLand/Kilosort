@@ -21,7 +21,7 @@ class KiloSortWorker(QtCore.QThread):
     plotDataReady = QtCore.pyqtSignal(str)
 
     def __init__(self, context, results_directory, steps,
-                 device=torch.device('cuda'), *args, **kwargs):
+                 device=torch.device('cuda'), file_object=None, *args, **kwargs):
         super(KiloSortWorker, self).__init__(*args, **kwargs)
         self.context = context
         self.data_path = context.data_path
@@ -29,6 +29,7 @@ class KiloSortWorker(QtCore.QThread):
         assert isinstance(steps, list) or isinstance(steps, str)
         self.steps = steps if isinstance(steps, list) else [steps]
         self.device = device
+        self.file_object = file_object
 
     def run(self):
         if "spikesort" in self.steps:
@@ -54,19 +55,19 @@ class KiloSortWorker(QtCore.QThread):
             if settings['nt0min'] is None:
                 settings['nt0min'] = int(20 * settings['nt']/61)
             data_dtype = settings['data_dtype']
-            device = self.device
 
             ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign)
 
             # TODO: add support for file object through data conversion
             # Set preprocessing and drift correction parameters
-            ops = compute_preprocessing(ops, device, tic0=tic0)#, file_object=file_object)
+            ops = compute_preprocessing(ops, self.device, tic0=tic0,
+                                        file_object=self.file_object)
             np.random.seed(1)
             torch.cuda.manual_seed_all(1)
             torch.random.manual_seed(1)
             ops, bfile, st0 = compute_drift_correction(
-                ops, device, tic0=tic0, progress_bar=self.progress_bar
-                #file_object=file_object
+                ops, self.device, tic0=tic0, progress_bar=self.progress_bar,
+                file_object=self.file_object
                 )
 
             # Will be None if nblocks = 0 (no drift correction)
@@ -76,7 +77,7 @@ class KiloSortWorker(QtCore.QThread):
                 self.plotDataReady.emit('drift')
 
             # Sort spikes and save results
-            st, tF, Wall0, clu0 = detect_spikes(ops, device, bfile, tic0=tic0,
+            st, tF, Wall0, clu0 = detect_spikes(ops, self.device, bfile, tic0=tic0,
                                                 progress_bar=self.progress_bar)
 
             self.Wall0 = Wall0
@@ -84,7 +85,7 @@ class KiloSortWorker(QtCore.QThread):
             self.clu0 = clu0
             self.plotDataReady.emit('diagnostics')
 
-            clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
+            clu, Wall = cluster_spikes(st, tF, ops, self.device, bfile, tic0=tic0,
                                        progress_bar=self.progress_bar)
             ops, similar_templates, is_ref, est_contam_rate = \
                 save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)

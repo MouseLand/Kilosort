@@ -1,6 +1,7 @@
 import importlib
 from pathlib import Path
 
+import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
 from kilosort.io import RecordingExtractorAsArray, spikeinterface_to_binary, BinaryRWFile
 from kilosort.gui.logger import setup_logger
@@ -20,6 +21,7 @@ _SPIKEINTERFACE_IMPORTS = {
 
 class DataConversionBox(QtWidgets.QWidget):
     disableInput = QtCore.pyqtSignal(bool)
+    fileObjectLoaded = QtCore.pyqtSignal(bool)
 
     def __init__(self, gui):
         super().__init__()
@@ -29,7 +31,8 @@ class DataConversionBox(QtWidgets.QWidget):
         self.filetype = None
         self.stream_id = None
         self.stream_name = None
-        self.data_dtype = None  # BinaryRWFile.supported_dtypes[0]
+        self.data_dtype = None
+        self.file_object = None
         self.dialog_path = Path('~').expanduser().as_posix()
         self.conversion_thread = ConversionThread(self)
 
@@ -155,12 +158,32 @@ class DataConversionBox(QtWidgets.QWidget):
 
     @QtCore.pyqtSlot()
     def load_as_wrapper(self):
-        # TODO
-        # Loading the wrapper here is easy, but need to update the rest
-        # of the GUI to not require a binary file to be selected. Should check
-        # if file_object is present instead (already set up to work with
-        # run_kilosort).
-        pass
+        if None in [self.filename, self.filetype, self.data_dtype]:
+            logger.exception(
+                'File name, file type, and data dtype must be specified.'
+            )
+            logger.exception(
+                f'File name: {self.filename}\nFile type: {self.filetype}\n'
+                f'Dtype: {self.data_dtype}'
+            )
+            return
+
+        recording = get_recording_extractor(
+            self.filename, self.filetype, self.stream_id, self.stream_name
+            )
+        f = RecordingExtractorAsArray(recording)
+        self.file_object = f
+        update_settings_box(self.gui.settings_box, f.c, f.fs, self.data_dtype)
+        self.fileObjectLoaded.emit(True)
+
+        # The np.dtype() wrapper is here because multiple strings can represent
+        # the same type, e.g. '<f4' for 'float32'
+        if np.dtype(f.dtype) != np.dtype(self.data_dtype):
+            logger.warn(
+                f'NOTE: SpikeInterface recording has dtype: {f.dtype},\n'
+                f'but dtype: {self.data_dtype} was selected in GUI.'
+                )
+        self.hide()
 
     @QtCore.pyqtSlot()
     def convert_to_binary(self):
@@ -214,6 +237,15 @@ def get_recording_extractor(filename, filetype, stream_id=None, stream_name=None
     return getattr(extractors, extractor_name)(filename, **kwargs)
 
 
+def update_settings_box(settings, n_chans, fs, dtype):
+    settings.n_chan_bin_input.setText(str(n_chans))
+    settings.n_chan_bin_input.editingFinished.emit()
+    settings.fs_input.setText(str(fs))
+    settings.fs_input.editingFinished.emit()
+    data_idx = settings.dtype_selector.findText(dtype)
+    settings.dtype_selector.setCurrentIndex(data_idx)
+
+
 class ConversionThread(QtCore.QThread):
 
     def __init__(self, parent, *args, **kwargs):
@@ -228,10 +260,5 @@ class ConversionThread(QtCore.QThread):
         )
 
         settings = self.parent.gui.settings_box
-        settings.n_chan_bin_input.setText(str(c))
-        settings.n_chan_bin_input.editingFinished.emit()
-        settings.fs_input.setText(str(fs))
-        settings.fs_input.editingFinished.emit()
-        data_idx = settings.dtype_selector.findText(self.parent.data_dtype)
-        settings.dtype_selector.setCurrentIndex(data_idx)
+        update_settings_box(settings, c, fs, self.parent.data_dtype)
         settings.data_file_path_input.setText(self.bin_filename.as_posix())

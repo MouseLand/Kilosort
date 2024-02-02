@@ -69,8 +69,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         download_probes(self.new_probe_files_path)
 
         self.num_channels = None
-
         self.context = None
+        self.file_object = None
 
         self.content = QtWidgets.QWidget(self)
         self.content_layout = QtWidgets.QVBoxLayout()
@@ -240,6 +240,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.run_box.setupContextForRun.connect(self.setup_context_for_run)
 
         self.converter.disableInput.connect(self.disable_all_input)
+        self.converter.fileObjectLoaded.connect(self.add_file_object)
 
     def change_channel_display(self, direction):
         if self.context is not None:
@@ -339,7 +340,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             dtype=data_dtype,
             tmin=tmin,
             tmax=tmax,
-            artifact_threshold=artifact
+            artifact_threshold=artifact,
+            file_object=self.file_object
         )
 
         self.context.binary_file = binary_file
@@ -359,7 +361,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             dtype=data_dtype,
             tmin=tmin,
             tmax=tmax,
-            artifact_threshold=artifact
+            artifact_threshold=artifact,
+            file_object=self.file_object
         ) as bin_file:
             self.context.whitening_matrix = preprocessing.get_whitening_matrix(
                 f=bin_file,
@@ -379,13 +382,24 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             dtype=data_dtype,
             tmin=tmin,
             tmax=tmax,
-            artifact_threshold=artifact
+            artifact_threshold=artifact,
+            file_object=self.file_object
         )
 
         self.context.filt_binary_file = filt_binary_file
 
         self.data_view_box.set_whitening_matrix(self.context.whitening_matrix)
         self.data_view_box.set_highpass_filter(self.context.highpass_filter)
+
+    def add_file_object(self):
+        self.file_object = self.converter.file_object
+        # NOTE: This filename will not actually be loaded the usual way, it's
+        #       just there to keep track of where the data is coming from
+        #       (and because `run_kilosort` expects a filename that exists).
+        filename = self.converter.filename
+        self.settings_box.use_file_object = True
+        self.settings_box.data_file_path = filename
+        self.settings_box.data_file_path_input.setText(filename)
 
     def setup_data_view(self):
         self.data_view_box.setup_seek(self.context)

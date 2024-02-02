@@ -28,6 +28,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         self.gui = parent
         self.load_enabled = False
+        self.use_file_object = False
         
         self.select_data_file = QtWidgets.QPushButton("Select Binary File")
         self.data_file_path = self.gui.data_path
@@ -386,8 +387,9 @@ class SettingsBox(QtWidgets.QGroupBox):
             return False
         else:
             f = Path(filename)
-            if f.exists() and f.is_file() and f.suffix in _ALLOWED_FILE_TYPES:
-                return True
+            if f.exists() and f.is_file():
+                if f.suffix in _ALLOWED_FILE_TYPES or self.use_file_object:
+                    return True
             else:
                 return False
 
@@ -631,7 +633,10 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def estimate_total_channels(self, num_channels):
         if self.check_valid_binary_path(self.data_file_path):
-            memmap_data = np.memmap(self.data_file_path, dtype=np.int16)
+            if self.use_file_object:
+                return self.gui.file_object.c
+            
+            memmap_data = np.memmap(self.data_file_path, dtype=self.data_dtype)
             data_size = memmap_data.size
 
             test_n_channels = np.arange(num_channels, num_channels + 31)

@@ -809,6 +809,12 @@ class RecordingExtractorAsArray:
                     'run `pip install spikeinterface`.'
                 )
         self.recording = recording_extractor
+        self.N = self.recording.get_total_samples()
+        self.c = self.recording.get_traces(start_frame=0, end_frame=1, segment_index=0).shape[1]
+        self.s = self.recording.get_num_segments()
+        self.fs = self.recording.get_sampling_frequency()
+        self.dtype = self.recording.get_dtype()
+        self.shape = (self.N, self.c)
 
     def __getitem__(self, *items):
         idx, *crop = items
@@ -824,11 +830,11 @@ class RecordingExtractorAsArray:
         j = sample_idx.stop
 
         if i is None: i = 0
-        if i < 0: i = self.shape[0] + i
-        if j is None: j = self.shape[0]
-        if j < 0: j = self.shape[0] + j
+        if i < 0: i = self.N + i
+        if j is None: j = self.N
+        if j < 0: j = self.N + j
 
-        # Convert channel slice to list of indices.
+        # Convert channel slice to list of indices starting from 0
         if isinstance(channel_ids, slice):
             c = channel_ids.start
             d = channel_ids.stop
@@ -838,6 +844,11 @@ class RecordingExtractorAsArray:
         elif channel_ids is not None:
             assert isinstance(channel_ids, int)
             channel_ids = [channel_ids]
+        else:
+            channel_ids = np.arange(self.shape[1])
+        # Index into actual channel ids from recording, which do not have to 
+        # be sequential or start from 0
+        channel_ids = self.recording.channel_ids[channel_ids]
 
         samples = self.recording.get_traces(start_frame=i, end_frame=j,
                                             channel_ids=channel_ids)
@@ -846,15 +857,3 @@ class RecordingExtractorAsArray:
 
     def __setitem__(self):
         raise ValueError('RecordingExtractorAsBinary is read-only.')
-    
-    @property
-    def shape(self):
-        # `get_traces()` is necessary to get true number of channels, to handle
-        # mismatch for some files, pending a fix from spikeinterface.
-        n_channels = self.recording.get_traces(segment_index=0, start_frame=0,
-                                               end_frame=1).shape[1]
-        return self.recording.get_total_samples(), n_channels
-
-    @property
-    def dtype(self):
-        return self.recording.get_dtype()
