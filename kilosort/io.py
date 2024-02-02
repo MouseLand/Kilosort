@@ -276,7 +276,7 @@ class BinaryRWFile:
 
     def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
-                 device: torch.device = torch.device('cpu'), write: bool = False,
+                 device: torch.device = None, write: bool = False,
                  dtype: str = None, tmin: float = 0.0, tmax: float = np.inf,
                  file_object=None):
         """
@@ -304,6 +304,11 @@ class BinaryRWFile:
         self.NT = NT 
         self.nt = nt 
         self.nt0min = nt0min
+        if device is None:
+            if torch.cuda.is_available():
+                device = torch.device('cuda')
+            else:
+                device = torch.device('cpu')
         self.device = device
         self.uint_set_warning = True
         self.writable = write
@@ -577,7 +582,7 @@ class BinaryFiltered(BinaryRWFile):
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  chan_map: np.ndarray = None, hp_filter: torch.Tensor = None,
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
-                 device: torch.device = torch.device('cuda'), do_CAR: bool = True,
+                 device: torch.device = None, do_CAR: bool = True,
                  artifact_threshold: float = np.inf, invert_sign: bool = False,
                  dtype=None, tmin: float = 0.0, tmax: float = np.inf, file_object=None):
 
