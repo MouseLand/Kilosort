@@ -7,11 +7,11 @@
 #     FigureCanvasQTAgg, NavigationToolbar2QT
 #     )
 # from matplotlib.figure import Figure
+import time
 import pyqtgraph as pg
 import matplotlib
 import numpy as np
 from numba import njit
-from numba.typed import List
 import torch
 from PyQt5 import QtWidgets
 
@@ -74,11 +74,7 @@ def plot_drift_scatter(plot_window, st0, settings):
 
 
     # TODO: Looks like this way is almost working? But it's so slow it's not
-    #       worth doing, and I still can't get the points to actually show up.
-
-    # # Invert color scheme for this plot, want white background
-    # pg.setConfigOption('background', 'w')
-    # pg.setConfigOption('foreground', 'k')
+    #       worth doing, and I still can't get the points to actually show up
 
     # p1 = plot_window.plot_widget.addPlot(
     #     row=0, col=0, labels={'left': 'Depth (microns)', 'bottom': 'Time (s)'}
@@ -95,23 +91,33 @@ def plot_drift_scatter(plot_window, st0, settings):
     # # Apply colormap and log normalization to amplitude
     # cm = matplotlib.colormaps['Greys']
     # LN = matplotlib.colors.LogNorm(vmin=10, vmax=100, clip=True)
-    # print(f'min max before: {z.min()}, {z.max()}')
+
+    # t0 = time.perf_counter()
     # z = np.array([cm(LN(a)) for a in z])
-    # print(f'values after: {z[0]}, {z[723]}, {z[-100]}')
+    # t1 = time.perf_counter()
+    # print(f'time to map colors: {(t1 - t0):.2f}')
 
     # # Build list of spots for plot
     # spots = [
     #     {'pos': (x[i], y[i]), 'size': 1, 'pen': {'color': z[i]}, 'brush': z[i]}
     #     for i in range(x.size)
     # ]
-
+    # t2 = time.perf_counter()
+    # print(f'time to build spot list: {(t2 - t1):.2f}')
     # # Add spots to plot area
     # scatter.addPoints(spots)
+    # t3 = time.perf_counter()
+    # print(f'time to add spots to plot: {(t3-t2):.2f}')
+
+    # NOTE: For sample dataset (90s, ~1GB), this broken  down to ~60s to map
+    #       values to color args, ~nothing to build the spots list, and ~35s to 
+    #       add the spots to the plot. So, optimizing the color mapping would
+    #       certainly help, but so long as scatter.addPoints(spots) is the only
+    #       way to do this with a colormap, that's still way too slow for a full
+    #       size dataset.
+
     # p1.addItem(scatter)
     # plot_window.show()
-
-    # pg.setConfigOption('background', 'k')
-    # pg.setConfigOption('foreground', 'w')
 
     # TODO: third option, try making it into a heatmap
 
@@ -183,3 +189,9 @@ def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
 
     # Finished, draw plot
     plot_window.show()
+
+
+# TODO: need to figure out what to do about scatter w/ color first, this would
+#       be done the same as the drift scatter (which is currently not working).
+def plot_probe_positions(plot_window):
+    pass
