@@ -1,29 +1,11 @@
-
-# import matplotlib
-# matplotlib.use('Qt5Agg')
-# import matplotlib.pyplot as plt
-# #plt.style.use('dark_background')
-# from matplotlib.backends.backend_qt5agg import (
-#     FigureCanvasQTAgg, NavigationToolbar2QT
-#     )
-# from matplotlib.figure import Figure
-import time
 import pyqtgraph as pg
 import matplotlib
+import scipy
 import numpy as np
-from numba import njit
 import torch
 from PyQt5 import QtWidgets
 
-
 _COLOR_CODES = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
-# Adapted from https://www.pythonguis.com/tutorials/plotting-matplotlib/
-# class MplCanvas(FigureCanvasQTAgg):
-#     def __init__(self, parent, nrows, ncols, width=5, height=4, dpi=100):
-#         self.parent = parent
-#         fig = Figure(figsize=(width,height), dpi=dpi, layout='constrained')
-#         self.axes = fig.subplots(nrows, ncols)
-#         super().__init__(fig)
 
 
 class PlotWindow(QtWidgets.QWidget):
@@ -61,88 +43,46 @@ def plot_drift_amount(plot_window, dshift, settings):
 
 
 def plot_drift_scatter(plot_window, st0, settings):
+    # Amplitude of spike over time and depth
+    p1 = plot_window.plot_widget.addPlot(
+        row=0, col=0, labels={'left': 'Depth (microns)', 'bottom': 'Time (s)'}
+    )
+    p1.setTitle('Spike amplitude across time and depth')
 
-    # TODO: this "works", but there's no way to color by amplitude that I've
-    #       been able to find
+    x = st0[:,0]  # spike time in seconds
+    x_ind = (x*10).astype('int')  # 100ms bins
+    y = st0[:,5]  # depth of spike center in microns
+    y_ind = (y*0.2).astype('int')   # 5 micron bins
+    z = st0[:,2]  # spike amplitude (data)
+    z[z < 10] = 10
+    z[z > 100] = 100
 
-    # p1 = plot_window.plot_widget.addPlot(
-    #     row=0, col=0, labels={'left': 'Depth (microns)', 'bottom': 'Time (s)'}
-    # )
-    # points = p1.plot(st0[:,0], st0[:,5], pen=None, symbol='o')
-    # points.setSymbolSize(1)
-    # plot_window.show()
+    # TODO: No reason to do this until white background is working, and still
+    #       not clear if this is working as intended.
+    # Set custom colormap
+    # greys = matplotlib.colormaps['Greys_r']
+    # pos = np.logspace(1, 2, 90)
+    # colors = []
+    # for p in pos:
+    #     r, g, b, _ = greys(((p-10)/90)*255)  # maps over range 0 to 255
+    #     colors.append((r, g, b))
+    # cm = pg.ColorMap(pos=pos, color=colors)
 
-
-    # TODO: Looks like this way is almost working? But it's so slow it's not
-    #       worth doing, and I still can't get the points to actually show up
-
-    # p1 = plot_window.plot_widget.addPlot(
-    #     row=0, col=0, labels={'left': 'Depth (microns)', 'bottom': 'Time (s)'}
-    # )
-    # scatter = pg.ScatterPlotItem()
-
-    # # Build list of spot dicts to add to scatter.
-    # # TODO: Simpler way to do this? Couldn't figure out another way to color
-    # #       by a 3rd variable.
-    # x = st0[:,0]  # spike time
-    # y = st0[:,5]  # depth of spike center
-    # z = st0[:,2]  # spike amplitude
-
-    # # Apply colormap and log normalization to amplitude
-    # cm = matplotlib.colormaps['Greys']
-    # LN = matplotlib.colors.LogNorm(vmin=10, vmax=100, clip=True)
-
-    # t0 = time.perf_counter()
-    # z = np.array([cm(LN(a)) for a in z])
-    # t1 = time.perf_counter()
-    # print(f'time to map colors: {(t1 - t0):.2f}')
-
-    # # Build list of spots for plot
-    # spots = [
-    #     {'pos': (x[i], y[i]), 'size': 1, 'pen': {'color': z[i]}, 'brush': z[i]}
-    #     for i in range(x.size)
-    # ]
-    # t2 = time.perf_counter()
-    # print(f'time to build spot list: {(t2 - t1):.2f}')
-    # # Add spots to plot area
-    # scatter.addPoints(spots)
-    # t3 = time.perf_counter()
-    # print(f'time to add spots to plot: {(t3-t2):.2f}')
-
-    # NOTE: For sample dataset (90s, ~1GB), this broken  down to ~60s to map
-    #       values to color args, ~nothing to build the spots list, and ~35s to 
-    #       add the spots to the plot. So, optimizing the color mapping would
-    #       certainly help, but so long as scatter.addPoints(spots) is the only
-    #       way to do this with a colormap, that's still way too slow for a full
-    #       size dataset.
-
-    # p1.addItem(scatter)
-    # plot_window.show()
-
-    # TODO: third option, try making it into a heatmap
-
-    # NOTE: No... this is dumb. Wouldn't be able to load the full thing into
-    #       memory, would have to do it in batches similar to the raw traces and
-    #       that's getting way too complicated for a simple scatterplot.
-    # p1 = plot_window.plot_widget.addPlot(
-    #     row=0, col=0, labels={'left': 'Depth (microns)', 'bottom': 'Time (s)'}
-    # )
-    # x = st0[:,0]  # spike time in seconds
-    # y = st0[:,5]  # depth of spike center in microns
-    # z = st0[:,2]  # spike amplitude
-    # # Convert to heatmap with 5ms time bins, 5 micron depth bins
-    # nx = int(np.ceil((x.max() - x.min())/0.005))
-    # _, x_bins = np.histogram(x, bins=nx)
-    # a = _make_heatmap(x, y, z, x_bin=0.005, y_bin=5)
-    pass
+    # Can't directly plot csr_matrix with pyqtgraph, so convert to array.
+    # Just using this for convenience of building the array format.
+    mat = scipy.sparse.csr_matrix((z, (x_ind, y_ind))).toarray()
+    img = pg.ImageItem(image=mat)#, colorMap=cm)
+    p1.addItem(img)
+    p1.getViewBox().invertY(True)
 
 
-@njit
-def _make_heatmap(x, y, z, x_bins, y_bins):
-    # Assumes x, y, z are all 1-dimensional and equal length
-    
-    for i in x.size:
-        pass
+    # Change tick scaling to match bin sizes
+    ax = p1.getAxis('bottom')
+    ax.setScale(0.1)
+    ay = p1.getAxis('left')
+    ay.setScale(5)
+
+    plot_window.show()
 
 
 def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
@@ -195,3 +135,117 @@ def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
 #       be done the same as the drift scatter (which is currently not working).
 def plot_probe_positions(plot_window):
     pass
+
+
+
+
+
+
+# TODO: this "works", but there's no way to color by amplitude that I've
+#       been able to find
+
+# p1 = plot_window.plot_widget.addPlot(
+#     row=0, col=0, labels={'left': 'Depth (microns)', 'bottom': 'Time (s)'}
+# )
+# points = p1.plot(st0[:,0], st0[:,5], pen=None, symbol='o')
+# points.setSymbolSize(1)
+# plot_window.show()
+
+
+# TODO: Looks like this way is almost working? But it's so slow it's not
+#       worth doing, and I still can't get the points to actually show up
+
+# p1 = plot_window.plot_widget.addPlot(
+#     row=0, col=0, labels={'left': 'Depth (microns)', 'bottom': 'Time (s)'}
+# )
+# scatter = pg.ScatterPlotItem()
+
+# # Build list of spot dicts to add to scatter.
+# # TODO: Simpler way to do this? Couldn't figure out another way to color
+# #       by a 3rd variable.
+# x = st0[:,0]  # spike time
+# y = st0[:,5]  # depth of spike center
+# z = st0[:,2]  # spike amplitude
+
+# # Apply colormap and log normalization to amplitude
+# cm = matplotlib.colormaps['Greys']
+# LN = matplotlib.colors.LogNorm(vmin=10, vmax=100, clip=True)
+
+# t0 = time.perf_counter()
+# z = np.array([cm(LN(a)) for a in z])
+# t1 = time.perf_counter()
+# print(f'time to map colors: {(t1 - t0):.2f}')
+
+# # Build list of spots for plot
+# spots = [
+#     {'pos': (x[i], y[i]), 'size': 1, 'pen': {'color': z[i]}, 'brush': z[i]}
+#     for i in range(x.size)
+# ]
+# t2 = time.perf_counter()
+# print(f'time to build spot list: {(t2 - t1):.2f}')
+# # Add spots to plot area
+# scatter.addPoints(spots)
+# t3 = time.perf_counter()
+# print(f'time to add spots to plot: {(t3-t2):.2f}')
+
+# NOTE: For sample dataset (90s, ~1GB), this broken  down to ~60s to map
+#       values to color args, ~nothing to build the spots list, and ~35s to 
+#       add the spots to the plot. So, optimizing the color mapping would
+#       certainly help, but so long as scatter.addPoints(spots) is the only
+#       way to do this with a colormap, that's still way too slow for a full
+#       size dataset.
+#       By contrast, the matplotlib version takes less than
+#       half a second to generate.
+
+# p1.addItem(scatter)
+# plot_window.show()
+
+# TODO: third option, try making it into a heatmap
+
+# NOTE: No... this is dumb. Wouldn't be able to load the full thing into
+#       memory, would have to do it in batches similar to the raw traces and
+#       that's getting way too complicated for a simple scatterplot.
+# p1 = plot_window.plot_widget.addPlot(
+#     row=0, col=0, labels={'left': 'Depth (microns)', 'bottom': 'Time (s)'}
+# )
+# x = st0[:,0]  # spike time in seconds
+# y = st0[:,5]  # depth of spike center in microns
+# z = st0[:,2]  # spike amplitude
+# # Convert to heatmap with 5ms time bins, 5 micron depth bins
+# nx = int(np.ceil((x.max() - x.min())/0.005))
+# _, x_bins = np.histogram(x, bins=nx)
+# a = _make_heatmap(x, y, z, x_bin=0.005, y_bin=5)
+
+
+# TODO: much faster now, and SHOULD be doing the right thing, but instead
+#       the plot is still coming out monochrome?
+
+
+# p1 = plot_window.plot_widget.addPlot(
+#     row=0, col=0, labels={'left': 'Depth (microns)', 'bottom': 'Time (s)'}
+# )
+# p1.setTitle('Spike amplitude across time and depth')
+# x = st0[:,0]  # spike time
+# y = st0[:,5]  # depth of spike center
+# z = st0[:,2]  # spike amplitude
+# # Clip values outside [10,100] for better visualization
+# # TODO: Will these values work for everyone's data?
+# z[z < 10] = 10
+# z[z > 100] = 100
+
+# # Apply colormap and log normalization to amplitude
+# n_bins = 90
+# cm = matplotlib.colormaps['Greys_r']
+# bin_idx = np.digitize(z, bins=np.logspace(1, 2, n_bins))
+# for i in np.unique(bin_idx):
+#     # Take mean of all amplitude values within one bin, map to color
+#     subset = (bin_idx == i)
+#     a = z[subset].mean()
+#     rgba = cm(((a-10)/90))  # map over range 0 to 255
+#     brush = pg.mkBrush(rgba)
+#     pen = pg.mkPen(rgba)
+#     # Add points to plot
+#     p1.plot(x[subset], y[subset], pen=None, symbol='o', symbolPen=pen,
+#             brush=brush, symbolSize=1)
+
+# plot_window.show()
