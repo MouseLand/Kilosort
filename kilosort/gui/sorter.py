@@ -89,6 +89,12 @@ class KiloSortWorker(QtCore.QThread):
             ops, similar_templates, is_ref, est_contam_rate = \
                 save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
 
+            self.ops = ops
+            self.st = st
+            self.clu = clu
+            self.tF = tF
+            self.is_refractory = is_ref
+            self.plotDataReady.emit('probe')
 
             logger.info(f"Spike sorting output saved in\n{results_dir}")
             self.finishedSpikesort.emit(self.context)

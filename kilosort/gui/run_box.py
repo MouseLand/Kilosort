@@ -2,7 +2,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from kilosort.gui.sorter import KiloSortWorker
 from kilosort.gui.sanity_plots import (
-    PlotWindow, plot_drift_amount, plot_drift_scatter, plot_diagnostics
+    PlotWindow, plot_drift_amount, plot_drift_scatter, plot_diagnostics,
+    plot_spike_positions
     )
 
 
@@ -211,6 +212,9 @@ class RunBox(QtWidgets.QGroupBox):
                 ),
             'diagnostics': PlotWindow(
                 nrows=2, ncols=2, width=800, height=800, title='Diagnostics'
+                ),
+            'probe': PlotWindow(
+                nrows=1, ncols=1, width=1200, height=400, title='Spike positions'
                 )
         }
 
@@ -234,3 +238,14 @@ class RunBox(QtWidgets.QGroupBox):
             wPCA = self.current_worker.wPCA
             clu0 = self.current_worker.clu0
             plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings)
+
+        elif plot_type == 'probe':
+            plot_window = self.plots['probe']
+            ops = self.current_worker.ops
+            st = self.current_worker.st
+            clu = self.current_worker.clu
+            tF = self.current_worker.tF
+            is_refractory = self.current_worker.is_refractory
+            device = self.parent.device
+            plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
+                                 device)

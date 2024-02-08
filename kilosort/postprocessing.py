@@ -22,16 +22,13 @@ def remove_duplicates(spike_times, spike_clusters, dt=15):
     return spike_times[keep], spike_clusters[keep], keep
 
 
-def compute_spike_positions(st, tF, ops, device=None):
+def compute_spike_positions(st, tF, ops):
     '''Get x,y positions of spikes relative to probe.'''
-    if device is None:
-        device = tmass.device
-
     tmass = (tF**2).sum(-1)
     tmass = tmass / tmass.sum(1, keepdim=True)
-    xc = torch.from_numpy(ops['xc']).to(device)
-    yc = torch.from_numpy(ops['yc']).to(device)
-    chs = ops['icc'][:, ops['iU'][st[:,1]]].cpu()
+    xc = torch.from_numpy(ops['xc']).to(tmass.device)
+    yc = torch.from_numpy(ops['yc']).to(tmass.device)
+    chs = ops['iCC'][:, ops['iU'][st[:,1]]].cpu()
     xc0 = xc[chs.T]
     yc0 = yc[chs.T]
 
