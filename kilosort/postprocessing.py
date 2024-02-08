@@ -1,6 +1,7 @@
 from numba import njit
 from numba.types import bool_
 import numpy as np
+import torch
 
 
 @njit
@@ -19,3 +20,22 @@ def remove_duplicates(spike_times, spike_clusters, dt=15):
             continue
     
     return spike_times[keep], spike_clusters[keep], keep
+
+
+def compute_spike_positions(st, tF, ops, device=None):
+    '''Get x,y positions of spikes relative to probe.'''
+    if device is None:
+        device = tmass.device
+
+    tmass = (tF**2).sum(-1)
+    tmass = tmass / tmass.sum(1, keepdim=True)
+    xc = torch.from_numpy(ops['xc']).to(device)
+    yc = torch.from_numpy(ops['yc']).to(device)
+    chs = ops['icc'][:, ops['iU'][st[:,1]]].cpu()
+    xc0 = xc[chs.T]
+    yc0 = yc[chs.T]
+
+    xs = (xc0 * tmass).sum(1).numpy()
+    ys = (yc0 * tmass).sum(1).numpy()
+
+    return xs, ys
