@@ -69,15 +69,17 @@ def plot_drift_scatter(plot_window, st0, settings):
         # Take mean of all amplitude values within one bin, map to color
         subset = (bin_idx == i)
         a = z[subset].mean()
-        r,g,b,a = cm(((a-10)/90))
-        brush = pg.mkBrush((r,g,b))
+        rgba = cm(((a-10)/90))
+        rgba = tuple([c*255 for c in rgba])
+        brush = pg.mkBrush(rgba)
         brushes[subset] = brush
-        pen = pg.mkPen((r,g,b))
+        pen = pg.mkPen(rgba)
         pens[subset] = pen
 
-    scatter = pg.ScatterPlotItem(x, y, symbol='o', size=1, pen=None, brush=brushes)
+    scatter = pg.ScatterPlotItem(x, y, symbol='o', size=2, pen=None, brush=brushes)
     p1.addItem(scatter)
     p1.getViewBox().setBackgroundColor('w')
+    p1.getViewBox().invertY(True)
     bottom_ax = p1.getAxis('bottom')
     bottom_ax.setPen('k')
     bottom_ax.setTextPen('k')

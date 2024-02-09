@@ -144,7 +144,7 @@ COLORMAP_COLORS = np.array(
 )
 
 # This is matplotlib tab10 with gray moved to the last position and all 0.5 alpha
-PROBE_PLOT_COLORS = np.array(
+PROBE_PLOT_COLORS = (np.array(
     [
         [0.12156863, 0.46666667, 0.70588235, 0.5],
         [1.        , 0.49803922, 0.05490196, 0.5],
@@ -157,4 +157,4 @@ PROBE_PLOT_COLORS = np.array(
         [0.09019608, 0.74509804, 0.81176471, 0.5],
         [0.49803922, 0.49803922, 0.49803922, 0.5]
     ]
-)
+)*255).astype('int')
