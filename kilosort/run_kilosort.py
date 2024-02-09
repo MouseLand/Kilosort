@@ -12,6 +12,7 @@ from kilosort import (
     clustering_qr,
     io,
     spikedetect,
+    CCG,
     PROBE_DIR
 )
 from kilosort.parameters import DEFAULT_SETTINGS
@@ -20,7 +21,8 @@ from kilosort.parameters import DEFAULT_SETTINGS
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
                  filename=None, file_object=None, data_dtype=None,
                  results_dir=None, do_CAR=True, invert_sign=False,
-                 device=torch.device('cuda'), progress_bar=None):
+                 device=torch.device('cuda'), progress_bar=None,
+                 save_extra_vars=False):
     """Spike sort the given dataset.
     
     Parameters
@@ -31,6 +33,8 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
         Must have 'shape' and 'dtype' attributes and support array-like
         indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
         array or memmap. Must specify a valid `filename` as well.
+    save_extra_vars : bool; default=False.
+        If True, save tF and Wall to disk after sorting.
     
     Raises
     ------
@@ -60,7 +64,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     # NOTE: Also modifies settings in-place
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir)
-    ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign)
+    ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign, device)
 
     # Set preprocessing and drift correction parameters
     ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
@@ -82,7 +86,8 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
                                progress_bar=progress_bar)
     ops, similar_templates, is_ref, est_contam_rate = \
-        save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
+        save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0,
+                     save_extra_vars=save_extra_vars)
 
     return ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
 
@@ -134,7 +139,7 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir):
     return filename, data_dir, results_dir, probe
 
 
-def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign) -> dict:
+def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign, device) -> dict:
     """Package settings and probe information into a single `ops` dictionary."""
 
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
@@ -147,6 +152,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign) -> dict:
     ops['NTbuff'] = ops['batch_size'] + 2 * ops['nt']
     ops['Nchan'] = len(probe['chanMap'])
     ops['n_chan_bin'] = settings['n_chan_bin']
+    ops['torch_device'] = str(device)
 
     if not settings['templates_from_data'] and settings['nt'] != 61:
         raise ValueError('If using pre-computed universal templates '
@@ -369,7 +375,8 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None):
     return clu, Wall
 
 
-def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan):  
+def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
+                 save_extra_vars=False):  
     """Save sorting results, and format them for use with Phy
 
     Parameters
@@ -405,7 +412,7 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan):
     print('\nSaving to phy and computing refractory periods')
     results_dir, similar_templates, is_ref, est_contam_rate = io.save_to_phy(
             st, clu, tF, Wall, ops['probe'], ops, imin, results_dir=results_dir,
-            data_dtype=ops['data_dtype']
+            data_dtype=ops['data_dtype'], save_extra_vars=save_extra_vars
             )
     print(f'{int(is_ref.sum())} units found with good refractory periods')
     
@@ -417,3 +424,35 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan):
     io.save_ops(ops, results_dir)
 
     return ops, similar_templates, is_ref, est_contam_rate
+
+
+def load_sorting(results_dir, device=None):
+    if device is None:
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
+
+    results_dir = Path(results_dir)
+    ops = io.load_ops(results_dir / 'ops.npy', device=device)
+    similar_templates = np.load(results_dir / 'similar_templates.npy')
+
+    clu = np.load(results_dir / 'spike_clusters.npy')
+    st = np.load(results_dir / 'spike_times.npy')
+    acg_threshold = ops['settings']['acg_threshold']
+    ccg_threshold = ops['settings']['ccg_threshold']
+    is_ref, est_contam_rate = CCG.refract(clu, st / ops['fs'],
+                                          acg_threshold=acg_threshold,
+                                          ccg_threshold=ccg_threshold)
+
+    try:
+        tF = np.load(results_dir / 'tF.npy')
+        tF = torch.from_numpy(tF).to(device)
+        Wall = np.load(results_dir / 'Wall.npy')
+        Wall = torch.from_numpy(Wall).to(device)
+    except FileNotFoundError:
+        # tF and Wall weren't saved, use `save_extra_vars=True`.   
+        tF = None
+        Wall = None
+
+    return ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
