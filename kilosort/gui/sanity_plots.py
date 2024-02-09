@@ -1,38 +1,30 @@
-
+import pyqtgraph as pg
+import scipy
 import matplotlib
-matplotlib.use('Qt5Agg')
-import matplotlib.pyplot as plt
-#plt.style.use('dark_background')
-from matplotlib.backends.backend_qt5agg import (
-    FigureCanvasQTAgg, NavigationToolbar2QT
-    )
-from matplotlib.figure import Figure
-
 import numpy as np
 import torch
 from PyQt5 import QtWidgets
 
+from kilosort.postprocessing import compute_spike_positions
+from kilosort.gui.palettes import PROBE_PLOT_COLORS
 
-# Adapted from https://www.pythonguis.com/tutorials/plotting-matplotlib/
-class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, parent, nrows, ncols, width=5, height=4, dpi=100):
-        self.parent = parent
-        fig = Figure(figsize=(width,height), dpi=dpi, layout='constrained')
-        self.axes = fig.subplots(nrows, ncols)
-        super().__init__(fig)
+_COLOR_CODES = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
 
 
 class PlotWindow(QtWidgets.QWidget):
-    def __init__(self, *args, title=None, **kwargs):
+    def __init__(self, *args, title=None, width=500, height=400,
+                 background=None, **kwargs):
         super().__init__()
         if title is not None:
             self.setWindowTitle(title)
-        self.canvas = MplCanvas(self, *args, **kwargs)
-        self.toolbar = NavigationToolbar2QT(self.canvas, self)
+        self.resize(width, height)
 
         layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(self.canvas)
-        layout.addWidget(self.toolbar)
+        self.plot_widget = pg.GraphicsLayoutWidget(parent=self)
+        if background is not None:
+            self.plot_widget.setBackground(background)
+        layout.addWidget(self.plot_widget)
+        layout.setContentsMargins(0,0,0,0)
         self.setLayout(layout)
 
         self.hide()
@@ -42,49 +34,87 @@ class PlotWindow(QtWidgets.QWidget):
 
 def plot_drift_amount(plot_window, dshift, settings):
     # Drift amount for each block of probe over time
-    ax = plot_window.canvas.axes
+    p1 = plot_window.plot_widget.addPlot(
+        row=0, col=0, labels={'left': 'Depth shift (um)', 'bottom': 'Time (s)'}
+        )
+    p1.setTitle('Drift amount per probe section, across batches')
     fs = settings['fs']
     NT = settings['batch_size']
     t = np.arange(dshift.shape[0])*(NT/fs)
 
-    ax.plot(t, dshift)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Depth shift (microns)')
+    for i in range(dshift.shape[1]):
+        color = _COLOR_CODES[i % len(_COLOR_CODES)]
+        p1.plot(t, dshift[:,i], pen=color)
 
-    plot_window.canvas.draw_idle()
     plot_window.show()
 
 
-def plot_drift_scatter(plot_window, st0):
-    # Scatter of depth of spike vs time, intensity = spike amplitude
-    ax = plot_window.canvas.axes
-    s = ax.scatter(
-        st0[:,0], st0[:,5], s=1, c=st0[:,2], cmap='Greys', vmin=10, vmax=100,
-        norm='log'
-        )
-    plot_window.canvas.figure.colorbar(s, ax=ax)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Depth (microns)')
+def plot_drift_scatter(plot_window, st0, settings):
+    # Amplitude of spike over time and depth
+    p1 = plot_window.plot_widget.addPlot(
+        row=0, col=0, labels={'left': 'Depth (um)', 'bottom': 'Time (s)'}
+    )
+    p1.setTitle('Spike amplitude across time and depth', color='black')
 
-    plot_window.canvas.draw_idle()
+    x = st0[:,0]  # spike time in seconds
+    y = st0[:,5]  # depth of spike center in microns
+    z = st0[:,2]  # spike amplitude (data)
+    z[z < 10] = 10
+    z[z > 100] = 100
+
+    bin_idx = np.digitize(z, np.logspace(1, 2, 90))
+    cm = matplotlib.colormaps['binary']
+    brushes = np.empty_like(z, dtype=object)
+    pens = np.empty_like(z, dtype=object)
+    for i in np.unique(bin_idx):
+        # Take mean of all amplitude values within one bin, map to color
+        subset = (bin_idx == i)
+        a = z[subset].mean()
+        rgba = cm(((a-10)/90))
+        # Matplotlib uses float[0,1], pyqtgraph uses int[0,255]
+        rgba = tuple([c*255 for c in rgba])
+        brush = pg.mkBrush(rgba)
+        brushes[subset] = brush
+        pen = pg.mkPen(rgba)
+        pens[subset] = pen
+
+    scatter = pg.ScatterPlotItem(x, y, symbol='o', size=3, pen=None,
+                                 brush=brushes)
+    p1.addItem(scatter)
+    # Set background to white, axis/text/etc to black
+    p1.getViewBox().setBackgroundColor('w')
+    p1.getViewBox().invertY(True)
+    bottom_ax = p1.getAxis('bottom')
+    bottom_ax.setPen('k')
+    bottom_ax.setTextPen('k')
+    bottom_ax.setTickPen('k')
+    left_ax = p1.getAxis('left')
+    left_ax.setPen('k')
+    left_ax.setTextPen('k')
+    left_ax.setTickPen('k')
+
     plot_window.show()
 
 
 def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
-    ax1, ax2, ax3, ax4 = plot_window.canvas.axes.flatten()
-
     # Temporal features (top left)
+    p1 = plot_window.plot_widget.addPlot(
+        row=0, col=0, labels={'bottom': 'Time (s)'}
+        )
+    p1.setTitle('Temporal Features')
     t = np.arange(wPCA.shape[1])/(settings['fs']/1000)
-    ax1.plot(t, wPCA.T, linewidth=1)
-    ax1.set_xlabel('Time (s)')
-    ax1.set_title('Temporal Features')
+    for i in range(wPCA.shape[0]):
+        color = _COLOR_CODES[i % len(_COLOR_CODES)]
+        p1.plot(t, wPCA[i,:], pen=color)
 
     # Spatial features (top right)
+    p2 = plot_window.plot_widget.addPlot(
+        row=0, col=1, labels={'bottom': 'Unit Number', 'left': 'Channel Number'}
+        )
+    p2.setTitle('Spatial Features')
     features = torch.linalg.norm(Wall0, dim=2).cpu().numpy()
-    ax2.imshow(features.T, aspect='auto')
-    ax2.set_xlabel('Unit Number')
-    ax2.set_ylabel('Channel Number')
-    ax2.set_title('Spatial Features')
+    img = pg.ImageItem(image=features.T)
+    p2.addItem(img)
 
     # Comput spike counts and mean amplitudes
     n_units = int(clu0.max()) + 1
@@ -94,17 +124,81 @@ def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
     mean_amp = torch.linalg.norm(Wall0, dim=(1,2)).cpu().numpy()
 
     # Unit amplitudes (bottom left)
-    ax3.plot(mean_amp)
-    ax3.set_xlabel('Unit Number')
-    ax3.set_ylabel('Amplitude (a.u.)')
-    ax3.set_title('Unit Amplitudes')
+    p3 = plot_window.plot_widget.addPlot(
+        row=1, col=0, labels={'bottom': 'Unit Number', 'left': 'Amplitude (a.u.)'}
+        )
+    p3.setTitle('Unit Amplitudes')
+    p3.plot(mean_amp)
 
-    # TODO: Still a mismatch here between unit counts for clu0 vs Wall3
     # Amplitude vs Spike Count (bottom right)
-    ax4.scatter(np.log(1 + spike_counts), mean_amp, s=1)
-    ax4.set_xlabel('Log(1 + Spike Count)')
-    ax4.set_ylabel('Amplitude (a.u.)')
-    ax4.set_title('Amplitude vs Spike Count')
+    p4 = plot_window.plot_widget.addPlot(
+        row=1, col=1,
+        labels={'bottom': 'Log(1 + Spike Count)', 'left': 'Amplitude (a.u.)'}
+        )
+    p4.setTitle('Amplitude vs Spike Count')
+    p4.plot(np.log(1 + spike_counts), mean_amp, pen=None, symbol='o')
 
-    plot_window.canvas.draw_idle()
+    # Finished, draw plot
     plot_window.show()
+
+
+# TODO: need to figure out what to do about scatter w/ color first, this would
+#       be done the same as the drift scatter (which is currently not working).
+def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
+                         device=None):
+
+    p1 = plot_window.plot_widget.addPlot(
+        row=0, col=0, labels={'bottom': 'Depth (um)', 'left': 'Lateral (um)'}
+    )
+    p1.setTitle('Spike position across probe, colored by cluster')
+
+    # 10 colors in palette, last one is gray for non-frefractory
+    clu = clu.copy()
+    bad_units = np.unique(clu)[is_refractory == 0]
+    bad_idx = np.in1d(clu, bad_units)
+    clu = np.mod(clu, 9)
+    clu[bad_idx] = 9
+    cm = PROBE_PLOT_COLORS
+
+    # Map modded cluster ids to brushes & pens
+    brushes = np.empty_like(clu, dtype=object)
+    pens = np.empty_like(clu, dtype=object)
+    for i in range(10):
+        subset = (clu == i)
+        rgba = cm[i]
+        brush = pg.mkBrush(rgba)
+        brushes[subset] = brush
+        pen = pg.mkPen(rgba)
+        pens[subset] = pen
+
+    # Get x, y positions, add to scatterplot
+    xs, ys = compute_spike_positions(st, tF, ops)
+    scatter = pg.ScatterPlotItem(ys, xs, symbol='o', size=3, pen=None,
+                                 brush=brushes)
+    p1.addItem(scatter)
+    plot_window.show()
+
+
+
+    # HEATMAP VERSION
+
+    # lookup = cm.getLookupTable(nPts=10)
+
+    # # Get x, y positions, scale to 2 micron bins
+    # xs, ys = compute_spike_positions(st, tF, ops)
+    # ys = (ys*0.5).astype('int')
+    # xs = (xs*0.5).astype('int')
+    
+    # # Arange clusters into heatmap
+    # mat = scipy.sparse.csr_matrix((clu, (ys, xs))).toarray()
+    # img = pg.ImageItem(image=mat)
+    # img.setLookupTable(lookup)
+    # p1.addItem(img)
+
+    # # Change tick scaling to match bin sizes
+    # ax = p1.getAxis('bottom')
+    # ax.setScale(2)
+    # ay = p1.getAxis('left')
+    # ay.setScale(2)
+
+    # plot_window.show()

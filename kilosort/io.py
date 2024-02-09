@@ -139,10 +139,12 @@ def save_probe(probe_dict, filepath):
         f.write(json.dumps(d))
 
 
-def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtype=None):
+def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
+                data_dtype=None, save_extra_vars=False):
 
     if results_dir is None:
         results_dir = ops['data_dir'].joinpath('kilosort4')
+    results_dir = Path(results_dir)
     results_dir.mkdir(exist_ok=True)
 
     # probe properties
@@ -167,11 +169,14 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtyp
     spike_times, spike_clusters, kept_spikes = remove_duplicates(
         spike_times, spike_clusters, dt=ops['settings']['duplicate_spike_bins']
     )
-    amplitudes = amplitudes[kept_spikes]
+    amp = amplitudes[kept_spikes]
     np.save((results_dir / 'spike_times.npy'), spike_times)
     np.save((results_dir / 'spike_templates.npy'), spike_clusters)
     np.save((results_dir / 'spike_clusters.npy'), spike_clusters)
-    np.save((results_dir / 'amplitudes.npy'), amplitudes)
+    np.save((results_dir / 'amplitudes.npy'), amp)
+    # Save spike mask so that it can be applied to other variables if needed
+    # when loading results.
+    np.save((results_dir / 'kept_spikes.npy'), kept_spikes)
 
     # template properties
     similar_templates = CCG.similarity(Wall, ops['wPCA'].contiguous(), nt=ops['nt'])
@@ -219,6 +224,15 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None, data_dtyp
         for key in params.keys():
             f.write(f'{key} = {params[key]}\n')
 
+    if save_extra_vars:
+        # Also save tF and Wall, for easier debugging/analysis
+        np.save(results_dir / 'tF.npy', tF.cpu().numpy())
+        np.save(results_dir / 'Wall.npy', Wall.cpu().numpy())
+        # And full st, clu, amp arrays with no spikes removed
+        np.save(results_dir / 'full_st.npy', st)
+        np.save(results_dir / 'full_clu.npy', clu)
+        np.save(results_dir / 'full_amp.npy', amplitudes)
+
     return results_dir, similar_templates, is_ref, est_contam_rate
 
 
@@ -255,8 +269,13 @@ def save_ops(ops, results_dir=None):
     np.save(results_dir / 'ops.npy', np.array(ops))
 
 
-def load_ops(ops_path, device=torch.device('cuda')):
+def load_ops(ops_path, device=None):
     """Load a saved `ops` dictionary and convert some arrays to tensors."""
+    if device is None:
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
 
     ops = np.load(ops_path, allow_pickle=True).item()
     for k, v in ops.items():

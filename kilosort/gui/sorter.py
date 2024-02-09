@@ -56,7 +56,8 @@ class KiloSortWorker(QtCore.QThread):
                 settings['nt0min'] = int(20 * settings['nt']/61)
             data_dtype = settings['data_dtype']
 
-            ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign)
+            ops = initialize_ops(settings, probe, data_dtype, do_CAR,
+                                 invert_sign, device)
 
             # TODO: add support for file object through data conversion
             # Set preprocessing and drift correction parameters
@@ -90,6 +91,12 @@ class KiloSortWorker(QtCore.QThread):
             ops, similar_templates, is_ref, est_contam_rate = \
                 save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
 
+            self.ops = ops
+            self.st = st
+            self.clu = clu
+            self.tF = tF
+            self.is_refractory = is_ref
+            self.plotDataReady.emit('probe')
 
             logger.info(f"Spike sorting output saved in\n{results_dir}")
             self.finishedSpikesort.emit(self.context)

@@ -2,7 +2,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 from kilosort.gui.sorter import KiloSortWorker
 from kilosort.gui.sanity_plots import (
-    PlotWindow, plot_drift_amount, plot_drift_scatter, plot_diagnostics
+    PlotWindow, plot_drift_amount, plot_drift_scatter, plot_diagnostics,
+    plot_spike_positions
     )
 
 
@@ -203,13 +204,21 @@ class RunBox(QtWidgets.QGroupBox):
         self.sortingStepStatusUpdate.emit(self.sorting_status)
 
     def setup_sanity_plots(self):
+        # TODO: remove row, col? looks like maybe just doing it at runtime is
+        #       how it works.
         self.plots = {
-            'drift_amount': PlotWindow(nrows=1, ncols=1, title='Drift Amount'),
+            'drift_amount': PlotWindow(
+                nrows=1, ncols=1, width=400, height=400, title='Drift Amount'
+                ),
             'drift_scatter': PlotWindow(
-                nrows=1, ncols=1, title='Drift Scatter', width=10, height=6
+                nrows=1, ncols=1, title='Drift Scatter', width=1500, height=700,
+                background='w'
                 ),
             'diagnostics': PlotWindow(
-                nrows=2, ncols=2, width=8, height=8, title='Diagnostics'
+                nrows=2, ncols=2, width=800, height=800, title='Diagnostics'
+                ),
+            'probe': PlotWindow(
+                nrows=1, ncols=1, width=1500, height=700, title='Spike positions'
                 )
         }
 
@@ -225,7 +234,7 @@ class RunBox(QtWidgets.QGroupBox):
             dshift = self.current_worker.dshift
             st0 = self.current_worker.st0
             plot_drift_amount(plot_window1, dshift, settings)
-            plot_drift_scatter(plot_window2, st0)
+            plot_drift_scatter(plot_window2, st0, settings)
 
         elif plot_type == 'diagnostics':
             plot_window = self.plots['diagnostics']
@@ -233,3 +242,14 @@ class RunBox(QtWidgets.QGroupBox):
             wPCA = self.current_worker.wPCA
             clu0 = self.current_worker.clu0
             plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings)
+
+        elif plot_type == 'probe':
+            plot_window = self.plots['probe']
+            ops = self.current_worker.ops
+            st = self.current_worker.st
+            clu = self.current_worker.clu
+            tF = self.current_worker.tF
+            is_refractory = self.current_worker.is_refractory
+            device = self.parent.device
+            plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
+                                 device)
