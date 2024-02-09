@@ -17,14 +17,14 @@ class PlotWindow(QtWidgets.QWidget):
         super().__init__()
         if title is not None:
             self.setWindowTitle(title)
-        self.setFixedWidth(width)
-        self.setFixedHeight(height)
+        self.resize(width, height)
 
         layout = QtWidgets.QVBoxLayout()
         self.plot_widget = pg.GraphicsLayoutWidget(parent=self)
         if background is not None:
             self.plot_widget.setBackground(background)
         layout.addWidget(self.plot_widget)
+        layout.setContentsMargins(0,0,0,0)
         self.setLayout(layout)
 
         self.hide()
@@ -37,6 +37,7 @@ def plot_drift_amount(plot_window, dshift, settings):
     p1 = plot_window.plot_widget.addPlot(
         row=0, col=0, labels={'left': 'Depth shift (um)', 'bottom': 'Time (s)'}
         )
+    p1.setTitle('Drift amount per probe section, across batches')
     fs = settings['fs']
     NT = settings['batch_size']
     t = np.arange(dshift.shape[0])*(NT/fs)
@@ -53,7 +54,7 @@ def plot_drift_scatter(plot_window, st0, settings):
     p1 = plot_window.plot_widget.addPlot(
         row=0, col=0, labels={'left': 'Depth (um)', 'bottom': 'Time (s)'}
     )
-    p1.setTitle('Spike amplitude across time and depth')
+    p1.setTitle('Spike amplitude across time and depth', color='black')
 
     x = st0[:,0]  # spike time in seconds
     y = st0[:,5]  # depth of spike center in microns
@@ -70,14 +71,17 @@ def plot_drift_scatter(plot_window, st0, settings):
         subset = (bin_idx == i)
         a = z[subset].mean()
         rgba = cm(((a-10)/90))
+        # Matplotlib uses float[0,1], pyqtgraph uses int[0,255]
         rgba = tuple([c*255 for c in rgba])
         brush = pg.mkBrush(rgba)
         brushes[subset] = brush
         pen = pg.mkPen(rgba)
         pens[subset] = pen
 
-    scatter = pg.ScatterPlotItem(x, y, symbol='o', size=2, pen=None, brush=brushes)
+    scatter = pg.ScatterPlotItem(x, y, symbol='o', size=3, pen=None,
+                                 brush=brushes)
     p1.addItem(scatter)
+    # Set background to white, axis/text/etc to black
     p1.getViewBox().setBackgroundColor('w')
     p1.getViewBox().invertY(True)
     bottom_ax = p1.getAxis('bottom')
@@ -144,7 +148,7 @@ def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
                          device=None):
 
     p1 = plot_window.plot_widget.addPlot(
-        row=0, col=0, labels={'left': 'Depth (um)', 'bottom': 'Lateral (um)'}
+        row=0, col=0, labels={'bottom': 'Depth (um)', 'left': 'Lateral (um)'}
     )
     p1.setTitle('Spike position across probe, colored by cluster')
 
@@ -154,24 +158,47 @@ def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
     bad_idx = np.in1d(clu, bad_units)
     clu = np.mod(clu, 9)
     clu[bad_idx] = 9
-    cm = pg.ColorMap(pos=np.arange(10), color=PROBE_PLOT_COLORS)
-    lookup = cm.getLookupTable(nPts=10)
+    cm = PROBE_PLOT_COLORS
 
-    # Get x, y positions, scale to 2 micron bins
+    # Map modded cluster ids to brushes & pens
+    brushes = np.empty_like(clu, dtype=object)
+    pens = np.empty_like(clu, dtype=object)
+    for i in range(10):
+        subset = (clu == i)
+        rgba = cm[i]
+        brush = pg.mkBrush(rgba)
+        brushes[subset] = brush
+        pen = pg.mkPen(rgba)
+        pens[subset] = pen
+
+    # Get x, y positions, add to scatterplot
     xs, ys = compute_spike_positions(st, tF, ops)
-    ys = (ys*0.5).astype('int')
-    xs = (xs*0.5).astype('int')
-    
-    # Arange clusters into heatmap
-    mat = scipy.sparse.csr_matrix((clu, (ys, xs))).toarray()
-    img = pg.ImageItem(image=mat)
-    img.setLookupTable(lookup)
-    p1.addItem(img)
-
-    # Change tick scaling to match bin sizes
-    ax = p1.getAxis('bottom')
-    ax.setScale(2)
-    ay = p1.getAxis('left')
-    ay.setScale(2)
-
+    scatter = pg.ScatterPlotItem(ys, xs, symbol='o', size=3, pen=None,
+                                 brush=brushes)
+    p1.addItem(scatter)
     plot_window.show()
+
+
+
+    # HEATMAP VERSION
+
+    # lookup = cm.getLookupTable(nPts=10)
+
+    # # Get x, y positions, scale to 2 micron bins
+    # xs, ys = compute_spike_positions(st, tF, ops)
+    # ys = (ys*0.5).astype('int')
+    # xs = (xs*0.5).astype('int')
+    
+    # # Arange clusters into heatmap
+    # mat = scipy.sparse.csr_matrix((clu, (ys, xs))).toarray()
+    # img = pg.ImageItem(image=mat)
+    # img.setLookupTable(lookup)
+    # p1.addItem(img)
+
+    # # Change tick scaling to match bin sizes
+    # ax = p1.getAxis('bottom')
+    # ax.setScale(2)
+    # ay = p1.getAxis('left')
+    # ay.setScale(2)
+
+    # plot_window.show()

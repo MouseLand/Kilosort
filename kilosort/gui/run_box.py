@@ -206,16 +206,18 @@ class RunBox(QtWidgets.QGroupBox):
         # TODO: remove row, col? looks like maybe just doing it at runtime is
         #       how it works.
         self.plots = {
-            'drift_amount': PlotWindow(nrows=1, ncols=1, title='Drift Amount'),
+            'drift_amount': PlotWindow(
+                nrows=1, ncols=1, width=400, height=400, title='Drift Amount'
+                ),
             'drift_scatter': PlotWindow(
-                nrows=1, ncols=1, title='Drift Scatter', width=1600, height=600,
+                nrows=1, ncols=1, title='Drift Scatter', width=1500, height=700,
                 background='w'
                 ),
             'diagnostics': PlotWindow(
                 nrows=2, ncols=2, width=800, height=800, title='Diagnostics'
                 ),
             'probe': PlotWindow(
-                nrows=1, ncols=1, width=1200, height=400, title='Spike positions'
+                nrows=1, ncols=1, width=1500, height=700, title='Spike positions'
                 )
         }
 

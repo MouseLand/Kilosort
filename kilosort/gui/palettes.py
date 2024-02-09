@@ -158,3 +158,4 @@ PROBE_PLOT_COLORS = (np.array(
         [0.49803922, 0.49803922, 0.49803922, 0.5]
     ]
 )*255).astype('int')
+# Matplotlib uses float[0,1], pyqtgraph uses int[0,255]
