@@ -56,7 +56,8 @@ class KiloSortWorker(QtCore.QThread):
             data_dtype = settings['data_dtype']
             device = self.device
 
-            ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign)
+            ops = initialize_ops(settings, probe, data_dtype, do_CAR,
+                                 invert_sign, device)
 
             # TODO: add support for file object through data conversion
             # Set preprocessing and drift correction parameters

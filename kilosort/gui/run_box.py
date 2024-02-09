@@ -208,7 +208,8 @@ class RunBox(QtWidgets.QGroupBox):
         self.plots = {
             'drift_amount': PlotWindow(nrows=1, ncols=1, title='Drift Amount'),
             'drift_scatter': PlotWindow(
-                nrows=1, ncols=1, title='Drift Scatter', width=1000, height=600
+                nrows=1, ncols=1, title='Drift Scatter', width=1600, height=600,
+                background='w'
                 ),
             'diagnostics': PlotWindow(
                 nrows=2, ncols=2, width=800, height=800, title='Diagnostics'

@@ -1,5 +1,6 @@
 import pyqtgraph as pg
 import scipy
+import matplotlib
 import numpy as np
 import torch
 from PyQt5 import QtWidgets
@@ -11,7 +12,8 @@ _COLOR_CODES = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
 
 
 class PlotWindow(QtWidgets.QWidget):
-    def __init__(self, *args, title=None, width=500, height=400, **kwargs):
+    def __init__(self, *args, title=None, width=500, height=400,
+                 background=None, **kwargs):
         super().__init__()
         if title is not None:
             self.setWindowTitle(title)
@@ -20,6 +22,8 @@ class PlotWindow(QtWidgets.QWidget):
 
         layout = QtWidgets.QVBoxLayout()
         self.plot_widget = pg.GraphicsLayoutWidget(parent=self)
+        if background is not None:
+            self.plot_widget.setBackground(background)
         layout.addWidget(self.plot_widget)
         self.setLayout(layout)
 
@@ -52,37 +56,36 @@ def plot_drift_scatter(plot_window, st0, settings):
     p1.setTitle('Spike amplitude across time and depth')
 
     x = st0[:,0]  # spike time in seconds
-    x_ind = (x*10).astype('int')  # 100ms bins
     y = st0[:,5]  # depth of spike center in microns
-    y_ind = (y*0.2).astype('int')   # 5 micron bins
     z = st0[:,2]  # spike amplitude (data)
     z[z < 10] = 10
     z[z > 100] = 100
 
-    # TODO: No reason to do this until white background is working, and still
-    #       not clear if this is working as intended.
-    # Set custom colormap
-    # greys = matplotlib.colormaps['Greys_r']
-    # pos = np.logspace(1, 2, 90)
-    # colors = []
-    # for p in pos:
-    #     r, g, b, _ = greys(((p-10)/90)*255)  # maps over range 0 to 255
-    #     colors.append((r, g, b))
-    # cm = pg.ColorMap(pos=pos, color=colors)
+    bin_idx = np.digitize(z, np.logspace(1, 2, 90))
+    cm = matplotlib.colormaps['binary']
+    brushes = np.empty_like(z, dtype=object)
+    pens = np.empty_like(z, dtype=object)
+    for i in np.unique(bin_idx):
+        # Take mean of all amplitude values within one bin, map to color
+        subset = (bin_idx == i)
+        a = z[subset].mean()
+        r,g,b,a = cm(((a-10)/90))
+        brush = pg.mkBrush((r,g,b))
+        brushes[subset] = brush
+        pen = pg.mkPen((r,g,b))
+        pens[subset] = pen
 
-    # Can't directly plot csr_matrix with pyqtgraph, so convert to array.
-    # Just using this for convenience of building the array format.
-    mat = scipy.sparse.csr_matrix((z, (x_ind, y_ind))).toarray()
-    img = pg.ImageItem(image=mat)#, colorMap=cm)
-    p1.addItem(img)
-    p1.getViewBox().invertY(True)
-
-
-    # Change tick scaling to match bin sizes
-    ax = p1.getAxis('bottom')
-    ax.setScale(0.1)
-    ay = p1.getAxis('left')
-    ay.setScale(5)
+    scatter = pg.ScatterPlotItem(x, y, symbol='o', size=1, pen=None, brush=brushes)
+    p1.addItem(scatter)
+    p1.getViewBox().setBackgroundColor('w')
+    bottom_ax = p1.getAxis('bottom')
+    bottom_ax.setPen('k')
+    bottom_ax.setTextPen('k')
+    bottom_ax.setTickPen('k')
+    left_ax = p1.getAxis('left')
+    left_ax.setPen('k')
+    left_ax.setTextPen('k')
+    left_ax.setTickPen('k')
 
     plot_window.show()
 
@@ -150,6 +153,7 @@ def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
     clu = np.mod(clu, 9)
     clu[bad_idx] = 9
     cm = pg.ColorMap(pos=np.arange(10), color=PROBE_PLOT_COLORS)
+    lookup = cm.getLookupTable(nPts=10)
 
     # Get x, y positions, scale to 2 micron bins
     xs, ys = compute_spike_positions(st, tF, ops)
@@ -158,7 +162,8 @@ def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
     
     # Arange clusters into heatmap
     mat = scipy.sparse.csr_matrix((clu, (ys, xs))).toarray()
-    img = pg.ImageItem(image=mat, colorMap=cm)
+    img = pg.ImageItem(image=mat)
+    img.setLookupTable(lookup)
     p1.addItem(img)
 
     # Change tick scaling to match bin sizes

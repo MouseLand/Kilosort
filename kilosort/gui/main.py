@@ -486,6 +486,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.message_log_box.popout_window.close()
         for _, p in self.run_box.plots.items():
             p.close()
+        self.run_box.current_worker.terminate()
         self.close_binary_files()
         event.accept()
 
