@@ -426,7 +426,7 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     return ops, similar_templates, is_ref, est_contam_rate
 
 
-def load_sorting(results_dir, device=None):
+def load_sorting(results_dir, device=None, load_extra_vars=False):
     if device is None:
         if torch.cuda.is_available():
             device = torch.device('cuda')
@@ -445,14 +445,16 @@ def load_sorting(results_dir, device=None):
                                           acg_threshold=acg_threshold,
                                           ccg_threshold=ccg_threshold)
 
-    try:
+    results = [ops, st, clu, similar_templates, is_ref, est_contam_rate]
+
+    if load_extra_vars:
         tF = np.load(results_dir / 'tF.npy')
         tF = torch.from_numpy(tF).to(device)
         Wall = np.load(results_dir / 'Wall.npy')
         Wall = torch.from_numpy(Wall).to(device)
-    except FileNotFoundError:
-        # tF and Wall weren't saved, use `save_extra_vars=True`.   
-        tF = None
-        Wall = None
+        full_st = np.load(results_dir / 'full_st.npy')
+        full_clu = np.load(results_dir / 'full_clu.npy')
+        full_amp = np.load(results_dir / 'full_amp.npy')
+        results.extend([tF, Wall, full_st, full_clu, full_amp])
 
-    return ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
+    return results

@@ -32,7 +32,7 @@ def compute_spike_positions(st, tF, ops):
     xc0 = xc[chs.T]
     yc0 = yc[chs.T]
 
-    xs = (xc0 * tmass).sum(1).numpy()
-    ys = (yc0 * tmass).sum(1).numpy()
+    xs = (xc0 * tmass).sum(1).cpu().numpy()
+    ys = (yc0 * tmass).sum(1).cpu().numpy()
 
     return xs, ys

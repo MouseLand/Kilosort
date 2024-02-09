@@ -169,11 +169,14 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     spike_times, spike_clusters, kept_spikes = remove_duplicates(
         spike_times, spike_clusters, dt=ops['settings']['duplicate_spike_bins']
     )
-    amplitudes = amplitudes[kept_spikes]
+    amp = amplitudes[kept_spikes]
     np.save((results_dir / 'spike_times.npy'), spike_times)
     np.save((results_dir / 'spike_templates.npy'), spike_clusters)
     np.save((results_dir / 'spike_clusters.npy'), spike_clusters)
-    np.save((results_dir / 'amplitudes.npy'), amplitudes)
+    np.save((results_dir / 'amplitudes.npy'), amp)
+    # Save spike mask so that it can be applied to other variables if needed
+    # when loading results.
+    np.save((results_dir / 'kept_spikes.npy'), kept_spikes)
 
     # template properties
     similar_templates = CCG.similarity(Wall, ops['wPCA'].contiguous(), nt=ops['nt'])
@@ -225,6 +228,10 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         # Also save tF and Wall, for easier debugging/analysis
         np.save(results_dir / 'tF.npy', tF.cpu().numpy())
         np.save(results_dir / 'Wall.npy', Wall.cpu().numpy())
+        # And full st, clu, amp arrays with no spikes removed
+        np.save(results_dir / 'full_st.npy', st)
+        np.save(results_dir / 'full_clu.npy', clu)
+        np.save(results_dir / 'full_amp.npy', amplitudes)
 
     return results_dir, similar_templates, is_ref, est_contam_rate
 
