@@ -55,6 +55,7 @@ class KiloSortWorker(QtCore.QThread):
             if settings['nt0min'] is None:
                 settings['nt0min'] = int(20 * settings['nt']/61)
             data_dtype = settings['data_dtype']
+            device = self.device
 
             ops = initialize_ops(settings, probe, data_dtype, do_CAR,
                                  invert_sign, device)
