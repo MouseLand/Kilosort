@@ -715,12 +715,20 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
     binary_filename = filepath / f'{data_name}'
     probe_filename = filepath / f'{probe_name}'
 
+    print('='*40)
+    print('Loading recording with SpikeInterface...')
+
     # Using actual data shape is less fragile than relying on .get_num_channels()
     N = recording.get_total_samples()
+    print(f'number of samples: {N}')
     c = recording.get_traces(start_frame=0, end_frame=1, segment_index=0).shape[1]
+    print(f'number of channels: {c}')
     s = recording.get_num_segments()
+    print(f'numbef of segments: {s}')
     fs = recording.get_sampling_frequency()
+    print(f'sampling rate: {fs}')
     dtype = recording.get_dtype()
+    print(f'dtype: {dtype}')
 
     # Determine start/end indices for each segment
     indices = []
@@ -769,6 +777,7 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
                     'SpikeInterface recording contains no probe information,\n'
                     'could not write .prb file.'
                 )
+                probe_filename = None
         except ModuleNotFoundError:
             raise ModuleNotFoundError(
                 'Could not import `write_prb` from probeinterface when exporting '
