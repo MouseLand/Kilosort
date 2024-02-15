@@ -2,8 +2,10 @@ import importlib
 from pathlib import Path
 
 import numpy as np
-from PyQt5 import QtCore, QtGui, QtWidgets
-from kilosort.io import RecordingExtractorAsArray, spikeinterface_to_binary, BinaryRWFile
+from PyQt5 import QtCore, QtWidgets
+from kilosort.io import (
+    RecordingExtractorAsArray, BinaryRWFile, spikeinterface_to_binary, load_probe
+    )
 from kilosort.gui.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -34,7 +36,7 @@ class DataConversionBox(QtWidgets.QWidget):
         self.data_dtype = None
         self.file_object = None
         self.dialog_path = Path('~').expanduser().as_posix()
-        self.conversion_thread = ConversionThread(self)
+        self.conversion_thread = None
 
         layout = QtWidgets.QGridLayout()
 
@@ -183,7 +185,23 @@ class DataConversionBox(QtWidgets.QWidget):
                 f'NOTE: SpikeInterface recording has dtype: {f.dtype},\n'
                 f'but dtype: {self.data_dtype} was selected in GUI.'
                 )
+
+        # TODO: let user decide whether probe info should be exported, and
+        #       set path for saving it.
+        from probeinterface import write_prb
+        try:
+            pg = recording.get_probegroup()
+            probe_filename = Path(self.filename).parent / 'probe.prb'
+            write_prb(probe_filename, pg)
+            add_probe_to_settings(self.gui.settings_box, probe_filename)
+        except ValueError:
+            print(
+                'SpikeInterface recording contains no probe information,\n'
+                'could not write .prb file.'
+            )
+
         self.hide()
+        self.gui.settings_box.check_load()
 
     @QtCore.pyqtSlot()
     def convert_to_binary(self):
@@ -207,13 +225,14 @@ class DataConversionBox(QtWidgets.QWidget):
             options=options,
         )
 
+        self.disableInput.emit(True)
         bin_filename = Path(bin_filename)
         self.hide()
         recording = get_recording_extractor(
             self.filename, self.filetype, self.stream_id, self.stream_name
             )
 
-        self.disableInput.emit(True)
+        self.conversion_thread = ConversionThread(self)
         self.conversion_thread.bin_filename = bin_filename
         self.conversion_thread.recording = recording
         self.conversion_thread.start()
@@ -221,6 +240,8 @@ class DataConversionBox(QtWidgets.QWidget):
             QtWidgets.QApplication.processEvents()
         else:
             self.disableInput.emit(False)
+        self.conversion_thread = None
+        self.gui.settings_box.check_load()
 
 
 # NOTE: spikeinterface should not be imported anywhere else in this module to
@@ -246,6 +267,13 @@ def update_settings_box(settings, n_chans, fs, dtype):
     settings.dtype_selector.setCurrentIndex(data_idx)
 
 
+def add_probe_to_settings(settings, probe_filename):
+    settings.probe_layout_selector.setCurrentIndex(0)
+    probe = load_probe(probe_filename)
+    settings.save_probe_selection(probe, probe_filename.name)
+    settings.enable_preview_probe()
+
+
 class ConversionThread(QtCore.QThread):
 
     def __init__(self, parent, *args, **kwargs):
@@ -261,4 +289,9 @@ class ConversionThread(QtCore.QThread):
 
         settings = self.parent.gui.settings_box
         update_settings_box(settings, c, fs, self.parent.data_dtype)
+        if probe_filename is not None:
+            add_probe_to_settings(settings, probe_filename)
+
         settings.data_file_path_input.setText(self.bin_filename.as_posix())
+
+# TODO: pick up here, watch print numbers

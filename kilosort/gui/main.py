@@ -501,6 +501,8 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         for _, p in self.run_box.plots.items():
             p.close()
         self.run_box.current_worker.terminate()
+        if self.converter.conversion_thread is not None:
+            self.converter.conversion_thread.terminate()
         self.close_binary_files()
         event.accept()
 

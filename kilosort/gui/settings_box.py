@@ -671,6 +671,12 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.disable_preview_probe()
         self.disable_load()
 
+    def check_load(self):
+        if self.check_settings():
+            self.enable_load()
+        else:
+            self.disable_load()
+
 
 class ExtraParametersWindow(QtWidgets.QWidget):
     def __init__(self, parent):
