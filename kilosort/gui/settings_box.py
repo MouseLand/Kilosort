@@ -91,7 +91,8 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.data_file_path_input,
             self.results_directory_input,
             self.probe_layout_selector,
-            self.dtype_selector
+            self.dtype_selector,
+            self.device_selector
             ]
         self.input_fields.extend(generated_inputs)
 
