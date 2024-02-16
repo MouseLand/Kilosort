@@ -666,8 +666,12 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def reset(self):
         self.data_file_path_input.clear()
+        self.gui.qt_settings.setValue('data_file_path', None)
         self.results_directory_input.clear()
+        self.gui.qt_settings.setValue('results_dir', None)
         self.probe_layout_selector.setCurrentIndex(0)
+        self.gui.qt_settings.setValue('probe_layout', None)
+        self.gui.qt_settings.setValue('probe_name', None)
         self.set_default_field_values()
         self.disable_preview_probe()
         self.disable_load()
