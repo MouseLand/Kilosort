@@ -73,7 +73,7 @@ class DataConversionBox(QtWidgets.QWidget):
         self.stream_name_input.textChanged.connect(self.set_stream_name)
         self.dtype_text = QtWidgets.QLabel("Data dtype (required):")
         self.dtype_note = QtWidgets.QLabel(
-            "Note: this is the dtype for the new .bin file.\nIf the existing file"
+            "NOTE: this is the dtype for the new .bin file.\nIf the existing file"
             " is not the same dtype, data may be altered."
         )
         self.dtype_selector = QtWidgets.QComboBox()
@@ -116,6 +116,16 @@ class DataConversionBox(QtWidgets.QWidget):
         layout.addWidget(self.wrapper_button, 6, 0, 1, 6)
         layout.addWidget(self.convert_button, 7, 0, 1, 6)
         layout.addWidget(self.convert_input, 7, 6, 1, 10)
+
+
+        # TODO: remove this after bug is fixed
+        self.crash_warning = QtWidgets.QLabel(
+            "NOTE: we are aware of a bug that causes the GUI to crash after data"
+            " is converted.\n If you encounter this issue, the new .bin file"
+            " should still have been created,\n so you can open the GUI again "
+            "and select it like any other binary file."
+        )
+        layout.addWidget(self.crash_warning, 8, 0, 3, 16)
 
         self.setLayout(layout)
 
