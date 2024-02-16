@@ -173,14 +173,14 @@ class RunBox(QtWidgets.QGroupBox):
             context=self.get_current_context(),
             results_directory=self.results_directory,
             steps=steps, device=self.parent.device,
-            file_object=self.parent.file_object
+            file_object=self.parent.file_object,
         )
         
         worker.progress_bar.connect(self.set_progress_val)
         # worker.finishedPreprocess.connect(self.finished_preprocess)
         worker.finishedSpikesort.connect(self.finished_spikesort)
         worker.finishedAll.connect(self.finished_spikesort)
-        # TODO: add option to disable sanity plots?
+
         worker.plotDataReady.connect(self.add_plot_data)
         self.current_worker = worker
         self.setup_sanity_plots()
@@ -204,28 +204,32 @@ class RunBox(QtWidgets.QGroupBox):
         self.sortingStepStatusUpdate.emit(self.sorting_status)
 
     def setup_sanity_plots(self):
-        # TODO: remove row, col? looks like maybe just doing it at runtime is
-        #       how it works.
-        self.plots = {
-            'drift_amount': PlotWindow(
-                nrows=1, ncols=1, width=400, height=400, title='Drift Amount'
-                ),
-            'drift_scatter': PlotWindow(
-                nrows=1, ncols=1, title='Drift Scatter', width=1500, height=700,
-                background='w'
-                ),
-            'diagnostics': PlotWindow(
-                nrows=2, ncols=2, width=800, height=800, title='Diagnostics'
-                ),
-            'probe': PlotWindow(
-                nrows=1, ncols=1, width=1500, height=700, title='Spike positions'
-                )
-        }
+        if self.parent.show_plots:
+            self.plots = {
+                'drift_amount': PlotWindow(
+                    nrows=1, ncols=1, width=400, height=400, title='Drift Amount'
+                    ),
+                'drift_scatter': PlotWindow(
+                    nrows=1, ncols=1, title='Drift Scatter', width=1500, height=700,
+                    background='w'
+                    ),
+                'diagnostics': PlotWindow(
+                    nrows=2, ncols=2, width=800, height=800, title='Diagnostics'
+                    ),
+                'probe': PlotWindow(
+                    nrows=1, ncols=1, width=1500, height=700, title='Spike positions'
+                    )
+            }
+        else:
+            self.plots = {}
 
     # TODO: have a separate process do the actual plotting, otherwise it
     #       locks up the sorting process. Not a big deal for the sample data,
     #       but on larger datasets the drift scatter could take a while, for example.
     def add_plot_data(self, plot_type):
+        if not self.parent.show_plots:
+            return
+
         settings = self.get_current_context().params
         if plot_type == 'drift':
             # Drift amount over time for each block of probe

@@ -60,6 +60,15 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         else:
             self.auto_load = True
 
+        if self.qt_settings.contains('show_plots'):
+            show_plots = self.qt_settings.value('show_plots')
+            if show_plots.lower() == 'false':
+                self.show_plots = False
+            else:
+                self.show_plots = True
+        else:
+            self.show_plots = True
+
         self.params = None
         self.local_config_path = DOWNLOADS_DIR
         self.local_config_path.mkdir(parents=True, exist_ok=True)

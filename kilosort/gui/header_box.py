@@ -21,6 +21,13 @@ class HeaderBox(QtWidgets.QWidget):
             self.auto_load_check.setCheckState(0)
         self.auto_load_check.stateChanged.connect(self.check_auto_load)
 
+        self.show_plots_check = QtWidgets.QCheckBox('Show Plots')
+        if self.gui.show_plots:
+            self.show_plots_check.setCheckState(2)
+        else:
+            self.show_plots_check.setCheckState(0)
+        self.show_plots_check.clicked.connect(self.check_show_plots)
+
         self.controls_button = QtWidgets.QPushButton("Controls")
         self.controls_button.clicked.connect(self.show_controls_popup)
 
@@ -35,6 +42,7 @@ class HeaderBox(QtWidgets.QWidget):
         # self.layout.addWidget(self.kilosort_text)
         self.layout.addStretch(0)
         self.layout.addWidget(self.auto_load_check)
+        self.layout.addWidget(self.show_plots_check)
         self.layout.addWidget(self.controls_button)
         self.layout.addWidget(self.help_button)
         self.layout.addWidget(self.reset_gui_button)
@@ -47,6 +55,11 @@ class HeaderBox(QtWidgets.QWidget):
     def check_auto_load(self):
         self.gui.auto_load = self.auto_load_check.isChecked()
         self.gui.qt_settings.setValue('auto_load', self.gui.auto_load)
+
+    @QtCore.pyqtSlot()
+    def check_show_plots(self):
+        self.gui.show_plots = self.show_plots_check.isChecked()
+        self.gui.qt_settings.setValue('show_plots', self.gui.show_plots)
 
     @QtCore.pyqtSlot()
     def show_help_popup(self):
