@@ -93,14 +93,26 @@ class DataConversionBox(QtWidgets.QWidget):
         layout.addWidget(self.dtype_note, 3, 10, 2, 6)
 
         # Bottom: convert to binary or load with wrapper
+        self.spacer = QtWidgets.QLabel('         ')
         self.wrapper_button = QtWidgets.QPushButton('Load As Wrapper')
         self.wrapper_button.clicked.connect(self.load_as_wrapper)
+        self.wrapper_button.setToolTip(
+            "'Load as Wrapper' will load the data without converting it, which is much"
+            " faster.\n However, sorting will be slower and the results will not "
+            "be browsable in Phy.\n We recommend using this option to check that "
+            "your data is being loaded correctly."
+        )
         self.convert_button = QtWidgets.QPushButton('Convert to Binary')
         self.convert_button.clicked.connect(self.convert_to_binary)
         self.convert_input = QtWidgets.QLineEdit()
         self.convert_input.setReadOnly(True)
-        self.spacer = QtWidgets.QLabel('         ')
-        layout.addWidget(self.spacer, 5, 0, 1, 6)
+        self.convert_button.setToolTip(
+            "'Convert to Binary' will copy the data to a new .bin file.\n"
+            "This process is slow for large recordings, but results will be "
+            "browsable in Phy.\n We recommend this option for most use cases."
+        )
+
+        layout.addWidget(self.spacer, 5, 0, 2, 6)
         layout.addWidget(self.wrapper_button, 6, 0, 1, 6)
         layout.addWidget(self.convert_button, 7, 0, 1, 6)
         layout.addWidget(self.convert_input, 7, 6, 1, 10)
