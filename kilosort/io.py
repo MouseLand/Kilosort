@@ -841,13 +841,23 @@ class RecordingExtractorAsArray:
                     'loading multi-segment SpikeInterface recordings. Please '
                     'run `pip install spikeinterface`.'
                 )
+
+        print('='*40)
+        print('Loading recording with SpikeInterface...')
         self.recording = recording_extractor
         self.N = self.recording.get_total_samples()
+        print(f'number of samples: {self.N}')
         self.c = self.recording.get_traces(start_frame=0, end_frame=1, segment_index=0).shape[1]
+        print(f'number of channels: {self.c}')
         self.s = self.recording.get_num_segments()
+        print(f'numbef of segments: {self.s}')
         self.fs = self.recording.get_sampling_frequency()
+        print(f'sampling rate: {self.fs}')
         self.dtype = self.recording.get_dtype()
+        print(f'dtype: {self.dtype}')
         self.shape = (self.N, self.c)
+        print('='*40)
+    
 
     def __getitem__(self, *items):
         idx, *crop = items

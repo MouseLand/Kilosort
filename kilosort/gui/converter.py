@@ -192,6 +192,7 @@ class DataConversionBox(QtWidgets.QWidget):
             )
             return
 
+        self.hide()
         recording = get_recording_extractor(
             self.filename, self.filetype, self.stream_id, self.stream_name
             )
@@ -221,8 +222,6 @@ class DataConversionBox(QtWidgets.QWidget):
                 'SpikeInterface recording contains no probe information,\n'
                 'could not write .prb file.'
             )
-
-        self.hide()
         self.gui.settings_box.check_load()
 
     @QtCore.pyqtSlot()
