@@ -28,11 +28,15 @@ class HeaderBox(QtWidgets.QWidget):
             self.show_plots_check.setCheckState(0)
         self.show_plots_check.clicked.connect(self.check_show_plots)
 
+        # TODO: connect the button clicks to open something in browser instead?
+        #       like the paper and/or wiki.
         self.controls_button = QtWidgets.QPushButton("Controls")
-        self.controls_button.clicked.connect(self.show_controls_popup)
+        self.controls_button.setToolTip(controls_popup_text)
+        #self.controls_button.clicked.connect(self.show_controls_popup)
 
         self.help_button = QtWidgets.QPushButton("Help")
-        self.help_button.clicked.connect(self.show_help_popup)
+        self.help_button.setToolTip(help_popup_text)
+        #self.help_button.clicked.connect(self.show_help_popup)
 
         self.reset_gui_button = QtWidgets.QPushButton("Reset GUI")
         
@@ -60,26 +64,6 @@ class HeaderBox(QtWidgets.QWidget):
     def check_show_plots(self):
         self.gui.show_plots = self.show_plots_check.isChecked()
         self.gui.qt_settings.setValue('show_plots', self.gui.show_plots)
-
-    @QtCore.pyqtSlot()
-    def show_help_popup(self):
-        QtWidgets.QMessageBox.information(
-            self,
-            "Help",
-            help_popup_text,
-            QtWidgets.QMessageBox.Ok,
-            QtWidgets.QMessageBox.Ok,
-        )
-
-    @QtCore.pyqtSlot()
-    def show_controls_popup(self):
-        QtWidgets.QMessageBox.information(
-            self,
-            "Controls",
-            controls_popup_text,
-            QtWidgets.QMessageBox.Ok,
-            QtWidgets.QMessageBox.Ok,
-        )
 
     @QtCore.pyqtSlot()
     def clear_cache(self):

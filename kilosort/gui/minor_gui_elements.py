@@ -241,13 +241,14 @@ Mouse Controls for Plots <br>
 """
 
 help_popup_text = """
-Welcome to Pykilosort!
+Welcome to Kilosort4!
 
 ##### Documentation #####
-Pykilosort is the Python port of Kilosort2, which was originally written in Matlab. For a documentation of the underlying algorithm or the GUI, please visit https://github.com/MouseLand/Kilosort/wiki.
+Pykilosort is the Python port of Kilosort2, which was originally written in Matlab.
+For documentation of the underlying algorithm or the GUI, please visit https://github.com/MouseLand/Kilosort/wiki
+or https://www.biorxiv.org/content/10.1101/2023.01.07.523036v1.
 
 ##### Troubleshooting #####
-1. Click 'Reset GUI' to clear any GUI problems or strange errors. If the problem persists, consider restarting pykilosort.
-2. If the problem does not resolve on a restart, try deleting the '.pykilosort' directory situated in the same folder as your data file. Then restart the GUI and attempt the sorting again. [WARNING: you will lose all intermediate files which haven't been exported yet!]
-3. If the problem persists, visit https://github.com/MouseLand/pykilosort and create an issue there with as much detail about the problem as possible.  
+1. Click 'Reset GUI' to clear any GUI problems or strange errors. If the problem persists, try 'Clear Cache' and restarting Kilosort. 
+2. If the problem persists, visit https://github.com/MouseLand/kilosort and create an issue there with as much detail about the problem as possible.  
 """
