@@ -220,8 +220,8 @@ class ProbeBuilder(QtWidgets.QDialog):
 
 controls_popup_text = """
 <font style="font-family:Monospace">
-Controls <br>
--------- <br>
+GUI Controls <br>
+------------ <br>
 <br>
 [1 2 3 4]        - activate/deactivate raw/filtered/prediction/residual views of the dataset <br>
 [up/down]        - move through channels in traces mode <br>
@@ -230,6 +230,13 @@ Controls <br>
 [alt + scroll]   - change data/colormap scaling <br>
 [shift + scroll] - zoom in/out in time <br>
 [left click]     - move forward/backward in time <br>
+<br>
+Mouse Controls for Plots <br>
+------------------------ <br>
+<br>
+[left click]     - click and drag to pan.
+[right click]    - click to open context menu, drag to rescale axes.
+[middle/wheel]   - click and drag to pan, or use wheel to zoom.
 </font>
 """
 
