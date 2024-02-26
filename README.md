@@ -2,6 +2,7 @@
 
 For older versions, please see Github releases:   
 
+* [Kilosort 3.0](https://github.com/MouseLand/Kilosort/releases/tag/v3.0) on Feb 26, 2024.
 * [Kilosort 2.5](https://github.com/MouseLand/Kilosort/releases/tag/v2.5) on Jan 30, 2021.
 * [Kilosort 2.0](https://github.com/MouseLand/Kilosort/releases/tag/v2.0) on Oct 28, 2020.
 
