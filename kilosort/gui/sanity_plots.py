@@ -114,6 +114,7 @@ def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
     p2.setTitle('Spatial Features')
     features = torch.linalg.norm(Wall0, dim=2).cpu().numpy()
     img = pg.ImageItem(image=features.T)
+    img.setLevels([0, 25])
     p2.addItem(img)
 
     # Comput spike counts and mean amplitudes
@@ -136,14 +137,14 @@ def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
         labels={'bottom': 'Log(1 + Spike Count)', 'left': 'Amplitude (a.u.)'}
         )
     p4.setTitle('Amplitude vs Spike Count')
-    p4.plot(np.log(1 + spike_counts), mean_amp, pen=None, symbol='o')
+    scatter = pg.ScatterPlotItem(np.log(1 + spike_counts), mean_amp,
+                                 symbol='o', size=3)
+    p4.addItem(scatter)
 
     # Finished, draw plot
     plot_window.show()
 
 
-# TODO: need to figure out what to do about scatter w/ color first, this would
-#       be done the same as the drift scatter (which is currently not working).
 def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
                          device=None):
 
@@ -177,28 +178,3 @@ def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
                                  brush=brushes)
     p1.addItem(scatter)
     plot_window.show()
-
-
-
-    # HEATMAP VERSION
-
-    # lookup = cm.getLookupTable(nPts=10)
-
-    # # Get x, y positions, scale to 2 micron bins
-    # xs, ys = compute_spike_positions(st, tF, ops)
-    # ys = (ys*0.5).astype('int')
-    # xs = (xs*0.5).astype('int')
-    
-    # # Arange clusters into heatmap
-    # mat = scipy.sparse.csr_matrix((clu, (ys, xs))).toarray()
-    # img = pg.ImageItem(image=mat)
-    # img.setLookupTable(lookup)
-    # p1.addItem(img)
-
-    # # Change tick scaling to match bin sizes
-    # ax = p1.getAxis('bottom')
-    # ax.setScale(2)
-    # ay = p1.getAxis('left')
-    # ay.setScale(2)
-
-    # plot_window.show()
