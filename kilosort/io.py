@@ -13,7 +13,7 @@ from torch.fft import fft, ifft, fftshift
 
 from kilosort import CCG
 from kilosort.preprocessing import get_drift_matrix, fft_highpass
-from kilosort.postprocessing import remove_duplicates
+from kilosort.postprocessing import remove_duplicates, compute_spike_positions
 
 
 def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
@@ -163,16 +163,22 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
 
     # spike properties
     spike_times = st[:,0] + imin  # shift by minimum sample index
+    spike_templates = st[:,1]
     spike_clusters = clu
+    xs, ys = compute_spike_positions(st, tF, ops)
+    spike_positions = np.vstack([xs, ys]).T
     amplitudes = ((tF**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
     # remove duplicate (artifact) spikes
     spike_times, spike_clusters, kept_spikes = remove_duplicates(
         spike_times, spike_clusters, dt=ops['settings']['duplicate_spike_bins']
     )
     amp = amplitudes[kept_spikes]
+    spike_templates = spike_templates[kept_spikes]
+    spike_positions = spike_positions[kept_spikes]
     np.save((results_dir / 'spike_times.npy'), spike_times)
-    np.save((results_dir / 'spike_templates.npy'), spike_clusters)
+    np.save((results_dir / 'spike_templates.npy'), spike_templates)
     np.save((results_dir / 'spike_clusters.npy'), spike_clusters)
+    np.save((results_dir / 'spike_positions.npy'), spike_positions)
     np.save((results_dir / 'amplitudes.npy'), amp)
     # Save spike mask so that it can be applied to other variables if needed
     # when loading results.
@@ -180,7 +186,6 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
 
     # template properties
     similar_templates = CCG.similarity(Wall, ops['wPCA'].contiguous(), nt=ops['nt'])
-    n_temp = Wall.shape[0]
     template_amplitudes = ((Wall**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
     templates = (Wall.unsqueeze(-1).cpu() * ops['wPCA'].cpu()).sum(axis=-2).numpy()
     templates = templates.transpose(0,2,1)
