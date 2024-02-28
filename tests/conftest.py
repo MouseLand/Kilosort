@@ -93,22 +93,9 @@ def data_directory(download, capture_mgr, gpu):
     if not results_path.is_dir():
         # Downloaded folder extracts here, get rid of any existing results
         # from running tests.
-        ks_path_windows = data_path / 'Kilosort4'
-        ks_path_unix = data_path / 'kilosort4'
         with capture_mgr.global_and_fixture_disabled():
             print(f'\nDownloading saved results to {results_path}.zip')
             download_data(results_path, results_url)
-
-        # For debugging, display directory tree after downloading results.
-        # Should contain a 'Kilosort4' folder with the results inside it, since
-        # it hasn't been renamed yet at this step.
-        print(list_files(data_path.as_posix()))
-
-        # Rename folder
-        if ks_path_windows.is_dir():
-            ks_path_windows.rename(results_path)
-        else:
-            ks_path_unix.rename(results_path)
 
     # Download default probe files if they don't already exist.
     download_probes()
