@@ -152,7 +152,7 @@ class TestDriftCorrection:
         saved_iKxx = saved_ops['iKxx'].to(torch_device)
         with capture_mgr.global_and_fixture_disabled():
             print('\nStarting datashift.run test...')
-            ops = datashift.run(saved_ops, bfile, device=torch_device)
+            ops, st = datashift.run(saved_ops, bfile, device=torch_device)
 
         # TODO: this fails on dshift, but the final version doesn't. So, dshift
         #       must be overwritten later on in the pipeline. Need to save the
