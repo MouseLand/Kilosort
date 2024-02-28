@@ -81,7 +81,7 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     io.save_ops(ops, results_dir)
 
     # Sort spikes and save results
-    st, tF, _, _ = detect_spikes(ops, device, bfile, tic0=tic0,
+    st, tF, _ = detect_spikes(ops, device, bfile, tic0=tic0,
                                  progress_bar=progress_bar)
     clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
                                progress_bar=progress_bar)
@@ -346,7 +346,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     
     tic = time.time()
     print('\nExtracting spikes using cluster waveforms')
-    st, tF, tF2, ops = template_matching.extract(ops, bfile, Wall3, device=device,
+    st, tF, ops = template_matching.extract(ops, bfile, Wall3, device=device,
                                                  progress_bar=progress_bar)
     print(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
             f'total {time.time()-tic0 : .2f}s')

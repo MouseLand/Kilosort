@@ -26,18 +26,15 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     ctc = prepare_matching(ops, U)
     st = np.zeros((10**6, 3), 'float64')
     tF  = torch.zeros((10**6, nC , ops['settings']['n_pcs']))
-    tF2 = torch.zeros((10**6, nC , ops['settings']['n_pcs']))
 
     k = 0
 
-    s = StringIO()
     for ibatch in tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
                         mininterval=60 if progress_bar else None):
         X = bfile.padded_batch_to_torch(ibatch, ops)
 
         stt, amps, Xres = run_matching(ops, X, U, ctc, device=device)
 
-        xfeat2   = X[iCC[:, iU[stt[:,1:2]]],stt[:,:1] + tiwave] @ ops['wPCA'].T
         xfeat = Xres[iCC[:, iU[stt[:,1:2]]],stt[:,:1] + tiwave] @ ops['wPCA'].T
         xfeat += amps * Ucc[:,stt[:,1]]
 
@@ -45,7 +42,6 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
         if k+nsp>st.shape[0]:                     
             st = np.concatenate((st, np.zeros_like(st)), 0)
             tF  = torch.cat((tF,  torch.zeros_like(tF)), 0)
-            tF2 = torch.cat((tF2, torch.zeros_like(tF2)), 0)
 
         stt = stt.double()
         #st[k:k+nsp,0] = ((stt[:,0]-nt)/ops['fs'] + ibatch * (ops['batch_size']/ops['fs'])).cpu().numpy()
@@ -55,7 +51,6 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
         st[k:k+nsp,2] = amps[:,0].cpu().numpy()
         
         tF[k:k+nsp]  = xfeat.transpose(0,1).cpu()#.numpy()
-        tF2[k:k+nsp] = xfeat2.transpose(0,1).cpu()
 
         k+= nsp
         
@@ -66,9 +61,8 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
 
     st = st[isort]
     tF = tF[isort]
-    tF2 = tF2[isort]
 
-    return st, tF, tF2, ops
+    return st, tF, ops
 
 def align_U(U, ops, device=torch.device('cuda')):
     Uex = torch.einsum('xyz, zt -> xty', U.to(device), ops['wPCA'])
