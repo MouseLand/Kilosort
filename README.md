@@ -1,99 +1,87 @@
-# Kilosort3: spike sorting on GPUs with template matching, drift correction and a new clustering method
+# Kilosort4 pre-release
 
-For older versions, please see Github releases:   
+You can run Kilosort4 without installing it locally using google colab. An example colab notebook is available [here](https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing). It will download some test data, run kilosort4 on it, and show some plots.
 
-* [Kilosort 3.0](https://github.com/MouseLand/Kilosort/releases/tag/v3.0) on Feb 26, 2024.
-* [Kilosort 2.5](https://github.com/MouseLand/Kilosort/releases/tag/v2.5) on Jan 30, 2021.
-* [Kilosort 2.0](https://github.com/MouseLand/Kilosort/releases/tag/v2.0) on Oct 28, 2020.
+Example notebooks are provided in the `docs/source/tutorials` folder and will be later published to readthedocs. The notebooks include: 
 
-## Citation requirement
+  1. `basic_example`:  sets up run on example data and shows how to modify parameters  
+  2. `load_data`:  example data format conversion through SpikeInterface  
+  3. `make_probe`:  making a custom probe configuration. 
 
-If you use any version of Kilosort, please cite the new Kilosort paper: 
+# Installation
 
-**Pachitariu, M., Sridhar, S., & Stringer, C. (2023). Solving the spike sorting problem with Kilosort. bioRxiv, 2023-01.**
+### System requirements
 
-If you use **Kilosort 2.5**, please also cite:   
+Linux and Windows 64-bit are supported for running the code. At least 8GB of GPU RAM is required to run the software. The software has been tested on Windows 10 and Ubuntu 20.04. 
 
-Steinmetz, N. A., Aydin, C., Lebedeva, A., Okun, M., Pachitariu, M., Bauza, M., ... & Harris, T. D. (2021). Neuropixels 2.0: A miniaturized high-density probe for stable, long-term brain recordings. Science, 372(6539), eabf4588.
+### Instructions
 
-![](Docs/img/frame_full.png)
+If you have an older `kilosort` environment you can remove it with `conda env remove -n kilosort` before creating a new one.
 
-## General description
+1. Install an [Anaconda](https://www.anaconda.com/products/distribution) distribution of Python. Note you might need to use an anaconda prompt if you did not add anaconda to the path.
+2. Open an anaconda prompt / command prompt which has `conda` for **python 3** in the path
+3. Create a new environment with `conda create --name kilosort python=3.8`. We recommend python 3.8 or python 3.9 but 3.10 should work as well.
+4. To activate this new environment, run `conda activate kilosort`
+5. Change into the directory containing the code, it should have a `setup.py` file in it.
+6. To install kilosort and the GUI, run `python -m pip install .[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install '.[gui]'.
+7. Instead of 6, you can install the minimal version of kilosort with `python -m pip install .`.  
+8. Next remove the CPU version of pytorch `pip uninstall torch`
+9. Then install the GPU version of pytorch `conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia`
 
-Welcome to Kilosort3, a MATLAB package for spike sorting electrophysiological data up to 1024 channels. In many cases, and especially for Neuropixels probes, the automated output of Kilosort3 requires minimal manual curation. The main change from v2.5 is a completely new and much more sophisticated clustering algorithm, which we will document soon. To learn about Kilosort2.5, the primary reference is the Neuropixels 2.0 [paper](https://www.biorxiv.org/content/10.1101/2020.10.27.358291v1). The Github wiki still refers to Kilosort2, and it will be updated. 
+Note you will always have to run `conda activate kilosort` before you run kilosort. If you want to run jupyter notebooks in this environment, then also `conda install jupyter` or `pip install notebook`, and `python -m pip install matplotlib`.
 
-Kilosort2.5 improves on Kilosort2 primarily in the type of drift correction we use. Where Kilosort2 modified templates as a function of time/drift (a drift **tracking** approach), Kilosort2.5 corrects the raw data directly via a sub-pixel registration process (a drift **correction** approach). Kilosort2.5 has not been as broadly tested as Kilosort2, but is expected to work out of the box on Neuropixels 1.0 and 2.0 probes, as well as other probes with vertical pitch <=40um. For other recording methods, like tetrodes or single-channel recordings, you should test empirically if v2.5 or v2.0 works better for you (use the "releases" on the github page to download older versions). 
+### Debugging pytorch installation 
 
-Kilosort2 can still be accessed by downloading the release "Kilosort 2.0". It improves on the original Kilosort primarily by employing drift correction, which changes the templates continuously as a function of drift. Drift correction does not depend on a particular probe geometry, but denser spacing of sites generally helps to better track neurons, especially if the probe movement is large. Kilosort2 has been primarily developed on awake, head-fixed recordings from Neuropixels 1.0 data, but has also been tested in a few other configurations. To get a sense of how probe drift affects spike sorting, check out our "eMouse" simulation [here](https://github.com/MouseLand/Kilosort2/tree/master/eMouse_drift) and [its wiki page](https://github.com/MouseLand/Kilosort2/wiki/4.-eMouse-simulator-with-drift).
+If step 9 does not work, you need to make sure the NVIDIA driver for your GPU is installed (available [here](https://www.nvidia.com/Download/index.aspx?lang=en-us)). You may also need to install the CUDA libraries for it, we recommend [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive).
 
-To aid in setting up a Kilosort2/2.5 run on your own probe configuration, we have developed a [graphical user interface](https://github.com/MouseLand/Kilosort/wiki/1.-The-GUI) where filepaths can be set and data loaded and visually inspected, to make sure Kilosort2/2.5 sees it correctly. The picture above is another GUI visualization: it shows the templates detected by Kilosort2 over a 60ms interval from a Neuropixels recording. The final output of Kilosort2/2.5 can be visualized and curated in the [Phy GUI](https://github.com/kwikteam/phy), which must be installed separately. Since Phy is in Python, you will also need the [npy-matlab](https://github.com/kwikteam/npy-matlab) package.
+If pytorch installation still fails, follow the instructions [here](https://pytorch.org/get-started/locally/) to determine what version of pytorch to install. The Anaconda install is strongly recommended, and then choose the CUDA version that is supported by your GPU (newer GPUs may need newer CUDA versions > 10.2). For instance this command will install the 11.8 version on Linux and Windows (note the `torchvision` and `torchaudio` commands are removed because kilosort doesn't require them):
 
-## Installation
+``
+conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia
+``
 
-Requirements:
+This [video](https://www.youtube.com/watch?v=gsixIQYvj3U) has step-by-step installation instructions for NVIDIA drivers and pytorch in Windows (ignore the environment creation step with the .yml file, we have an environment already, to activate it use `conda activate kilosort`).
 
-* MATLAB >= R2016b
-* MATLAB Toolboxes:
-  * Parallel Computing Toolbox
-  * Signal Processing Toolbox
-  * Statistics and Machine Learning Toolbox
-* An NVIDIA GPU and CUDA capabilities
 
-You must run and complete successfully `mexGPUall.m` in the `CUDA` folder. This requires mexcuda support, which comes with the parallel computing toolbox. To set up mexcuda compilation, install the exact version of the CUDA toolkit compatible with your MATLAB version (see [here](https://www.mathworks.com/help/distcomp/gpu-support-by-release.html)). On Windows, you must also install a CPU compiler, for example the freely available [Visual Studio Community](https://www.visualstudio.com/vs/older-downloads/). You may need to check that the version of Visual Studio you install is compatible with your version of CUDA. If you had previously used a different CPU compiler in MATLAB, you must switch to the CUDA-compatible compiler using `mex -setup C++`. For more about mexcuda installation, see these [instructions](http://uk.mathworks.com/help/distcomp/mexcuda.html).
+# Running kilosort 
 
-### General instructions for running Kilosort2
+1. Open the GUI with `python -m kilosort`
+2. Select the path to the binary file and optionally the results directory. We recommend putting the binary file on an SSD for faster processing. 
+3. Select the probe configuration (mat files recommended, they actually exclude off channels unlike prb files)
+4. Hit `LOAD`. The data should now be visible.
+5. Hit `Run`. This will run the pipeline and output the results in a format compatible with Phy, the most popular spike sorting curating software.
 
-#### Option 1: Using the GUI
-
-Navigate to the `Kilosort` directory and run `kilosort`:
-
-```bash
->> cd \my\kilosort\directory\
->> kilosort
+There is a warning that will always pop up when running Kilosort and/or using the BinaryFile class, but it's nothing to worry about:
 ```
-See the [GUI documentation](https://github.com/MouseLand/Kilosort/wiki/1.-The-GUI) for more details.
-
-#### Option 2: Using scripts (classic method)
-
-1. Make a copy of `main_kilosort.m` and `\configFiles\StandardConfig_MOVEME.m` and put them in a different directory. These files will contain your own settings, and you don't want them to be overwritten when you update Kilosort.  
-2. Generate a channel map file for your probe using `\configFiles\createChannelMap.m` as a starting point.
-3. Edit the config file with desired parameters. You should at least set the file paths `ops.fbinary`, `ops.root` and `ops.fproc` (this file will not exist yet - `kilosort` will create it), the sampling frequency `ops.fs`, the number of channels in the file `ops.NchanTOT` and the location of your channel map file `ops.chanMap`.
-4. Edit `main_kilosort.m` so that the paths at the top ([lines 3–4](https://github.com/MouseLand/Kilosort/blob/main/main_kilosort.m#L3-L4)) point to your local copies of those GitHub repositories, and so that the configuration file is correctly specified ([lines 6–7](https://github.com/MouseLand/Kilosort/blob/2fba667359dbddbb0e52e67fa848f197e44cf5ef/main_kilosort.m#L6-L7)).
-
-### Parameters
-
-If you are unhappy with the quality of the automated sorting, try changing one of the main parameters:
-
-`ops.Th = [10 4]` (default). Thresholds on spike detection used during the optimization `Th(1)` or during the final pass `Th(2)`. These thresholds are applied to the template projections, not to the voltage. Typically, `Th(1)` is high enough that the algorithm only picks up sortable units, while `Th(2)` is low enough that it can pick all of the spikes of these units. It doesn't matter if the final pass also collects noise: an additional per neuron threshold is set afterwards, and a splitting step ensures clusters with multiple units get split.
-
-`ops.AUCsplit = 0.9` (default). Threshold on the area under the curve (AUC) criterion for performing a split in the final step. If the AUC of the split is higher than this, that split is considered good. However, a good split only goes through if, additionally, the cross-correlogram of the split units does not contain a big dip at time 0.
-
-`ops.lam = 10` (default). The individual spike amplitudes are biased towards the mean of the cluster by this factor; 50 is a lot, 0 is no bias.
-
-A list of all the adjustable parameters is in the example configuration file.
+UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at C:\cb\pytorch_1000000000000\work\torch\csrc\utils\tensor_numpy.cpp:205.)
+```
 
 ## Integration with Phy GUI
 
-Kilosort2 provides a results file called `rez`, where the first column of `rez.st`are the spike times and the second column are the cluster identities. It also provides a field `rez.good` which is 1 if the algorithm classified that cluster as a good single unit. To visualize the results of Kilosort2, you can use [Phy](https://github.com/kwikteam/phy), which also provides a manual clustering interface for refining the results of the algorithm. Kilosort2 automatically sets the "good" units in Phy based on a <20% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
+[Phy](https://github.com/kwikteam/phy) provides a manual clustering interface for refining the results of the algorithm. Kilosort4 automatically sets the "good" units in Phy based on a <10% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
 
-Because Phy is written in Python, you also need to install [npy-matlab](https://github.com/kwikteam/npy-matlab), to provide read/write functions from MATLAB to Python.
+Check out the [Phy](https://github.com/kwikteam/phy) repo for more in-depth install instructions, but in most cases the following should work: activate the kilosort environment (`conda activate kilosort`), and then
+~~~
+pip install phy --pre --upgrade
+~~~
 
-Detailed instructions for interpreting results are provided [here](https://github.com/kwikteam/phy-contrib/blob/master/docs/template-gui.md). That documentation was developed for Kilosort1, so things will look a little different with Kilosort2.
+Note there is a deprecation by numpy that will break phy, so please `pip install numpy==1.23`.
 
-## Credits
+Next change to the results directory from kilosort4 (by default a folder named `kilosort4` in the binary directory) and run:
+~~~
+phy template-gui params.py
+~~~
 
-Kilosort2 by Marius Pachitariu  
-GUI by Nick Steinmetz  
-eMouse simulation by Jennifer Colonell  
+Now phy should run correctly in the `kilosort` environment you made (if not make a new environment for phy).
 
-## Questions
+### Developer instructions
 
-Please create an issue for bugs / installation problems.
+Need to install pytest
+~~~
+pip install pytest
+~~~
 
-## Licence
+Then run all tests with:
+~~~
+pytest tests/ --runslow
 
-This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License along with this program. If not, see <http://www.gnu.org/licenses>.
