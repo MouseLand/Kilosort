@@ -12,7 +12,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Kilosort4'
-copyright = '2023, Marius Pachitariu & Carsen Stringer'
+copyright = '2024, Marius Pachitariu, Jacob Pennington & Carsen Stringer'
 author = 'Jacob Pennington (documentation)'
 release = '0.0.1'
 
