@@ -71,8 +71,8 @@ def data_directory(download, capture_mgr, gpu):
     data_path = DOWNLOADS_DIR / '.test_data/'
     data_path.mkdir(parents=True, exist_ok=True)
 
-    binary_path = data_path / 'ZFM-02370_mini.imec0.ap.bin'
-    binary_url = 'https://www.kilosort.org/downloads/ZFM-02370_mini.imec0.ap.zip'
+    binary_path = data_path / 'ZFM-02370_mini.imec0.ap.short.bin'
+    binary_url = 'https://www.kilosort.org/downloads/ZFM-02370_mini.imec0.ap.short.zip'
     if (download == 'binary') or (download == 'both'):
         if binary_path.is_file():
             binary_path.unlink()
@@ -219,7 +219,7 @@ def bfile(saved_ops, torch_device, data_directory):
     settings = saved_ops['settings']
     # Don't get filename from settings, will be different based on OS and which
     # system ran tests originally.
-    filename = data_directory / 'ZFM-02370_mini.imec0.ap.bin'
+    filename = data_directory / 'ZFM-02370_mini.imec0.ap.short.bin'
 
     # TODO: add option to load BinaryFiltered from ops dict, move this code
     #       to that function
