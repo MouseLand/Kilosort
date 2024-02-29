@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a bug.
+title: "BUG: <Please write a comprehensive title after the 'BUG: ' prefix>"
+
+body:
+- type: markdown
+  attributes:
+    value: >
+      Thank you for taking the time to file a bug report. Before creating a new
+      issue, please make sure to take a few minutes to check if this issue has been 
+      brought up before.
+    
+- type: textarea
+  attributes: 
+    label: "Describe the issue:"
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Reproduce the bug:"
+    description: >
+      A short code example that reproduces the problem/missing feature,
+      if applicable.
+    render: python
+  
+- type: textarea
+  attributes:
+    label: "Error message:"
+    description: >
+      Please include full error message, if any.
+    render: shell
+
+- type: textarea
+  attributes:
+    label: "Version information:"
+    description: >
+      Version of operating system and python used, as well as any other
+      software versions you think might be relevant to the bug (e.g. CUDA toolkit).
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Context for the issue:"
+    description: |
+      Please explain how this issue affects your work or why it should be prioritized.
+
+- type: textarea
+  attributes:
+    label: "Experiment information:"
+    description: >
+      Type of probe used, species and brain area recorded from, etc, if your bug
+      is related to "strange/unexpected results."

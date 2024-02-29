@@ -1,0 +1,13 @@
+name: Other issue
+description: Report something about Kilosort.
+title: "<Please write a comprehensive title.>"
+
+body:
+    
+- type: textarea
+  attributes: 
+    label: "Describe the issue:"
+    description: >
+      Description.
+  validations:
+    required: true  
