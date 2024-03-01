@@ -33,7 +33,7 @@ If you have an older `kilosort` environment you can remove it with `conda env re
 
 1. Install an [Anaconda](https://www.anaconda.com/products/distribution) distribution of Python. Note you might need to use an anaconda prompt if you did not add anaconda to the path.
 2. Open an anaconda prompt / command prompt which has `conda` for **python 3** in the path
-3. Create a new environment with `conda create --name kilosort python=3.8`. We recommend python 3.8 or python 3.9 but 3.10 should work as well.
+3. Create a new environment with `conda create --name kilosort python=3.9`. Python 3.10 should work as well.
 4. To activate this new environment, run `conda activate kilosort`
 5. Change into the directory containing the code, it should have a `setup.py` file in it.
 6. To install kilosort and the GUI, run `python -m pip install .[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install '.[gui]'.
