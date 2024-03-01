@@ -97,9 +97,11 @@ pip install pytest
 Then run all tests with:
 ~~~
 pytest --runslow
+~~~
 
 To run on GPU:
 ~~~
 pytest --gpu --runslow
+~~~
 
 Omitting the `--runslow` will only run the faster unit tests, not the slower regression tests.
