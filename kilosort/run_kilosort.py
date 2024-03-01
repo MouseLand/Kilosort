@@ -61,6 +61,10 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     if settings['nt0min'] is None:
         settings['nt0min'] = int(20 * settings['nt']/61)
 
+    if data_dtype is None:
+        print("Interpreting binary file as default dtype='int16'. If data was "
+                "saved in a different format, specify `data_dtype`.")
+
     # NOTE: Also modifies settings in-place
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir)

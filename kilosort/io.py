@@ -341,8 +341,6 @@ class BinaryRWFile:
             dtype = file_object.dtype
         if dtype is None:
             dtype = 'int16'
-            print("Interpreting binary file as default dtype='int16'. If data was "
-                    "saved in a different format, specify `data_dtype`.")
         self.dtype = dtype
 
         if str(self.dtype) not in self.supported_dtypes:
