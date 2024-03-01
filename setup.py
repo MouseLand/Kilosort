@@ -15,7 +15,8 @@ gui_deps = [
     'pyqtgraph<=0.12',
     'pyqt5',
     'pyqt5.sip',
-    'google-cloud-storage'
+    'google-cloud-storage',
+    'matplotlib'
 ]
 
 docs_deps = [
