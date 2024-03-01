@@ -162,8 +162,8 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     np.save((results_dir / 'whitening_mat_inv.npy'), whitening_mat_inv)
 
     # spike properties
-    spike_times = st[:,0] + imin  # shift by minimum sample index
-    spike_templates = st[:,1]
+    spike_times = st[:,0].astype('int64') + imin  # shift by minimum sample index
+    spike_templates = st[:,1].astype('int32')
     spike_clusters = clu
     xs, ys = compute_spike_positions(st, tF, ops)
     spike_positions = np.vstack([xs, ys]).T
