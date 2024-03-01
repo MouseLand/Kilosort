@@ -4,13 +4,19 @@ import numpy as np
 import torch
 
 
-@njit
+@njit("(int64[:], int32[:], int32)")
 def remove_duplicates(spike_times, spike_clusters, dt=15):
     '''Removes same-cluster spikes that occur within `dt` samples.'''
     keep = np.zeros_like(spike_times, bool_)
     cluster_t0 = {}
-    for (i,t), c in zip(enumerate(spike_times), spike_clusters):
-        t0 = cluster_t0.get(c, t-dt)
+    for i in range(spike_times.size):
+        t = spike_times[i]
+        c = spike_clusters[i]
+        if c in cluster_t0:
+            t0 = cluster_t0[c]
+        else:
+            t0 = t - dt
+
         if t >= (t0 + dt):
             # Separate spike, reset t0 and keep spike
             cluster_t0[c] = t
