@@ -9,13 +9,13 @@ DOWNLOADS_DIR = pathlib.Path(_DOWNLOADS_DIR_ENV) if _DOWNLOADS_DIR_ENV else _DOW
 PROBE_DIR = DOWNLOADS_DIR.joinpath('probes')
 
 # use mat file probes because they enable disconnected channels
-probe_names = ['neuropixPhase3A_kilosortChanMap.mat',
-               'neuropixPhase3B1_kilosortChanMap.mat',
-               'neuropixPhase3B2_kilosortChanMap.mat',
-               'NP2_kilosortChanMap.mat', 
-               'Linear16x1_kilosortChanMap.mat',
-               'neuropixPhase3B1_kilosortChanMap.prb',
-               ]
+probe_names = [
+    'neuropixPhase3A_kilosortChanMap.mat',
+    'neuropixPhase3B1_kilosortChanMap.mat',
+    'neuropixPhase3B2_kilosortChanMap.mat',
+    'NP2_kilosortChanMap.mat', 
+    'Linear16x1_kilosortChanMap.mat',
+    ]
 
 def template_path(basename='wTEMP.npz'):
     """ currently only one set of example templates to use"""
