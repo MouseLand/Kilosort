@@ -21,7 +21,7 @@ from kilosort.parameters import DEFAULT_SETTINGS
 def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
                  filename=None, file_object=None, data_dtype=None,
                  results_dir=None, do_CAR=True, invert_sign=False,
-                 device=torch.device('cuda'), progress_bar=None,
+                 device=None, progress_bar=None,
                  save_extra_vars=False):
     """Spike sort the given dataset.
     
@@ -64,6 +64,16 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     if data_dtype is None:
         print("Interpreting binary file as default dtype='int16'. If data was "
                 "saved in a different format, specify `data_dtype`.")
+
+    if device is None:
+        if torch.cuda.is_available():
+            print('Using GPU for PyTorch computations. '
+                  'Specify `device` to change this.')
+            device = torch.device('cuda')
+        else:
+            print('Using CPU for PyTorch computations. '
+                  'Specify `device` to change this.')
+            device = torch.device('cpu')
 
     # NOTE: Also modifies settings in-place
     filename, data_dir, results_dir, probe = \
