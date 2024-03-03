@@ -96,7 +96,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     tic0 = time.time()
 
     # Configure settings, ops, and file paths
-    if settings is None or settings['n_chan_bin'] is None:
+    if settings is None or settings.get('n_chan_bin', None) is None:
         raise ValueError(
             '`n_chan_bin` is a required setting. This is the total number of '
             'channels in the binary file, which may or may not be equal to the '
