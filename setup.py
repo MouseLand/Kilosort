@@ -43,15 +43,15 @@ setup(
     author="Marius Pachitariu",
     author_email="pachitarium@janelia.hhmi.org",
     description="spike sorting pipeline",
-    version="0.1",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/MouseLand/kilosort",
     setup_requires=[
         'pytest-runner',
+        'setuptools-scm',
     ],
     packages=setuptools.find_packages(),
-    use_scm_version=False,
+    use_scm_version=True,
     install_requires=install_deps,
     tests_require=[
         'pytest'
@@ -64,7 +64,7 @@ setup(
     include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: BSD License",
+        "License :: OSI Approved :: GPL License",
         "Operating System :: OS Independent",
     ],
     entry_points={
