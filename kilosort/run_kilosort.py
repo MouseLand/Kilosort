@@ -18,21 +18,62 @@ from kilosort import (
 from kilosort.parameters import DEFAULT_SETTINGS
 
 
-def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
-                 filename=None, file_object=None, data_dtype=None,
-                 results_dir=None, do_CAR=True, invert_sign=False,
-                 device=None, progress_bar=None,
-                 save_extra_vars=False):
-    """Spike sort the given dataset.
+def run_kilosort(settings, probe=None, probe_name=None, filename=None,
+                 data_dir=None, file_object=None, results_dir=None,
+                 data_dtype=None, do_CAR=True, invert_sign=False, device=None,
+                 progress_bar=None, save_extra_vars=False):
+    """Run full spike sorting pipeline on specified data.
     
     Parameters
     ----------
-    TODO
-
+    settings : dict
+        Specifies a number of configurable parameters used throughout the
+        spike sorting pipeline. See `kilosort/parameters.py` for a full list of
+        available parameters.
+        NOTE: `n_chan_bin` must be specified here, but all other settings are
+              optional.
+    probe : dict; optional.
+        A Kilosort4 probe dictionary, as returned by `kilosort.io.load_probe`.
+    probe_name : str; optional.
+        Filename of probe to use, within the default `PROBE_DIR`. Only include
+        the filename without any preceeding directories. Will ony be used if
+        `probe is None`. Alternatively, the full filepath to a probe stored in
+        any directory can be specified with `settings = {'probe_path': ...}`.
+        See `kilosort.utils` for default `PROBE_DIR` definition.
+    filename: str or Path; optional.
+        Full path to binary data file. If specified, will also set
+        `data_dir = filename.parent`.
+    data_dir : str or Path; optional.
+        Specifies directory where binary data file is stored. Kilosort will
+        attempt to find the binary file. This works best if there is exactly one
+        file in the directory with a .bin, .bat, .dat, or .raw extension.
+        Only used if `filename is None`.
+        Also see `kilosort.io.find_binary`.
     file_object : array-like file object; optional.
         Must have 'shape' and 'dtype' attributes and support array-like
         indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
-        array or memmap. Must specify a valid `filename` as well.
+        array or memmap. Must specify a valid `filename` as well, even though
+        data will not be directly loaded from that file.
+    results_dir : str or Path; optional.
+        Directory where results will be stored. By default, will be set to
+        `data_dir / 'kilosort4'`.
+    data_dtype : str or type; optional.
+        dtype of data in binary file, like `'int32'` or `np.uint16`. By default,
+        dtype is assumed to be `'int16'`.
+    do_CAR : bool; default=True.
+        If True, apply common average reference during preprocessing
+        (recommended).
+    invert_sign : bool; default=False.
+        If True, flip positive/negative values in data to conform to standard
+        expected by Kilosort4.
+    device : torch.device; optional.
+        CPU or GPU device to use for PyTorch calculations. By default, PyTorch
+        will use the first detected GPU. If no GPUs are detected, CPU will be
+        used. To set this manually, specify `device = torch.device(<device_name>)`.
+        See PyTorch documentation for full description.
+    progress_bar : tqdm.std.tqdm or QtWidgets.QProgressBar; optional.
+        Used by sorting steps and GUI to track sorting progress. Users should
+        not need to specify this.
     save_extra_vars : bool; default=False.
         If True, save tF and Wall to disk after sorting.
     
@@ -41,6 +82,11 @@ def run_kilosort(settings=None, probe=None, probe_name=None, data_dir=None,
     ValueError
         If settings[`n_chan_bin`] is None (default). User must specify, for
         example:  `run_kilosort(settings={'n_chan_bin': 385})`.
+
+    Returns
+    -------
+    ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
+        Description TODO
 
     """
 
