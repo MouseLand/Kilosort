@@ -15,11 +15,14 @@
 
 You can run Kilosort4 without installing it locally using google colab. An example colab notebook is available [here](https://colab.research.google.com/drive/1gFZa8TEBDXmg_CB5RwuT_52Apl3hP0Ie?usp=sharing). It will download some test data, run kilosort4 on it, and show some plots.
 
-Example notebooks are provided in the `docs/source/tutorials` folder and will be later published to readthedocs. The notebooks include: 
+Example notebooks are provided in the `docs/source/tutorials` folder and in the [docs](https://kilosort.readthedocs.io/en/latest/tutorials/tutorials.html). The notebooks include: 
 
   1. `basic_example`:  sets up run on example data and shows how to modify parameters  
   2. `load_data`:  example data format conversion through SpikeInterface  
-  3. `make_probe`:  making a custom probe configuration. 
+  3. `make_probe`:  making a custom probe configuration.
+
+**If you use Kilosort1-4, please cite the [paper](https://www.biorxiv.org/content/10.1101/2023.01.07.523036v1):**     
+Pachitariu, M., Sridhar, S., Pennington, J., & Stringer, C. (2024). Spike sorting with Kilosort4.
 
 # Installation
 
@@ -35,19 +38,18 @@ If you have an older `kilosort` environment you can remove it with `conda env re
 2. Open an anaconda prompt / command prompt which has `conda` for **python 3** in the path
 3. Create a new environment with `conda create --name kilosort python=3.9`. Python 3.10 should work as well.
 4. To activate this new environment, run `conda activate kilosort`
-5. Change into the directory containing the code, it should have a `setup.py` file in it.
-6. To install kilosort and the GUI, run `python -m pip install .[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install '.[gui]'.
-7. Instead of 6, you can install the minimal version of kilosort with `python -m pip install .`.  
-8. Next remove the CPU version of pytorch `pip uninstall torch`
-9. Then install the GPU version of pytorch `conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia`
+5. To install kilosort and the GUI, run `python -m pip install kilosort[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install 'kilosort[gui]'.
+6. Instead of 5, you can install the minimal version of kilosort with `python -m pip install kilosort`.  
+7. Next, if the CPU version of pytorch was installed (will happen on Windows), remove it with `pip uninstall torch`
+8. Then install the GPU version of pytorch `conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia`
 
 Note you will always have to run `conda activate kilosort` before you run kilosort. If you want to run jupyter notebooks in this environment, then also `conda install jupyter` or `pip install notebook`, and `python -m pip install matplotlib`.
 
 ### Debugging pytorch installation 
 
-If step 9 does not work, you need to make sure the NVIDIA driver for your GPU is installed (available [here](https://www.nvidia.com/Download/index.aspx?lang=en-us)). You may also need to install the CUDA libraries for it, we recommend [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive).
+If step 8 does not work, you need to make sure the NVIDIA driver for your GPU is installed (available [here](https://www.nvidia.com/Download/index.aspx?lang=en-us)). You may also need to install the CUDA libraries for it, we recommend [CUDA 11.8](https://developer.nvidia.com/cuda-11-8-0-download-archive).
 
-If pytorch installation still fails, follow the instructions [here](https://pytorch.org/get-started/locally/) to determine what version of pytorch to install. The Anaconda install is strongly recommended, and then choose the CUDA version that is supported by your GPU (newer GPUs may need newer CUDA versions > 10.2). For instance this command will install the 11.8 version on Linux and Windows (note the `torchvision` and `torchaudio` commands are removed because kilosort doesn't require them):
+If pytorch installation still fails, follow the instructions [here](https://pytorch.org/get-started/locally/) to determine what version of pytorch to install. The Anaconda install is strongly recommended on Windows, and then choose the CUDA version that is supported by your GPU (newer GPUs may need newer CUDA versions > 10.2). For instance this command will install the 11.8 version on Linux and Windows (note the `torchvision` and `torchaudio` commands are removed because kilosort doesn't require them):
 
 ``
 conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia
