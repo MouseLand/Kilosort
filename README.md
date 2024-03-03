@@ -25,7 +25,7 @@ Example notebooks are provided in the `docs/source/tutorials` folder and will be
 
 ### System requirements
 
-Linux and Windows 64-bit are supported for running the code. At least 8GB of GPU RAM is required to run the software (see [wiki](https://github.com/MouseLand/Kilosort/wiki/8.-Hardware-guide) for more recommendations). The software has been tested on Windows 10 and Ubuntu 20.04. 
+Linux and Windows 64-bit are supported for running the code. At least 8GB of GPU RAM is required to run the software (see [docs](https://kilosort.readthedocs.io/en/latest/hardware.html) for more recommendations). The software has been tested on Windows 10 and Ubuntu 20.04. 
 
 ### Instructions
 

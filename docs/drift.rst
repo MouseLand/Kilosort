@@ -1,7 +1,7 @@
 Drift correction
 ==============================
 
-Here we get into the details of drift: why it happens, what it looks like, how you can characterize it for your own recordings, and how you can tell if Kilosort2 is fixing it. The examples in this section are from acute Neuropixels 1.0 recordings in head-fixed mice. 
+Here we get into the details of drift: why it happens, what it looks like, how you can characterize it for your own recordings, and how you can tell if Kilosort is fixing it. The examples in this section are from acute Neuropixels 1.0 recordings in head-fixed mice. 
 
 Why drift happens
 ------------------------
@@ -53,10 +53,10 @@ Now the PCA feature projections across all times, for the two channels where the
 
 
 .. image:: https://www.kilosort.org/static/images/scatter_PCA.png
-   :width: 400
+   :width: 200
 
 
 Finally, here are the projections on the time-varying templates of Kilosort2, showing that the units maintain a constant high separation throughout the recording:
 
 .. image:: https://www.kilosort.org/static/images/scatter_TEMP.png
-   :width: 400
+   :width: 300
