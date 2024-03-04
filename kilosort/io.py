@@ -176,9 +176,10 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     spike_templates = spike_templates[kept_spikes]
     spike_positions = spike_positions[kept_spikes]
     np.save((results_dir / 'spike_times.npy'), spike_times)
-    np.save((results_dir / 'spike_templates.npy'), spike_templates)
+    np.save((results_dir / 'spike_templates.npy'), spike_clusters)
     np.save((results_dir / 'spike_clusters.npy'), spike_clusters)
     np.save((results_dir / 'spike_positions.npy'), spike_positions)
+    np.save((results_dir / 'spike_detection_templates.npy'), spike_templates)
     np.save((results_dir / 'amplitudes.npy'), amp)
     # Save spike mask so that it can be applied to other variables if needed
     # when loading results.
