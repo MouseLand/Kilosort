@@ -24,7 +24,7 @@ Example notebooks are provided in the `docs/source/tutorials` folder and in the 
 **If you use Kilosort1-4, please cite the [paper](https://www.biorxiv.org/content/10.1101/2023.01.07.523036v1):**     
 Pachitariu, M., Sridhar, S., Pennington, J., & Stringer, C. (2024). Spike sorting with Kilosort4.
 
-# Installation
+## Installation
 
 ### System requirements
 
@@ -58,7 +58,7 @@ conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia
 This [video](https://www.youtube.com/watch?v=gsixIQYvj3U) has step-by-step installation instructions for NVIDIA drivers and pytorch in Windows (ignore the environment creation step with the .yml file, we have an environment already, to activate it use `conda activate kilosort`).
 
 
-# Running kilosort 
+## Running kilosort 
 
 1. Open the GUI with `python -m kilosort`
 2. Select the path to the binary file and optionally the results directory. We recommend putting the binary file on an SSD for faster processing. 
@@ -73,25 +73,18 @@ UserWarning: The given NumPy array is not writable, and PyTorch does not support
 
 ## Integration with Phy GUI
 
-[Phy](https://github.com/kwikteam/phy) provides a manual clustering interface for refining the results of the algorithm. Kilosort4 automatically sets the "good" units in Phy based on a <10% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
+[Phy](https://github.com/cortex-lab/phy) provides a manual clustering interface for refining the results of the algorithm. Kilosort4 automatically sets the "good" units in Phy based on a <10% estimated contamination rate with spikes from other neurons (computed from the refractory period violations relative to expected).
 
-Check out the [Phy](https://github.com/kwikteam/phy) repo for more in-depth install instructions, but in most cases the following should work: activate the kilosort environment (`conda activate kilosort`), and then
-~~~
-pip install phy --pre --upgrade
-~~~
+Check out the [Phy](https://github.com/cortex-lab/phy) repo for more install instructions. We recommend installing Phy in its own environment to avoid package conflicts.
 
-Note there is a deprecation by numpy that will break phy, so please `pip install numpy==1.23`.
-
-Next change to the results directory from kilosort4 (by default a folder named `kilosort4` in the binary directory) and run:
+After installation, activate your Phy environment and navigate to the results directory from Kilosort4 (by default, a folder named `kilosort4` in the same directory as the binary data file) and run:
 ~~~
 phy template-gui params.py
 ~~~
 
-Now phy should run correctly in the `kilosort` environment you made (if not make a new environment for phy).
+## Developer instructions
 
-### Developer instructions
-
-Need to install pytest
+First, you will need to install pytest
 ~~~
 pip install pytest
 ~~~
@@ -106,4 +99,4 @@ To run on GPU:
 pytest --gpu --runslow
 ~~~
 
-Omitting the `--runslow` will only run the faster unit tests, not the slower regression tests.
+Omitting the `--runslow` flag will only run the faster unit tests, not the slower regression tests.
