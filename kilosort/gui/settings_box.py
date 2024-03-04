@@ -131,7 +131,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         layout.addWidget(self.select_data_file, row_count, 0, 1, 3)
         layout.addWidget(self.data_file_path_input, row_count, 3, 1, 2)
         self.select_data_file.clicked.connect(self.on_select_data_file_clicked)
-        self.data_file_path_input.textChanged.connect(self.on_data_file_path_changed)
         self.data_file_path_input.editingFinished.connect(
             self.on_data_file_path_changed
         )
@@ -145,9 +144,6 @@ class SettingsBox(QtWidgets.QGroupBox):
         layout.addWidget(self.results_directory_input, row_count, 3, 1, 2)
         self.select_results_directory.clicked.connect(
             self.on_select_results_dir_clicked
-        )
-        self.results_directory_input.textChanged.connect(
-            self.on_results_directory_changed
         )
         self.results_directory_input.editingFinished.connect(
             self.on_results_directory_changed
@@ -313,10 +309,12 @@ class SettingsBox(QtWidgets.QGroupBox):
         )
         if data_file_name:
             self.data_file_path_input.setText(data_file_name)
+            self.data_file_path_input.editingFinished.emit()
 
     def set_data_file_path_from_drag_and_drop(self, filename):
         if Path(filename).suffix in ['.bin', '.dat', '.bat', '.raw']:
             self.data_file_path_input.setText(filename)
+            self.data_file_path_input.editingFinished.emit()
             logger.info(f"File at location: {filename} is ready to load!")
 
         else:
@@ -348,6 +346,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         )
         if results_dir_name:
             self.results_directory_input.setText(results_dir_name.toLocalFile())
+            self.results_directory_input.editingFinished.emit()
 
     def on_results_directory_changed(self):
         results_directory = Path(self.results_directory_input.text())
@@ -372,6 +371,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             parent_folder = data_file_path.parent
             results_folder = parent_folder / "kilosort4"
             self.results_directory_input.setText(results_folder.as_posix())
+            self.results_directory_input.editingFinished.emit()
             self.data_file_path = data_file_path
             self.gui.qt_settings.setValue('data_file_path', data_file_path)
 
@@ -664,8 +664,10 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def reset(self):
         self.data_file_path_input.clear()
+        self.data_file_path = None
         self.gui.qt_settings.setValue('data_file_path', None)
         self.results_directory_input.clear()
+        self.results_directory_path = None
         self.gui.qt_settings.setValue('results_dir', None)
         self.probe_layout_selector.setCurrentIndex(0)
         self.gui.qt_settings.setValue('probe_layout', None)
