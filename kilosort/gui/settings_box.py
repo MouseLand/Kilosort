@@ -41,11 +41,10 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         self.convert_data_button = QtWidgets.QPushButton("Convert to Binary")
 
-        if self.data_file_path is not None:
+        self.results_directory_path = self.gui.results_directory
+        if self.data_file_path is not None and self.results_directory_path is None:
             self.results_directory_path = self.data_file_path.parent.joinpath('kilosort4/')
-        else:
-            self.results_directory_path = None
-        self.gui.results_directory = self.results_directory_path 
+
         self.select_results_directory = QtWidgets.QPushButton(
             "Select Results Dir."
         )
@@ -373,7 +372,6 @@ class SettingsBox(QtWidgets.QGroupBox):
             parent_folder = data_file_path.parent
             results_folder = parent_folder / "kilosort4"
             self.results_directory_input.setText(results_folder.as_posix())
-
             self.data_file_path = data_file_path
             self.gui.qt_settings.setValue('data_file_path', data_file_path)
 

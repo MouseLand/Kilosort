@@ -326,6 +326,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.update_run_box()
 
         self.disable_all_input(False)
+        self.data_view_box.whitened_button.click()
         QtWidgets.QApplication.restoreOverrideCursor()
 
     def load_binary_files(self):
@@ -426,7 +427,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         )
 
     def setup_context_for_run(self):
-        self.set_parameters()
+        self.load_data()
         self.context["params"] = self.params
 
     @QtCore.pyqtSlot(object)
