@@ -19,7 +19,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.probe_view = pg.PlotWidget()
 
         self.info_message = QtWidgets.QLabel(
-            "scroll to zoom, click to view channel,\nright click to disable channel"
+            "Scroll to zoom\n Left click to toggle channels."
         )
 
         self.setup()
