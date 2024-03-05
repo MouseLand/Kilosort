@@ -469,6 +469,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                 total_channels = self.probe_layout["n_chan"]
                 total_channels = self.estimate_total_channels(total_channels)
                 self.n_chan_bin_input.setText(str(total_channels))
+                self.n_chan_bin_input.editingFinished.emit()
 
                 self.enable_preview_probe()
 
@@ -558,6 +559,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                         total_channels = self.probe_layout["n_chan"]
                         total_channels = self.estimate_total_channels(total_channels)
                         self.n_chan_bin_input.setText(str(total_channels))
+                        self.n_chan_bin_input.editingFinished.emit()
 
                         self.enable_preview_probe()
 
