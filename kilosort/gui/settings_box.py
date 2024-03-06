@@ -220,6 +220,9 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def set_cached_field_values(self):
         # Only run during setup, so that resetting gui always goes to defaults.
+        if self.gui.qt_settings.contains('data_dtype'):
+            dtype = self.gui.qt_settings.value('data_dtype')
+            self.dtype_selector.setCurrentText(dtype)
         epw = self.extra_parameters_window
         for k, p in MAIN_PARAMETERS.items():
             if self.gui.qt_settings.contains(k):
@@ -585,6 +588,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def on_data_dtype_selected(self, data_dtype):
         self.data_dtype = data_dtype
+        self.gui.qt_settings.setValue('data_dtype', data_dtype)
         if self.check_settings():
             self.enable_load()
 
