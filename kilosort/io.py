@@ -448,8 +448,8 @@ class BinaryRWFile:
         samples = self.file[sample_indices]
         # Shift data to +/- 2**15
         if self.dtype == 'uint16':
+            samples = samples.astype('float32')
             samples = samples - 2**15
-            samples = samples.astype('int16')
 
         return samples
     
@@ -488,8 +488,8 @@ class BinaryRWFile:
         data = data.T
         # Shift data to +/- 2**15
         if self.dtype == 'uint16':
+            data = data.astype('float32')
             data = data - 2**15
-            data = data.astype('int16')
 
         nsamp = data.shape[-1]
         X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device=self.device)
