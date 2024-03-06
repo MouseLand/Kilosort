@@ -12,7 +12,7 @@ install_deps = [
 ]
 
 gui_deps = [
-    'pyqtgraph<=0.12',
+    'pyqtgraph>=0.13.0',
     'pyqt5',
     'pyqt5.sip',
     'google-cloud-storage',
