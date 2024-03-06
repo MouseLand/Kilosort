@@ -232,6 +232,10 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.settings_box.settingsUpdated.connect(self.load_data)
         self.settings_box.previewProbe.connect(self.probe_view_box.preview_probe)
+        # Don't allow spike sorting to run until new data has actually
+        # been loaded.
+        self.settings_box.dataChanged.connect(self.disable_run)
+        self.settings_box.dataChanged.connect(self.auto_load_new_data)
 
         self.data_view_box.channelChanged.connect(self.probe_view_box.update_probe_view)
         self.data_view_box.modeChanged.connect(
@@ -294,6 +298,12 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def load_data(self):
         self.set_parameters()
         self.do_load()
+        self.enable_run()
+
+    @QtCore.pyqtSlot()
+    def auto_load_new_data(self):
+        if self.auto_load:
+            self.load_data()
 
     def set_parameters(self):
         settings = self.settings_box.settings
@@ -448,6 +458,14 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def update_run_box(self):
         self.run_box.set_data_path(self.data_path)
         self.run_box.set_results_directory(self.results_directory)
+
+    @QtCore.pyqtSlot()
+    def disable_run(self):
+        self.run_box.disable_all_buttons()
+
+    @QtCore.pyqtSlot()
+    def enable_run(self):
+        self.run_box.reenable_buttons()
 
     @QtCore.pyqtSlot(dict)
     def update_sorting_status(self, status_dict):

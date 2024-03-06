@@ -22,6 +22,7 @@ _ALLOWED_FILE_TYPES = ['.bin', '.dat', '.bat', '.raw']  # For binary data
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.pyqtSignal()
     previewProbe = QtCore.pyqtSignal(object)
+    dataChanged = QtCore.pyqtSignal()
 
     def __init__(self, parent):
         QtWidgets.QGroupBox.__init__(self, parent=parent)
@@ -380,6 +381,8 @@ class SettingsBox(QtWidgets.QGroupBox):
 
             if self.check_settings():
                 self.enable_load()
+                self.dataChanged.emit()
+
         except AssertionError:
             logger.exception("Please select a valid binary file path.")
             self.disable_load()
