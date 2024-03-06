@@ -120,29 +120,43 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         layout = QtWidgets.QGridLayout()
         row_count = 0
+        rspan = 3
+        col1 = 0
+        col2 = 3
+        cspan1 = 3
+        cspan2 = 3
+        dbl = cspan1 + cspan2
 
         font = self.load_settings_button.font()
         font.setPointSize(18)
         self.load_settings_button.setFont(font)
         self.load_settings_button.setDisabled(True)
         self.load_settings_button.clicked.connect(self.update_settings)
-        layout.addWidget(self.load_settings_button, row_count, 0, 1, 5)
+        layout.addWidget(self.load_settings_button, row_count, col1, rspan, dbl)
 
-        row_count += 1
-        layout.addWidget(self.select_data_file, row_count, 0, 1, 3)
-        layout.addWidget(self.data_file_path_input, row_count, 3, 1, 2)
+        row_count += rspan
+        layout.addWidget(self.select_data_file, row_count, col1, rspan, cspan1)
+        layout.addWidget(self.convert_data_button, row_count, col2, rspan, cspan2)
+        self.convert_data_button.clicked.connect(self.open_data_converter)
+        row_count += rspan
+        layout.addWidget(self.data_file_path_input, row_count, col1, rspan, dbl)
         self.select_data_file.clicked.connect(self.on_select_data_file_clicked)
         self.data_file_path_input.editingFinished.connect(
             self.on_data_file_path_changed
         )
 
+        # Add small vertical space for visual grouping
+        row_count += rspan
+        layout.addWidget(QtWidgets.QWidget(), row_count, 0, 1, dbl)
         row_count += 1
-        layout.addWidget(self.convert_data_button, row_count, 0, 1, 3)
-        self.convert_data_button.clicked.connect(self.open_data_converter)
 
-        row_count += 1
-        layout.addWidget(self.select_results_directory, row_count, 0, 1, 3)
-        layout.addWidget(self.results_directory_input, row_count, 3, 1, 2)
+        layout.addWidget(
+            self.select_results_directory, row_count, col1, rspan, cspan1
+            )
+        row_count += rspan
+        layout.addWidget(
+            self.results_directory_input, row_count, col1, rspan, dbl
+            )
         self.select_results_directory.clicked.connect(
             self.on_select_results_dir_clicked
         )
@@ -150,9 +164,19 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.on_results_directory_changed
         )
 
+        # Add small vertical space for visual grouping
+        row_count += rspan
+        layout.addWidget(QtWidgets.QWidget(), row_count, 0, 1, dbl)
         row_count += 1
-        layout.addWidget(self.probe_layout_text, row_count, 0, 1, 3)
-        layout.addWidget(self.probe_layout_selector, row_count, 3, 1, 2)
+
+        layout.addWidget(self.probe_layout_text, row_count, col1, rspan, cspan1)
+        layout.addWidget(
+            self.probe_preview_button, row_count, col2, rspan, cspan2)
+        self.probe_preview_button.setDisabled(True)
+        self.probe_preview_button.clicked.connect(self.show_probe_layout)
+
+        row_count += rspan
+        layout.addWidget(self.probe_layout_selector, row_count, col1, rspan, dbl)
         self.probe_layout_selector.setSizeAdjustPolicy(
             QtWidgets.QComboBox.AdjustToMinimumContentsLength
         )
@@ -160,15 +184,13 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.on_probe_layout_selected
         )
 
+        # Add small vertical space for visual grouping
+        row_count += rspan
+        layout.addWidget(QtWidgets.QWidget(), row_count, 0, 1, dbl)
         row_count += 1
-        self.probe_preview_button.setDisabled(True)
-        self.probe_preview_button.clicked.connect(self.show_probe_layout)
-        layout.addWidget(
-            self.probe_preview_button, row_count, 3, 1, 2)
 
-        row_count += 1
-        layout.addWidget(self.dtype_selector_text, row_count, 0, 1, 3)
-        layout.addWidget(self.dtype_selector, row_count, 3, 1, 2)
+        layout.addWidget(self.dtype_selector_text, row_count, col1, rspan, cspan1)
+        layout.addWidget(self.dtype_selector, row_count, col2, rspan, cspan2)
         self.dtype_selector.setSizeAdjustPolicy(
             QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
         )
@@ -176,9 +198,9 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.on_data_dtype_selected
         )
 
-        row_count += 1
-        layout.addWidget(self.device_selector_text, row_count, 0, 1, 3)
-        layout.addWidget(self.device_selector, row_count, 3, 1, 2)
+        row_count += rspan
+        layout.addWidget(self.device_selector_text, row_count, col1, rspan, cspan1)
+        layout.addWidget(self.device_selector, row_count, col2, rspan, cspan2)
         self.device_selector.setSizeAdjustPolicy(
             QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
         )
@@ -187,22 +209,32 @@ class SettingsBox(QtWidgets.QGroupBox):
         )
 
         for k in list(MAIN_PARAMETERS.keys()):
-            row_count += 1
-            layout.addWidget(getattr(self, f'{k}_text'), row_count, 0, 1, 3)
-            layout.addWidget(getattr(self, f'{k}_input'), row_count, 3, 1, 2)
+            row_count += rspan
+            layout.addWidget(
+                getattr(self, f'{k}_text'), row_count, col1, rspan, cspan1
+                )
+            layout.addWidget(
+                getattr(self, f'{k}_input'), row_count, col2, rspan, cspan2
+                )
             inp = getattr(self, f'{k}_input')
             inp.editingFinished.connect(self.update_parameter)
 
-        row_count +=1
-        layout.addWidget(self.extra_parameters_button, row_count, 0, 1, 5)
+        row_count += rspan
+        layout.addWidget(
+            self.extra_parameters_button, row_count, col1, rspan, dbl
+            )
         self.extra_parameters_button.clicked.connect(
             lambda x: self.extra_parameters_window.show()
             )
         
-        row_count += 1
-        layout.addWidget(self.import_settings_button, row_count, 0, 1, 3)
+        row_count += rspan
+        layout.addWidget(
+            self.import_settings_button, row_count, col1, rspan, cspan1
+            )
         self.import_settings_button.clicked.connect(self.import_settings)
-        layout.addWidget(self.export_settings_button, row_count, 3, 1, 2)
+        layout.addWidget(
+            self.export_settings_button, row_count, col2, rspan, cspan2
+            )
         self.export_settings_button.clicked.connect(self.export_settings)
 
         self.setLayout(layout)
