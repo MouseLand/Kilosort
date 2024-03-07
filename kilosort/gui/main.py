@@ -243,10 +243,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         )
         self.data_view_box.intervalUpdated.connect(self.load_data)
 
-        self.probe_view_box.channelSelected.connect(
-            self.data_view_box.change_primary_channel
-        )
-
         self.run_box.updateContext.connect(self.update_context)
         self.run_box.disableInput.connect(self.disable_all_input)
         self.run_box.sortingStepStatusUpdate.connect(self.update_sorting_status)
