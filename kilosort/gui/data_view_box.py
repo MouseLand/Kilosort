@@ -31,8 +31,6 @@ class DataViewBox(QtWidgets.QGroupBox):
         )
         self.time_label = pg.TextItem(color=(180, 180, 180))
 
-        # self.traces_button = QtWidgets.QPushButton("Traces")
-        # self.colormap_button = QtWidgets.QPushButton("Colormap")
         self.raw_button = QtWidgets.QPushButton("Raw")
         self.whitened_button = QtWidgets.QPushButton("Whitened")
         # Set minimum and maximum time in seconds for spike sorting.
@@ -41,8 +39,6 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.tmin = float(self.tmin_input.text())
         self.tmax_input = self.gui.settings_box.tmax_input
         self.tmax = float(self.tmax_input.text())
-        # self.prediction_button = QtWidgets.QPushButton("Prediction")
-        # self.residual_button = QtWidgets.QPushButton("Residual")
 
         self.mode_buttons_group = QtWidgets.QButtonGroup(self)
         self.view_buttons_group = QtWidgets.QButtonGroup(self)
@@ -50,26 +46,18 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.view_buttons = {
             "raw": self.raw_button,
             "whitened": self.whitened_button,
-            # "prediction": self.prediction_button,
-            # "residual": self.residual_button,
         }
 
         self.input_fields = [self.tmin_input, self.tmax_input]
 
-        # self.mode_buttons = [self.traces_button, self.colormap_button]
-
         self._view_button_checked_bg_colors = {
             "raw": "white",
             "whitened": "lightblue",
-            # "prediction": "green",
-            # "residual": "red",
         }
 
         self._keys = [
             "raw",
             "whitened",
-            # "prediction",
-            # "residual",
         ]
 
         self.view_buttons_state = {key: False for key in self._keys}
@@ -107,14 +95,10 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.traces_scaling_factor = {
             "raw": 1,
             "whitened": 15,
-            # "prediction": 15,
-            # "residual": 15,
         }
         self.traces_curve_color = {
             "raw": "w",
             "whitened": "c",
-            # "prediction": "g",
-            # "residual": "r",
         }
 
         # colormap settings
@@ -144,7 +128,6 @@ class DataViewBox(QtWidgets.QGroupBox):
 
         self.time_seek.sigPositionChanged.connect(self.update_seek_text)
         self.time_seek.sigPositionChanged.connect(self.update_seek_position)
-        # self.time_seek.sigPositionChangeFinished.connect(self.update_seek_position)
 
         self.data_view_widget.setMenuEnabled(False)
         self.data_view_widget.setMouseEnabled(True)
@@ -169,14 +152,6 @@ class DataViewBox(QtWidgets.QGroupBox):
 
         data_controls_layout = QtWidgets.QHBoxLayout()
 
-        # self.traces_button.setCheckable(True)
-        # self.colormap_button.setCheckable(True)
-        # self.colormap_button.setChecked(True)
-
-        # for mode_button in self.mode_buttons:
-        #     self.mode_buttons_group.addButton(mode_button)
-        #     mode_button.clicked.connect(self.toggle_mode_from_click)
-        # self.mode_buttons_group.setExclusive(True)
 
         for key in self._keys:
             button = self.view_buttons[key]
@@ -198,8 +173,6 @@ class DataViewBox(QtWidgets.QGroupBox):
             self.view_buttons[key].isChecked() for key in self._keys
         ]
 
-        # data_controls_layout.addWidget(self.traces_button)
-        # data_controls_layout.addWidget(self.colormap_button)
 
         # Connect time controls
         self.tmin_input.editingFinished.connect(self.on_tmin_edited)
@@ -208,8 +181,6 @@ class DataViewBox(QtWidgets.QGroupBox):
         data_controls_layout.addStretch(0)
         data_controls_layout.addWidget(self.raw_button)
         data_controls_layout.addWidget(self.whitened_button)
-        # data_controls_layout.addWidget(self.prediction_button)
-        # data_controls_layout.addWidget(self.residual_button)
 
         data_seek_layout = QtWidgets.QHBoxLayout()
         data_seek_layout.addWidget(self.data_seek_widget)
@@ -281,10 +252,7 @@ class DataViewBox(QtWidgets.QGroupBox):
     @QtCore.pyqtSlot(float)
     def on_wheel_scroll_plus_control(self, direction):
         if self.context_set():
-            if self.traces_mode_active():
-                self.shift_primary_channel(direction)
-            else:
-                self.change_displayed_channel_count(direction)
+            self.change_displayed_channel_count(direction)
 
     @QtCore.pyqtSlot(float)
     def on_wheel_scroll_plus_shift(self, direction):
@@ -295,68 +263,6 @@ class DataViewBox(QtWidgets.QGroupBox):
     def on_wheel_scroll_plus_alt(self, direction):
         if self.context_set():
             self.change_plot_scaling(direction)
-
-    # @QtCore.pyqtSlot()
-    # def toggle_mode_from_click(self):
-    #     if self.traces_mode_active():
-    #         self.modeChanged.emit("traces", self.get_currently_displayed_channel_count())
-    #         self.view_buttons_group.setExclusive(False)
-    #         self.update_plot()
-    #
-    #     if self.colormap_mode_active():
-    #         self.modeChanged.emit("colormap", self.get_currently_displayed_channel_count())
-    #         self._traces_to_colormap_toggle()
-    #         self.update_plot()
-
-    # def toggle_mode(self):
-    #     if self.colormap_mode_active():
-    #         self.traces_button.toggle()
-    #         self.modeChanged.emit("traces", self.get_currently_displayed_channel_count())
-    #         self.view_buttons_group.setExclusive(False)
-    #         self.update_plot()
-    #
-    #     elif self.traces_mode_active():
-    #         self.colormap_button.toggle()
-    #         self.modeChanged.emit("colormap", self.get_currently_displayed_channel_count())
-    #         self._traces_to_colormap_toggle()
-    #         self.update_plot()
-    #
-    #     else:
-    #         pass
-    #
-    # def _traces_to_colormap_toggle(self):
-    #     if sum([button.isChecked() for button in self.view_buttons.values()]) == 1:
-    #         # if exactly one mode is active, that mode persists into colormap mode
-    #         self.update_plot()
-    #     else:
-    #         # if more than one mode is active, raw mode is activated on toggle
-    #         for name, button in self.view_buttons.items():
-    #             if button.isChecked():
-    #                 button.setChecked(False)
-    #             if button.isEnabled():
-    #                 button.setStyleSheet(
-    #                     "QPushButton {background-color: black; color: white;}"
-    #                 )
-    #             else:
-    #                 button.setStyleSheet(
-    #                     "QPushButton {background-color: black; color: gray;}"
-    #                 )
-    #
-    #         self.view_buttons["raw"].setChecked(True)
-    #         self.view_buttons["raw"].setStyleSheet(
-    #             f"QPushButton {{"
-    #             f"background-color: {self._view_button_checked_bg_colors['raw']}; "
-    #             f"color: black;"
-    #             f"}}"
-    #         )
-    #
-    #     self.view_buttons_group.setExclusive(True)
-
-    def traces_mode_active(self):
-        return False
-
-    def colormap_mode_active(self):
-        return True
 
     def context_set(self):
         return self.get_context() is not None
@@ -379,19 +285,13 @@ class DataViewBox(QtWidgets.QGroupBox):
             self.update_plot()
 
     def get_currently_displayed_channel_count(self):
-        if self.traces_mode_active():
-            return self.channels_displayed_traces
-        else:
-            count = self.channels_displayed_colormap
-            if count is None:
-                count = self.get_total_channels()
-            return count
+        count = self.channels_displayed_colormap
+        if count is None:
+            count = self.get_total_channels()
+        return count
 
     def set_currently_displayed_channel_count(self, count):
-        if self.traces_mode_active():
-            self.channels_displayed_traces = count
-        else:
-            self.channels_displayed_colormap = count
+        self.channels_displayed_colormap = count
 
     def get_total_channels(self):
         return self.gui.probe_view_box.total_channels
@@ -417,7 +317,6 @@ class DataViewBox(QtWidgets.QGroupBox):
 
     def refresh_plot_on_displayed_channel_count_change(self):
         self.plot_item.clear()
-        # self.create_plot_items()
         self.update_plot()
 
     def shift_current_time(self, direction):
@@ -463,33 +362,22 @@ class DataViewBox(QtWidgets.QGroupBox):
                 self.time_seek.setPos(new_time)
 
     def change_plot_scaling(self, direction):
-        if self.traces_mode_active():
-            scale_factor = self.scale_factor * (1.1 ** direction)
-            if 0.1 < scale_factor < 10.0:
-                self.scale_factor = scale_factor
+        colormap_min = self.colormap_min + (direction * 0.05)
+        colormap_max = self.colormap_max - (direction * 0.05)
+        if 0.0 <= colormap_min < colormap_max <= 1.0:
+            self.colormap_min = colormap_min
+            self.colormap_max = colormap_max
+            self.lookup_table = self.generate_lookup_table(
+                self.colormap_min, self.colormap_max
+            )
 
-                self.update_plot()
-
-        if self.colormap_mode_active():
-            colormap_min = self.colormap_min + (direction * 0.05)
-            colormap_max = self.colormap_max - (direction * 0.05)
-            if 0.0 <= colormap_min < colormap_max <= 1.0:
-                self.colormap_min = colormap_min
-                self.colormap_max = colormap_max
-                self.lookup_table = self.generate_lookup_table(
-                    self.colormap_min, self.colormap_max
-                )
-
-                self.update_plot()
+            self.update_plot()
 
     def on_scene_clicked(self, ev):
         if self.context_set():
             if ev.button() == QtCore.Qt.LeftButton:
                 sample_rate = self.get_context().params["fs"]
-                if self.traces_mode_active():
-                    x_pos = self.data_view_box.mapSceneToView(ev.pos()).x()
-                else:
-                    x_pos = self.colormap_image.mapFromScene(ev.pos()).x()
+                x_pos = self.colormap_image.mapFromScene(ev.pos()).x()
                 plot_range = self.plot_range * sample_rate
                 fraction = x_pos / plot_range
                 if fraction > 0.5:
@@ -535,7 +423,6 @@ class DataViewBox(QtWidgets.QGroupBox):
     def update_seek_position(self, seek):
         position = seek.pos()[0]
         self.current_time = position - self.tmin
-        # self.clear_cached_traces()
         try:
             self.update_plot()
         except ValueError:
@@ -547,14 +434,7 @@ class DataViewBox(QtWidgets.QGroupBox):
 
     @QtCore.pyqtSlot()
     def enable_view_buttons(self):
-        if self.colormap_mode_active():
-            # if self.prediction_button.isChecked() or self.residual_button.isChecked():
-            self.raw_button.click()
-        # else:
-        #     if self.prediction_button.isChecked():
-        #         self.prediction_button.click()
-        #     if self.residual_button.isChecked():
-        #         self.residual_button.click()
+        self.raw_button.click()
 
         if self.whitening_matrix is not None:
             self.whitened_button.setEnabled(True)
@@ -567,42 +447,13 @@ class DataViewBox(QtWidgets.QGroupBox):
                 "QPushButton {background-color: black; color: gray;}"
             )
 
-        # if self.sorting_status["preprocess"] and self.sorting_status["spikesort"]:
-        #     self.prediction_button.setEnabled(True)
-        #     self.prediction_button.setStyleSheet(
-        #         "QPushButton {background-color: black; color: white;}"
-        #     )
-        #     self.residual_button.setEnabled(True)
-        #     self.residual_button.setStyleSheet(
-        #         "QPushButton {background-color: black; color: white;}"
-        #     )
-        # else:
-        #     self.prediction_button.setDisabled(True)
-        #     self.prediction_button.setStyleSheet(
-        #         "QPushButton {background-color: black; color: gray;}"
-        #     )
-        #     self.residual_button.setDisabled(True)
-        #     self.residual_button.setStyleSheet(
-        #         "QPushButton {background-color: black; color: gray;}"
-        #     )
-
     def reset(self):
         self.plot_item.clear()
-        # self.delete_curve_plot_items()
-        # self.clear_cached_traces()
         self.clear_cached_whitening_matrix()
 
     def prepare_for_new_context(self):
         self.plot_item.clear()
-        # self.delete_curve_plot_items()
-        # self.clear_cached_traces()
         self.clear_cached_whitening_matrix()
-
-    # @QtCore.pyqtSlot(object)
-    # def clear_cached_traces(self, _=None):
-    #     self.whitened_traces = None
-    #     self.residual_traces = None
-    #     self.prediction_traces = None
 
     def clear_cached_whitening_matrix(self):
         self.whitening_matrix = None
@@ -612,89 +463,6 @@ class DataViewBox(QtWidgets.QGroupBox):
         positions = np.linspace(colormap_min, colormap_max, len(self._colors))
         color_map = pg.ColorMap(pos=positions, color=self._colors)
         return color_map.getLookupTable(nPts=num_points)
-
-    # def create_plot_items(self):
-    #     """
-    #     Create curve plot items for each active view.
-    #
-    #     Loops over all views and creates curve plot items for each view.
-    #     Creating plot items beforehand results in quicker plotting and a
-    #     smoother GUI experience when scrolling through data in traces
-    #     mode.
-    #     """
-    #
-    #     for view in self._keys:
-    #         self.traces_plot_items[view] = []
-    #         for c, channel in enumerate(
-    #                 range(
-    #                     self.primary_channel + self.channels_displayed_traces,
-    #                     self.primary_channel,
-    #                     -1
-    #                 )
-    #         ):
-    #             curve = pg.PlotCurveItem()
-    #             curve.setPos(0, 200 * c)
-    #             self.plot_item.addItem(curve)
-    #
-    #             self.traces_plot_items[view].append(curve)
-    #
-    # def add_traces_to_plot_items(
-    #         self,
-    #         traces: np.ndarray,
-    #         view: str
-    # ):
-    #     """
-    #     Update plot items with traces.
-    #
-    #     Loops over traces and plots each trace using the setData() method
-    #     of pyqtgraph's PlotCurveItem. The color of the trace depends on
-    #     the mode requested (raw, whitened, prediction, residual). Each trace
-    #     is also scaled by a certain factor defined in self.traces_scaling_factor.
-    #
-    #     Parameters
-    #     ----------
-    #     traces : numpy.ndarray
-    #         Data to be plotted.
-    #     view : str
-    #         One of "raw", "whitened", "prediction" and "residual" views
-    #     """
-    #     for i, curve in enumerate(self.traces_plot_items[view]):
-    #         try:
-    #             trace = traces[:, i] * self.scale_factor * self.traces_scaling_factor[view]
-    #
-    #             color = (
-    #                 self.traces_curve_color[view]
-    #             )
-    #             curve.setPen(color=color, width=1)
-    #             curve.setData(trace)
-    #         except IndexError:
-    #             curve.setData()
-    #
-    # def hide_inactive_traces(self):
-    #     """
-    #     Use setData() on all PlotCurveItems belonging to inactive views.
-    #     """
-    #     for view in self._keys:
-    #         if not self.view_buttons[view].isChecked():
-    #             for curve_item in self.traces_plot_items[view]:
-    #                 curve_item.setData()
-    #
-    # def hide_traces(self):
-    #     """
-    #     Use setData() on all PlotCurveItems in the plot.
-    #
-    #     Used when switching from traces mode to colormap mode.
-    #     """
-    #     for view in self._keys:
-    #         for curve_item in self.traces_plot_items[view]:
-    #             curve_item.setData()
-
-    # def delete_curve_plot_items(self):
-    #     """
-    #     Deletes all PlotCurveItems in self.traces_plot_items.
-    #     """
-    #     for view in self.traces_plot_items.keys():
-    #         self.traces_plot_items[view] = []
 
     def add_image_to_plot(self, raw_traces, level_min, level_max):
         image_item = pg.ImageItem(setPxMode=False)
@@ -715,34 +483,6 @@ class DataViewBox(QtWidgets.QGroupBox):
     @QtCore.pyqtSlot(object)
     def set_highpass_filter(self, filter):
         self.highpass_filter = filter
-
-    # def calculate_approx_whitening_matrix(self, context):
-    #     raw_data = context.raw_data
-    #     params = context.params
-    #     probe = context.probe
-    #     # intermediate = context.intermediate
-    #
-    #     @QtCore.pyqtSlot()
-    #     def _call_enable_buttons():
-    #         self.enable_view_buttons()
-    #
-    #     # if "Wrot" in intermediate and self.whitening_matrix is None:
-    #     #     self.whitening_matrix = intermediate.Wrot
-    #     #     logger.info("Approx. whitening matrix loaded from existing context.")
-    #     #     _call_enable_buttons()
-    #     #
-    #     # elif (self.whitening_matrix is None) and not (self.thread_pool.activeThreadCount() > 0):
-    #     if (self.whitening_matrix is None) and not (self.thread_pool.activeThreadCount() > 0):
-    #         whitening_worker = WhiteningMatrixCalculator(
-    #             raw_data=raw_data,
-    #             params=params,
-    #             probe=probe
-    #         )
-    #
-    #         whitening_worker.signals.result.connect(self.set_whitening_matrix)
-    #         whitening_worker.signals.finished.connect(_call_enable_buttons)
-    #
-    #         self.thread_pool.start(whitening_worker)
 
     def update_plot(self, context=None):
         if context is None:
@@ -786,27 +526,15 @@ class DataViewBox(QtWidgets.QGroupBox):
             to_display = np.arange(start_channel, end_channel, dtype=int)
             to_display = to_display[to_display < max_channels].tolist()
 
-            if self.traces_mode_active():
-                self._update_traces(
-                    params=params,
-                    probe=probe,
-                    binary_file=binary_file,
-                    filt_binary_file=filt_binary_file,
-                    to_display=to_display,
-                    start_time=start_time,
-                    end_time=end_time,
-                )
-
-            if self.colormap_mode_active():
-                self._update_colormap(
-                    params=params,
-                    probe=probe,
-                    binary_file=binary_file,
-                    filt_binary_file=filt_binary_file,
-                    to_display=to_display,
-                    start_time=start_time,
-                    end_time=end_time,
-                )
+            self._update_colormap(
+                params=params,
+                probe=probe,
+                binary_file=binary_file,
+                filt_binary_file=filt_binary_file,
+                to_display=to_display,
+                start_time=start_time,
+                end_time=end_time,
+            )
 
             min_tick = start_time + (self.tmin * sample_rate)
             self.data_x_axis.setTicks(
@@ -820,95 +548,6 @@ class DataViewBox(QtWidgets.QGroupBox):
 
             self.data_view_widget.autoRange()
 
-    def _update_traces(
-            self,
-            params,
-            probe,
-            binary_file,
-            filt_binary_file,
-            to_display,
-            start_time,
-            end_time
-    ):
-        pass
-        # self.hide_inactive_traces()
-        #
-        # if self.raw_button.isChecked():
-        #     raw_traces = binary_file[start_time:end_time].numpy()
-        #     self.add_traces_to_plot_items(
-        #         traces=raw_traces[to_display, :].T,
-        #         view="raw",
-        #     )
-        #
-        # if self.whitened_button.isChecked():
-        #     whitened_traces = filt_binary_file[start_time:end_time].numpy()
-        #     self.add_traces_to_plot_items(
-        #         traces=whitened_traces[to_display, :].T,
-        #         view="whitened",
-        #     )
-        #
-        # if self.prediction_button.isChecked():
-        #     if self.prediction_traces is None:
-        #         prediction_traces = get_predicted_traces(
-        #             matrix_U=asnumpy(intermediate.U_s),
-        #             matrix_W=asnumpy(intermediate.Wphy),
-        #             sorting_result=intermediate.st3,
-        #             time_limits=(start_time, end_time),
-        #         )
-        #         self.prediction_traces = prediction_traces
-        #     else:
-        #         prediction_traces = self.prediction_traces
-        #
-        #     processed_traces = np.zeros_like(raw_traces, dtype=np.int16)
-        #     processed_traces[:, good_channels] = prediction_traces
-        #     self.add_traces_to_plot_items(
-        #         traces=processed_traces[:, to_display],
-        #         good_channels=good_channels[to_display],
-        #         view="prediction",
-        #     )
-        #
-        # if self.residual_button.isChecked():
-        #     if self.residual_traces is None:
-        #         if self.whitened_traces is None:
-        #             whitened_traces = filter_and_whiten(
-        #                 raw_traces=raw_traces,
-        #                 params=params,
-        #                 probe=probe,
-        #                 whitening_matrix=self.whitening_matrix,
-        #                 good_channels=good_channels,
-        #             )
-        #
-        #             self.whitened_traces = whitened_traces
-        #
-        #         else:
-        #             whitened_traces = self.whitened_traces
-        #
-        #         if self.prediction_traces is None:
-        #             prediction_traces = get_predicted_traces(
-        #                 matrix_U=asnumpy(intermediate.U_s),
-        #                 matrix_W=asnumpy(intermediate.Wphy),
-        #                 sorting_result=intermediate.st3,
-        #                 time_limits=(start_time, end_time),
-        #             )
-        #
-        #             self.prediction_traces = prediction_traces
-        #
-        #         else:
-        #             prediction_traces = self.prediction_traces
-        #
-        #         residual_traces = whitened_traces - prediction_traces
-        #
-        #         self.residual_traces = residual_traces
-        #     else:
-        #         residual_traces = self.residual_traces
-        #
-        #     processed_traces = np.zeros_like(raw_traces, dtype=np.int16)
-        #     processed_traces[:, good_channels] = residual_traces
-        #     self.add_traces_to_plot_items(
-        #         traces=processed_traces[:, to_display],
-        #         good_channels=good_channels[to_display],
-        #         view="residual",
-        #     )
 
     def _update_colormap(
             self,
@@ -920,7 +559,6 @@ class DataViewBox(QtWidgets.QGroupBox):
             start_time,
             end_time
     ):
-        # self.hide_traces()
 
         if self.raw_button.isChecked():
             colormap_min, colormap_max = -32.0, 32.0
@@ -941,67 +579,6 @@ class DataViewBox(QtWidgets.QGroupBox):
                 colormap_max,
             )
 
-        # elif self.prediction_button.isChecked():
-        #     if self.prediction_traces is None:
-        #         prediction_traces = get_predicted_traces(
-        #             matrix_U=asnumpy(intermediate.U_s),
-        #             matrix_W=asnumpy(intermediate.Wphy),
-        #             sorting_result=intermediate.st3,
-        #             time_limits=(start_time, end_time),
-        #         )
-        #         self.prediction_traces = prediction_traces
-        #     else:
-        #         prediction_traces = self.prediction_traces
-        #     colormap_min, colormap_max = -4.0, 4.0
-        #     processed_traces[:, good_channels] = prediction_traces
-        #     self.add_image_to_plot(
-        #         processed_traces[:, to_display],
-        #         colormap_min,
-        #         colormap_max,
-        #     )
-        #
-        # elif self.residual_button.isChecked():
-        #     if self.residual_traces is None:
-        #         if self.whitened_traces is None:
-        #             whitened_traces = filter_and_whiten(
-        #                 raw_traces=raw_traces,
-        #                 params=params,
-        #                 probe=probe,
-        #                 whitening_matrix=self.whitening_matrix,
-        #                 good_channels=good_channels,
-        #             )
-        #
-        #             self.whitened_traces = whitened_traces
-        #
-        #         else:
-        #             whitened_traces = self.whitened_traces
-        #
-        #         if self.prediction_traces is None:
-        #             prediction_traces = get_predicted_traces(
-        #                 matrix_U=asnumpy(intermediate.U_s),
-        #                 matrix_W=asnumpy(intermediate.Wphy),
-        #                 sorting_result=intermediate.st3,
-        #                 time_limits=(start_time, end_time),
-        #             )
-        #
-        #             self.prediction_traces = prediction_traces
-        #
-        #         else:
-        #             prediction_traces = self.prediction_traces
-        #
-        #         residual_traces = whitened_traces - prediction_traces
-        #
-        #         self.residual_traces = residual_traces
-        #     else:
-        #         residual_traces = self.residual_traces
-        #     colormap_min, colormap_max = -4.0, 4.0
-        #     processed_traces[:, good_channels] = residual_traces
-        #     self.add_image_to_plot(
-        #         processed_traces[:, to_display],
-        #         colormap_min,
-        #         colormap_max,
-        #     )
-
 
 class KSPlotWidget(pg.PlotWidget):
     signalChangeTimePoint = QtCore.pyqtSignal(float)
@@ -1013,11 +590,6 @@ class KSPlotWidget(pg.PlotWidget):
         super(KSPlotWidget, self).__init__(*args, **kwargs)
 
     def wheelEvent(self, ev):
-        # QtWidgets.QGraphicsView.wheelEvent(self, ev)
-        # if not self.mouseEnabled:
-        #     ev.ignore()
-        #     return
-
         delta = ev.angleDelta().y()
         if delta == 0:
             delta = ev.angleDelta().x()
@@ -1046,34 +618,3 @@ class KSPlotWidget(pg.PlotWidget):
 
     def mouseMoveEvent(self, ev):
         pass
-
-# class WhiteningMatrixCalculator(QtCore.QRunnable):
-#
-#     def __init__(self, raw_data, probe, params):
-#         super(WhiteningMatrixCalculator, self).__init__()
-#         self.raw_data = raw_data
-#         self.params = params
-#         self.probe = probe
-#
-#         self.signals = CalculatorSignals()
-#
-#     def run(self):
-#         try:
-#             logger.info("Calculating approx. whitening matrix.")
-#             whitening_matrix = get_approx_whitening_matrix(
-#                 raw_data=self.raw_data,
-#                 params=self.params,
-#                 probe=self.probe,
-#             )
-#         except Exception as e:
-#             logger.error(e)
-#         else:
-#             logger.info("Approx. whitening matrix calculated.")
-#             self.signals.result.emit(whitening_matrix)
-#         finally:
-#             self.signals.finished.emit()
-#
-#
-# class CalculatorSignals(QtCore.QObject):
-#     finished = QtCore.pyqtSignal()
-#     result = QtCore.pyqtSignal(object)

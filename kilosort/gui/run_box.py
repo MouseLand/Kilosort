@@ -22,14 +22,10 @@ class RunBox(QtWidgets.QGroupBox):
         self.layout = QtWidgets.QGridLayout()
 
         self.run_all_button = QtWidgets.QPushButton("Run")
-        # self.preprocess_button = QtWidgets.QPushButton("Preprocess")
         self.spike_sort_button = QtWidgets.QPushButton("Spikesort")
         
         self.buttons = [
             self.run_all_button,
-            # self.preprocess_button,
-            # self.spike_sort_button,
-            # self.export_button,
         ]
 
         self.data_path = None
@@ -37,7 +33,6 @@ class RunBox(QtWidgets.QGroupBox):
         self.results_directory = None
 
         self.sorting_status = {
-            # "preprocess": False,
             "spikesort": False,
             "export": False,
         }
@@ -49,14 +44,11 @@ class RunBox(QtWidgets.QGroupBox):
 
         self.progress_bar = QtWidgets.QProgressBar()
         self.layout.addWidget(self.progress_bar, 2, 0, 2, 2)
-        #self.gui.progress_bar = self.progress_bar 
 
         self.setup()
 
     def setup(self):
-        # self.run_all_button.clicked.connect(self.run_all)
         self.run_all_button.clicked.connect(self.spikesort)
-        # self.preprocess_button.clicked.connect(self.preprocess)
         self.spike_sort_button.clicked.connect(self.spikesort)
         
         self.run_all_button.setSizePolicy(
@@ -64,8 +56,6 @@ class RunBox(QtWidgets.QGroupBox):
         )
 
         self.layout.addWidget(self.run_all_button, 0, 0, 2, 2)
-        # self.layout.addWidget(self.preprocess_button, 0, 2, 1, 2)
-        # self.layout.addWidget(self.spike_sort_button, 0, 2, 1, 2)
         
         self.setLayout(self.layout)
 
@@ -79,11 +69,6 @@ class RunBox(QtWidgets.QGroupBox):
     def reenable_buttons(self):
         self.run_all_button.setEnabled(True)
         self.spike_sort_button.setEnabled(True)
-        # self.preprocess_button.setEnabled(True)
-        # if self.sorting_status["preprocess"]:
-        #     self.spike_sort_button.setEnabled(True)
-        # else:
-        #     self.spike_sort_button.setEnabled(False)
         
     @QtCore.pyqtSlot(bool)
     def disable_all_input(self, value):
@@ -109,41 +94,12 @@ class RunBox(QtWidgets.QGroupBox):
         self.sorting_status = status_dict
         self.reenable_buttons()
 
-    # @QtCore.pyqtSlot(object)
-    # def finished_preprocess(self, context):
-    #     self.updateContext.emit(context)
-    #     self.update_sorting_status("preprocess", True)
-
     @QtCore.pyqtSlot(object)
     def finished_spikesort(self, context):
         self.updateContext.emit(context)
         self.current_worker = None
         self.update_sorting_status("spikesort", True)
 
-    # @QtCore.pyqtSlot()
-    # def preprocess(self):
-    #     if self.get_current_context() is not None:
-    #         if self.sorting_status["preprocess"]:
-    #             response = QtWidgets.QMessageBox.warning(
-    #                 self,
-    #                 "Confirmation",
-    #                 "If you redo this step, all intermediate files from the previous "
-    #                 "sorting will be deleted. Are you sure you want to proceed?",
-    #                 QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-    #                 QtWidgets.QMessageBox.No
-    #             )
-    #
-    #             if response == QtWidgets.QMessageBox.Yes:
-    #                 self.change_sorting_status({
-    #                     "preprocess": False,
-    #                     "spikesort": False,
-    #                     "export": False
-    #                 })
-    #                 self.sortingStepStatusUpdate.emit(self.sorting_status)
-    #                 self.run_steps("preprocess")
-    #         else:
-    #             self.run_steps("preprocess")
-    #
     @QtCore.pyqtSlot()
     def spikesort(self):
         if self.get_current_context() is not None:

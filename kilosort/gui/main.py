@@ -150,8 +150,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
                 self.shift_data(time_shift=-1)
             elif event.key() == QtCore.Qt.Key_Right:
                 self.shift_data(time_shift=1)
-            # elif event.key() == QtCore.Qt.Key_C:
-            #     self.toggle_view()
             elif event.key() == QtCore.Qt.Key_1:
                 self.toggle_mode("raw")
             elif event.key() == QtCore.Qt.Key_2:
@@ -279,10 +277,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             self.data_view_box.raw_button.click()
         elif mode == "whitened":
             self.data_view_box.whitened_button.click()
-        # elif mode == "prediction":
-        #     self.data_view_box.prediction_button.click()
-        # elif mode == "residual":
-        #     self.data_view_box.residual_button.click()
         else:
             raise ValueError("Invalid mode requested!")
 
@@ -303,17 +297,13 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def set_parameters(self):
         settings = self.settings_box.settings
-        # advanced_options = self.settings_box.advanced_options
 
         self.data_path = settings["data_file_path"]
         self.results_directory = settings["results_dir"]
         self.probe_layout = settings["probe"]
         self.probe_name = settings["probe_name"]
-        # self.time_range = settings.pop("time_range")
         self.num_channels = settings["n_chan_bin"]
 
-        # params = KilosortParams()
-        # params = params.parse_obj(advanced_options)
         params = settings.copy()
 
         assert params
@@ -419,7 +409,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def setup_data_view(self):
         self.data_view_box.setup_seek(self.context)
-        # self.data_view_box.create_plot_items()
         self.data_view_box.enable_view_buttons()
 
     def setup_context(self):
@@ -448,7 +437,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def update_data_view(self):
         self.data_view_box.set_whitening_matrix(self.context.whitening_matrix)
-        # self.data_view_box.clear_cached_traces()
         self.data_view_box.update_plot(self.context)
 
     def update_run_box(self):
@@ -508,7 +496,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
                 self.context.filt_binary_file.close()
 
     def reset_gui(self):
-        # self.time_range = None
         self.num_channels = None
         self.context = None
 
