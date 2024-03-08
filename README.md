@@ -24,7 +24,7 @@ Example notebooks are provided in the `docs/source/tutorials` folder and in the 
 **If you use Kilosort1-4, please cite the [paper](https://www.biorxiv.org/content/10.1101/2023.01.07.523036v1):**     
 Pachitariu, M., Sridhar, S., Pennington, J., & Stringer, C. (2024). Spike sorting with Kilosort4.
 
-**Warning** :bangbang:: There was a bug in Kilosort 2.5 and 3 which caused fewer spikes to be detected in ~7ms periods at batch boundaries (every 2.1866s, issue #594). The patch0 releases fix this bug.
+**Warning** :bangbang:: There was a bug in Kilosort 2.5 and 3 (but not 1,2 and 4) which caused fewer spikes to be detected in ~7ms periods at batch boundaries (every 2.1866s, issue #594). The patch0 releases fix this bug. It is also advised not to manually change the batch size in any Matlab-version of Kilosort (1-3). 
 
 ## Installation
 
