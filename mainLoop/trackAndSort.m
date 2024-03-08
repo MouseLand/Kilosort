@@ -123,7 +123,10 @@ for ibatch = 1:niter
     % loading a single batch (same as everywhere)
     offset = 2 * ops.Nchan*batchstart(k);
     fseek(fid, offset, 'bof');
-    dat = fread(fid, [ops.Nchan NT + ops.ntbuff], '*int16');
+    % dat = fread(fid, [ops.Nchan NT + ops.ntbuff], '*int16');
+    % spike holes bug issue #594, location 1/2
+    dat = fread(fid, [ops.Nchan NT], '*int16');
+
     dat = dat';
     dataRAW = single(gpuArray(dat))/ ops.scaleproc;
     Params(1) = size(dataRAW,1);
@@ -184,7 +187,14 @@ for ibatch = 1:niter
     % of the raw data at this time
     
     % we carefully assign the correct absolute times to spikes found in this batch
-    toff = nt0min + t0 + NT*(k-1);
+    % toff = nt0min + t0 + NT*(k-1);
+    % spike holes bug issue #594, location 2/2    
+    ioffset         = ops.ntbuff;
+    if k==1
+        ioffset         = 0; % the first batch is special (no pre-buffer)
+    end
+    toff = nt0min + t0 -ioffset + (NT-ops.ntbuff)*(k-1);
+
     st = toff + double(st0);
     
     irange = ntot + [1:numel(x0)]; % spikes and features go into these indices
