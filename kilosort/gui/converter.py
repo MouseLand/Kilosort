@@ -35,8 +35,12 @@ class DataConversionBox(QtWidgets.QWidget):
         self.stream_name = None
         self.data_dtype = None
         self.file_object = None
-        self.dialog_path = Path('~').expanduser().as_posix()
         self.conversion_thread = None
+
+        if not self.gui.qt_settings.contains('last_data_location'):
+            self.gui.qt_settings.setValue(
+                'last_data_location', Path('~').expanduser().as_posix()
+                )
 
         layout = QtWidgets.QGridLayout()
 
@@ -67,10 +71,10 @@ class DataConversionBox(QtWidgets.QWidget):
         # Top right: kwargs for spikeinterface loader, dtype
         self.stream_id_text = QtWidgets.QLabel('stream_id (optional)')
         self.stream_id_input = QtWidgets.QLineEdit()
-        self.stream_id_input.textChanged.connect(self.set_stream_id)
+        self.stream_id_input.editingFinished.connect(self.set_stream_id)
         self.stream_name_text = QtWidgets.QLabel('stream_name (optional)')
         self.stream_name_input = QtWidgets.QLineEdit()
-        self.stream_name_input.textChanged.connect(self.set_stream_name)
+        self.stream_name_input.editingFinished.connect(self.set_stream_name)
         self.dtype_text = QtWidgets.QLabel("Data dtype (required):")
         self.dtype_note = QtWidgets.QLabel(
             "NOTE: this is the dtype for the new .bin file.\nIf the existing file"
@@ -136,12 +140,13 @@ class DataConversionBox(QtWidgets.QWidget):
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
             parent=self,
             caption="Choose file to load data from...",
-            directory=self.dialog_path,
+            directory=self.gui.qt_settings.value('last_data_location'),
             options=options,
         )
         self.filename = filename
         self.filename_input.setText(filename)
-        self.dialog_path = Path(filename).parent.as_posix()
+        data_location = Path(filename).parent.as_posix()
+        self.gui.qt_settings.setValue('last_data_location', data_location)
 
     @QtCore.pyqtSlot()
     def select_folder(self):
@@ -149,12 +154,13 @@ class DataConversionBox(QtWidgets.QWidget):
         directory = QtWidgets.QFileDialog.getExistingDirectory(
             parent=self,
             caption="Choose directory to load data from...",
-            directory=self.dialog_path,
+            directory=self.gui.qt_settings.value('last_data_location'),
             options=options,
         )
         self.filename = directory
         self.filename_input.setText(directory)
-        self.dialog_path = Path(directory).as_posix()
+        data_location = Path(directory).as_posix()
+        self.gui.qt_settings.setValue('last_data_location', data_location)
 
     @QtCore.pyqtSlot()
     def select_filetype(self):
@@ -314,5 +320,3 @@ class ConversionThread(QtCore.QThread):
             add_probe_to_settings(settings, probe_filename)
 
         settings.data_file_path_input.setText(self.bin_filename.as_posix())
-
-# TODO: pick up here, watch print numbers

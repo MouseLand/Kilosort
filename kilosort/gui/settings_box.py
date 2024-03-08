@@ -40,12 +40,10 @@ class SettingsBox(QtWidgets.QGroupBox):
             if self.data_file_path is not None else None
             )
         
-        if self.gui.qt_settings.contains('last_data_location'):
-            self.last_data_location = self.gui.qt_settings.value(
-                'last_data_location'
+        if not self.gui.qt_settings.contains('last_data_location'):
+            self.gui.qt_settings.setValue(
+                'last_data_location', Path('~').expanduser().as_posix()
                 )
-        else:
-            self.last_data_location = Path('~').expanduser().as_posix()
 
         self.convert_data_button = QtWidgets.QPushButton("Convert to Binary")
 
@@ -347,7 +345,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         data_file_name, _ = QtWidgets.QFileDialog.getOpenFileName(
             parent=self,
             caption="Choose data file to load...",
-            directory=self.last_data_location,
+            directory=self.gui.qt_settings.value('last_data_location'),
             options=file_dialog_options,
         )
         if data_file_name:
@@ -355,7 +353,6 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.data_file_path_input.editingFinished.emit()
             # Cache data folder for the next time a file is selected
             data_folder = Path(data_file_name).parent.as_posix()
-            self.last_data_location = data_folder
             self.gui.qt_settings.setValue('last_data_location', data_folder)
 
     def set_data_file_path_from_drag_and_drop(self, filename):
