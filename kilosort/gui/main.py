@@ -398,7 +398,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         #       (and because `run_kilosort` expects a filename that exists).
         filename = self.converter.filename
         self.settings_box.use_file_object = True
-        self.settings_box.data_file_path = filename
+        self.settings_box.data_file_path = Path(filename)
         self.settings_box.data_file_path_input.setText(filename)
 
     def setup_data_view(self):

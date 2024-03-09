@@ -172,7 +172,7 @@ class DataConversionBox(QtWidgets.QWidget):
         if stream_id is None or stream_id == '':
             stream_id = None
         else:
-            stream_id = int(stream_id)
+            stream_id = stream_id
         self.stream_id = stream_id
 
     @QtCore.pyqtSlot()
@@ -247,10 +247,12 @@ class DataConversionBox(QtWidgets.QWidget):
         bin_filename, _ = QtWidgets.QFileDialog.getSaveFileName(
             parent=self,
             caption="Specify a .bin file location to save data to...",
-            directory=self.dialog_path,
+            directory=self.gui.qt_settings.value('last_data_location'),
             filter='*.bin',
             options=options,
         )
+        data_location = Path(bin_filename).parent.as_posix()
+        self.gui.qt_settings.setValue('last_data_location', data_location)
 
         self.disableInput.emit(True)
         bin_filename = Path(bin_filename)
@@ -320,3 +322,4 @@ class ConversionThread(QtCore.QThread):
             add_probe_to_settings(settings, probe_filename)
 
         settings.data_file_path_input.setText(self.bin_filename.as_posix())
+        settings.data_file_path_input.editingFinished.emit()
