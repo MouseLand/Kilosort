@@ -261,6 +261,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
 
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
     t0 = time.time()
+    nearby_chans_empty = 0
     for kk in tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None, mininterval=10 if progress_bar else None):
         # get the data
         #iclust_template = st[:,1].astype('int32')
@@ -270,7 +271,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
             dminx = ops['dminx'], ncomps=ncomps
             )
 
-        if Xd is None:            
+        if Xd is None:
+            nearby_chans_empty += 1
             continue
 
         if Xd.shape[0]<1000:
@@ -310,6 +312,18 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         
         if 0:#kk%50==0:
             print(kk, nmax, time.time()-t0)
+
+    if nearby_chans_empty == len(ycent):
+        raise ValueError(
+            f'`get_data_cpu` never found suitable channels in `clustering_qr.run`.'
+            f'\ndmin, dminx, and xcenter are: {d0, ops["dminx"], xcup.mean()}'
+        )
+
+    if Wall.sum() == 0:
+        # Wall is empty, unspecified reason
+        raise ValueError(
+            'Wall is empty after `clustering_qr.run`, cannot continue clustering.'
+        )
 
     return clu, Wall
 
