@@ -331,9 +331,19 @@ EXTRA_PARAMETERS = {
 
 # Add default values to descriptions
 for k, v in MAIN_PARAMETERS.items():
-    v['description'] += f'Default value: {str(v["default"])}.'
+    s = f"""
+        Default value: {str(v["default"])}   
+        Min, max: ({str(v['min'])}, {str(v['max'])})   
+        Type: {v['type'].__name__}
+        """
+    v['description'] += s
 for k, v in EXTRA_PARAMETERS.items():
-    v['description'] += f'Default value: {str(v["default"])}.'
+    s = f"""
+        Default value: {str(v["default"])}   
+        Min, max: ({str(v['min'])}, {str(v['max'])})   
+        Type: {v['type'].__name__}
+        """
+    v['description'] += s
 
 main_defaults = {k: v['default'] for k, v in MAIN_PARAMETERS.items()}
 extra_defaults = {k: v['default'] for k, v in EXTRA_PARAMETERS.items()}
