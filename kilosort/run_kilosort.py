@@ -477,8 +477,12 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     print(f'{int(is_ref.sum())} units found with good refractory periods')
     
     runtime = time.time()-tic0
-    print(f'\nTotal runtime: {runtime:.2f}s = {int(runtime//3600):02d}:' +
-          f'{int(runtime//60):02d}:{int(runtime%60)} h:m:s')
+    seconds = runtime % 60
+    mins = runtime // 60
+    hrs = mins // 60
+    mins = mins % 60
+    print(f'\nTotal runtime: {runtime:.2f}s = {int(hrs):02d}:' +
+          f'{int(mins):02d}:{round(seconds)} h:m:s')
     ops['runtime'] = runtime 
 
     io.save_ops(ops, results_dir)
