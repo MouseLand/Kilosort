@@ -1,6 +1,7 @@
 import os, tempfile, shutil, pathlib
 from tqdm import tqdm
 from urllib.request import urlopen
+from urllib.error import HTTPError
 
 _DOWNLOADS_URL = 'https://www.kilosort.org/downloads'
 _DOWNLOADS_DIR_ENV = os.environ.get("KILOSORT_LOCAL_DOWNLOADS_PATH")
@@ -39,7 +40,11 @@ def download_probes(probe_dir=None):
         cached_file = os.fspath(probe_dir.joinpath(probe_name)) 
         if not os.path.exists(cached_file):
             print('Downloading: "{}" to {}\n'.format(url, cached_file))
-            download_url_to_file(url, cached_file, progress=True)
+            try:
+                download_url_to_file(url, cached_file, progress=True)
+            except HTTPError as e:
+                print(f'Unable to download probe {probe_name}, error:')
+                print(e)
 
 
 def download_url_to_file(url, dst, progress=True):
