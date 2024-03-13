@@ -15,6 +15,8 @@ from kilosort import CCG
 from kilosort.preprocessing import get_drift_matrix, fft_highpass
 from kilosort.postprocessing import remove_duplicates, compute_spike_positions
 
+_torch_warning = ".*PyTorch does not support non-writable tensors"
+
 
 def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
     """Find binary file in `data_dir`."""
@@ -493,17 +495,24 @@ class BinaryRWFile:
 
         nsamp = data.shape[-1]
         X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device=self.device)
-        # fix the data at the edges for the first and last batch
-        if ibatch == 0:
-            X[:, self.nt : self.nt+nsamp] = torch.from_numpy(data).to(self.device).float()
-            X[:, :self.nt] = X[:, self.nt : self.nt+1]
-            bstart = self.imin - self.nt
-        elif ibatch == self.n_batches-1:
-            X[:, :nsamp] = torch.from_numpy(data).to(self.device).float()
-            X[:, nsamp:] = X[:, nsamp-1:nsamp]
-            bend += self.nt
-        else:
-            X[:] = torch.from_numpy(data).to(self.device).float()
+
+        with warnings.catch_warnings():
+            # Don't need this, we know about the warning and it doesn't cause
+            # any problems. Doing this the "correct" way is much slower.
+            warnings.filterwarnings("ignore", message=_torch_warning)
+
+            # fix the data at the edges for the first and last batch
+            if ibatch == 0:
+                X[:, self.nt : self.nt+nsamp] = torch.from_numpy(data).to(self.device).float()
+                X[:, :self.nt] = X[:, self.nt : self.nt+1]
+                bstart = self.imin - self.nt
+            elif ibatch == self.n_batches-1:
+                X[:, :nsamp] = torch.from_numpy(data).to(self.device).float()
+                X[:, nsamp:] = X[:, nsamp-1:nsamp]
+                bend += self.nt
+            else:
+                X[:] = torch.from_numpy(data).to(self.device).float()
+    
         inds = [bstart, bend]
         if return_inds:
             return X, inds
@@ -656,7 +665,11 @@ class BinaryFiltered(BinaryRWFile):
 
     def __getitem__(self, *items):
         samples = super().__getitem__(*items)
-        X = torch.from_numpy(samples.T).to(self.device).float()
+        with warnings.catch_warnings():
+            # Don't need this, we know about the warning and it doesn't cause
+            # any problems. Doing this the "correct" way is much slower.
+            warnings.filterwarnings("ignore", message=_torch_warning)
+            X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
         
     def padded_batch_to_torch(self, ibatch, ops=None, return_inds=False):
