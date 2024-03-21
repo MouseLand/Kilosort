@@ -68,6 +68,20 @@ This [video](https://www.youtube.com/watch?v=gsixIQYvj3U) has step-by-step insta
 4. Hit `LOAD`. The data should now be visible.
 5. Hit `Run`. This will run the pipeline and output the results in a format compatible with Phy, the most popular spike sorting curating software.
 
+### Debugging qt.qpa.plugin error
+
+Some users have encountered the following error (or similar ones with slight variations) when attempting to launch the Kilosort4 GUI:
+```
+QObject::moveToThread: Current thread (0x2a7734988a0) is not the object's thread (0x2a77349d4e0).
+Cannot move to target thread (0x2a7734988a0)
+
+qt.qpa.plugin: Could not load the Qt platform plugin "windows" in "<FILEPATH>" even though it was found.
+This application failed to start because no Qt platform plugin could be initialized. Reinstalling the application may fix this problem.
+
+Available platform plugins are: minimal, offscreen, webgl, windows.
+```
+This is not specific to Kilosort4, it is a general problem with PyQt (the GUI library we chose to develop with) that doesn't appear to have a single cause or fix. We are looking into alternatives for the GUI code to avoid this issue, but in the meantime please check [issue 597](https://github.com/MouseLand/Kilosort/issues/597) and [issue 613](https://github.com/MouseLand/Kilosort/issues/613) for some suggested solutions.
+
 
 ## Integration with Phy GUI
 
