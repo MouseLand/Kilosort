@@ -68,10 +68,6 @@ This [video](https://www.youtube.com/watch?v=gsixIQYvj3U) has step-by-step insta
 4. Hit `LOAD`. The data should now be visible.
 5. Hit `Run`. This will run the pipeline and output the results in a format compatible with Phy, the most popular spike sorting curating software.
 
-There is a warning that will always pop up when running Kilosort and/or using the BinaryFile class, but it's nothing to worry about:
-```
-UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at C:\cb\pytorch_1000000000000\work\torch\csrc\utils\tensor_numpy.cpp:205.)
-```
 
 ## Integration with Phy GUI
 
