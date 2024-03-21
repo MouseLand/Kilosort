@@ -55,7 +55,7 @@ class ProbeBuilder(QtWidgets.QDialog):
 
         self.channel_map_value = QtWidgets.QLineEdit()
         self.channel_map_label = QtWidgets.QLabel(
-            "Channel map (list of rows in the data file for each site):"
+            "Channel map (row in data file for each site, 0-indexed):"
         )
 
         self.input_list = [
