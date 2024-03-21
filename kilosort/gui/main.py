@@ -307,17 +307,19 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def do_load(self):
         self.disable_all_input(True)
         QtWidgets.QApplication.setOverrideCursor(QtGui.QCursor(QtCore.Qt.CursorShape.WaitCursor))
-
-        self.prepare_for_new_context()
-        self.setup_context()
-        self.load_binary_files()
-        self.update_probe_view()
-        self.setup_data_view()
-        self.update_run_box()
-
-        self.disable_all_input(False)
-        self.data_view_box.whitened_button.click()
-        QtWidgets.QApplication.restoreOverrideCursor()
+        try:
+            self.prepare_for_new_context()
+            self.setup_context()
+            self.load_binary_files()
+            self.update_probe_view()
+            self.setup_data_view()
+            self.update_run_box()
+            self.data_view_box.whitened_button.click()
+        except Exception as e:
+            print(e)
+        finally:
+            self.disable_all_input(False)
+            QtWidgets.QApplication.restoreOverrideCursor()
 
     def load_binary_files(self):
         n_channels = self.params["n_chan_bin"]
@@ -492,9 +494,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def reset_gui(self):
         self.num_channels = None
         self.context = None
-
         self.close_binary_files()
-
         self.probe_view_box.reset()
         self.data_view_box.reset()
         self.settings_box.reset()

@@ -196,7 +196,6 @@ class DataViewBox(QtWidgets.QGroupBox):
         try:
             self.tmin = float(self.tmin_input.text())
             self.check_time_interval()
-            self.intervalUpdated.emit()
         except ValueError:
             logger.exception('Could not convert tmin to float.')
         except AssertionError:
@@ -207,7 +206,6 @@ class DataViewBox(QtWidgets.QGroupBox):
         try:
             self.tmax = float(self.tmax_input.text())
             self.check_time_interval()
-            self.intervalUpdated.emit()
         except ValueError:
             logger.exception('Could not convert tmax to float.')
         except AssertionError:
