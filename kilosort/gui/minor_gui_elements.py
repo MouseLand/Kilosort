@@ -1,6 +1,6 @@
 import numpy as np
 from kilosort.gui.logger import setup_logger
-from PyQt5 import QtGui, QtWidgets
+from PyQt5 import QtGui, QtWidgets, QtCore
 
 logger = setup_logger(__name__)
 
@@ -35,6 +35,9 @@ class ProbeBuilder(QtWidgets.QDialog):
     def __init__(self, parent, *args, **kwargs):
         super(ProbeBuilder, self).__init__(parent=parent, *args, **kwargs)
         self.parent = parent
+        self.setWindowFlags(
+            self.windowFlags() ^ QtCore.Qt.WindowContextHelpButtonHint
+            )
 
         self.map_name_value = QtWidgets.QLineEdit()
         self.map_name_label = QtWidgets.QLabel("Name for new channel map:")
@@ -47,7 +50,7 @@ class ProbeBuilder(QtWidgets.QDialog):
 
         self.k_coords_value = QtWidgets.QLineEdit()
         self.k_coords_label = QtWidgets.QLabel(
-            "Shrank index ('kcoords') for each " "site (leave blank for single shank):"
+            "Shank index ('kcoords') for each " "site (leave blank for single shank):"
         )
 
         self.channel_map_value = QtWidgets.QLineEdit()
@@ -154,32 +157,33 @@ class ProbeBuilder(QtWidgets.QDialog):
     def check_inputs(self):
         try:
             map_name = self.map_name_value.text()
-            assert len(map_name.split()) == 1
+            assert len(map_name.split()) == 1, \
+                   'probe name cannot contain spaces'
 
             x_coords = eval(self.x_coords_value.text())
             y_coords = eval(self.y_coords_value.text())
-
             x_coords = np.array(x_coords, dtype=np.float64)
             y_coords = np.array(y_coords, dtype=np.float64)
-
-            assert len(x_coords) == len(y_coords)
+            assert len(x_coords) == len(y_coords), \
+                   'x and y positions must have same size'
 
             k_coords = self.k_coords_value.text()
             if k_coords == "":
-
                 k_coords = np.ones_like(x_coords, dtype=np.float64)
             else:
                 k_coords = np.array(eval(k_coords), dtype=np.float64)
-                assert x_coords.size == k_coords.size
+                assert x_coords.size == k_coords.size, \
+                       'contact positions and shank indices must have same size'
 
             channel_map = self.channel_map_value.text()
             if channel_map == "":
                 channel_map = np.arange(x_coords.size)
             else:
                 channel_map = np.array(eval(channel_map), dtype=np.int32)
-                assert x_coords.size == channel_map.size
-                assert channel_map.size == np.unique(channel_map).size
-                assert np.amax(channel_map) < channel_map.size
+                assert x_coords.size == channel_map.size, \
+                       'contact positions and channel map must be same size'
+                assert channel_map.size == np.unique(channel_map).size, \
+                       'channel map cannot contain repeats'
 
         except Exception as e:
             self.error_label.setText(str(e))
