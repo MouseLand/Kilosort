@@ -1,3 +1,5 @@
+.. _gui_guide:
+
 How to use the GUI
 ==================
 This page explains how to use the basic functions of Kilosort4 GUI, in order of the steps you would take to start sorting.
