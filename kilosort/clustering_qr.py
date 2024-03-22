@@ -371,7 +371,7 @@ def get_data_cpu(ops, xy, iC, PID, tF, ycenter, xcenter, dmin=20, dminx=32,
         Xd = torch.reshape(dd, (nspikes, -1))
     else:
         # Keep channels and features separate
-        Xd = torch.reshape(dd, (nspikes, -1, 6))
+        Xd = dd
 
     return Xd, ch_min, ch_max, igood
 
