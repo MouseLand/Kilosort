@@ -14,9 +14,10 @@ please see our pre-print on `BioArxiv <https://www.biorxiv.org/content/10.1101/2
    installation
    first_run
    gui_guide
+   parameters
+   multi_shank
    hardware
    drift
-   multi_shank
 
 .. toctree::
    :maxdepth: 1

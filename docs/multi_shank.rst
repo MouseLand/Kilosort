@@ -1,3 +1,5 @@
+.. _multi_shank:
+
 Using probes with multiple shanks
 ==================================
 Currently, Kilosort4 does not process shanks separately. Until this is added, we recommend changing your probe layout to artificially stack the shanks in a single column with a bit of vertical space (50-100um) between each shank.
