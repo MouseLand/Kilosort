@@ -16,6 +16,7 @@ please see our pre-print on `BioArxiv <https://www.biorxiv.org/content/10.1101/2
    gui_guide
    hardware
    drift
+   multi_shank
 
 .. toctree::
    :maxdepth: 1
