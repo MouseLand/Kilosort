@@ -227,10 +227,9 @@ controls_popup_text = """
 GUI Controls <br>
 ------------ <br>
 <br>
-[1 2 3 4]        - activate/deactivate raw/filtered/prediction/residual views of the dataset <br>
-[up/down]        - move through channels in traces mode <br>
+[1 2]        - activate/deactivate raw/filtered views of the dataset <br>
 [scroll]         - move forward/backward in time <br>
-[ctrl + scroll]  - add/remove channels in colormap mode; slide up/down probe in traces mode <br>
+[ctrl + scroll]  - add/remove channels in colormap mode;
 [alt + scroll]   - change data/colormap scaling <br>
 [shift + scroll] - zoom in/out in time <br>
 [left click]     - move forward/backward in time <br>

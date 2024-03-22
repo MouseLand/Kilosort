@@ -154,10 +154,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
                 self.toggle_mode("raw")
             elif event.key() == QtCore.Qt.Key_2:
                 self.toggle_mode("whitened")
-            elif event.key() == QtCore.Qt.Key_3:
-                self.toggle_mode("prediction")
-            elif event.key() == QtCore.Qt.Key_4:
-                self.toggle_mode("residual")
             else:
                 pass
             event.accept()
