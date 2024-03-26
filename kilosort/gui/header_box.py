@@ -16,16 +16,16 @@ class HeaderBox(QtWidgets.QWidget):
 
         self.auto_load_check = QtWidgets.QCheckBox('Auto Load')
         if self.gui.auto_load:
-            self.auto_load_check.setCheckState(2)
+            self.auto_load_check.setCheckState(QtCore.Qt.CheckState.Checked)
         else:
-            self.auto_load_check.setCheckState(0)
+            self.auto_load_check.setCheckState(QtCore.Qt.CheckState.Unchecked)
         self.auto_load_check.stateChanged.connect(self.check_auto_load)
 
         self.show_plots_check = QtWidgets.QCheckBox('Show Plots')
         if self.gui.show_plots:
-            self.show_plots_check.setCheckState(2)
+            self.show_plots_check.setCheckState(QtCore.Qt.CheckState.Checked)
         else:
-            self.show_plots_check.setCheckState(0)
+            self.show_plots_check.setCheckState(QtCore.Qt.CheckState.Unchecked)
         self.show_plots_check.clicked.connect(self.check_show_plots)
 
         # TODO: connect the button clicks to open something in browser instead?

@@ -182,9 +182,9 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         row_count += rspan
         layout.addWidget(self.probe_layout_selector, row_count, col1, rspan, dbl)
-        self.probe_layout_selector.setSizeAdjustPolicy(
-            QtWidgets.QComboBox.AdjustToMinimumContentsLength
-        )
+        #self.probe_layout_selector.setSizeAdjustPolicy(
+        #    QtWidgets.QComboBox.AdjustToMinimumContentsLength
+        #)
         self.probe_layout_selector.currentTextChanged.connect(
             self.on_probe_layout_selected
         )
@@ -196,9 +196,9 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         layout.addWidget(self.dtype_selector_text, row_count, col1, rspan, cspan1)
         layout.addWidget(self.dtype_selector, row_count, col2, rspan, cspan2)
-        self.dtype_selector.setSizeAdjustPolicy(
-            QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
-        )
+        #self.dtype_selector.setSizeAdjustPolicy(
+        #    QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
+        #)
         self.dtype_selector.currentTextChanged.connect(
             self.on_data_dtype_selected
         )
@@ -206,9 +206,9 @@ class SettingsBox(QtWidgets.QGroupBox):
         row_count += rspan
         layout.addWidget(self.device_selector_text, row_count, col1, rspan, cspan1)
         layout.addWidget(self.device_selector, row_count, col2, rspan, cspan2)
-        self.device_selector.setSizeAdjustPolicy(
-            QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
-        )
+        #self.device_selector.setSizeAdjustPolicy(
+        #    QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
+        #)
         self.device_selector.currentTextChanged.connect(
             self.on_device_selected
         )
@@ -776,7 +776,7 @@ class ExtraParametersWindow(QtWidgets.QWidget):
 
         self.setLayout(layout)
 
-        center = QtWidgets.QDesktopWidget().availableGeometry().center()
+        center = QtWidgets.QApplication.screens()[0].availableGeometry().center()
         geo = self.frameGeometry()
         geo.moveCenter(center)
         self.move(geo.topLeft())

@@ -13,7 +13,7 @@ class MessageLogBox(QtWidgets.QGroupBox):
         self.setLayout(self.layout)
         self.log_box = QtWidgets.QPlainTextEdit()
         self.log_box.setReadOnly(True)
-        self.log_box.setLineWrapMode(200)
+        self.log_box.setLineWrapMode(QtWidgets.QPlainTextEdit.WidgetWidth) 
         self.log_box.setFont(QtGui.QFont("Monospace"))
         self.layout.addWidget(self.log_box, 0, 0, 1, 2)
 
@@ -84,11 +84,11 @@ class ExpandedLog(QtWidgets.QWidget):
         self.setLayout(self.layout)
         self.log_box = QtWidgets.QPlainTextEdit()
         self.log_box.setReadOnly(True)
-        self.log_box.setLineWrapMode(400)
+        self.log_box.setLineWrapMode(QtWidgets.QPlainTextEdit.WidgetWidth) 
         self.log_box.setFont(QtGui.QFont("Monospace"))
         self.layout.addWidget(self.log_box, 0, 0, 1, 1)
         
-        center = QtWidgets.QDesktopWidget().availableGeometry().center()
+        center = QtWidgets.QApplication.screens()[0].availableGeometry().center()
         self.setGeometry(0, 0, 800, 500)
         geo = self.frameGeometry()
         geo.moveCenter(center)

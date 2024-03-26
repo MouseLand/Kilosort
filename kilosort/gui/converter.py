@@ -83,9 +83,9 @@ class DataConversionBox(QtWidgets.QWidget):
         self.dtype_selector = QtWidgets.QComboBox()
         supported_dtypes = BinaryRWFile.supported_dtypes
         self.dtype_selector.addItems([''] + supported_dtypes)
-        self.dtype_selector.setSizeAdjustPolicy(
-            QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
-        )
+        #self.dtype_selector.setSizeAdjustPolicy(
+        #    QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
+        #)
         self.dtype_selector.currentTextChanged.connect(self.set_dtype)
     
         layout.addWidget(self.stream_id_text, 0, 10, 1, 3)
