@@ -2,16 +2,16 @@ import numpy as np
 import pyqtgraph as pg
 from kilosort.gui.logger import setup_logger
 from kilosort.gui.palettes import COLORMAP_COLORS
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 
 logger = setup_logger(__name__)
 
 
 class DataViewBox(QtWidgets.QGroupBox):
-    channelChanged = QtCore.pyqtSignal(int, int)
-    modeChanged = QtCore.pyqtSignal(str, int)
-    updateContext = QtCore.pyqtSignal(object)
-    intervalUpdated = QtCore.pyqtSignal()
+    channelChanged = QtCore.Signal(int, int)
+    modeChanged = QtCore.Signal(str, int)
+    updateContext = QtCore.Signal(object)
+    intervalUpdated = QtCore.Signal()
 
     def __init__(self, parent):
         QtWidgets.QGroupBox.__init__(self, parent=parent)
@@ -191,7 +191,7 @@ class DataViewBox(QtWidgets.QGroupBox):
 
         self.setLayout(layout)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def on_tmin_edited(self):
         try:
             self.tmin = float(self.tmin_input.text())
@@ -201,7 +201,7 @@ class DataViewBox(QtWidgets.QGroupBox):
         except AssertionError:
             logger.exception('Invalid tmin,tmax: must have 0 <= tmin < tmax')
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def on_tmax_edited(self):
         try:
             self.tmax = float(self.tmax_input.text())
@@ -216,7 +216,7 @@ class DataViewBox(QtWidgets.QGroupBox):
         assert self.tmin >= 0
         assert self.tmin < self.tmax
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def on_views_clicked(self):
         current_state = {key: self.view_buttons[key].isChecked() for key in self._keys}
 
@@ -242,22 +242,22 @@ class DataViewBox(QtWidgets.QGroupBox):
 
             self.update_plot()
 
-    @QtCore.pyqtSlot(float)
+    @QtCore.Slot(float)
     def on_wheel_scroll(self, direction):
         if self.context_set():
             self.shift_current_time(direction)
 
-    @QtCore.pyqtSlot(float)
+    @QtCore.Slot(float)
     def on_wheel_scroll_plus_control(self, direction):
         if self.context_set():
             self.change_displayed_channel_count(direction)
 
-    @QtCore.pyqtSlot(float)
+    @QtCore.Slot(float)
     def on_wheel_scroll_plus_shift(self, direction):
         if self.context_set():
             self.change_plot_range(direction)
 
-    @QtCore.pyqtSlot(float)
+    @QtCore.Slot(float)
     def on_wheel_scroll_plus_alt(self, direction):
         if self.context_set():
             self.change_plot_scaling(direction)
@@ -430,7 +430,7 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.sorting_status = status_dict
         self.enable_view_buttons()
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def enable_view_buttons(self):
         self.raw_button.click()
 
@@ -474,11 +474,11 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.colormap_image = image_item
         self.plot_item.addItem(image_item)
 
-    @QtCore.pyqtSlot(object)
+    @QtCore.Slot(object)
     def set_whitening_matrix(self, array):
         self.whitening_matrix = array
 
-    @QtCore.pyqtSlot(object)
+    @QtCore.Slot(object)
     def set_highpass_filter(self, filter):
         self.highpass_filter = filter
 
@@ -579,10 +579,10 @@ class DataViewBox(QtWidgets.QGroupBox):
 
 
 class KSPlotWidget(pg.PlotWidget):
-    signalChangeTimePoint = QtCore.pyqtSignal(float)
-    signalChangeChannel = QtCore.pyqtSignal(float)
-    signalChangeTimeRange = QtCore.pyqtSignal(float)
-    signalChangeScaling = QtCore.pyqtSignal(float)
+    signalChangeTimePoint = QtCore.Signal(float)
+    signalChangeChannel = QtCore.Signal(float)
+    signalChangeTimeRange = QtCore.Signal(float)
+    signalChangeScaling = QtCore.Signal(float)
 
     def __init__(self, *args, **kwargs):
         super(KSPlotWidget, self).__init__(*args, **kwargs)

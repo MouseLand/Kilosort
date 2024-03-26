@@ -1,6 +1,6 @@
 import numpy as np
 from kilosort.gui.logger import setup_logger
-from PyQt5 import QtGui, QtWidgets, QtCore
+from qtpy import QtGui, QtWidgets, QtCore
 
 logger = setup_logger(__name__)
 
@@ -247,8 +247,7 @@ help_popup_text = """
 Welcome to Kilosort4!
 
 ##### Documentation #####
-Pykilosort is the Python port of Kilosort2, which was originally written in Matlab.
-For documentation of the underlying algorithm or the GUI, please visit https://github.com/MouseLand/Kilosort/wiki
+For documentation of the underlying algorithm or the GUI, please visit https://github.com/MouseLand/Kilosort/
 or https://www.biorxiv.org/content/10.1101/2023.01.07.523036v1.
 
 ##### Troubleshooting #####

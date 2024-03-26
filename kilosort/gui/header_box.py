@@ -1,6 +1,6 @@
 from kilosort import __version__
 from kilosort.gui.minor_gui_elements import help_popup_text, controls_popup_text
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 
 class HeaderBox(QtWidgets.QWidget):
@@ -55,17 +55,17 @@ class HeaderBox(QtWidgets.QWidget):
         self.setLayout(self.layout)
 
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def check_auto_load(self):
         self.gui.auto_load = self.auto_load_check.isChecked()
         self.gui.qt_settings.setValue('auto_load', self.gui.auto_load)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def check_show_plots(self):
         self.gui.show_plots = self.show_plots_check.isChecked()
         self.gui.qt_settings.setValue('show_plots', self.gui.show_plots)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def clear_cache(self):
         self.gui.qt_settings.clear()
         

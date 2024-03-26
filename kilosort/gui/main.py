@@ -13,7 +13,7 @@ from kilosort.gui import (
 from kilosort.gui.logger import setup_logger
 from kilosort.io import BinaryFiltered
 from kilosort.utils import DOWNLOADS_DIR, download_probes
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 logger = setup_logger(__name__)
 
@@ -275,7 +275,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         else:
             raise ValueError("Invalid mode requested!")
 
-    @QtCore.pyqtSlot(bool)
+    @QtCore.Slot(bool)
     def disable_all_input(self, value):
         self.settings_box.disable_all_input(value)
         self.run_box.disable_all_input(value)
@@ -417,13 +417,13 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.load_data()
         self.context["params"] = self.params
 
-    @QtCore.pyqtSlot(object)
+    @QtCore.Slot(object)
     def update_context(self, context):
         self.context = context
         self.update_probe_view()
         self.update_data_view()
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def update_probe_view(self):
         self.probe_view_box.set_layout(self.context)
 
@@ -435,15 +435,15 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.run_box.set_data_path(self.data_path)
         self.run_box.set_results_directory(self.results_directory)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def disable_run(self):
         self.run_box.disable_all_buttons()
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def enable_run(self):
         self.run_box.reenable_buttons()
 
-    @QtCore.pyqtSlot(dict)
+    @QtCore.Slot(dict)
     def update_sorting_status(self, status_dict):
         self.run_box.change_sorting_status(status_dict)
         self.data_view_box.change_sorting_status(status_dict)

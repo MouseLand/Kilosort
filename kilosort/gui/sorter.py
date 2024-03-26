@@ -2,7 +2,7 @@ import time
 
 import numpy as np
 import torch
-from PyQt5 import QtCore
+from qtpy import QtCore
 
 from kilosort.gui.logger import setup_logger
 from kilosort.run_kilosort import (
@@ -14,11 +14,11 @@ logger = setup_logger(__name__)
 
 
 class KiloSortWorker(QtCore.QThread):
-    finishedPreprocess = QtCore.pyqtSignal(object)
-    finishedSpikesort = QtCore.pyqtSignal(object)
-    finishedAll = QtCore.pyqtSignal(object)
-    progress_bar = QtCore.pyqtSignal(int)
-    plotDataReady = QtCore.pyqtSignal(str)
+    finishedPreprocess = QtCore.Signal(object)
+    finishedSpikesort = QtCore.Signal(object)
+    finishedAll = QtCore.Signal(object)
+    progress_bar = QtCore.Signal(int)
+    plotDataReady = QtCore.Signal(str)
 
     def __init__(self, context, results_directory, steps,
                  device=torch.device('cuda'), file_object=None, *args, **kwargs):

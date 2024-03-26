@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from PyQt5 import QtCore
+from qtpy import QtCore
 
 
 class QtHandler(logging.Handler):
@@ -17,7 +17,7 @@ class QtHandler(logging.Handler):
 class XStream(QtCore.QObject):
     _stdout = None
     _stderr = None
-    messageWritten = QtCore.pyqtSignal(str)
+    messageWritten = QtCore.Signal(str)
 
     def flush(self):
         pass
