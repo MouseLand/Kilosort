@@ -474,7 +474,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         if not self.check_valid_binary_path(self.data_file_path):
             return False
 
-        none_allowed = ['dmin', 'dminx', 'nt0min']
+        none_allowed = ['dmin', 'nt0min']
         for k, v in self.settings.items():
             if v is None and k not in none_allowed:
                 return False
