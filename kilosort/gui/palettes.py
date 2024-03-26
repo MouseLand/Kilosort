@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt5 import QtGui
+from qtpy import QtGui
 
 
 class DarkPalette(QtGui.QPalette):

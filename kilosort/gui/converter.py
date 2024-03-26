@@ -2,7 +2,7 @@ import importlib
 from pathlib import Path
 
 import numpy as np
-from PyQt5 import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets
 from kilosort.io import (
     RecordingExtractorAsArray, BinaryRWFile, spikeinterface_to_binary, load_probe
     )
@@ -22,8 +22,8 @@ _SPIKEINTERFACE_IMPORTS = {
 
 
 class DataConversionBox(QtWidgets.QWidget):
-    disableInput = QtCore.pyqtSignal(bool)
-    fileObjectLoaded = QtCore.pyqtSignal(bool)
+    disableInput = QtCore.Signal(bool)
+    fileObjectLoaded = QtCore.Signal(bool)
 
     def __init__(self, gui):
         super().__init__()
@@ -134,7 +134,7 @@ class DataConversionBox(QtWidgets.QWidget):
         self.setLayout(layout)
 
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def select_file(self):
         options = QtWidgets.QFileDialog.DontUseNativeDialog
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -148,7 +148,7 @@ class DataConversionBox(QtWidgets.QWidget):
         data_location = Path(filename).parent.as_posix()
         self.gui.qt_settings.setValue('last_data_location', data_location)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def select_folder(self):
         options = QtWidgets.QFileDialog.DontUseNativeDialog
         directory = QtWidgets.QFileDialog.getExistingDirectory(
@@ -162,11 +162,11 @@ class DataConversionBox(QtWidgets.QWidget):
         data_location = Path(directory).as_posix()
         self.gui.qt_settings.setValue('last_data_location', data_location)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def select_filetype(self):
         self.filetype = self.filetype_selector.currentText()
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def set_stream_id(self):
         stream_id = self.stream_id_input.text()
         if stream_id is None or stream_id == '':
@@ -175,18 +175,18 @@ class DataConversionBox(QtWidgets.QWidget):
             stream_id = stream_id
         self.stream_id = stream_id
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def set_stream_name(self):
         stream_name = self.stream_name_input.text()
         if stream_name == '':
             stream_name = None
         self.stream_name = stream_name
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def set_dtype(self):
         self.data_dtype = self.dtype_selector.currentText()
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def load_as_wrapper(self):
         if None in [self.filename, self.filetype, self.data_dtype]:
             logger.exception(
@@ -230,7 +230,7 @@ class DataConversionBox(QtWidgets.QWidget):
             )
         self.gui.settings_box.check_load()
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def convert_to_binary(self):
         # TODO: add option to specify chunksize for conversion
         if None in [self.filename, self.filetype, self.data_dtype]:

@@ -13,9 +13,9 @@ install_deps = [
 
 gui_deps = [
     'pyqtgraph>=0.13.0',
-    'pyqt5',
-    'pyqt5.sip',
-    'google-cloud-storage',
+    'qtpy',
+    'pyqt6',
+    'pyqt6.sip',
     'matplotlib'
 ]
 
@@ -25,12 +25,37 @@ docs_deps = [
     'sphinx_rtd_theme',
 ]
 
+### remove torch install if already installed
 try:
     import torch
     a = torch.ones(2, 3)
     version = int(torch.__version__.split(".")[1])
     if version >= 6:
         install_deps.remove("torch>=1.6")
+except:
+    pass
+
+### remove pyqt6 install if other qt backend installed
+try:
+    import PyQt5
+    gui_deps.remove("pyqt6")
+    gui_deps.remove("pyqt6.sip")
+    gui_deps.append("pyqt5")
+    gui_deps.append("pyqt5.sip")
+except:
+    pass
+
+try:
+    import PySide2
+    gui_deps.remove("pyqt6")
+    gui_deps.remove("pyqt6.sip")
+except:
+    pass
+
+try:
+    import PySide6
+    gui_deps.remove("pyqt6")
+    gui_deps.remove("pyqt6.sip")
 except:
     pass
 

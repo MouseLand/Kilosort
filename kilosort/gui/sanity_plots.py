@@ -1,15 +1,14 @@
 import pyqtgraph as pg
 import scipy
-import matplotlib
 import numpy as np
+import matplotlib
 import torch
-from PyQt5 import QtWidgets
+from qtpy import QtWidgets
 
 from kilosort.postprocessing import compute_spike_positions
 from kilosort.gui.palettes import PROBE_PLOT_COLORS
 
 _COLOR_CODES = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
-
 
 class PlotWindow(QtWidgets.QWidget):
     def __init__(self, *args, title=None, width=500, height=400,

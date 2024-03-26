@@ -1,4 +1,4 @@
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 from kilosort.gui.sorter import KiloSortWorker
 from kilosort.gui.sanity_plots import (
@@ -8,10 +8,10 @@ from kilosort.gui.sanity_plots import (
 
 
 class RunBox(QtWidgets.QGroupBox):
-    setupContextForRun = QtCore.pyqtSignal()
-    updateContext = QtCore.pyqtSignal(object)
-    sortingStepStatusUpdate = QtCore.pyqtSignal(dict)
-    disableInput = QtCore.pyqtSignal(bool)
+    setupContextForRun = QtCore.Signal()
+    updateContext = QtCore.Signal(object)
+    sortingStepStatusUpdate = QtCore.Signal(dict)
+    disableInput = QtCore.Signal(bool)
 
     def __init__(self, parent):
         QtWidgets.QGroupBox.__init__(self, parent=parent)
@@ -70,7 +70,7 @@ class RunBox(QtWidgets.QGroupBox):
         self.run_all_button.setEnabled(True)
         self.spike_sort_button.setEnabled(True)
         
-    @QtCore.pyqtSlot(bool)
+    @QtCore.Slot(bool)
     def disable_all_input(self, value):
         if value:
             self.disable_all_buttons()
@@ -94,18 +94,18 @@ class RunBox(QtWidgets.QGroupBox):
         self.sorting_status = status_dict
         self.reenable_buttons()
 
-    @QtCore.pyqtSlot(object)
+    @QtCore.Slot(object)
     def finished_spikesort(self, context):
         self.updateContext.emit(context)
         self.current_worker = None
         self.update_sorting_status("spikesort", True)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def spikesort(self):
         if self.get_current_context() is not None:
             self.run_steps("spikesort")
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def run_all(self):
         if self.get_current_context() is not None:
             self.run_steps([

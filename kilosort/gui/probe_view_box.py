@@ -1,14 +1,14 @@
 import numpy as np
 import pyqtgraph as pg
 from kilosort.gui.logger import setup_logger
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 logger = setup_logger(__name__)
 
 
 class ProbeViewBox(QtWidgets.QGroupBox):
 
-    channelSelected = QtCore.pyqtSignal(int)
+    channelSelected = QtCore.Signal(int)
 
     def __init__(self, parent):
         super(ProbeViewBox, self).__init__(parent=parent)
@@ -58,7 +58,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.total_channels = self.active_layout["n_chan"]
         self.channel_map = self.active_layout["chanMap"]
 
-    @QtCore.pyqtSlot(str, int)
+    @QtCore.Slot(str, int)
     def synchronize_data_view_mode(self, mode: str):
         if self.active_data_view_mode != mode:
             self.probe_view.clear()
@@ -85,11 +85,11 @@ class ProbeViewBox(QtWidgets.QGroupBox):
 
         return spots
 
-    @QtCore.pyqtSlot(int, int)
+    @QtCore.Slot(int, int)
     def update_probe_view(self):
         self.create_plot()
 
-    @QtCore.pyqtSlot(object)
+    @QtCore.Slot(object)
     def preview_probe(self, probe):
         self.probe_view.clear()
         self.set_active_layout(probe)

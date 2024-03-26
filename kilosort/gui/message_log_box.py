@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from kilosort.gui.logger import XStream
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 
 class MessageLogBox(QtWidgets.QGroupBox):
@@ -35,18 +35,18 @@ class MessageLogBox(QtWidgets.QGroupBox):
         XStream.stderr().messageWritten.connect(self.update_text)
 
 
-    @QtCore.pyqtSlot(str)
+    @QtCore.Slot(str)
     def update_text(self, text):
         self.log_box.moveCursor(QtGui.QTextCursor.End)
         self.log_box.appendPlainText(text)
         self.log_box.ensureCursorVisible()
         self.popout_window.update_text(text)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def show_log_popout(self):
         self.popout_window.show()
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def dump_settings(self):
         # For debugging purposes, check for mismatch between displayed parameter
         # values and the values that are actually being used.

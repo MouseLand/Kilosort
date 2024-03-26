@@ -5,7 +5,7 @@ import json
 
 import numpy as np
 import torch
-from PyQt5 import QtCore, QtWidgets, QtGui
+from qtpy import QtCore, QtWidgets, QtGui
 from scipy.io.matlab.miobase import MatReadError
 
 from kilosort.gui.logger import setup_logger
@@ -20,9 +20,9 @@ _DEFAULT_DTYPE = 'int16'
 _ALLOWED_FILE_TYPES = ['.bin', '.dat', '.bat', '.raw']  # For binary data
 
 class SettingsBox(QtWidgets.QGroupBox):
-    settingsUpdated = QtCore.pyqtSignal()
-    previewProbe = QtCore.pyqtSignal(object)
-    dataChanged = QtCore.pyqtSignal()
+    settingsUpdated = QtCore.Signal()
+    previewProbe = QtCore.Signal(object)
+    dataChanged = QtCore.Signal()
 
     def __init__(self, parent):
         QtWidgets.QGroupBox.__init__(self, parent=parent)
@@ -281,7 +281,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             getattr(epw, f'{k}_input').setText(d)
             getattr(epw, f'{k}_input').editingFinished.emit()
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def import_settings(self):
         # 1) open file dialog
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
@@ -310,7 +310,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.device_selector.setCurrentIndex(settings['misc']['device_idx'])
 
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def export_settings(self):
         # 1) dump parameters to dict
         #       don't save entire settings dict, other stuff is data-specific
@@ -480,13 +480,13 @@ class SettingsBox(QtWidgets.QGroupBox):
                 return False
         return True
     
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def update_parameter(self):
         parameter_key = self.sender().var_name
         parameter_info = MAIN_PARAMETERS[parameter_key]
         _check_parameter(self, self, parameter_key, parameter_info)
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def update_settings(self):
         if self.check_settings():
             if not self.results_directory_path.exists():
@@ -500,11 +500,11 @@ class SettingsBox(QtWidgets.QGroupBox):
             else:
                 self.settingsUpdated.emit()
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def show_probe_layout(self):
         self.previewProbe.emit(self.probe_layout)
 
-    @QtCore.pyqtSlot(str)
+    @QtCore.Slot(str)
     def on_probe_layout_selected(self, name):
         if name not in ["", "[new]", "other..."]:
             probe_path = Path(self.gui.new_probe_files_path).joinpath(name)
@@ -781,7 +781,7 @@ class ExtraParametersWindow(QtWidgets.QWidget):
         geo.moveCenter(center)
         self.move(geo.topLeft())
 
-    @QtCore.pyqtSlot()
+    @QtCore.Slot()
     def update_parameter(self):
         parameter_key = self.sender().var_name
         parameter_info = EXTRA_PARAMETERS[parameter_key]
