@@ -84,32 +84,20 @@ def get_waves(ops, device=torch.device('cuda')):
     return wPCA, wTEMP
 
 def template_centers(ops):
-    xmin, xmax, ymin, ymax = ops['xc'].min(), ops['xc'].max(), ops['yc'].min(), ops['yc'].max()
-    dmin = ops['settings'].get('dmin', None)
+    xmin, xmax, ymin, ymax = ops['xc'].min(), ops['xc'].max(), \
+                             ops['yc'].min(), ops['yc'].max()
+
+    dmin = ops['settings']['dmin']
     if dmin is None:
         # Try to determine a good value automatically based on contact positions.
         dmin = np.median(np.diff(np.unique(ops['yc'])))
     ops['dmin'] = dmin
     ops['yup'] = np.arange(ymin, ymax+.00001, dmin//2)
 
-    dminx = ops['settings'].get('dminx', None)
-    if dminx is None:
-        # Try to determine a good value automatically.
-        yunq = np.unique(ops['yc'])
-        mxc = np.NaN * np.ones(len(yunq))
-        for j in range(len(yunq)):
-            xc = ops['xc'][ops['yc']==yunq[j]]
-            if len(xc)>1:
-                mxc[j] = np.median(np.diff(np.sort(xc)))
-            else:
-                mxc[j] = 0
-        dminx = np.nanmedian(mxc)
-        dminx = np.maximum(1, dminx)
-    ops['dminx'] = dminx
-
+    ops['dminx'] = dminx = ops['settings']['dminx']
     nx = np.round((xmax - xmin) / (dminx/2)) + 1
-    
     ops['xup'] = np.linspace(xmin, xmax, int(nx))
+
     return ops
 
 
@@ -227,7 +215,9 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
         msg = """
               NaNs and/or zeroes present in weights for spikedetect.run,
               may need to adjust `min_template_size` and/or `dminx` 
-              for best results.
+              for best results.\n
+              If you're using a probe with multiple shanks, see 
+              https://kilosort.readthedocs.io/en/latest/multi_shank.html
               """
         warnings.warn(msg, UserWarning)
 

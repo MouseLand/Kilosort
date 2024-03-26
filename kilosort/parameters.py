@@ -188,11 +188,13 @@ EXTRA_PARAMETERS = {
 
     'dminx': {
         'gui_name': 'dminx', 'type': float, 'min': 0, 'max': np.inf,
-        'exclude': [0], 'default': None, 'step': 'spike detection',
+        'exclude': [0], 'default': 32, 'step': 'spike detection',
         'description':
             """
             Horizontal spacing of template centers used for spike detection,
-            in microns. Determined automatically by default.
+            in microns. The default 32um should work well for Neuropixels 1 and
+            Neuropixels 2 probes. For other probe geometries, try setting this 
+            to the median lateral distance between contacts to start.
             """
     },
 

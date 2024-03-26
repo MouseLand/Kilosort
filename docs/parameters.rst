@@ -32,7 +32,7 @@ This sets the start and end of data used for sorting (in seconds). By default, a
 
 ``dmin`` and ``dminx``
 ----------------------
-These adjust the vertical and lateral spacing, respectively, of the universal templates used during spike detection, as well as the vertical size of channel neighborhoods used for clustering. By default, Kilosort will attempt to determine a good value based on the median distance between contacts, which tends to work for Neuropixels-like probes. However, if contacts are irregularly spaced, you may need to specify these manually.
+These adjust the vertical and lateral spacing, respectively, of the universal templates used during spike detection, as well as the vertical and lateral sizes of channel neighborhoods used for clustering. By default, Kilosort will attempt to determine a good value for ``dmin`` based on the median distance between contacts, which tends to work well for Neuropixels-like probes. However, if contacts are irregularly spaced, you may need to specify this manually. The default for ``dminx`` is 32um, which is also well suited to Neuropixels probes. For other probes, try setting ``dminx`` to the median lateral distance between contacts as a starting point.
 
 ``min_template_size``
 ---------------------
