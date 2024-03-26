@@ -17,7 +17,7 @@ This sets the number of samples included in each batch of data to be sorted, wit
 
 ``nblocks``
 -----------
-This is the number of sections the probe is divided into when performing drift correction. The default of ``nblocks = 1`` indicates rigid registration (the same amount of drift is applied to the entire probe). If you see different amounts of drift in your data depending on depth along the probe, increasing ``nblocks`` will help get a better drift estimate. ``nblocks=5`` can be a good choice for single-shank Neuropixels probes. For probes with fewer channels (around 64 or less) or with sparser spacing (around 30um or more between contacts), drift estimates are not likely to be accurate, so drift correction should be skipped by setting ``nblocks = 0``.
+This is the number of sections the probe is divided into when performing drift correction. The default of ``nblocks = 1`` indicates rigid registration (the same amount of drift is applied to the entire probe). If you see different amounts of drift in your data depending on depth along the probe, increasing ``nblocks`` will help get a better drift estimate. ``nblocks=5`` can be a good choice for single-shank Neuropixels probes. For probes with fewer channels (around 64 or less) or with sparser spacing (around 50um or more between contacts), drift estimates are not likely to be accurate, so drift correction should be skipped by setting ``nblocks = 0``.
 
 
 ``Th_universal`` and ``Th_learned``
@@ -46,4 +46,6 @@ This is the number of nearest channels and template locations, respectively, use
 
 ``duplicate_spike_bins``
 ------------------------
-After sorting has finished, spikes that occur within this number of bins of each other, from the same unit, are assumed to be artifacts and removed. The default of 15 bins corresponds to 0.5ms for a sampling rate of 30000hz. If your sampling rate is different, you may need to increase or decrease this accordingly. Warning!!! Do not increase this value beyond 0.5ms as it will interfere with the ACG and CCG refractory period estimations (which normally ignores the central 1ms of the correlogram). If you see otherwise good neurons with large peaks around 0ms when viewing correlograms in Phy, increasing this value can help remove those artifacts.
+After sorting has finished, spikes that occur within this number of bins of each other, from the same unit, are assumed to be artifacts and removed. The default of 15 bins corresponds to 0.5ms for a sampling rate of 30000hz. If your sampling rate is different, you may need to increase or decrease this accordingly. If you see otherwise good neurons with large peaks around 0ms when viewing correlograms in Phy, increasing this value can help remove those artifacts.
+
+**Warning!!!** Do not increase this value beyond 0.5ms as it will interfere with the ACG and CCG refractory period estimations (which normally ignores the central 1ms of the correlogram).
