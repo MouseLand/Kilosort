@@ -20,6 +20,8 @@ If your data is not in one of the supported formats listed in the previous step,
 .. image:: https://www.kilosort.org/static/images/gui_convert_data.png
    :width: 600
 
+Note: this tool is only intended to cover the most common formats and options for getting your data into Kilosort. If you don't see your data format or if you run into errors related to extra options that aren't in our GUI, we recommend using SpikeInterface directly to convert your data. Their `documentation here <https://spikeinterface.readthedocs.io/en/latest/modules_gallery/core/plot_1_recording_extractor.html>`_ shows an example of how to save recording traces to .raw format using their own tools.
+
 
 Choose where to save results
 ----------------------------
