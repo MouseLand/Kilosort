@@ -12,6 +12,7 @@ Launching the GUI
 5. Hit :code:`Run`. This will run the pipeline and output the results in a
    format compatible with Phy, the most popular spike sorting curating software.
 
+See :ref:`gui_guide` for more detailed instructions.
 
 Using the API
 -------------

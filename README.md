@@ -24,7 +24,9 @@ Example notebooks are provided in the `docs/source/tutorials` folder and in the 
 **If you use Kilosort1-4, please cite the [paper](https://www.biorxiv.org/content/10.1101/2023.01.07.523036v1):**     
 Pachitariu, M., Sridhar, S., Pennington, J., & Stringer, C. (2024). Spike sorting with Kilosort4.
 
-**Warning** :bangbang:: There was a bug in Kilosort 2.5 and 3 (but not 1,2 and 4) which caused fewer spikes to be detected in ~7ms periods at batch boundaries (every 2.1866s, issue #594). The patch0 releases fix this bug. It is also advised not to manually change the batch size in any Matlab-version of Kilosort (1-3). 
+**Warning** :bangbang:: There was a bug in Kilosort 2.5 and 3 (but not 1,2 and 4) which caused fewer spikes to be detected in ~7ms periods at batch boundaries (every 2.1866s, issue #594). The patch0 releases fix this bug. It is also advised not to manually change the batch size in any Matlab-version of Kilosort (1-3).
+
+**Note on multi-shank probes** : We are aware of some issues with sorting data from probes with multiple shanks. See [documentation here](https://kilosort.readthedocs.io/en/latest/multi_shank.html) for recommended workarounds until the code is updated to handle these probes.
 
 ## Installation
 
@@ -68,10 +70,20 @@ This [video](https://www.youtube.com/watch?v=gsixIQYvj3U) has step-by-step insta
 4. Hit `LOAD`. The data should now be visible.
 5. Hit `Run`. This will run the pipeline and output the results in a format compatible with Phy, the most popular spike sorting curating software.
 
-There is a warning that will always pop up when running Kilosort and/or using the BinaryFile class, but it's nothing to worry about:
+### Debugging qt.qpa.plugin error
+
+Some users have encountered the following error (or similar ones with slight variations) when attempting to launch the Kilosort4 GUI:
 ```
-UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at C:\cb\pytorch_1000000000000\work\torch\csrc\utils\tensor_numpy.cpp:205.)
+QObject::moveToThread: Current thread (0x2a7734988a0) is not the object's thread (0x2a77349d4e0).
+Cannot move to target thread (0x2a7734988a0)
+
+qt.qpa.plugin: Could not load the Qt platform plugin "windows" in "<FILEPATH>" even though it was found.
+This application failed to start because no Qt platform plugin could be initialized. Reinstalling the application may fix this problem.
+
+Available platform plugins are: minimal, offscreen, webgl, windows.
 ```
+This is not specific to Kilosort4, it is a general problem with PyQt (the GUI library we chose to develop with) that doesn't appear to have a single cause or fix. We are looking into alternatives for the GUI code to avoid this issue, but in the meantime please check [issue 597](https://github.com/MouseLand/Kilosort/issues/597) and [issue 613](https://github.com/MouseLand/Kilosort/issues/613) for some suggested solutions.
+
 
 ## Integration with Phy GUI
 
