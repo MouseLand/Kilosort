@@ -171,7 +171,8 @@ EXTRA_PARAMETERS = {
         'description': 
             """
             Sample index for aligning waveforms, so that their minimum 
-            or maximum value happens here. Default of 20.
+            or maximum value happens here. Defaults to 
+            `int(20 * settings['nt']/61)`.
             """
     },
 
