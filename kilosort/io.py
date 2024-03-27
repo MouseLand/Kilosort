@@ -253,6 +253,12 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         np.save(results_dir / 'full_clu.npy', clu)
         np.save(results_dir / 'full_amp.npy', amplitudes)
 
+    # Remove cached .phy results if present from running Phy on a previous
+    # version of results in the same directory.
+    phy_cache_path = Path(results_dir / '.phy')
+    if phy_cache_path.is_dir():
+        shutil.rmtree(phy_cache_path)
+
     return results_dir, similar_templates, is_ref, est_contam_rate
 
 
