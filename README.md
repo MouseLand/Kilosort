@@ -28,6 +28,8 @@ Pachitariu, M., Sridhar, S., Pennington, J., & Stringer, C. (2024). Spike sortin
 
 **Note on multi-shank probes** : We are aware of some issues with sorting data from probes with multiple shanks. See [documentation here](https://kilosort.readthedocs.io/en/latest/multi_shank.html) for recommended workarounds until the code is updated to handle these probes.
 
+**Note on reusing parameters from previous versions**: Please don't do this. Kilosort4 is a new algorithm, and the main parameters (the thresholds) can affect the results in a different way for your data. Please start with the default parameters and adjust from there based on what you see in Phy. 
+
 ## Installation
 
 ### System requirements
