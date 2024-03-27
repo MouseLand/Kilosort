@@ -82,7 +82,8 @@ def make_pc_features(ops, spike_templates, spike_clusters, tF):
     # xy: template centers, iC: channels associated with each template
     xy, iC = xy_templates(ops)
     n_clusters = np.unique(spike_clusters).size
-    feature_ind = np.zeros((n_clusters, ops['nearest_chans']), dtype=np.uint32)
+    n_chans = ops['nearest_chans']
+    feature_ind = np.zeros((n_clusters, n_chans), dtype=np.uint32)
 
     for i in np.unique(spike_clusters):
         # Get templates associated with cluster (often just 1)
@@ -102,9 +103,9 @@ def make_pc_features(ops, spike_templates, spike_clusters, tF):
         chan_norm = torch.linalg.norm(spike_mean, dim=1)
         sorted_chans, ind = torch.sort(chan_norm, descending=True)
         # Assign features to overwrite tF in-place
-        tF[igood,:] = Xd[:, ind[:10], :]
+        tF[igood,:] = Xd[:, ind[:n_chans], :]
         # Save channel inds for phy
-        feature_ind[i,:] = ind[:10].numpy() + ch_min.cpu().numpy()
+        feature_ind[i,:] = ind[:n_chans].numpy() + ch_min.cpu().numpy()
 
     # Swap last 2 dimensions to get ordering Phy expects
     tF = torch.permute(tF, (0, 2, 1))
