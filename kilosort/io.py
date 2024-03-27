@@ -13,7 +13,9 @@ from torch.fft import fft, ifft, fftshift
 
 from kilosort import CCG
 from kilosort.preprocessing import get_drift_matrix, fft_highpass
-from kilosort.postprocessing import remove_duplicates, compute_spike_positions
+from kilosort.postprocessing import (
+    remove_duplicates, compute_spike_positions, make_pc_features
+    )
 
 
 def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
@@ -195,6 +197,19 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     np.save((results_dir / 'templates.npy'), templates)
     np.save((results_dir / 'templates_ind.npy'), templates_ind)
     
+    # pc features
+    if save_extra_vars:
+        # Save tF first since it gets updated in-place
+        np.save(results_dir / 'tF.npy', tF.cpu().numpy())
+    # This will momentarily copy tF which is pretty large, but it's on CPU
+    # so the extra memory hopefully won't be an issue.
+    tF = tF[kept_spikes]
+    pc_features, pc_feature_ind = make_pc_features(
+        ops, spike_templates, spike_clusters, tF
+        )
+    np.save(results_dir / 'pc_features.npy', pc_features)
+    np.save(results_dir / 'pc_feature_ind.npy', pc_feature_ind)
+
     # contamination ratio
     acg_threshold = ops['settings']['acg_threshold']
     ccg_threshold = ops['settings']['ccg_threshold']
@@ -231,8 +246,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
             f.write(f'{key} = {params[key]}\n')
 
     if save_extra_vars:
-        # Also save tF and Wall, for easier debugging/analysis
-        np.save(results_dir / 'tF.npy', tF.cpu().numpy())
+        # Also save Wall, for easier debugging/analysis
         np.save(results_dir / 'Wall.npy', Wall.cpu().numpy())
         # And full st, clu, amp arrays with no spikes removed
         np.save(results_dir / 'full_st.npy', st)

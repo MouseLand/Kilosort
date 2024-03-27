@@ -3,6 +3,8 @@ from numba.types import bool_
 import numpy as np
 import torch
 
+from kilosort.clustering_qr import xy_templates, get_data_cpu
+
 
 @njit("(int64[:], int32[:], int32)")
 def remove_duplicates(spike_times, spike_clusters, dt=15):
@@ -42,3 +44,36 @@ def compute_spike_positions(st, tF, ops):
     ys = (yc0 * tmass).sum(1).cpu().numpy()
 
     return xs, ys
+
+
+def make_pc_features(ops, spike_templates, spike_clusters, tF):
+    # spike_templates: st[:,1]
+    # spike clusters:  clu
+
+    xy, iC = xy_templates(ops)
+    n_clusters = np.unique(spike_clusters).size
+    feature_ind = np.zeros((n_clusters, 10), dtype=np.uint32)
+
+    for i in np.unique(spike_clusters):
+        iunq = np.unique(spike_templates[spike_clusters==i]).astype(int)
+        ix = torch.from_numpy(np.zeros(int(spike_templates.max())+1, bool))
+        ix[iunq] = True
+        Xd, ch_min, ch_max, igood = get_data_cpu(
+            ops, xy, iC, spike_templates, tF, None, None,
+            dmin=ops['dmin'], dminx=ops['dminx'], ix=ix, merge_dim=False
+            )
+
+        # Take mean of Xd across spikes, find channels w/ largest norm
+        spike_mean = Xd.mean(0)
+        chan_norm = torch.linalg.norm(spike_mean, dim=1)
+        sorted_chans, ind = torch.sort(chan_norm, descending=True)
+        # Assign Xd to overwrite tF in-place
+        tF[igood,:] = Xd[:, ind[:10], :]
+        # Save channel inds for phy
+        feature_ind[i,:] = ind[:10].numpy() + ch_min.cpu().numpy()
+        # TODO: should be sorted by physical distance from first channel?
+        # TODO: cast to uint32
+
+    tF = torch.permute(tF, (0, 2, 1))
+
+    return tF, feature_ind
