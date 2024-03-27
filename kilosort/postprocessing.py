@@ -47,33 +47,66 @@ def compute_spike_positions(st, tF, ops):
 
 
 def make_pc_features(ops, spike_templates, spike_clusters, tF):
-    # spike_templates: st[:,1]
-    # spike clusters:  clu
+    '''Get PC Features and corresponding indices for export to Phy.
 
+    NOTE: This function will update tF in-place!
+
+    Parameters
+    ----------
+    ops : dict
+        Dictionary of state variables updated throughout the sorting process.
+        This function is intended to be used with the final state of ops, after
+        all sorting has finished.
+    spike_templates : np.ndarray
+        Vector of template ids with shape `(n_spikes,)`. This is equivalent to
+        `st[:,1]`, where `st` is returned by `template_matching.extract`.
+    spike_clusters : np.ndarray
+        Vector of cluster ids with shape `(n_pikes,)`. This is equivalent to
+        `clu` returned by `template_matching.merging_function`.
+    tF : torch.Tensor
+        Tensor of pc features as returned by `template_matching.extract`,
+        with shape `(n_spikes, nearest_chans, n_pcs)`.
+
+    Returns
+    -------
+    tF : torch.Tensor
+        As above, but with some data replaced so that features are associated 
+        with the final clusters instead of templates. The second and third
+        dimensions are also swapped to conform to the shape expected by Phy.
+    feature_ind : np.ndarray
+        Channel indices associated with the data present in tF for each cluster,
+        with shape `(n_clusters, nearest_chans)`.
+    
+    '''
+
+    # xy: template centers, iC: channels associated with each template
     xy, iC = xy_templates(ops)
     n_clusters = np.unique(spike_clusters).size
-    feature_ind = np.zeros((n_clusters, 10), dtype=np.uint32)
+    feature_ind = np.zeros((n_clusters, ops['nearest_chans']), dtype=np.uint32)
 
     for i in np.unique(spike_clusters):
+        # Get templates associated with cluster (often just 1)
         iunq = np.unique(spike_templates[spike_clusters==i]).astype(int)
+        # Get boolean mask with size (n_templates,), True if they match cluster
         ix = torch.from_numpy(np.zeros(int(spike_templates.max())+1, bool))
         ix[iunq] = True
+        # Get PC features for all spikes detected with those templates (Xd),
+        # and the indices in tF where those spikes occur (igood).
         Xd, ch_min, ch_max, igood = get_data_cpu(
             ops, xy, iC, spike_templates, tF, None, None,
             dmin=ops['dmin'], dminx=ops['dminx'], ix=ix, merge_dim=False
             )
 
-        # Take mean of Xd across spikes, find channels w/ largest norm
+        # Take mean of features across spikes, find channels w/ largest norm
         spike_mean = Xd.mean(0)
         chan_norm = torch.linalg.norm(spike_mean, dim=1)
         sorted_chans, ind = torch.sort(chan_norm, descending=True)
-        # Assign Xd to overwrite tF in-place
+        # Assign features to overwrite tF in-place
         tF[igood,:] = Xd[:, ind[:10], :]
         # Save channel inds for phy
         feature_ind[i,:] = ind[:10].numpy() + ch_min.cpu().numpy()
-        # TODO: should be sorted by physical distance from first channel?
-        # TODO: cast to uint32
 
+    # Swap last 2 dimensions to get ordering Phy expects
     tF = torch.permute(tF, (0, 2, 1))
 
     return tF, feature_ind
