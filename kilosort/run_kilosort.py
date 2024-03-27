@@ -512,10 +512,11 @@ def load_sorting(results_dir, device=None, load_extra_vars=False):
     results = [ops, st, clu, similar_templates, is_ref, est_contam_rate]
 
     if load_extra_vars:
+        # NOTE: tF and Wall always go on CPU, not CUDA
         tF = np.load(results_dir / 'tF.npy')
-        tF = torch.from_numpy(tF).to(device)
+        tF = torch.from_numpy(tF)
         Wall = np.load(results_dir / 'Wall.npy')
-        Wall = torch.from_numpy(Wall).to(device)
+        Wall = torch.from_numpy(Wall)
         full_st = np.load(results_dir / 'full_st.npy')
         full_clu = np.load(results_dir / 'full_clu.npy')
         full_amp = np.load(results_dir / 'full_amp.npy')

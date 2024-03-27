@@ -328,7 +328,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     return clu, Wall
 
 
-def get_data_cpu(ops, xy, iC, PID, tF, ycenter,  xcenter, dmin = 20, dminx = 32, ncomps = 64):
+def get_data_cpu(ops, xy, iC, PID, tF, ycenter, xcenter, dmin=20, dminx=32,
+                 ncomps=64, ix=None, merge_dim=True):
     PID =  torch.from_numpy(PID).long()
 
     #iU = ops['iU'].cpu().numpy()
@@ -341,7 +342,11 @@ def get_data_cpu(ops, xy, iC, PID, tF, ycenter,  xcenter, dmin = 20, dminx = 32,
     x0 = xcenter #xy[0].mean() - xcenter
 
     #print(dmin, dminx)
-    ix = torch.logical_and(torch.abs(xy[1] - y0) < dmin, torch.abs(xy[0] - x0) < dminx)
+    if ix is None:
+        ix = torch.logical_and(
+            torch.abs(xy[1] - y0) < dmin,
+            torch.abs(xy[0] - x0) < dminx
+            )
     #print(ix.nonzero()[:,0])
     igood = ix[PID].nonzero()[:,0]
 
@@ -362,7 +367,12 @@ def get_data_cpu(ops, xy, iC, PID, tF, ycenter,  xcenter, dmin = 20, dminx = 32,
         #print(ij.sum())
         dd[ij.unsqueeze(-1), iC[:,j]-ch_min] = data[ij]
 
-    Xd = torch.reshape(dd, (nspikes, -1))
+    if merge_dim:
+        Xd = torch.reshape(dd, (nspikes, -1))
+    else:
+        # Keep channels and features separate
+        Xd = dd
+
     return Xd, ch_min, ch_max, igood
 
 
