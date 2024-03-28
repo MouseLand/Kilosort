@@ -30,6 +30,11 @@ These control the threshold for spike detection when applying the universal and 
 This sets the start and end of data used for sorting (in seconds). By default, all data is included. If your data contains recording artifacts near the beginning or end of the session, you can adjust these to omit that data. "inf" and "np.inf" can be used for tmax to indicate end of session in the GUI and API respectively. 
 
 
+``nt``
+------
+This is the number of time samples used to represent spike waveforms, as well as the amount of symmetric padding for filtering. The default represents 2ms + 1 bin for a sampling rate of 30kHz. For a different sampling rate, you may want to adjust accordingly. For example, ``nt = 81`` would be the 2ms equivalent for 40kHz.
+
+
 ``dmin`` and ``dminx``
 ----------------------
 These adjust the vertical and lateral spacing, respectively, of the universal templates used during spike detection, as well as the vertical and lateral sizes of channel neighborhoods used for clustering. By default, Kilosort will attempt to determine a good value for ``dmin`` based on the median distance between contacts, which tends to work well for Neuropixels-like probes. However, if contacts are irregularly spaced, you may need to specify this manually. The default for ``dminx`` is 32um, which is also well suited to Neuropixels probes. For other probes, try setting ``dminx`` to the median lateral distance between contacts as a starting point.
