@@ -84,7 +84,7 @@ This application failed to start because no Qt platform plugin could be initiali
 
 Available platform plugins are: minimal, offscreen, webgl, windows.
 ```
-This is not specific to Kilosort4, it is a general problem with PyQt (the GUI library we chose to develop with) that doesn't appear to have a single cause or fix. We are looking into alternatives for the GUI code to avoid this issue, but in the meantime please check [issue 597](https://github.com/MouseLand/Kilosort/issues/597) and [issue 613](https://github.com/MouseLand/Kilosort/issues/613) for some suggested solutions.
+This is not specific to Kilosort4, it is a general problem with PyQt (the GUI library we chose to develop with) that doesn't appear to have a single cause or fix. If you encounter this error, please check [issue 597](https://github.com/MouseLand/Kilosort/issues/597) and [issue 613](https://github.com/MouseLand/Kilosort/issues/613) for some suggested solutions.
 
 
 ## Integration with Phy GUI
