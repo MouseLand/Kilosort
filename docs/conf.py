@@ -1,7 +1,12 @@
 # NOTE: To build locally, run the following from the top level of the Kilosort4
-#       repository: `sphinx-build -b html docs/source docs/build/html`
+#       repository:
+#       `conda install -c conda-forge pandoc`
+#       Then reinstall Kilosort4 with docs dependencies:
+#       `pip install -e .[docs]`
+#       Then build the html with:
+#       `sphinx-build -b html docs/ docs/build/html`
 #       For api: `sphinx-apidoc -f -o docs/source/api kilosort` (WIP)
-#                For now, add to api.rst manually instead.
+#                For now, add to api.rst manually instead.       
 
 # Configuration file for the Sphinx documentation builder.
 #

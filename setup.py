@@ -22,7 +22,10 @@ gui_deps = [
 docs_deps = [
     'sphinx>=3.0',
     'sphinxcontrib-apidoc',
+    'nbsphinx',
+    'myst_parser',
     'sphinx_rtd_theme',
+    'pandoc'
 ]
 
 ### remove torch install if already installed
