@@ -134,3 +134,6 @@ dmypy.json
 # Test data
 tests/.test_data/
 tests/.test_data/*
+
+# docs/ copy of README
+docs/README.md

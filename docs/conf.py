@@ -8,6 +8,14 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+# Download README from main branch when building documentation, following:
+# https://stackoverflow.com/questions/66495200/is-it-possible-to-include-external-rst-files-in-my-documentation
+from urllib.request import urlretrieve
+urlretrieve (
+    "https://raw.githubusercontent.com/MouseLand/Kilosort/main/README.md",
+    "README.md"
+)
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -58,7 +66,7 @@ html_theme_options = {
     'display_version': True,
     'prev_next_buttons_location': 'top',
     'style_external_links': False,
-    'style_nav_header_background': 'black',
+    'style_nav_header_background': 'Gray',
     # Toc options
     'collapse_navigation': True,
     'sticky_navigation': True,
