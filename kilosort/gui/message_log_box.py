@@ -1,4 +1,5 @@
 from pathlib import Path
+import pprint
 
 from kilosort.gui.logger import XStream
 from qtpy import QtCore, QtGui, QtWidgets
@@ -15,16 +16,20 @@ class MessageLogBox(QtWidgets.QGroupBox):
         self.log_box.setReadOnly(True)
         self.log_box.setLineWrapMode(QtWidgets.QPlainTextEdit.WidgetWidth) 
         self.log_box.setFont(QtGui.QFont("Monospace"))
-        self.layout.addWidget(self.log_box, 0, 0, 1, 2)
+        self.layout.addWidget(self.log_box, 0, 0, 1, 3)
 
         self.popout_button = QtWidgets.QPushButton('Show More')
         self.popout_button.clicked.connect(self.show_log_popout)
         self.layout.addWidget(self.popout_button, 1, 0, 1, 1)
         self.popout_window = ExpandedLog()
 
-        self.dump_button = QtWidgets.QPushButton('Dump Settings')
-        self.dump_button.clicked.connect(self.dump_settings)
-        self.layout.addWidget(self.dump_button, 1, 1, 1, 1)
+        self.dump_settings_button = QtWidgets.QPushButton('Dump Settings')
+        self.dump_settings_button.clicked.connect(self.dump_settings)
+        self.layout.addWidget(self.dump_settings_button, 1, 1, 1, 1)
+
+        self.dump_probe_button = QtWidgets.QPushButton('Dump Probe')
+        self.dump_probe_button.clicked.connect(self.dump_probe)
+        self.layout.addWidget(self.dump_probe_button, 1, 2, 1, 1)
 
         log_box_document = self.log_box.document()
         default_font = log_box_document.defaultFont()
@@ -50,8 +55,26 @@ class MessageLogBox(QtWidgets.QGroupBox):
     def dump_settings(self):
         # For debugging purposes, check for mismatch between displayed parameter
         # values and the values that are actually being used.
-        settings_text = str(self.gui.settings_box.settings)
+        settings_text = "settings = "
+        settings = self.gui.settings_box.settings.copy()
+        settings['probe'] = '... (use dump probe)'
+        s = pprint.pformat(settings, indent=4, sort_dicts=False)
+        settings_text += s[0] + '\n ' + s[1:-1] + '\n' + s[-1]
+
         self.update_text(settings_text)
+
+    @QtCore.Slot()
+    def dump_probe(self):
+        # For debugging purposes, make sure probe is loaded correctly.
+        probe_text = "probe = "
+        probe = self.gui.settings_box.settings['probe']
+        p = pprint.pformat(probe, indent=4, sort_dicts=False)
+        # insert `np.` so that text can be copied directly to code
+        p = 'np.array'.join(p.split('array'))
+        p = 'dtype=np.'.join(p.split('dtype='))
+        probe_text += p[0] + '\n ' + p[1:-1] + '\n' + p[-1]
+
+        self.update_text(probe_text)
 
     def prepare_for_new_context(self):
         self.save_log_file()
