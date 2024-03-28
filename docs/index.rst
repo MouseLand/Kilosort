@@ -11,7 +11,7 @@ please see our pre-print on `BioArxiv <https://www.biorxiv.org/content/10.1101/2
    :maxdepth: 1
    :caption: Getting Started
 
-   README.md
+   README <README.md>
    gui_guide
    parameters
    multi_shank
