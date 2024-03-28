@@ -1,2 +1,2 @@
 :ref:`README <readme>`
-.. include:: ../README.md
+.. include:: ../README
