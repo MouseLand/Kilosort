@@ -92,6 +92,8 @@ def template_centers(ops):
         # Try to determine a good value automatically based on contact positions.
         dmin = np.median(np.diff(np.unique(ops['yc'])))
     ops['dmin'] = dmin
+    if ops['max_channel_distance'] is None:
+        ops['max_channel_distance'] = dmin
     ops['yup'] = np.arange(ymin, ymax+.00001, dmin//2)
 
     ops['dminx'] = dminx = ops['settings']['dminx']
@@ -161,7 +163,9 @@ def nearest_chans(ys, yc, xs, xc, nC, device=torch.device('cuda')):
     iC = np.argsort(ds, 0)[:nC]
     iC = torch.from_numpy(iC).to(device)
     ds = np.sort(ds, 0)[:nC]
+
     return iC, ds
+
 
 def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):    
 
@@ -190,17 +194,23 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
         ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
 
     ops = template_centers(ops)
-
     [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
     ys, xs = ys.flatten(), xs.flatten()
-    ops['ycup'], ops['xcup'] = ys, xs
-
     xc, yc = ops['xc'], ops['yc']
     Nfilt = len(ys)
 
     nC = ops['settings']['nearest_chans']
     nC2 = ops['settings']['nearest_templates']
     iC, ds = nearest_chans(ys, yc, xs, xc, nC, device=device)
+
+    # Don't use templates that are too far away from nearest channel
+    igood = ds[0,:] < ops['max_channel_distance']
+    iC = iC[:,igood]
+    ds = ds[:,igood]
+    ys = ys[igood]
+    xs = xs[igood]
+    ops['ycup'], ops['xcup'] = ys, xs
+
     iC2, ds2 = nearest_chans(ys, ys, xs, xs, nC2, device=device)
 
     ds_torch = torch.from_numpy(ds).to(device).float()
