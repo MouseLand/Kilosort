@@ -92,13 +92,15 @@ def template_centers(ops):
         # Try to determine a good value automatically based on contact positions.
         dmin = np.median(np.diff(np.unique(ops['yc'])))
     ops['dmin'] = dmin
-    if ops['max_channel_distance'] is None:
-        ops['max_channel_distance'] = dmin
     ops['yup'] = np.arange(ymin, ymax+.00001, dmin//2)
 
     ops['dminx'] = dminx = ops['settings']['dminx']
     nx = np.round((xmax - xmin) / (dminx/2)) + 1
     ops['xup'] = np.linspace(xmin, xmax, int(nx))
+
+    # Set max channel distance based on dmin, dminx, use whichever is greater.
+    if ops['max_channel_distance'] is None:
+        ops['max_channel_distance'] = max(dmin, dminx)
 
     return ops
 
@@ -204,7 +206,8 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     iC, ds = nearest_chans(ys, yc, xs, xc, nC, device=device)
 
     # Don't use templates that are too far away from nearest channel
-    igood = ds[0,:] < ops['max_channel_distance']
+    # (use square of max distance since ds are squared distances)
+    igood = ds[0,:] < ops['max_channel_distance']**2
     iC = iC[:,igood]
     ds = ds[:,igood]
     ys = ys[igood]
