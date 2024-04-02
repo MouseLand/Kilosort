@@ -335,7 +335,7 @@ class BinaryRWFile:
         
         Parameters
         ----------
-        filename : str
+        filename : str or Path
             The filename of the file to read from or write to
         n_chan_bin : int
             number of channels

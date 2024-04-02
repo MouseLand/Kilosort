@@ -32,7 +32,9 @@ class KiloSortGUI(QtWidgets.QMainWindow):
                 device = torch.device('cpu')
         self.device = device
 
-        if (filename is None) and self.qt_settings.contains('data_file_path'):
+        if filename is not None:
+            filename = Path(filename)
+        elif (filename is None) and self.qt_settings.contains('data_file_path'):
             filename = self.qt_settings.value('data_file_path')
         self.data_path = filename
 
