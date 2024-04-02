@@ -18,6 +18,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.setTitle("Probe View")
         self.gui = parent
         self.probe_view = pg.PlotWidget()
+        self.template_toggle = QtWidgets.QCheckBox('Show Template Centers')
         self.setup()
 
         self.active_layout = None
@@ -29,6 +30,8 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.total_channels = None
         self.channel_map = None
         self.channel_map_dict = {}
+        self.channel_spots = None
+        self.template_spots = None
 
         self.sorting_status = {
             "preprocess": False,
@@ -42,9 +45,14 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.probe_view.hideAxis("left")
         self.probe_view.hideAxis("bottom")
         self.probe_view.setMouseEnabled(False, True)
+        self.show_templates = False
+
+        self.template_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        self.template_toggle.stateChanged.connect(self.toggle_templates)
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.probe_view, 95)
+        layout.addWidget(self.template_toggle)
         self.setLayout(layout)
 
     def set_layout(self, context):
@@ -81,6 +89,18 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         xs = xs[igood]
 
         return xs, ys
+    
+    @QtCore.Slot()
+    def toggle_templates(self):
+        if self.template_toggle.isChecked():
+            self.show_templates = True
+        else:
+            self.show_templates = False
+        # If no layout is loaded, this will just be an empty plot.
+        # Otherwise, re-uses current layout to re-generate with or without
+        # template centers shown.
+        template_args = self.gui.settings_box.get_probe_template_args()
+        self.preview_probe(self.gui.settings_box.probe_layout, template_args)
 
     @QtCore.Slot(str, int)
     def synchronize_data_view_mode(self, mode: str):
@@ -93,32 +113,35 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.sorting_status = status_dict
 
     def generate_spots_list(self):
-        spots = []
-        size = 10
-        symbol = "s"
+        channel_spots = []
+        template_spots = []
 
-        for x_pos, y_pos in zip(self.xc, self.yc):
-            pos = (x_pos, y_pos)
-            color = 'g'
-            pen = pg.mkPen(0.5)
-            brush = pg.mkBrush(color)
-            spots.append({
-                'pos': pos, 'size': size, 'pen': pen, 'brush': brush,
-                'symbol': symbol
-                })
+        if self.xc is not None:
+            size = 10
+            symbol = "s"
+            color = "g"
+            for x_pos, y_pos in zip(self.xc, self.yc):
+                pen = pg.mkPen(0.5)
+                brush = pg.mkBrush(color)
+                channel_spots.append({
+                    'pos': (x_pos, y_pos), 'size': size, 'pen': pen, 'brush': brush,
+                    'symbol': symbol
+                    })
+        self.channel_spots = channel_spots
 
         if self.xcup is not None:
             size = 5
             symbol = "o"
             color = "w"
             for x, y in zip(self.xcup, self.ycup):
+                pen = pg.mkPen(0.5)
                 brush = pg.mkBrush(color)
-                spots.append({
+                template_spots.append({
                     'pos': (x,y), 'size': size, 'pen': pen, 'brush': brush,
                     'symbol': symbol
                     })
+        self.template_spots = template_spots
 
-        return spots
 
     @QtCore.Slot(int, int)
     def update_probe_view(self):
@@ -131,7 +154,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.create_plot()
 
     def create_plot(self):
-        spots = self.generate_spots_list()
+        self.generate_spots_list()
+        spots = self.channel_spots
+        if self.show_templates:
+            spots += self.template_spots
         scatter_plot = pg.ScatterPlotItem(spots)
         self.probe_view.addItem(scatter_plot)
 
