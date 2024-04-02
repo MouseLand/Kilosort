@@ -1,7 +1,11 @@
-import numpy as np
-import pyqtgraph as pg
-from kilosort.gui.logger import setup_logger
 from qtpy import QtCore, QtGui, QtWidgets
+import numpy as np
+import torch
+import pyqtgraph as pg
+
+from kilosort.spikedetect import template_centers, nearest_chans
+from kilosort.gui.logger import setup_logger
+
 
 logger = setup_logger(__name__)
 
@@ -21,6 +25,8 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.kcoords = None
         self.xc = None
         self.yc = None
+        self.xcup = None
+        self.ycup = None
         self.total_channels = None
         self.channel_map = None
         self.channel_map_dict = {}
@@ -48,15 +54,35 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.set_active_layout(probe)
         self.update_probe_view()
 
-    def set_active_layout(self, probe):
+    def set_active_layout(self, probe, template_args):
         self.active_layout = probe
         self.kcoords = self.active_layout["kcoords"]
         self.xc, self.yc = self.active_layout["xc"], self.active_layout["yc"]
+        self.xcup, self.ycup = self.get_template_centers(*template_args)
         self.channel_map_dict = {}
         for ind, (xc, yc) in enumerate(zip(self.xc, self.yc)):
             self.channel_map_dict[(xc, yc)] = ind
         self.total_channels = self.active_layout["n_chan"]
         self.channel_map = self.active_layout["chanMap"]
+
+    def get_template_centers(self, nC, dmin, dminx, max_dist, device):
+        ops = {
+            'yc': self.yc, 'xc': self.xc,
+            'dmin': dmin, 'dminx': dminx,
+            'max_channel_distance': max_dist
+            }
+        ops = template_centers(ops)
+        [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
+        ys, xs = ys.flatten(), xs.flatten()
+        iC, ds = nearest_chans(ys, self.yc, xs, self.xc, nC, device=device)
+
+        igood = ds[0,:] <= ops['max_channel_distance']**2
+        iC = iC[:,igood]
+        ds = ds[:,igood]
+        ys = ys[igood]
+        xs = xs[igood]
+        self.ycup = ys
+        self.xcup = ds
 
     @QtCore.Slot(str, int)
     def synchronize_data_view_mode(self, mode: str):
@@ -82,6 +108,17 @@ class ProbeViewBox(QtWidgets.QGroupBox):
                 'pos': pos, 'size': size, 'pen': pen, 'brush': brush,
                 'symbol': symbol
                 })
+
+        if self.xcup is not None:
+            size = 5
+            symbol = "o"
+            color = "w"
+            for x, y in zip(self.xcup, self.ycup):
+                brush = pg.mkBrush(color)
+                spots.append({
+                    'pos': (x,y), 'size': size, 'pen': pen, 'brush': brush,
+                    'symbol': symbol
+                    })
 
         return spots
 

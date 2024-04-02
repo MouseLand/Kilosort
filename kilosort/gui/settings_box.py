@@ -21,7 +21,7 @@ _ALLOWED_FILE_TYPES = ['.bin', '.dat', '.bat', '.raw']  # For binary data
 
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.Signal()
-    previewProbe = QtCore.Signal(object)
+    previewProbe = QtCore.Signal(object, object)
     dataChanged = QtCore.Signal()
 
     def __init__(self, parent):
@@ -502,7 +502,11 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     @QtCore.Slot()
     def show_probe_layout(self):
-        self.previewProbe.emit(self.probe_layout)
+        template_args = [
+            self.nearest_chans, self.dmin, self.dminx, 
+            self.max_channel_distance, self.gui.device
+            ]
+        self.previewProbe.emit(self.probe_layout, template_args)
 
     @QtCore.Slot(str)
     def on_probe_layout_selected(self, name):
