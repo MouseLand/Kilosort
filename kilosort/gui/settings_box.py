@@ -502,9 +502,10 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     @QtCore.Slot()
     def show_probe_layout(self):
+        epw = self.extra_parameters_window
         template_args = [
-            self.nearest_chans, self.dmin, self.dminx, 
-            self.max_channel_distance, self.gui.device
+            epw.nearest_chans, epw.dmin, epw.dminx, 
+            epw.max_channel_distance, self.gui.device
             ]
         self.previewProbe.emit(self.probe_layout, template_args)
 

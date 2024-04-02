@@ -1,6 +1,5 @@
 from qtpy import QtCore, QtGui, QtWidgets
 import numpy as np
-import torch
 import pyqtgraph as pg
 
 from kilosort.spikedetect import template_centers, nearest_chans
@@ -67,9 +66,8 @@ class ProbeViewBox(QtWidgets.QGroupBox):
 
     def get_template_centers(self, nC, dmin, dminx, max_dist, device):
         ops = {
-            'yc': self.yc, 'xc': self.xc,
-            'dmin': dmin, 'dminx': dminx,
-            'max_channel_distance': max_dist
+            'yc': self.yc, 'xc': self.xc, 'max_channel_distance': max_dist,
+            'settings': {'dmin': dmin, 'dminx': dminx}
             }
         ops = template_centers(ops)
         [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
@@ -81,8 +79,8 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         ds = ds[:,igood]
         ys = ys[igood]
         xs = xs[igood]
-        self.ycup = ys
-        self.xcup = ds
+
+        return xs, ys
 
     @QtCore.Slot(str, int)
     def synchronize_data_view_mode(self, mode: str):
@@ -126,10 +124,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     def update_probe_view(self):
         self.create_plot()
 
-    @QtCore.Slot(object)
-    def preview_probe(self, probe):
+    @QtCore.Slot(object, object)
+    def preview_probe(self, probe, template_args):
         self.probe_view.clear()
-        self.set_active_layout(probe)
+        self.set_active_layout(probe, template_args)
         self.create_plot()
 
     def create_plot(self):
