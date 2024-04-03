@@ -207,7 +207,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
 
     # Don't use templates that are too far away from nearest channel
     # (use square of max distance since ds are squared distances)
-    igood = ds[0,:] < ops['max_channel_distance']**2
+    igood = ds[0,:] <= ops['max_channel_distance']**2
     iC = iC[:,igood]
     ds = ds[:,igood]
     ys = ys[igood]
