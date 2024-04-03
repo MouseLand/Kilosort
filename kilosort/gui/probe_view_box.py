@@ -1,4 +1,4 @@
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtWidgets
 import numpy as np
 import pyqtgraph as pg
 
@@ -18,7 +18,8 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.setTitle("Probe View")
         self.gui = parent
         self.probe_view = pg.PlotWidget()
-        self.template_toggle = QtWidgets.QCheckBox('Show Template Centers')
+        self.template_toggle = QtWidgets.QCheckBox('Universal Templates')
+        self.spot_scale = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.setup()
 
         self.active_layout = None
@@ -42,23 +43,32 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.active_data_view_mode = "colormap"
 
     def setup(self):
-        self.probe_view.hideAxis("left")
-        self.probe_view.hideAxis("bottom")
-        self.probe_view.setMouseEnabled(False, True)
+        # This was the previous behavior, zoom will only change vertical scaling
+        # and no axes are visible.
+        # self.probe_view.hideAxis("left")
+        # self.probe_view.hideAxis("bottom")
+        # self.probe_view.setMouseEnabled(False, True)
         self.show_templates = False
 
         self.template_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
         self.template_toggle.stateChanged.connect(self.toggle_templates)
 
+        self.spot_scale.setMinimum(0)
+        self.spot_scale.setMaximum(10)
+        self.spot_scale.setValue(1)
+        self.spot_scale.valueChanged.connect(self.refresh_plot)
+
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.probe_view, 95)
         layout.addWidget(self.template_toggle)
+        layout.addWidget(self.spot_scale)
         self.setLayout(layout)
 
     def set_layout(self, context):
         self.probe_view.clear()
         probe = context.raw_probe
-        self.set_active_layout(probe)
+        template_args = self.gui.settings_box.get_probe_template_args()
+        self.set_active_layout(probe, template_args)
         self.update_probe_view()
 
     def set_active_layout(self, probe, template_args):
@@ -99,6 +109,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         # If no layout is loaded, this will just be an empty plot.
         # Otherwise, re-uses current layout to re-generate with or without
         # template centers shown.
+        self.refresh_plot()
+
+    @QtCore.Slot()
+    def refresh_plot(self):
         template_args = self.gui.settings_box.get_probe_template_args()
         self.preview_probe(self.gui.settings_box.probe_layout, template_args)
 
@@ -117,7 +131,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         template_spots = []
 
         if self.xc is not None:
-            size = 10
+            size = 10 * self.spot_scale.value()
             symbol = "s"
             color = "g"
             for x_pos, y_pos in zip(self.xc, self.yc):
@@ -130,7 +144,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.channel_spots = channel_spots
 
         if self.xcup is not None:
-            size = 5
+            size = 5 * self.spot_scale.value()
             symbol = "o"
             color = "w"
             for x, y in zip(self.xcup, self.ycup):
