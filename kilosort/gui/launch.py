@@ -1,9 +1,9 @@
-import sys, argparse
+import sys
+from urllib.error import HTTPError
 
 import pyqtgraph as pg
 from kilosort.gui import DarkPalette, KiloSortGUI
 from qtpy import QtWidgets, QtGui, QtCore
-from pathlib import Path
 from kilosort.utils import DOWNLOADS_DIR, download_url_to_file
 
 # TODO: figure out how to fix margin/padding around tooltip text.
@@ -27,10 +27,16 @@ def launcher(filename=None):
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
     icon_path = DOWNLOADS_DIR / "logo.png"
     if not icon_path.is_file():
-        print("downloading logo")
-        download_url_to_file(
-            "https://www.kilosort.org/static/downloads/kilosort_logo_small.png",
-            icon_path, progress=True)
+        print("downloading logo...")
+        try:
+            download_url_to_file(
+                "https://www.kilosort.org/static/downloads/kilosort_logo_small.png",
+                icon_path, progress=True
+                )
+        except HTTPError as e:
+            print('Unable to download logo')
+            print(e)
+
     icon_path = str(icon_path.resolve())
     app_icon = QtGui.QIcon()
     app_icon.addFile(icon_path, QtCore.QSize(16, 16))
