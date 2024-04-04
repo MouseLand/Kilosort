@@ -1,11 +1,14 @@
-from io import StringIO
+import time
+
 import numpy as np
 import torch
 from torch import sparse_coo_tensor as coo
 from scipy.sparse import csr_matrix 
 import faiss
 from tqdm import tqdm 
+
 from kilosort import hierarchical, swarmsplitter 
+
 
 def neigh_mat(Xd, nskip=10, n_neigh=30):
     Xsub = Xd[::nskip]
@@ -50,6 +53,7 @@ def assign_mu(iclust, Xg, cols_mu, tones, nclust = None, lpow = 1):
 
     return mu, N
 
+
 def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj, device=torch.device('cuda')):
     NN = kn.shape[0]
 
@@ -69,6 +73,7 @@ def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj, device=t
 
     return iclust
 
+
 def assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,ki,kj, device=torch.device('cuda')):
     n_neigh = kn.shape[1]
     cols = iclust.unsqueeze(-1).tile((1, n_neigh))
@@ -86,6 +91,7 @@ def assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,ki,kj, device=torch.dev
 
     isub = torch.argmax(xS, 1)
     return isub
+
 
 def Mstats(M, device=torch.device('cuda')):
     m = M.sum()
@@ -176,6 +182,7 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
 
     return iclust
 
+
 def compute_score(mu, mu2, N, ccN, lam):
     mu_pairs  = ((N*mu).unsqueeze(1)  + N*mu)  / (1e-6 + N+N[:,0]).unsqueeze(-1)
     mu2_pairs = ((N*mu2).unsqueeze(1) + N*mu2) / (1e-6 + N+N[:,0]).unsqueeze(-1)
@@ -189,19 +196,15 @@ def compute_score(mu, mu2, N, ccN, lam):
     score = (ccN + ccN.T) - lam * dexp
     return score
 
+
 def run_one(Xd, st0, nskip = 20, lam = 0):
-
     iclust, iclust0, M = cluster(Xd,nskip = nskip, lam = 0, seed = 5)
-
     xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
-
-    xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust, my_clus, meta = st0)
-
+    xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust,
+                                       my_clus, meta = st0)
     iclust1 = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
 
     return iclust1
-
-import time
 
 
 def xy_templates(ops):
@@ -214,23 +217,25 @@ def xy_templates(ops):
 
     iU = ops['iU'].cpu().numpy()
     iC = ops['iCC'][:, ops['iU']]    
+
     return xy, iC
+
 
 def xy_up(ops):
     xcup, ycup = ops['xcup'], ops['ycup']
     xy = np.vstack((xcup, ycup))
     xy = torch.from_numpy(xy)
-
     iC = ops['iC'] 
+
     return xy, iC
+
 
 def xy_c(ops):
     xcup, ycup = ops['xc'][::4], ops['yc'][::4]    
     xy = np.vstack((xcup, ycup+10))
     xy = torch.from_numpy(xy)
-
     iC = ops['iC']
-    #print(1)
+
     return xy, iC
 
 
