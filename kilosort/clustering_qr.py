@@ -231,15 +231,6 @@ def xy_up(ops):
     return xy, iC
 
 
-def xy_c(ops):
-    xcup, ycup = ops['xc'][::4], ops['yc'][::4]    
-    xy = np.vstack((xcup, ycup+10))
-    xy = torch.from_numpy(xy)
-    iC = ops['iC']
-
-    return xy, iC
-
-
 def x_centers(ops):
     probe = ops['probe']
     dminx = ops['dminx']
@@ -279,10 +270,6 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         xy, iC = xy_templates(ops)
         iclust_template = st[:,1].astype('int32')
         xcup, ycup = ops['xcup'], ops['ycup']
-    elif mode == 'spikes_nn':
-        xy, iC = xy_c(ops)
-        xcup, ycup = ops['xc'][::4], ops['yc'][::4]   
-        iclust_template = st[:,5].astype('int32')
     else:
         xy, iC = xy_up(ops)
         iclust_template = st[:,5].astype('int32')
@@ -295,6 +282,19 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     ycent = np.arange(ycup.min()+dmin-1, ycup.max()+dmin+1, 2*dmin)
     xcent = x_centers(ops)
     nsp = st.shape[0]
+
+    # Get positions of all grouping centers
+    ycent_pos, xcent_pos = np.meshgrid(ycent, xcent)
+    ycent_pos = torch.from_numpy(ycent_pos.flatten())
+    xcent_pos = torch.from_numpy(xcent_pos.flatten())
+    # Compute distances from templates
+    center_distance = (
+        (xy[0,:] - xcent_pos.unsqueeze(-1))**2
+        + (xy[1,:] - ycent_pos.unsqueeze(-1))**2
+        )
+    # # Add some randomness in case of ties ?
+    # center_distance += 1e-20*np.random.rand(center_distance.shape)
+    minimum_distance = center_distance.min(axis=0)
     
     clu = np.zeros(nsp, 'int32')
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
@@ -306,16 +306,18 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         #iclust_template = st[:,1].astype('int32')
         for x0 in xcent:
             # get the data
+            this_distance = (xy[0,:] - x0)**2 + (xy[1,:] - ycent[kk])**2
+            ix = this_distance < minimum_distance + 1e-6
             Xd, ch_min, ch_max, igood  = get_data_cpu(
                 ops, xy, iC, iclust_template, tF, ycent[kk], x0, dmin=dmin,
-                dminx=dminx, ncomps=ncomps
+                dminx=dminx, ncomps=ncomps, ix=ix
                 )
 
             if Xd is None:
                 nearby_chans_empty += 1
                 continue
-
-            if Xd.shape[0]<1000:
+            elif Xd.shape[0]<1000:
+                print('assigning iclust as all zeroes')
                 #clu[igood] = nmax
                 #nmax += 1
                 iclust = torch.zeros((Xd.shape[0],))
