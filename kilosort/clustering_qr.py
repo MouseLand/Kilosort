@@ -1,9 +1,10 @@
-import time
-
 import numpy as np
 import torch
 from torch import sparse_coo_tensor as coo
-from scipy.sparse import csr_matrix 
+from scipy.sparse import csr_matrix
+from scipy.ndimage.filters import gaussian_filter
+from scipy.signal import find_peaks
+from scipy.cluster.vq import kmeans
 import faiss
 from tqdm import tqdm 
 
@@ -239,6 +240,39 @@ def xy_c(ops):
     return xy, iC
 
 
+def x_centers(ops):
+    probe = ops['probe']
+    dminx = ops['dminx']
+    min_x = probe['xc'].min()
+    max_x = probe['xc'].max()
+
+    # Make histogram of x-positions with bin size roughly equal to dminx,
+    # with a bit of padding on either end of the probe so that peaks can be
+    # detected at edges.
+    num_bins = int((max_x-min_x)/(dminx)) + 4
+    bins = np.linspace(min_x - dminx*2, max_x + dminx*2, num_bins)
+    hist, edges = np.histogram(probe['xc'], bins=bins)
+    # Apply smoothing to make peak-finding simpler.
+    smoothed = gaussian_filter(hist, sigma=0.5)
+    peaks, _ = find_peaks(smoothed)
+    # peaks are indices, translate back to position in microns
+    approx_centers = [edges[p] for p in peaks]
+    # Use these as initial guesses for centroids in k-means to get
+    # a more accurate value for the actual centers.
+    centers, distortion = kmeans(probe['xc'], approx_centers)
+
+    # TODO: Maybe use distortion to raise warning if it seems too large?
+    # "The mean (non-squared) Euclidean distance between the observations passed
+    #  and the centroids generated. Note the difference to the standard definition
+    #  of distortion in the context of the k-means algorithm, which is the sum of
+    #  the squared distances."
+
+    # For example, could raise a warning if this is greater than dminx*2?
+    # Most probes should satisfy that criteria.
+
+    return centers
+
+
 def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_bar=None):
 
     if mode == 'template':
@@ -254,74 +288,73 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         iclust_template = st[:,5].astype('int32')
         xcup, ycup = ops['xcup'], ops['ycup']
 
-    d0 = ops['dmin']
-    ycent = np.arange(ycup.min()+d0-1, ycup.max()+d0+1, 2*d0)
-
-    nsp = st.shape[0]
-    clu = np.zeros(nsp, 'int32')
-    nmax = 0
-
+    dmin = ops['dmin']
+    dminx = ops['dminx']
     nskip = ops['settings']['cluster_downsampling']
     ncomps = ops['settings']['cluster_pcs']
-
+    ycent = np.arange(ycup.min()+dmin-1, ycup.max()+dmin+1, 2*dmin)
+    xcent = x_centers(ops)
+    nsp = st.shape[0]
+    
+    clu = np.zeros(nsp, 'int32')
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
-    t0 = time.time()
     nearby_chans_empty = 0
-    for kk in tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None, mininterval=10 if progress_bar else None):
-        # get the data
+    nmax = 0
+
+    for kk in tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None,
+                   mininterval=10 if progress_bar else None):
         #iclust_template = st[:,1].astype('int32')
+        for x0 in xcent:
+            # get the data
+            Xd, ch_min, ch_max, igood  = get_data_cpu(
+                ops, xy, iC, iclust_template, tF, ycent[kk], x0, dmin=dmin,
+                dminx=dminx, ncomps=ncomps
+                )
 
-        Xd, ch_min, ch_max, igood  = get_data_cpu(
-            ops, xy, iC, iclust_template, tF, ycent[kk], xcup.mean(), dmin=d0,
-            dminx = ops['dminx'], ncomps=ncomps
-            )
+            if Xd is None:
+                nearby_chans_empty += 1
+                continue
 
-        if Xd is None:
-            nearby_chans_empty += 1
-            continue
-
-        if Xd.shape[0]<1000:
-            #clu[igood] = nmax
-            #nmax += 1
-            iclust = torch.zeros((Xd.shape[0],))
-        else:
-            if mode == 'template':
-                st0 = st[igood,0]/ops['fs']
+            if Xd.shape[0]<1000:
+                #clu[igood] = nmax
+                #nmax += 1
+                iclust = torch.zeros((Xd.shape[0],))
             else:
-                st0 = None
+                if mode == 'template':
+                    st0 = st[igood,0]/ops['fs']
+                else:
+                    st0 = None
 
-            # find new clusters
-            iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
-                                                      seed=5, device=device)
+                # find new clusters
+                iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
+                                                        seed=5, device=device)
 
-            xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
+                xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
-            xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust, my_clus, meta = st0)
+                xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust, my_clus, meta = st0)
 
-            iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
+                iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
 
-        clu[igood] = iclust + nmax
-        Nfilt = int(iclust.max() + 1)
-        nmax += Nfilt
+            clu[igood] = iclust + nmax
+            Nfilt = int(iclust.max() + 1)
+            nmax += Nfilt
 
-        # we need the new templates here         
-        W = torch.zeros((Nfilt, ops['Nchan'], ops['settings']['n_pcs']))
-        for j in range(Nfilt):
-            w = Xd[iclust==j].mean(0)
-            W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['n_pcs'])).cpu()
-        
-        Wall = torch.cat((Wall, W), 0)
+            # we need the new templates here         
+            W = torch.zeros((Nfilt, ops['Nchan'], ops['settings']['n_pcs']))
+            for j in range(Nfilt):
+                w = Xd[iclust==j].mean(0)
+                W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['n_pcs'])).cpu()
+            
+            Wall = torch.cat((Wall, W), 0)
 
-        if progress_bar is not None:
-            progress_bar.emit(int((kk+1) / len(ycent) * 100))
-        
-        if 0:#kk%50==0:
-            print(kk, nmax, time.time()-t0)
+            if progress_bar is not None:
+                progress_bar.emit(int((kk+1) / len(ycent) * 100))
+            
 
     if nearby_chans_empty == len(ycent):
         raise ValueError(
             f'`get_data_cpu` never found suitable channels in `clustering_qr.run`.'
-            f'\ndmin, dminx, and xcenter are: {d0, ops["dminx"], xcup.mean()}'
+            f'\ndmin, dminx, and xcenter are: {dmin, dminx, xcup.mean()}'
         )
 
     if Wall.sum() == 0:

@@ -99,7 +99,7 @@ def template_centers(ops):
     ops['xup'] = np.linspace(xmin, xmax, int(nx))
 
     # Set max channel distance based on dmin, dminx, use whichever is greater.
-    if ops['max_channel_distance'] is None:
+    if ops.get('max_channel_distance', None) is None:
         ops['max_channel_distance'] = max(dmin, dminx)
 
     return ops
