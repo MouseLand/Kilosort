@@ -324,9 +324,11 @@ __global__ void  bestFilter(const double *Params, const float *data,
               if  (Cf > Cnextbest + 1e-6)
                     Cnextbest = Cf;
       }
-      err[tid0] 	= Cbest;
-      eloss[tid0] 	= Cbest - Cnextbest;
-      ftype[tid0] 	= ibest;
+      if (tid0>=nt0){
+          err[tid0] 	= Cbest;
+          eloss[tid0] 	= Cbest - Cnextbest;
+          ftype[tid0] 	= ibest;
+      }
 
       tid0 += blockDim.x * gridDim.x;
   }
@@ -351,7 +353,7 @@ __global__ void  bestFilterUpdate(const double *Params, const float *data,
   
   if (ind<counter[0]){
       t = st[ind]-nt0 + tid;
-      if (t>=0 && t<NT){
+      if (t>=nt0 && t<NT){
           Cbest = 0.0f;
           for (i=0; i<Nfilt;i++){
               a = 1+ lam;

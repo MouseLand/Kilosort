@@ -56,7 +56,11 @@ sigmaMask  = ops.sigmaMask;
 % spike threshold for finding missed spikes in residuals
 ops.spkTh = -6; % why am I overwriting this here?
 
-batchstart = 0:NT:NT*nBatches;
+% This was updated in 2.5.2 (fixes for spike holes issue #594)
+ntpad = ops.ntbuff; %16 * ceil(2*nt0 / 32);
+batchstart = ntpad:NT:NT*nBatches;
+
+%batchstart = 0:NT:NT*nBatches;
 
 % find the closest NchanNear channels, and the masks for those channels
 [iC, mask, C2C] = getClosestChannels(rez, sigmaMask, NchanNear);
@@ -120,12 +124,28 @@ dWU1 = dWU;
 for ibatch = 1:niter    
     k = iorder(ibatch); % k is the index of the batch in absolute terms
     
+    % new version (fixing spikes hole issue #594) -------------------------
     % loading a single batch (same as everywhere)
-    offset = 2 * ops.Nchan*batchstart(k);
+    offset = 2 * ops.Nchan*(batchstart(k) - ntpad);
     fseek(fid, offset, 'bof');
-    % dat = fread(fid, [ops.Nchan NT + ops.ntbuff], '*int16');
+    %dat = fread(fid, [ops.Nchan NT + ops.ntbuff], '*int16'); 
     % spike holes bug issue #594, location 1/2
-    dat = fread(fid, [ops.Nchan NT], '*int16');
+    dat = fread(fid, [ops.Nchan NT+2*ntpad], '*int16');
+    if size(dat,2)<NT+2*ntpad
+        NT_current = size(dat,2);
+        ndiff = NT+2*ntpad - NT_current;
+        dat(:, NT_current+1:NT+2*ntpad) = repmat(dat(:, NT_current), 1, ndiff);
+    end
+    
+    % ---------------------------------------------------------------------
+
+     % old version
+%     % loading a single batch (same as everywhere)
+%     offset = 2 * ops.Nchan*batchstart(k);
+%     fseek(fid, offset, 'bof');
+%     % dat = fread(fid, [ops.Nchan NT + ops.ntbuff], '*int16');
+%     % spike holes bug issue #594, location 1/2
+%     dat = fread(fid, [ops.Nchan NT], '*int16');
 
     dat = dat';
     dataRAW = single(gpuArray(dat))/ ops.scaleproc;
@@ -156,6 +176,18 @@ for ibatch = 1:niter
         mexMPnu8(Params, dataRAW, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
         wPCA);
     
+
+    % exclude spike times in the padding (to fix issue #594)
+    ix = (st0>ntpad) & (st0<=NT+ntpad);
+    %ix = [1:numel(st0)] > nmax;
+    
+    st0 = st0(ix);
+    id0 = id0(ix);
+    x0 = x0(ix);
+    featW = featW(:, ix);
+    featPC = featPC(:,:,ix);
+    vexp = vexp(ix); 
+
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     
@@ -189,11 +221,14 @@ for ibatch = 1:niter
     % we carefully assign the correct absolute times to spikes found in this batch
     % toff = nt0min + t0 + NT*(k-1);
     % spike holes bug issue #594, location 2/2    
-    ioffset         = ops.ntbuff;
-    if k==1
-        ioffset         = 0; % the first batch is special (no pre-buffer)
-    end
-    toff = nt0min + t0 -ioffset + (NT-ops.ntbuff)*(k-1);
+%     ioffset         = ops.ntbuff;
+%     if k==1
+%         ioffset         = 0; % the first batch is special (no pre-buffer)
+%     end
+%     toff = nt0min + t0 -ioffset + (NT-ops.ntbuff)*(k-1);
+
+    % new version in patch 2.5.2
+    toff = t0 + nt0min -ntpad + batchstart(k); 
 
     st = toff + double(st0);
     
