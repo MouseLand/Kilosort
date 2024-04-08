@@ -3,7 +3,7 @@ function [rez, st3, fW, fWpc] = trackAndSort(rez, iorder)
 % iorder is the order in which to traverse the batches
 
 % Turn on sorting of spikes before subtracting and averaging in mpnu8
-rez.ops.useStableMode = getOr(rez.ops, 'useStableMode', 1);
+rez.ops.useStableMode = 0; %getOr(rez.ops, 'useStableMode', 1);
 useStableMode = rez.ops.useStableMode;
 
 ops = rez.ops;
@@ -48,7 +48,9 @@ sigmaMask  = ops.sigmaMask;
 % spike threshold for finding missed spikes in residuals
 ops.spkTh = -6; % why am I overwriting this here?
 
-batchstart = 0:NT:NT*nBatches;
+% update to fix the spike holes problem, issue #594
+ntpad = rez.ops.ntbuff; 
+batchstart = ntpad:NT:NT*nBatches;
 
 % find the closest NchanNear channels, and the masks for those channels
 [iC, mask, C2C] = getClosestChannels(rez, sigmaMask, NchanNear);
@@ -107,15 +109,32 @@ fWpc = zeros(NchanNear, Nrank, 1e7, 'single'); % NchanNear is the number of near
 
 dWU1 = dWU;
 
-for ibatch = 1:niter    
+for ibatch = 1:niter
     k = iorder(ibatch); % k is the index of the batch in absolute terms
-    
-    % loading a single batch (same as everywhere)
-    offset = 2 * ops.Nchan*batchstart(k);
+
+    % --------- fixed way to load batches, issue #594 ----------
+    % loading a single batch 
+    offset = 2 * ops.Nchan*(batchstart(k) - ntpad);
     fseek(fid, offset, 'bof');
-    %dat = fread(fid, [ops.Nchan NT + ops.ntbuff], '*int16'); 
-    % spike holes bug issue #594, location 1/2
-    dat = fread(fid, [ops.Nchan NT], '*int16');
+    
+    % original batch sizes
+    %dat = fread(fid, [ops.Nchan NT + ops.ntbuff], '*int16');  
+
+    dat = fread(fid, [ops.Nchan NT+2*ntpad], '*int16');
+    if size(dat,2)<NT+2*ntpad
+        NT_current = size(dat,2);
+        ndiff = NT+2*ntpad - NT_current;
+        dat(:, NT_current+1:NT+2*ntpad) = repmat(dat(:, NT_current), 1, ndiff);
+    end
+    % -------------------------------------------------------------
+
+    % old broken way to load batches
+%     % loading a single batch (same as everywhere)
+%     offset = 2 * ops.Nchan*batchstart(k);
+%     fseek(fid, offset, 'bof');
+%     %dat = fread(fid, [ops.Nchan NT + ops.ntbuff], '*int16'); 
+%     % spike holes bug issue #594, location 1/2
+%     dat = fread(fid, [ops.Nchan NT], '*int16');
 
     dat = dat';
     dataRAW = single(gpuArray(dat))/ ops.scaleproc;
@@ -145,6 +164,22 @@ for ibatch = 1:niter
     [st0, id0, x0, featW, dWU0, drez, nsp0, featPC, vexp, errmsg] = ...
         mexMPnu8(Params, dataRAW, single(U), single(W), single(mu), iC-1, iW-1, UtU, iList-1, ...
         wPCA);
+
+    
+    % fix for spike holes issue #594 ------------------------------------
+    
+    % exclude spike times in the padding
+    ix = (st0>ntpad) & (st0<=NT+ntpad);
+    %ix = [1:numel(st0)] > nmax;
+    
+    st0 = st0(ix);
+    id0 = id0(ix);
+    x0 = x0(ix);
+    featW = featW(:, ix);
+    featPC = featPC(:,:,ix);
+    vexp = vexp(ix); 
+
+    %--------------------------------------------------------------------
     
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
     % \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
@@ -180,12 +215,15 @@ for ibatch = 1:niter
 
     % toff = nt0min + t0 + NT*(k-1);
     % spike holes bug issue #594, location 2/2    
-    ioffset         = ops.ntbuff;
-    if k==1
-        ioffset         = 0; % the first batch is special (no pre-buffer)
-    end
-    toff = nt0min + t0 -ioffset + (NT-ops.ntbuff)*(k-1);
-    
+%     ioffset         = ops.ntbuff;
+%     if k==1
+%         ioffset         = 0; % the first batch is special (no pre-buffer)
+%     end
+%     toff = nt0min + t0 -ioffset + (NT-ops.ntbuff)*(k-1);
+
+    % new spike holes fix #594, first batch now works fine
+    toff = t0 + nt0min -ntpad + batchstart(k);
+
     st = toff + double(st0);
     
     irange = ntot + [1:numel(x0)]; % spikes and features go into these indices
