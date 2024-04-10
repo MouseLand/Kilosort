@@ -292,9 +292,10 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
         (xy[0,:] - xcent_pos.unsqueeze(-1))**2
         + (xy[1,:] - ycent_pos.unsqueeze(-1))**2
         )
-    # # Add some randomness in case of ties ?
-    # center_distance += 1e-20*np.random.rand(center_distance.shape)
-    minimum_distance = center_distance.min(axis=0)
+    # Add some randomness in case of ties
+    center_distance += 1e-20*torch.rand(center_distance.shape)
+    # Get flattened index of x-y center that is closest to template
+    minimum_distance = torch.min(center_distance, 0).indices
     
     clu = np.zeros(nsp, 'int32')
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
@@ -303,13 +304,12 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
 
     for kk in tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None,
                    mininterval=10 if progress_bar else None):
-        #iclust_template = st[:,1].astype('int32')
-        for x0 in xcent:
-            # get the data
-            this_distance = (xy[0,:] - x0)**2 + (xy[1,:] - ycent[kk])**2
-            ix = this_distance < minimum_distance + 1e-6
+        for jj in np.arange(len(xcent)):
+            # Get data for all templates that were closest to this x,y center.
+            ii = ii = kk + jj*ycent.size
+            ix = (minimum_distance == ii)
             Xd, ch_min, ch_max, igood  = get_data_cpu(
-                ops, xy, iC, iclust_template, tF, ycent[kk], x0, dmin=dmin,
+                ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj], dmin=dmin,
                 dminx=dminx, ncomps=ncomps, ix=ix
                 )
 
@@ -317,9 +317,6 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
                 nearby_chans_empty += 1
                 continue
             elif Xd.shape[0]<1000:
-                print('assigning iclust as all zeroes')
-                #clu[igood] = nmax
-                #nmax += 1
                 iclust = torch.zeros((Xd.shape[0],))
             else:
                 if mode == 'template':
