@@ -3,6 +3,7 @@ import numpy as np
 import pyqtgraph as pg
 
 from kilosort.spikedetect import template_centers, nearest_chans
+from kilosort.clustering_qr import x_centers
 from kilosort.gui.logger import setup_logger
 
 
@@ -19,6 +20,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.gui = parent
         self.probe_view = pg.PlotWidget()
         self.template_toggle = QtWidgets.QCheckBox('Universal Templates')
+        self.center_toggle = QtWidgets.QCheckBox('Grouping Centers')
         self.aspect_toggle = QtWidgets.QCheckBox('True Aspect Ratio')
         self.spot_scale = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.setup()
@@ -34,6 +36,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.channel_map_dict = {}
         self.channel_spots = None
         self.template_spots = None
+        self.center_spots = None
 
         self.sorting_status = {
             "preprocess": False,
@@ -44,16 +47,12 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.active_data_view_mode = "colormap"
 
     def setup(self):
-        # This was the previous behavior, zoom will only change vertical scaling
-        # and no axes are visible.
-        # self.probe_view.hideAxis("left")
-        # self.probe_view.hideAxis("bottom")
-        # self.probe_view.setMouseEnabled(False, True)
-        self.show_templates = False
-        self.template_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.template_toggle.stateChanged.connect(self.toggle_templates)
         self.aspect_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
         self.aspect_toggle.stateChanged.connect(self.refresh_plot)
+        self.template_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        self.template_toggle.stateChanged.connect(self.refresh_plot)
+        self.center_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        self.center_toggle.stateChanged.connect(self.refresh_plot)
 
         self.spot_scale.setMinimum(0)
         self.spot_scale.setMaximum(10)
@@ -64,6 +63,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         layout.addWidget(self.probe_view, 95)
         layout.addWidget(self.aspect_toggle)
         layout.addWidget(self.template_toggle)
+        layout.addWidget(self.center_toggle)
         layout.addWidget(self.spot_scale)
         self.setLayout(layout)
 
@@ -78,14 +78,15 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.active_layout = probe
         self.kcoords = self.active_layout["kcoords"]
         self.xc, self.yc = self.active_layout["xc"], self.active_layout["yc"]
-        self.xcup, self.ycup = self.get_template_centers(*template_args)
+        self.xcup, self.ycup, self.ops = self.get_template_spots(*template_args)
+        self.xcent_pos, self.ycent_pos = self.get_center_spots()
         self.channel_map_dict = {}
         for ind, (xc, yc) in enumerate(zip(self.xc, self.yc)):
             self.channel_map_dict[(xc, yc)] = ind
         self.total_channels = self.active_layout["n_chan"]
         self.channel_map = self.active_layout["chanMap"]
 
-    def get_template_centers(self, nC, dmin, dminx, max_dist, device):
+    def get_template_spots(self, nC, dmin, dminx, max_dist, device):
         ops = {
             'yc': self.yc, 'xc': self.xc, 'max_channel_distance': max_dist,
             'settings': {'dmin': dmin, 'dminx': dminx}
@@ -101,18 +102,18 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         ys = ys[igood]
         xs = xs[igood]
 
-        return xs, ys
-    
-    @QtCore.Slot()
-    def toggle_templates(self):
-        if self.template_toggle.isChecked():
-            self.show_templates = True
-        else:
-            self.show_templates = False
-        # If no layout is loaded, this will just be an empty plot.
-        # Otherwise, re-uses current layout to re-generate with or without
-        # template centers shown.
-        self.refresh_plot()
+        return xs, ys, ops
+
+    def get_center_spots(self):
+        dmin = self.ops['dmin']
+        ycent = np.arange(self.ycup.min()+dmin-1, self.ycup.max()+dmin+1, 2*dmin)
+        xcent = x_centers(self.ops)
+
+        ycent_pos, xcent_pos = np.meshgrid(ycent, xcent)
+        ycent_pos = ycent_pos.flatten()
+        xcent_pos = xcent_pos.flatten()
+
+        return xcent_pos, ycent_pos
 
     @QtCore.Slot()
     def refresh_plot(self):
@@ -132,6 +133,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     def generate_spots_list(self):
         channel_spots = []
         template_spots = []
+        center_spots = []
 
         if self.xc is not None:
             size = 10 * self.spot_scale.value()
@@ -159,6 +161,19 @@ class ProbeViewBox(QtWidgets.QGroupBox):
                     })
         self.template_spots = template_spots
 
+        if self.xcent_pos is not None:
+            size = 20 * self.spot_scale.value()
+            symbol = "o"
+            color = "y"
+            for x, y in zip(self.xcent_pos, self.ycent_pos):
+                pen = pg.mkPen(color=color)
+                brush = None
+                center_spots.append({
+                    'pos': (x,y), 'size': size, 'pen': pen, 'brush': brush,
+                    'symbol': symbol
+                })
+        self.center_spots = center_spots
+
 
     @QtCore.Slot(int, int)
     def update_probe_view(self):
@@ -173,8 +188,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     def create_plot(self):
         self.generate_spots_list()
         spots = self.channel_spots
-        if self.show_templates:
+        if self.template_toggle.isChecked():
             spots += self.template_spots
+        if self.center_toggle.isChecked():
+            spots += self.center_spots
         scatter_plot = pg.ScatterPlotItem(spots)
         if self.aspect_toggle.isChecked():
             self.probe_view.setAspectLocked()

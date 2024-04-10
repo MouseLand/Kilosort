@@ -232,17 +232,16 @@ def xy_up(ops):
 
 
 def x_centers(ops):
-    probe = ops['probe']
     dminx = ops['dminx']
-    min_x = probe['xc'].min()
-    max_x = probe['xc'].max()
+    min_x = ops['xc'].min()
+    max_x = ops['xc'].max()
 
     # Make histogram of x-positions with bin size roughly equal to dminx,
     # with a bit of padding on either end of the probe so that peaks can be
     # detected at edges.
     num_bins = int((max_x-min_x)/(dminx)) + 4
     bins = np.linspace(min_x - dminx*2, max_x + dminx*2, num_bins)
-    hist, edges = np.histogram(probe['xc'], bins=bins)
+    hist, edges = np.histogram(ops['xc'], bins=bins)
     # Apply smoothing to make peak-finding simpler.
     smoothed = gaussian_filter(hist, sigma=0.5)
     peaks, _ = find_peaks(smoothed)
@@ -250,7 +249,7 @@ def x_centers(ops):
     approx_centers = [edges[p] for p in peaks]
     # Use these as initial guesses for centroids in k-means to get
     # a more accurate value for the actual centers.
-    centers, distortion = kmeans(probe['xc'], approx_centers)
+    centers, distortion = kmeans(ops['xc'], approx_centers)
 
     # TODO: Maybe use distortion to raise warning if it seems too large?
     # "The mean (non-squared) Euclidean distance between the observations passed
