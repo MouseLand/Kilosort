@@ -664,6 +664,12 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.probe_layout_selector.addItems([""] + probes_list + ["[new]", "other..."])
         self._probes = probes_list
 
+    def clear_probe_selection(self):
+        self.probe_layout_selector.setCurrentIndex(0)
+        self.gui.qt_settings.setValue('probe_layout', None)
+        self.gui.qt_settings.setValue('probe_name', None)
+        self.disable_preview_probe()
+
     def populate_dtype_selector(self):
         self.dtype_selector.clear()
         supported_dtypes = BinaryRWFile.supported_dtypes
@@ -718,11 +724,8 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.results_directory_input.clear()
         self.results_directory_path = None
         self.gui.qt_settings.setValue('results_dir', None)
-        self.probe_layout_selector.setCurrentIndex(0)
-        self.gui.qt_settings.setValue('probe_layout', None)
-        self.gui.qt_settings.setValue('probe_name', None)
+        self.clear_probe_selection()
         self.set_default_field_values()
-        self.disable_preview_probe()
         self.disable_load()
 
     def check_load(self):

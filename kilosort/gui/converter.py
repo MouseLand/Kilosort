@@ -228,6 +228,8 @@ class DataConversionBox(QtWidgets.QWidget):
                 'SpikeInterface recording contains no probe information,\n'
                 'could not write .prb file.'
             )
+            self.gui.settings_box.clear_probe_selection()
+
         self.gui.settings_box.check_load()
 
     @QtCore.Slot()
@@ -269,7 +271,23 @@ class DataConversionBox(QtWidgets.QWidget):
             QtWidgets.QApplication.processEvents()
         else:
             self.disableInput.emit(False)
+
+        # Get output of conversion, then delete thread.
+        c = self.conversion_thread.c
+        fs = self.conversion_thread.fs
+        probe_filename = self.conversion_thread.probe_filename
         self.conversion_thread = None
+
+        # Update settings with new data file, probe, etc
+        settings = self.gui.settings_box
+        update_settings_box(settings, c, fs, self.data_dtype)
+        if probe_filename is not None:
+            add_probe_to_settings(settings, probe_filename)
+        else:
+            settings.clear_probe_selection()
+        settings.data_file_path_input.setText(bin_filename.as_posix())
+        settings.data_file_path_input.editingFinished.emit()
+        
         self.gui.settings_box.check_load()
 
 
@@ -310,16 +328,8 @@ class ConversionThread(QtCore.QThread):
         self.parent = parent
 
     def run(self):
-        _, N, c, s, fs, probe_filename = spikeinterface_to_binary(
+        _, _, self.c, _, self.fs, self.probe_filename = spikeinterface_to_binary(
             self.recording, self.bin_filename.parent,
             data_name=self.bin_filename.name,
             dtype=self.parent.data_dtype
         )
-
-        settings = self.parent.gui.settings_box
-        update_settings_box(settings, c, fs, self.parent.data_dtype)
-        if probe_filename is not None:
-            add_probe_to_settings(settings, probe_filename)
-
-        settings.data_file_path_input.setText(self.bin_filename.as_posix())
-        settings.data_file_path_input.editingFinished.emit()
