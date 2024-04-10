@@ -19,6 +19,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.gui = parent
         self.probe_view = pg.PlotWidget()
         self.template_toggle = QtWidgets.QCheckBox('Universal Templates')
+        self.aspect_toggle = QtWidgets.QCheckBox('True Aspect Ratio')
         self.spot_scale = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.setup()
 
@@ -49,9 +50,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         # self.probe_view.hideAxis("bottom")
         # self.probe_view.setMouseEnabled(False, True)
         self.show_templates = False
-
         self.template_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
         self.template_toggle.stateChanged.connect(self.toggle_templates)
+        self.aspect_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        self.aspect_toggle.stateChanged.connect(self.refresh_plot)
 
         self.spot_scale.setMinimum(0)
         self.spot_scale.setMaximum(10)
@@ -60,6 +62,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.probe_view, 95)
+        layout.addWidget(self.aspect_toggle)
         layout.addWidget(self.template_toggle)
         layout.addWidget(self.spot_scale)
         self.setLayout(layout)
@@ -173,6 +176,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         if self.show_templates:
             spots += self.template_spots
         scatter_plot = pg.ScatterPlotItem(spots)
+        if self.aspect_toggle.isChecked():
+            self.probe_view.setAspectLocked()
+        else:
+            self.probe_view.setAspectLocked(lock=False)
         self.probe_view.addItem(scatter_plot)
 
     def reset(self):
