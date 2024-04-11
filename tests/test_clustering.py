@@ -42,6 +42,11 @@ def random_np2(n_chans=384, n_shanks=4):
 class TestCenters:
     ops = {'dminx': 32}
 
+    def __init__(self, data_directory):
+        # This is just here to make sure probes are downloaded before these
+        # tests are run.
+        pass
+
     def test_linear(self):
         self.ops['probe'] = load_probe(PROBE_DIR/'Linear16x1_kilosortChanMap.mat')
         centers = x_centers(self.ops)
