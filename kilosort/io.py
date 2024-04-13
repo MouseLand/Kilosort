@@ -545,8 +545,14 @@ def get_total_samples(filename, n_channels, dtype=np.int16):
     bytes_per_value = np.dtype(dtype).itemsize
     bytes_per_sample = np.int64(bytes_per_value * n_channels)
     total_bytes = os.path.getsize(filename)
+    samples = (total_bytes / bytes_per_sample)
 
-    return int(total_bytes / bytes_per_sample)
+    if samples%1 != 0:
+        raise ValueError(
+            "Bytes in binary file did not divide evenly, incorrect n_chan_bin."
+        )
+    else:
+        return int(samples)
 
 
 class BinaryFileGroup:
