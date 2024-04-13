@@ -43,7 +43,7 @@ If you need to create a new probe layout, select "[new]" to open the probe creat
 .. image:: https://www.kilosort.org/static/images/gui_make_probe.png
    :width: 600
 
-After a probe is selected, you can click "Preview Probe" to see a visualization and verify that the probe geometry looks correct.
+After a probe is selected, you can click "Preview Probe" to see a visualization and verify that the probe geometry looks correct. Checking "True Aspect Ratio" will show a physically proportional representation. Moving the slider will adjust the displayed scale of the contacts.
 
 
 Load the data

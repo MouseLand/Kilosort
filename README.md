@@ -24,7 +24,7 @@ Example notebooks are provided in the `docs/source/tutorials` folder and in the 
 **If you use Kilosort1-4, please cite the [paper](https://www.nature.com/articles/s41592-024-02232-7):**     
 Pachitariu, M., Sridhar, S., Pennington, J., & Stringer, C. (2024). Spike sorting with Kilosort4.
 
-**Note on multi-shank probes** : We are aware of some issues with sorting data from probes with multiple shanks. See [documentation here](https://kilosort.readthedocs.io/en/latest/multi_shank.html) for recommended workarounds until the code is updated to handle these probes.
+**Note on multi-shank probes** : We are aware of some issues with sorting data from probes with multiple shanks or 2D arrays. See [documentation here](https://kilosort.readthedocs.io/en/latest/multi_shank.html) for recommended workarounds until the code is updated to handle these probes.
 
 **Note on reusing parameters from previous versions**: This probably will not work well. Kilosort4 is a new algorithm, and the main parameters (the thresholds) can affect the results in a different way for your data. Please start with the default parameters and adjust from there based on what you see in Phy. 
 

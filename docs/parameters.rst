@@ -49,6 +49,11 @@ This sets the standard deviation of the smallest Gaussian spatial envelope used 
 This is the number of nearest channels and template locations, respectively, used when assigning templates to spikes during spike detection. ``nearest_chans`` cannot be larger than the total number of channels on the probe, so it will need to be reduced for probes with less than 10 channels. ``nearest_templates`` does not have this restriction. However, for probes with around 64 channels or less and sparsely spaced contacts, decreasing ``nearest_templates`` to be less than or equal to the number of channels helps avoid numerical instability.
 
 
+``x_centers``
+-------------
+The number of x-positions to use when determining centers for template groupings. Specifically, this is the number of centroids to look for when using k-means to cluster the x-positions for the probe. In most cases you should not need to specify this. However, **for probes with contacts arranged in a 2D grid**, we recommend setting ``x_centers`` such that centers are placed every 200-300um so that there are not too many templates in each group. For example, for an array that is 2000um in width, try ``x_centers = 10``. If contacts are very densely spaced, you may need to use a higher value for better performance.
+
+
 ``duplicate_spike_bins``
 ------------------------
 After sorting has finished, spikes that occur within this number of bins of each other, from the same unit, are assumed to be artifacts and removed. The default of 15 bins corresponds to 0.5ms for a sampling rate of 30000hz. If your sampling rate is different, you may need to increase or decrease this accordingly. If you see otherwise good neurons with large peaks around 0ms when viewing correlograms in Phy, increasing this value can help remove those artifacts.
