@@ -104,9 +104,6 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
             )
     settings = {**DEFAULT_SETTINGS, **settings}
 
-    if settings['nt0min'] is None:
-        settings['nt0min'] = int(20 * settings['nt']/61)
-
     if data_dtype is None:
         print("Interpreting binary file as default dtype='int16'. If data was "
                 "saved in a different format, specify `data_dtype`.")
@@ -202,6 +199,8 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir):
 def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign, device) -> dict:
     """Package settings and probe information into a single `ops` dictionary."""
 
+    if settings['nt0min'] is None:
+        settings['nt0min'] = int(20 * settings['nt']/61)
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
     ops = settings  
     ops['settings'] = settings 

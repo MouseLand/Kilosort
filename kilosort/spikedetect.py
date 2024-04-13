@@ -98,6 +98,10 @@ def template_centers(ops):
     nx = np.round((xmax - xmin) / (dminx/2)) + 1
     ops['xup'] = np.linspace(xmin, xmax, int(nx))
 
+    # Set max channel distance based on dmin, dminx, use whichever is greater.
+    if ops.get('max_channel_distance', None) is None:
+        ops['max_channel_distance'] = max(dmin, dminx)
+
     return ops
 
 
@@ -161,7 +165,9 @@ def nearest_chans(ys, yc, xs, xc, nC, device=torch.device('cuda')):
     iC = np.argsort(ds, 0)[:nC]
     iC = torch.from_numpy(iC).to(device)
     ds = np.sort(ds, 0)[:nC]
+
     return iC, ds
+
 
 def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):    
 
@@ -190,17 +196,24 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
         ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
 
     ops = template_centers(ops)
-
     [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
     ys, xs = ys.flatten(), xs.flatten()
-    ops['ycup'], ops['xcup'] = ys, xs
-
     xc, yc = ops['xc'], ops['yc']
     Nfilt = len(ys)
 
     nC = ops['settings']['nearest_chans']
     nC2 = ops['settings']['nearest_templates']
     iC, ds = nearest_chans(ys, yc, xs, xc, nC, device=device)
+
+    # Don't use templates that are too far away from nearest channel
+    # (use square of max distance since ds are squared distances)
+    igood = ds[0,:] <= ops['max_channel_distance']**2
+    iC = iC[:,igood]
+    ds = ds[:,igood]
+    ys = ys[igood]
+    xs = xs[igood]
+    ops['ycup'], ops['xcup'] = ys, xs
+
     iC2, ds2 = nearest_chans(ys, ys, xs, xs, nC2, device=device)
 
     ds_torch = torch.from_numpy(ds).to(device).float()

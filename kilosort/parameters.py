@@ -238,6 +238,17 @@ EXTRA_PARAMETERS = {
             """
     },
 
+    'max_channel_distance': {
+        'gui_name': 'max channel distance', 'type': float, 'min': 1,
+        'max': np.inf, 'exclude': [], 'default': None, 'step': 'spike detection',
+        'description':
+            """
+            Templates farther away than this from their nearest channel will
+            not be used. Also limits distance between compared channels during
+            clustering.
+            """
+    },
+
     'templates_from_data': {
         'gui_name': 'templates from data', 'type': bool, 'min': None, 'max': None,
         'exclude': [], 'default': True, 'step': 'spike detection',

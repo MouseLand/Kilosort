@@ -21,7 +21,7 @@ _ALLOWED_FILE_TYPES = ['.bin', '.dat', '.bat', '.raw']  # For binary data
 
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.Signal()
-    previewProbe = QtCore.Signal(object)
+    previewProbe = QtCore.Signal(object, object)
     dataChanged = QtCore.Signal()
 
     def __init__(self, parent):
@@ -474,7 +474,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         if not self.check_valid_binary_path(self.data_file_path):
             return False
 
-        none_allowed = ['dmin', 'nt0min']
+        none_allowed = ['dmin', 'nt0min', 'max_channel_distance']
         for k, v in self.settings.items():
             if v is None and k not in none_allowed:
                 return False
@@ -500,9 +500,17 @@ class SettingsBox(QtWidgets.QGroupBox):
             else:
                 self.settingsUpdated.emit()
 
+    def get_probe_template_args(self):
+        epw = self.extra_parameters_window
+        template_args = [
+            epw.nearest_chans, epw.dmin, epw.dminx, 
+            epw.max_channel_distance, self.gui.device
+            ]
+        return template_args
+
     @QtCore.Slot()
     def show_probe_layout(self):
-        self.previewProbe.emit(self.probe_layout)
+        self.previewProbe.emit(self.probe_layout, self.get_probe_template_args())
 
     @QtCore.Slot(str)
     def on_probe_layout_selected(self, name):
