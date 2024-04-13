@@ -55,8 +55,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.center_toggle.stateChanged.connect(self.refresh_plot)
 
         self.spot_scale.setMinimum(0)
-        self.spot_scale.setMaximum(10)
-        self.spot_scale.setValue(1)
+        # Actually want 0 to 10 scaling, but these are multiplied by 4
+        # to get 0.25 increments.
+        self.spot_scale.setMaximum(40)
+        self.spot_scale.setValue(4)
         self.spot_scale.valueChanged.connect(self.refresh_plot)
 
         layout = QtWidgets.QVBoxLayout()
@@ -138,7 +140,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         center_spots = []
 
         if self.xc is not None:
-            size = 10 * self.spot_scale.value()
+            size = 10 * self.spot_scale.value()/4
             symbol = "s"
             color = "g"
             for x_pos, y_pos in zip(self.xc, self.yc):
@@ -151,7 +153,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.channel_spots = channel_spots
 
         if self.xcup is not None:
-            size = 5 * self.spot_scale.value()
+            size = 5 * self.spot_scale.value()/4
             symbol = "o"
             color = "w"
             for x, y in zip(self.xcup, self.ycup):
@@ -164,7 +166,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.template_spots = template_spots
 
         if self.xcent_pos is not None:
-            size = 20 * self.spot_scale.value()
+            size = 20 * self.spot_scale.value()/4
             symbol = "o"
             color = "y"
             for x, y in zip(self.xcent_pos, self.ycent_pos):
