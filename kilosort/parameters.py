@@ -330,6 +330,19 @@ EXTRA_PARAMETERS = {
             """
     },
 
+    'x_centers': {
+        'gui_name': 'x centers', 'type': int, 'min': 1,
+        'max': np.inf, 'exclude': [], 'default': None, 'step': 'clustering',
+        'description':
+            """
+            Number of x-positions to use when determining center points for
+            template groupings. If None, this will be determined automatically
+            by finding peaks in channel density. For 2D array type probes, we
+            recommend specifying this so that centers are placed every few
+            hundred microns.
+            """
+    },
+
 
     ### POSTPROCESSING
     'duplicate_spike_bins': {

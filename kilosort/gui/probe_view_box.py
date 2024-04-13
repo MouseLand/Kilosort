@@ -3,7 +3,7 @@ import numpy as np
 import pyqtgraph as pg
 
 from kilosort.spikedetect import template_centers, nearest_chans
-from kilosort.clustering_qr import x_centers
+from kilosort.clustering_qr import x_centers, y_centers
 from kilosort.gui.logger import setup_logger
 
 
@@ -86,10 +86,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.total_channels = self.active_layout["n_chan"]
         self.channel_map = self.active_layout["chanMap"]
 
-    def get_template_spots(self, nC, dmin, dminx, max_dist, device):
+    def get_template_spots(self, nC, dmin, dminx, max_dist, x_centers, device):
         ops = {
             'yc': self.yc, 'xc': self.xc, 'max_channel_distance': max_dist,
-            'settings': {'dmin': dmin, 'dminx': dminx}
+            'x_centers': x_centers, 'settings': {'dmin': dmin, 'dminx': dminx}
             }
         ops = template_centers(ops)
         [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
@@ -101,12 +101,14 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         ds = ds[:,igood]
         ys = ys[igood]
         xs = xs[igood]
+        ops['xcup'] = xs
+        ops['ycup'] = ys
 
         return xs, ys, ops
 
     def get_center_spots(self):
         dmin = self.ops['dmin']
-        ycent = np.arange(self.ycup.min()+dmin-1, self.ycup.max()+dmin+1, 2*dmin)
+        ycent = y_centers(self.ops)
         xcent = x_centers(self.ops)
 
         ycent_pos, xcent_pos = np.meshgrid(ycent, xcent)

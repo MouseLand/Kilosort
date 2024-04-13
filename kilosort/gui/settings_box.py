@@ -474,9 +474,10 @@ class SettingsBox(QtWidgets.QGroupBox):
         if not self.check_valid_binary_path(self.data_file_path):
             return False
 
-        none_allowed = ['dmin', 'nt0min', 'max_channel_distance']
+        none_allowed = ['dmin', 'nt0min', 'max_channel_distance', 'x_centers']
         for k, v in self.settings.items():
             if v is None and k not in none_allowed:
+                print(f'`None` not allowed for parameter {k}.')
                 return False
         return True
     
@@ -504,7 +505,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         epw = self.extra_parameters_window
         template_args = [
             epw.nearest_chans, epw.dmin, epw.dminx, 
-            epw.max_channel_distance, self.gui.device
+            epw.max_channel_distance, epw.x_centers, self.gui.device
             ]
         return template_args
 

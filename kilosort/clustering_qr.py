@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import sparse_coo_tensor as coo
 from scipy.sparse import csr_matrix
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage import gaussian_filter
 from scipy.signal import find_peaks
 from scipy.cluster.vq import kmeans
 import faiss
@@ -232,25 +232,34 @@ def xy_up(ops):
 
 
 def x_centers(ops):
-    dminx = ops['dminx']
-    min_x = ops['xc'].min()
-    max_x = ops['xc'].max()
+    k = ops.get('x_centers', None)
+    if k is not None:
+        # Use this as the input for k-means, either a number of centers
+        # or initial guesses.
+        approx_centers = k
+    else:
+        # NOTE: This automated method does not work well for 2D array probes.
+        #       We recommend specifying `x_centers` manually for that case.
+        dminx = ops['dminx']
+        min_x = ops['xc'].min()
+        max_x = ops['xc'].max()
 
-    # Make histogram of x-positions with bin size roughly equal to dminx,
-    # with a bit of padding on either end of the probe so that peaks can be
-    # detected at edges.
-    num_bins = int((max_x-min_x)/(dminx)) + 4
-    bins = np.linspace(min_x - dminx*2, max_x + dminx*2, num_bins)
-    hist, edges = np.histogram(ops['xc'], bins=bins)
-    # Apply smoothing to make peak-finding simpler.
-    smoothed = gaussian_filter(hist, sigma=0.5)
-    peaks, _ = find_peaks(smoothed)
-    # peaks are indices, translate back to position in microns
-    approx_centers = [edges[p] for p in peaks]
-    # Use these as initial guesses for centroids in k-means to get
-    # a more accurate value for the actual centers. Or, if there's only 1,
-    # just look for one centroid.
-    if len(approx_centers) == 1: approx_centers = 1
+        # Make histogram of x-positions with bin size roughly equal to dminx,
+        # with a bit of padding on either end of the probe so that peaks can be
+        # detected at edges.
+        num_bins = int((max_x-min_x)/(dminx)) + 4
+        bins = np.linspace(min_x - dminx*2, max_x + dminx*2, num_bins)
+        hist, edges = np.histogram(ops['xc'], bins=bins)
+        # Apply smoothing to make peak-finding simpler.
+        smoothed = gaussian_filter(hist, sigma=0.5)
+        peaks, _ = find_peaks(smoothed)
+        # peaks are indices, translate back to position in microns
+        approx_centers = [edges[p] for p in peaks]
+        # Use these as initial guesses for centroids in k-means to get
+        # a more accurate value for the actual centers. Or, if there's only 1,
+        # just look for one centroid.
+        if len(approx_centers) == 1: approx_centers = 1
+
     centers, distortion = kmeans(ops['xc'], approx_centers)
 
     # TODO: Maybe use distortion to raise warning if it seems too large?
@@ -261,6 +270,17 @@ def x_centers(ops):
 
     # For example, could raise a warning if this is greater than dminx*2?
     # Most probes should satisfy that criteria.
+
+    return centers
+
+
+def y_centers(ops):
+    ycup = ops['ycup']
+    dmin = ops['dmin']
+    # TODO: May want to add the -dmin/2 in the future to center these, but
+    #       this changes the results for testing so we need to wait until we can
+    #       check it with simulations.
+    centers = np.arange(ycup.min()+dmin-1, ycup.max()+dmin+1, 2*dmin)# - dmin/2
 
     return centers
 
@@ -280,7 +300,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     dminx = ops['dminx']
     nskip = ops['settings']['cluster_downsampling']
     ncomps = ops['settings']['cluster_pcs']
-    ycent = np.arange(ycup.min()+dmin-1, ycup.max()+dmin+1, 2*dmin)
+    ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
 
