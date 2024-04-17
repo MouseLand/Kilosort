@@ -331,6 +331,12 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         tmax = self.params['tmax']
         artifact = self.params['artifact_threshold']
 
+        if chan_map.max() >= n_channels:
+            raise ValueError(
+                f'Largest value of chanMap exceeds channel count of data, '
+                'make sure chanMap is 0-indexed.'
+            )
+
         binary_file = BinaryFiltered(
             filename=self.data_path,
             n_chan_bin=n_channels,

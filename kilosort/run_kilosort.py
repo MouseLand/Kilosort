@@ -123,6 +123,12 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         set_files(settings, filename, probe, probe_name, data_dir, results_dir)
     ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign, device)
 
+    if probe['chanMap'].max() >= settings['n_chan_bin']:
+        raise ValueError(
+            f'Largest value of chanMap exceeds channel count of data, '
+             'make sure chanMap is 0-indexed.'
+        )
+
     # Set preprocessing and drift correction parameters
     ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
     np.random.seed(1)
