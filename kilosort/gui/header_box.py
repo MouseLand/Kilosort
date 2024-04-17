@@ -1,3 +1,5 @@
+import webbrowser
+
 from kilosort import __version__
 from kilosort.gui.minor_gui_elements import help_popup_text, controls_popup_text
 from qtpy import QtCore, QtGui, QtWidgets
@@ -32,11 +34,11 @@ class HeaderBox(QtWidgets.QWidget):
         #       like the paper and/or wiki.
         self.controls_button = QtWidgets.QPushButton("Controls")
         self.controls_button.setToolTip(controls_popup_text)
-        #self.controls_button.clicked.connect(self.show_controls_popup)
+        self.controls_button.clicked.connect(self.open_controls_link)
 
         self.help_button = QtWidgets.QPushButton("Help")
         self.help_button.setToolTip(help_popup_text)
-        #self.help_button.clicked.connect(self.show_help_popup)
+        self.help_button.clicked.connect(self.open_help_link)
 
         self.reset_gui_button = QtWidgets.QPushButton("Reset GUI")
         
@@ -69,3 +71,11 @@ class HeaderBox(QtWidgets.QWidget):
     def clear_cache(self):
         self.gui.qt_settings.clear()
         
+    @QtCore.Slot()
+    def open_controls_link(self):
+        webbrowser.open('https://kilosort.readthedocs.io/en/latest/gui_guide.html')
+        
+
+    @QtCore.Slot()
+    def open_help_link(self):
+        webbrowser.open('https://github.com/MouseLand/Kilosort/issues')

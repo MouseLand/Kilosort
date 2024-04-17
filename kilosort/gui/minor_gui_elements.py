@@ -248,9 +248,9 @@ Welcome to Kilosort4!
 
 ##### Documentation #####
 For documentation of the underlying algorithm or the GUI, please visit https://github.com/MouseLand/Kilosort/
-or https://www.biorxiv.org/content/10.1101/2023.01.07.523036v1.
+or read the paper at https://www.nature.com/articles/s41592-024-02232-7.
 
 ##### Troubleshooting #####
 1. Click 'Reset GUI' to clear any GUI problems or strange errors. If the problem persists, try 'Clear Cache' and restarting Kilosort. 
-2. If the problem persists, visit https://github.com/MouseLand/kilosort and create an issue there with as much detail about the problem as possible.  
+2. If the problem persists, visit https://github.com/MouseLand/Kilosort/issues/ and ask for assistance there with as much detail about the problem as possible.  
 """
