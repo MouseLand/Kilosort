@@ -11,20 +11,21 @@ def test_pipeline(data_directory, results_directory, saved_ops, torch_device, ca
     bin_file = data_directory / 'ZFM-02370_mini.imec0.ap.short.bin'
     with pytest.raises(ValueError):
         # Should result in an error, since `n_chan_bin` isn't specified.
-        ops, st, clu, _, _, _, _, _ = run_kilosort(
+        ops, st, clu, _, _, _, _, _, kept_spikes = run_kilosort(
             settings={}, filename=bin_file, device=torch_device,
             probe_name='neuropixPhase3B1_kilosortChanMap.mat',
             )
 
     with capture_mgr.global_and_fixture_disabled():
         print('\nStarting run_kilosort test...')
-        ops, st, clu, _, _, _, _, _ = run_kilosort(
+        ops, st, clu, _, _, _, _, _, kept_spikes = run_kilosort(
             filename=bin_file, device=torch_device,
             settings={'n_chan_bin': 385},
             probe_name='neuropixPhase3B1_kilosortChanMap.mat',
             )
 
-    st = st[:,0]  # only first column is spike times, that's all that gets saved
+    st = st[kept_spikes,0]  # only first column is spike times
+    clu = clu[kept_spikes]
         
     # Check that spike times and spike cluster assignments match
     st_load = np.load(results_directory / 'spike_times.npy')

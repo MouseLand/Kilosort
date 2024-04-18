@@ -261,7 +261,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     if phy_cache_path.is_dir():
         shutil.rmtree(phy_cache_path)
 
-    return results_dir, similar_templates, is_ref, est_contam_rate
+    return results_dir, similar_templates, is_ref, est_contam_rate, kept_spikes
 
 
 def save_ops(ops, results_dir=None):

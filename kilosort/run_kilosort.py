@@ -148,11 +148,12 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                                  progress_bar=progress_bar)
     clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
                                progress_bar=progress_bar)
-    ops, similar_templates, is_ref, est_contam_rate = \
+    ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
         save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0,
                      save_extra_vars=save_extra_vars)
 
-    return ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
+    return ops, st, clu, tF, Wall, similar_templates, \
+           is_ref, est_contam_rate, kept_spikes
 
 
 def set_files(settings, filename, probe, probe_name, data_dir, results_dir):
@@ -475,7 +476,8 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     """
 
     print('\nSaving to phy and computing refractory periods')
-    results_dir, similar_templates, is_ref, est_contam_rate = io.save_to_phy(
+    results_dir, similar_templates, is_ref, est_contam_rate, kept_spikes = \
+        io.save_to_phy(
             st, clu, tF, Wall, ops['probe'], ops, imin, results_dir=results_dir,
             data_dtype=ops['data_dtype'], save_extra_vars=save_extra_vars
             )
@@ -492,7 +494,7 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
 
     io.save_ops(ops, results_dir)
 
-    return ops, similar_templates, is_ref, est_contam_rate
+    return ops, similar_templates, is_ref, est_contam_rate, kept_spikes
 
 
 def load_sorting(results_dir, device=None, load_extra_vars=False):

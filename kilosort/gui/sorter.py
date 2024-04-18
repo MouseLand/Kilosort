@@ -89,13 +89,13 @@ class KiloSortWorker(QtCore.QThread):
 
             clu, Wall = cluster_spikes(st, tF, ops, self.device, bfile, tic0=tic0,
                                        progress_bar=self.progress_bar)
-            ops, similar_templates, is_ref, est_contam_rate = \
+            ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
                 save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
 
             self.ops = ops
-            self.st = st
-            self.clu = clu
-            self.tF = tF
+            self.st = st[kept_spikes]
+            self.clu = clu[kept_spikes]
+            self.tF = tF[kept_spikes]
             self.is_refractory = is_ref
             self.plotDataReady.emit('probe')
 
