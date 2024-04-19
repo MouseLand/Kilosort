@@ -111,7 +111,7 @@ class ProbeBuilder(QtWidgets.QDialog):
         error_label_size_policy.setRetainSizeWhenHidden(True)
         self.error_label.setSizePolicy(error_label_size_policy)
         error_label_palette = self.error_label.palette()
-        error_label_palette.setColor(QtGui.QPalette.Foreground, QtGui.QColor("red"))
+        error_label_palette.setColor(QtGui.QPalette.WindowText, QtGui.QColor("red"))
         self.error_label.setPalette(error_label_palette)
         self.error_label.hide()
 
