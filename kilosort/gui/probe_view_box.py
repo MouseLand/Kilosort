@@ -31,6 +31,8 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.yc = None
         self.xcup = None
         self.ycup = None
+        self.xcent_pos = None
+        self.ycent_pos = None
         self.total_channels = None
         self.channel_map = None
         self.channel_map_dict = {}
@@ -80,8 +82,9 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.active_layout = probe
         self.kcoords = self.active_layout["kcoords"]
         self.xc, self.yc = self.active_layout["xc"], self.active_layout["yc"]
-        self.xcup, self.ycup, self.ops = self.get_template_spots(*template_args)
-        self.xcent_pos, self.ycent_pos = self.get_center_spots()
+        if self.template_toggle.isChecked() or self.center_toggle.isChecked():
+            self.xcup, self.ycup, self.ops = self.get_template_spots(*template_args)
+            self.xcent_pos, self.ycent_pos = self.get_center_spots()
         self.channel_map_dict = {}
         for ind, (xc, yc) in enumerate(zip(self.xc, self.yc)):
             self.channel_map_dict[(xc, yc)] = ind
