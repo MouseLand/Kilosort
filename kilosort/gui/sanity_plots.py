@@ -108,7 +108,7 @@ def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
 
     # Spatial features (top right)
     p2 = plot_window.plot_widget.addPlot(
-        row=0, col=1, labels={'bottom': 'Unit Number', 'left': 'Channel Number'}
+        row=0, col=1, labels={'bottom': 'Channel Number', 'left': 'Unit Number'}
         )
     p2.setTitle('Spatial Features')
     features = torch.linalg.norm(Wall0, dim=2).cpu().numpy()
