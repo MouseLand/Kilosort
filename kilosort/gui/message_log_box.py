@@ -23,13 +23,13 @@ class MessageLogBox(QtWidgets.QGroupBox):
         self.layout.addWidget(self.popout_button, 1, 0, 1, 1)
         self.popout_window = ExpandedLog()
 
-        self.dump_settings_button = QtWidgets.QPushButton('Dump Settings')
-        self.dump_settings_button.clicked.connect(self.dump_settings)
-        self.layout.addWidget(self.dump_settings_button, 1, 1, 1, 1)
+        self.print_settings_button = QtWidgets.QPushButton('Print Settings')
+        self.print_settings_button.clicked.connect(self.print_settings)
+        self.layout.addWidget(self.print_settings_button, 1, 1, 1, 1)
 
-        self.dump_probe_button = QtWidgets.QPushButton('Dump Probe')
-        self.dump_probe_button.clicked.connect(self.dump_probe)
-        self.layout.addWidget(self.dump_probe_button, 1, 2, 1, 1)
+        self.print_probe_button = QtWidgets.QPushButton('Print Probe')
+        self.print_probe_button.clicked.connect(self.print_probe)
+        self.layout.addWidget(self.print_probe_button, 1, 2, 1, 1)
 
         log_box_document = self.log_box.document()
         default_font = log_box_document.defaultFont()
@@ -52,7 +52,7 @@ class MessageLogBox(QtWidgets.QGroupBox):
         self.popout_window.show()
 
     @QtCore.Slot()
-    def dump_settings(self):
+    def print_settings(self):
         # For debugging purposes, check for mismatch between displayed parameter
         # values and the values that are actually being used.
         settings_text = "settings = "
@@ -64,7 +64,7 @@ class MessageLogBox(QtWidgets.QGroupBox):
         self.update_text(settings_text)
 
     @QtCore.Slot()
-    def dump_probe(self):
+    def print_probe(self):
         # For debugging purposes, make sure probe is loaded correctly.
         probe_text = "probe = "
         probe = self.gui.settings_box.settings['probe']
