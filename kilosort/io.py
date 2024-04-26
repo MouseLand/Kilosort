@@ -549,7 +549,8 @@ def get_total_samples(filename, n_channels, dtype=np.int16):
 
     if samples%1 != 0:
         raise ValueError(
-            "Bytes in binary file did not divide evenly, incorrect n_chan_bin."
+            "Bytes in binary file did not divide evenly, "
+            "incorrect n_chan_bin ('number of channels' in GUI)."
         )
     else:
         return int(samples)
