@@ -92,7 +92,7 @@ def template_centers(ops):
         # Try to determine a good value automatically based on contact positions.
         dmin = np.median(np.diff(np.unique(ops['yc'])))
     ops['dmin'] = dmin
-    ops['yup'] = np.arange(ymin, ymax+.00001, dmin//2)
+    ops['yup'] = np.arange(ymin, ymax+.00001, dmin/2)
 
     ops['dminx'] = dminx = ops['settings']['dminx']
     nx = np.round((xmax - xmin) / (dminx/2)) + 1
