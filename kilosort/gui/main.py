@@ -85,16 +85,17 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.content = QtWidgets.QWidget(self)
         self.content_layout = QtWidgets.QVBoxLayout()
+        self.left_boxes = QtWidgets.QWidget()
+        self.left_boxes_layout = QtWidgets.QVBoxLayout(self.left_boxes)
+        self.right_boxes = QtWidgets.QWidget()
+        self.right_boxes_layout = QtWidgets.QVBoxLayout(self.right_boxes)
+        self.left_right_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        self.settings_probe_splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
+        self.settings_message_splitter = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        self.settings_area = QtWidgets.QWidget()
+        self.settings_layout = QtWidgets.QVBoxLayout(self.settings_area)
 
         self.header_box = HeaderBox(self)
-
-        self.boxes = QtWidgets.QWidget()
-        self.boxes_layout = QtWidgets.QHBoxLayout(self.boxes)
-        self.first_boxes_layout = QtWidgets.QVBoxLayout()
-        self.second_boxes_layout = QtWidgets.QHBoxLayout()
-        self.third_boxes_layout = QtWidgets.QVBoxLayout()
-        self.fourth_boxes_layout = QtWidgets.QVBoxLayout()
-
         self.converter = DataConversionBox(self)
         self.settings_box = SettingsBox(self)
         self.probe_view_box = ProbeViewBox(self)
@@ -202,30 +203,43 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def setup(self):
         self.setWindowTitle(f"Kilosort4")
 
-        self.third_boxes_layout.addWidget(self.settings_box, 85)
-        self.third_boxes_layout.addWidget(self.run_box, 15)
+        # Set Wiget positions
+        # Top left, settings plus "load" and "run" buttons.
+        self.settings_layout.addWidget(self.settings_box, 85)
+        self.settings_layout.addWidget(self.run_box, 15)
+        # To right of settings, add probe view
+        self.settings_probe_splitter.addWidget(self.settings_area)
+        self.settings_probe_splitter.addWidget(self.probe_view_box)
+        # Below settings & probe, add message box
+        self.settings_message_splitter.addWidget(self.settings_probe_splitter)
+        self.settings_message_splitter.addWidget(self.message_log_box)
+        self.left_boxes_layout.addWidget(self.settings_message_splitter)
+        # Right-hand side, header plus data view
+        self.right_boxes_layout.addWidget(self.header_box, 3)
+        self.right_boxes_layout.addWidget(self.data_view_box, 97)
+        # Nest left and right within vertical splitter
+        self.left_right_splitter.addWidget(self.left_boxes)
+        self.left_right_splitter.addWidget(self.right_boxes)
 
-        self.second_boxes_layout.addLayout(self.third_boxes_layout, 50)
-        self.second_boxes_layout.addWidget(self.probe_view_box, 50)
-
-        self.first_boxes_layout.addLayout(self.second_boxes_layout, 60)
-        self.first_boxes_layout.addWidget(self.message_log_box, 40)
-
-        self.fourth_boxes_layout.addWidget(self.header_box, 3)
-        self.fourth_boxes_layout.addWidget(self.data_view_box, 97)
-
-        self.boxes_layout.addLayout(self.first_boxes_layout, 25)
-        self.boxes_layout.addLayout(self.fourth_boxes_layout, 75)
-
-        self.boxes.setLayout(self.boxes_layout)
-        self.content_layout.addWidget(self.boxes, 90)
-
+        self.content_layout.addWidget(self.left_right_splitter, 90)
         self.content_layout.setContentsMargins(10, 10, 10, 10)
         self.content.setLayout(self.content_layout)
         self.setCentralWidget(self.content)
 
-        self.header_box.reset_gui_button.clicked.connect(self.reset_gui)
+        # Restore splitter positions if saved from previous session
+        if self.qt_settings.contains('settings_probe_splitter'):
+            self.settings_probe_splitter.restoreState(
+                self.qt_settings.value('settings_probe_splitter')
+                )
+            self.settings_message_splitter.restoreState(
+                self.qt_settings.value('settings_message_splitter')
+                )
+            self.left_right_splitter.restoreState(
+                self.qt_settings.value('left_right_splitter')
+                )
 
+        # Connect signals
+        self.header_box.reset_gui_button.clicked.connect(self.reset_gui)
         self.settings_box.settingsUpdated.connect(self.load_data)
         self.settings_box.previewProbe.connect(self.probe_view_box.preview_probe)
         # Don't allow spike sorting to run until new data has actually
@@ -245,6 +259,20 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.converter.disableInput.connect(self.disable_all_input)
         self.converter.fileObjectLoaded.connect(self.add_file_object)
+
+        self.settings_probe_splitter.splitterMoved.connect(self.save_widget_sizes)
+        self.settings_message_splitter.splitterMoved.connect(self.save_widget_sizes)
+        self.left_right_splitter.splitterMoved.connect(self.save_widget_sizes)
+
+    @QtCore.Slot()
+    def save_widget_sizes(self):
+        # Store splitter positions so that resizing persists between sessions.
+        state1 = self.settings_probe_splitter.saveState()
+        self.qt_settings.setValue('settings_probe_splitter', state1)
+        state2 = self.settings_message_splitter.saveState()
+        self.qt_settings.setValue('settings_message_splitter', state2)
+        state3 = self.left_right_splitter.saveState()
+        self.qt_settings.setValue('left_right_splitter', state3)
 
     def change_channel_display(self, direction):
         if self.context is not None:
@@ -505,6 +533,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.message_log_box.reset()
 
     def closeEvent(self, event: QtGui.QCloseEvent):
+        # Make sure all threads and pop-out windows are closed as well.
         self.message_log_box.save_log_file()
         self.message_log_box.popout_window.close()
         for _, p in self.run_box.plots.items():
@@ -513,6 +542,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         if self.converter.conversion_thread is not None:
             self.converter.conversion_thread.terminate()
         self.close_binary_files()
+
         event.accept()
 
 
