@@ -157,13 +157,18 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     np.save((results_dir / 'channel_map.npy'), chan_map)
     np.save((results_dir / 'channel_positions.npy'), channel_positions)
 
-    # whitening matrix ** saving real whitening matrix doesn't work with phy currently
-    whitening_mat = ops['Wrot'].cpu().numpy()
-    np.save((results_dir / 'whitening_mat_dat.npy'), whitening_mat)
-    whitening_mat = 0.005 * np.eye(len(chan_map), dtype='float32')
-    whitening_mat_inv = np.linalg.inv(whitening_mat + 1e-5 * np.eye(whitening_mat.shape[0]))
-    np.save((results_dir / 'whitening_mat.npy'), whitening_mat)
-    np.save((results_dir / 'whitening_mat_inv.npy'), whitening_mat_inv)
+    # whitening matrix
+    whitening_mat = ops['Wrot']
+    np.save((results_dir / 'whitening_mat_dat.npy'), whitening_mat.cpu())
+    # NOTE: commented out for reference, this was different in KS 2.5 because
+    #       the binary file was already whitened.
+    # whitening_mat = 0.005 * np.eye(len(chan_map), dtype='float32')
+    whitening_mat_inv = torch.inverse(
+        whitening_mat
+        + 1e-5 * torch.eye(whitening_mat.shape[0]).to(whitening_mat.device)
+        )
+    np.save((results_dir / 'whitening_mat.npy'), whitening_mat.cpu())
+    np.save((results_dir / 'whitening_mat_inv.npy'), whitening_mat_inv.cpu())
 
     # spike properties
     spike_times = st[:,0].astype('int64') + imin  # shift by minimum sample index
