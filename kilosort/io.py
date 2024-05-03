@@ -197,12 +197,6 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     template_amplitudes = ((Wall**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
     templates = (Wall.unsqueeze(-1).cpu() * ops['wPCA'].cpu()).sum(axis=-2).numpy()
     templates = templates.transpose(0,2,1)
-    # normalize templates by amplitude
-    # TODO: check if this helps / hurts going between snippets and templates
-    #       scale should not change when switching between
-    # TODO: post issue on phy github asking where 'amp' is actually coming from,
-    #        other issue answers are old and don't seem to point anywhere relevant
-    templates = templates / template_amplitudes[:, np.newaxis, np.newaxis]
     templates_ind = np.tile(np.arange(Wall.shape[1])[np.newaxis, :], (templates.shape[0],1))
     np.save((results_dir / 'similar_templates.npy'), similar_templates)
     np.save((results_dir / 'templates.npy'), templates)
