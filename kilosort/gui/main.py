@@ -237,6 +237,13 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             self.left_right_splitter.restoreState(
                 self.qt_settings.value('left_right_splitter')
                 )
+        else:
+            # Default to 25/75 split for left/right, 50/50 for settings/probe
+            # NOTE: The large values are used so that QT will divide the extra
+            #       pixels proportionally between the split widgets, which is
+            #       much simpler than figuring out the exact pixel positions.
+            self.left_right_splitter.setSizes([250000, 750000])
+            self.settings_probe_splitter.setSizes([500000, 500000])
 
         # Connect signals
         self.header_box.reset_gui_button.clicked.connect(self.reset_gui)
