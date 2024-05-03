@@ -155,7 +155,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     np.save((results_dir / 'channel_map.npy'), chan_map)
     np.save((results_dir / 'channel_positions.npy'), channel_positions)
 
-    # whitening matrix ** saving real whitening matrix doesn't work with phy currently
+    # whitening matrix
     whitening_mat = ops['Wrot']
     np.save((results_dir / 'whitening_mat_dat.npy'), whitening_mat.cpu())
     # NOTE: commented out for reference, this was different in KS 2.5 because
