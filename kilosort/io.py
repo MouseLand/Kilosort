@@ -509,8 +509,12 @@ class BinaryRWFile:
             bstart = self.imin
             bend = self.imin + self.NT + self.nt
         else:
-            bstart = self.imin + (ibatch * self.NT) - self.nt
-            bend = min(self.imax, bstart + self.NT + 2*self.nt)
+            # Casting to uint64 is to prevent overflow for long recordings.
+            # It's done multiple times because python is stubborn about
+            # switching things back to default types.
+            ibatch = np.uint64(ibatch)
+            bstart = np.uint64(self.imin + (ibatch * self.NT) - self.nt)
+            bend = min(self.imax, np.uint64(bstart + self.NT + 2*self.nt))
         data = self.file[bstart : bend]
         data = data.T
         # Shift data to +/- 2**15
