@@ -199,6 +199,11 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir):
         
         probe  = io.load_probe(probe_path)
         print(f"using probe {probe_path.name}")
+    else:
+        # Make sure xc, yc are float32, otherwise there are casting problems
+        # with some pytorch functions.
+        probe['xc'] = probe['xc'].astype(np.float32)
+        probe['yc'] = probe['yc'].astype(np.float32)
 
     return filename, data_dir, results_dir, probe
 
