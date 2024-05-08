@@ -56,7 +56,7 @@ def plot_drift_scatter(plot_window, st0, settings):
     p1.setTitle('Spike amplitude across time and depth', color='black')
 
     x = st0[:,0]  # spike time in seconds
-    y = st0[:,5]  # depth of spike center in microns
+    y = st0[:,1]  # depth of spike center in microns
     z = st0[:,2]  # spike amplitude (data)
     z[z < 10] = 10
     z[z > 100] = 100
