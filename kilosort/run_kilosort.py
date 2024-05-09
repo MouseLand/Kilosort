@@ -422,6 +422,14 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     print(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
             f'total {time.time()-tic0 : .2f}s')
 
+    negative_spikes = (st[:,0] < 0).sum()
+    if negative_spikes > 0:
+        print(
+            f'{negative_spikes} spikes with negative spike times were detected.\n'
+            'We are aware of an issue causing this to happen for a small number '
+            'of spikes, and are working on a fix.'
+            )
+
     return st, tF, Wall, clu
 
 
