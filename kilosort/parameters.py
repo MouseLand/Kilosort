@@ -321,15 +321,6 @@ EXTRA_PARAMETERS = {
             """
     },
 
-    'cluster_pcs': {
-        'gui_name': 'cluster pcs', 'type': int, 'min': 1, 'max': np.inf,
-        'exclude': [], 'default': 64, 'step': 'clustering',
-        'description':
-            """
-            Maximum number of spatiotemporal PC features used for clustering.
-            """
-    },
-
     'x_centers': {
         'gui_name': 'x centers', 'type': int, 'min': 1,
         'max': np.inf, 'exclude': [], 'default': None, 'step': 'clustering',
