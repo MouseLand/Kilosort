@@ -45,8 +45,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
 
         stt = stt.double()
         #st[k:k+nsp,0] = ((stt[:,0]-nt)/ops['fs'] + ibatch * (ops['batch_size']/ops['fs'])).cpu().numpy()
-        left_pad = 0 if ibatch == 0 else nt
-        st[k:k+nsp,0] = ((stt[:,0]-left_pad) + ibatch * (ops['batch_size'])).cpu().numpy() - nt//2 + ops['nt0min']
+        st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['batch_size'])).cpu().numpy() - nt//2 + ops['nt0min']
 
         st[k:k+nsp,1] = stt[:,1].cpu().numpy()
         st[k:k+nsp,2] = amps[:,0].cpu().numpy()
