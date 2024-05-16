@@ -1,14 +1,16 @@
 name: Bug report
 description: Report a bug.
-title: "BUG: <Please write a comprehensive title after the 'BUG: ' prefix>"
+title: "BUG: <Please replace this text with a comprehensive title>"
 
 body:
 - type: markdown
   attributes:
     value: >
       Thank you for taking the time to file a bug report. Before creating a new
-      issue, please make sure to take a few minutes to check if this issue has been 
-      brought up before.
+      issue, please take a few minutes to try these steps:
+      1) Check if the issue has already been brought up.
+      2) Try upgrading to the latest version of Kilosort.
+      3) Check relevant pages at kilosort.readthedocs.io
     
 - type: textarea
   attributes: 
@@ -35,7 +37,7 @@ body:
   attributes:
     label: "Version information:"
     description: >
-      Version of operating system and python used, as well as any other
+      Version of python, Kilosort, operating system, and any other
       software versions you think might be relevant to the bug (e.g. CUDA toolkit).
   validations:
     required: true
