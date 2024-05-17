@@ -109,11 +109,14 @@ class DataConversionBox(QtWidgets.QWidget):
         self.convert_button = QtWidgets.QPushButton('Convert to Binary')
         self.convert_button.clicked.connect(self.convert_to_binary)
         self.convert_input = QtWidgets.QLineEdit()
+        self.convert_input.setPlaceholderText(
+            "NOTE: Must include .bin extension in filename."
+            )
         self.convert_input.setReadOnly(True)
         self.convert_button.setToolTip(
             "'Convert to Binary' will copy the data to a new .bin file.\n"
             "This process is slow for large recordings, but results will be "
-            "browsable in Phy.\n We recommend this option for most use cases."
+            "browsable in Phy.\n We recommend this option for most use cases.\n"
         )
 
         layout.addWidget(self.spacer, 5, 0, 2, 6)
