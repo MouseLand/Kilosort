@@ -429,13 +429,18 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def check_valid_binary_path(self, filename):
         if filename is None:
+            print('Binary path is None.')
             return False
         else:
             f = Path(filename)
             if f.exists() and f.is_file():
                 if f.suffix in _ALLOWED_FILE_TYPES or self.use_file_object:
                     return True
+                else:
+                    print(f'Binary file has invalid suffix. Must be {_ALLOWED_FILE_TYPES}')
+                    return False
             else:
+                print('Binary file does not exist at that path.')
                 return False
 
     def disable_all_input(self, value):
