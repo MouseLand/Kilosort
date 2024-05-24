@@ -2,6 +2,7 @@ import os
 import pprint
 from pathlib import Path
 import json
+import ast
 
 import numpy as np
 import torch
@@ -813,7 +814,9 @@ def _check_parameter(sender_obj, main_obj, k, p):
             v = None
         else:
             v = _str_to_type(value, p['type'])
-            if not isinstance(v, bool):
+            if isinstance(v, bool) or isinstance(v, list):
+                pass
+            else:
                 assert v >= p['min']
                 assert v <= p['max']
                 assert v not in p['exclude']
@@ -853,6 +856,8 @@ def _str_to_type(string, dtype):
             v = True
         else:
             raise TypeError(f'{string} should be True or False for bool.')
+    elif dtype is list:
+        v = ast.literal_eval(string)
     else:
         v = dtype(string)
     return v

@@ -136,7 +136,7 @@ def align_block2(F, ysamp, ops, device=torch.device('cuda')):
     Kn = kernelD(dt,dtup,1) 
 
     # smooth the dot-product matrices across blocks, batches and across vertical offsets
-    dcs = gaussian_filter(dcs, [0.5, 0.5, 0.5])
+    dcs = gaussian_filter(dcs, ops['drift_smoothing'])
 
     # for each block, upsample the dot-product matrix and find new max
     imin = np.zeros((Nbatches, nblocks))
