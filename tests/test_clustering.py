@@ -42,34 +42,35 @@ def random_np2(n_chans=384, n_shanks=4):
 class TestCenters:
     ops = {'dminx': 32}
 
-    def __init__(self, data_directory):
-        # This is just here to make sure probes are downloaded before these
-        # tests are run.
-        pass
-
-    def test_linear(self):
-        self.ops['probe'] = load_probe(PROBE_DIR/'Linear16x1_kilosortChanMap.mat')
+    def test_linear(self, data_directory):
+        # NOTE: The `data_directory` argument is only there to make sure probes are
+        # downloaded before these tests are run.
+        probe = load_probe(PROBE_DIR/'Linear16x1_kilosortChanMap.mat')
+        self.ops['xc'] = probe['xc']
         centers = x_centers(self.ops)
         # X positions are all 1um
         assert len(centers) == 1
         assert np.abs(centers[0] - 1) < 5
 
     def test_np1(self):
-        self.ops['probe'] = load_probe(PROBE_DIR/'neuropixPhase3B1_kilosortChanMap.mat')
+        probe = load_probe(PROBE_DIR/'neuropixPhase3B1_kilosortChanMap.mat')
+        self.ops['xc'] = probe['xc']
         centers = x_centers(self.ops)
         # One shank from 11um to 59um, should be 1 center near 35um
         assert len(centers) == 1
         assert np.abs(centers[0] - 35) < 5
 
     def test_np2_1shank(self):
-        self.ops['probe'] = load_probe(PROBE_DIR/'NP2_kilosortChanMap.mat')
+        probe = load_probe(PROBE_DIR/'NP2_kilosortChanMap.mat')
+        self.ops['xc'] = probe['xc']
         centers = x_centers(self.ops)
         # One shank from 0 to 32um, should be 1 center near 16um
         assert len(centers) == 1
         assert np.abs(centers[0] - 16) < 5
 
     def test_np2_3shank(self):
-        self.ops['probe'] = random_np2(n_shanks=3)
+        probe = random_np2(n_shanks=3)
+        self.ops['xc'] = probe['xc']
         centers = x_centers(self.ops)
         assert len(centers == 3)
         true = np.array([22, 272, 522, 772])
@@ -79,7 +80,8 @@ class TestCenters:
             assert (np.abs(c - true) < 5).sum() == 1
 
     def test_np2_4shank(self):
-        self.ops['probe'] = random_np2(n_shanks=4)
+        probe = random_np2(n_shanks=4)
+        self.ops['xc'] = probe['xc']
         centers = x_centers(self.ops)
         # All centers should be within 2 microns of the true values
         print(f'centers: {centers}')
