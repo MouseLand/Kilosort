@@ -1,16 +1,18 @@
 import time
+import logging
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import torch
 from qtpy import QtCore
 
-from kilosort.gui.logger import setup_logger
+#from kilosort.gui.logger import setup_logger
 from kilosort.run_kilosort import (
-    initialize_ops, compute_preprocessing, compute_drift_correction,
+    setup_logger, initialize_ops, compute_preprocessing, compute_drift_correction,
     detect_spikes, cluster_spikes, save_sorting
     )
 
-logger = setup_logger(__name__)
+#logger = setup_logger(__name__)
 
 
 class KiloSortWorker(QtCore.QThread):
@@ -39,9 +41,9 @@ class KiloSortWorker(QtCore.QThread):
             settings["filename"] = self.data_path
             results_dir = self.results_directory
             if not results_dir.exists():
-                logger.info(f"Results dir at {results_dir} does not exist."
-                             "The folder will be created.")
                 results_dir.mkdir(parents=True)
+            
+            setup_logger(results_dir)
 
             tic0 = time.time()
 
@@ -99,5 +101,4 @@ class KiloSortWorker(QtCore.QThread):
             self.is_refractory = is_ref
             self.plotDataReady.emit('probe')
 
-            logger.info(f"Spike sorting output saved in\n{results_dir}")
             self.finishedSpikesort.emit(self.context)

@@ -555,6 +555,7 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
                 f'{int(mins):02d}:{round(seconds)} h:m:s')
     ops['runtime'] = runtime 
     io.save_ops(ops, results_dir)
+    logger.info(f'Sorting output saved in: {results_dir}.')
 
     return ops, similar_templates, is_ref, est_contam_rate, kept_spikes
 
