@@ -275,7 +275,13 @@ class SettingsBox(QtWidgets.QGroupBox):
         for k, p in EXTRA_PARAMETERS.items():
             if self.gui.qt_settings.contains(k):
                 # Use cached value
-                d = str(self.gui.qt_settings.value(k))
+                v = self.gui.qt_settings.value(k)
+                if k == 'drift_smoothing':
+                    # List of floats gets cached as list of strings, so
+                    # have to convert back.
+                    d = str([float(s) for s in v])
+                else:
+                    d = str(v)
             else:
                 # Use default value
                 d = str(p['default'])
