@@ -1,8 +1,13 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from scipy.sparse import coo_matrix
 import numpy as np
 from scipy.ndimage import gaussian_filter
 import torch
+
 from kilosort import spikedetect
+
 
 def bin_spikes(ops, st):
     """ for each batch, the spikes in that batch are binned to a 2D matrix by amplitude and depth
@@ -185,7 +190,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     
     if ops['nblocks']<1:
         ops['dshift'] = None 
-        print('nblocks = 0, skipping drift correction')
+        logger.info('nblocks = 0, skipping drift correction')
         return ops, None
     
     # the first step is to extract all spikes using the universal templates

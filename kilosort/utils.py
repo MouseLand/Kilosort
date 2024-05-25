@@ -1,4 +1,7 @@
 import os, tempfile, shutil, pathlib
+import logging
+logger = logging.getLogger(__name__)
+
 from tqdm import tqdm
 from urllib.request import urlopen
 from urllib.error import HTTPError
@@ -18,6 +21,7 @@ probe_names = [
     'Linear16x1_kilosortChanMap.mat',
     ]
 
+
 def template_path(basename='wTEMP.npz'):
     """ currently only one set of example templates to use"""
     return cache_template_path(basename)
@@ -27,7 +31,7 @@ def cache_template_path(basename):
     url = f'{_DOWNLOADS_URL}/{basename}'
     cached_file = os.fspath(DOWNLOADS_DIR.joinpath(basename)) 
     if not os.path.exists(cached_file):
-        print('Downloading: "{}" to {}\n'.format(url, cached_file))
+        logger.info('Downloading: "{}" to {}\n'.format(url, cached_file))
         download_url_to_file(url, cached_file, progress=True)
     return cached_file
 
@@ -39,12 +43,12 @@ def download_probes(probe_dir=None):
         url = f'{_DOWNLOADS_URL}/{probe_name}'
         cached_file = os.fspath(probe_dir.joinpath(probe_name)) 
         if not os.path.exists(cached_file):
-            print('Downloading: "{}" to {}\n'.format(url, cached_file))
+            logger.info('Downloading: "{}" to {}\n'.format(url, cached_file))
             try:
                 download_url_to_file(url, cached_file, progress=True)
             except HTTPError as e:
-                print(f'Unable to download probe {probe_name}, error:')
-                print(e)
+                logger.info(f'Unable to download probe {probe_name}, error:')
+                logger.info(e)
 
 
 def download_url_to_file(url, dst, progress=True):

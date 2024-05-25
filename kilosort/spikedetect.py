@@ -1,5 +1,6 @@
 from io import StringIO
-import warnings
+import logging
+logger = logging.getLogger(__name__)
 
 from torch.nn.functional import max_pool2d, avg_pool2d, conv1d, max_pool1d
 import numpy as np
@@ -183,7 +184,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     nsizes = ops['settings']['template_sizes'] 
 
     if ops['settings']['templates_from_data']:
-        print('Re-computing universal templates from data.')
+        logger.info('Re-computing universal templates from data.')
         # Determine templates and PC features from data.
         ops['wPCA'], ops['wTEMP'] = extract_wPCA_wTEMP(
             ops, bfile, nt=ops['nt'], twav_min=ops['nt0min'], 
@@ -191,7 +192,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
             device=device
             )
     else:
-        print('Using built-in universal templates.')
+        logger.info('Using built-in universal templates.')
         # Use pre-computed templates.
         ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
 

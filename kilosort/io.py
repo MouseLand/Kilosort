@@ -5,6 +5,8 @@ import os, shutil
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 import time
+import logging
+logger = logging.getLogger(__name__)
 
 from scipy.io import loadmat
 import numpy as np
@@ -458,8 +460,10 @@ class BinaryRWFile:
             if self.uint_set_warning:
                 # Inform user of shift to hopefully avoid confusion, but only
                 # do this once per bfile.
-                print("NOTE: When setting new values for uint16 data, 2**15 will "
-                      "be added to the given values before writing to file.")
+                logger.info(
+                    "NOTE: When setting new values for uint16 data, 2**15 will "
+                    "be added to the given values before writing to file."
+                    )
                 self.uint_set_warning = False
         # Convert back from float to file dtype
         data = data.astype(self.dtype)
@@ -693,7 +697,7 @@ class BinaryFiltered(BinaryRWFile):
         if self.whiten_mat is not None:
             if self.dshift is not None and ops is not None and ibatch is not None:
                 M = get_drift_matrix(ops, self.dshift[ibatch], device=self.device)
-                #print(M.dtype, X.dtype, self.whiten_mat.dtype)
+                #logger.info(M.dtype, X.dtype, self.whiten_mat.dtype)
                 X = (M @ self.whiten_mat) @ X
             else:
                 X = self.whiten_mat @ X
@@ -768,20 +772,20 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
     binary_filename = filepath / f'{data_name}'
     probe_filename = filepath / f'{probe_name}'
 
-    print('='*40)
-    print('Loading recording with SpikeInterface...')
+    logger.info('='*40)
+    logger.info('Loading recording with SpikeInterface...')
 
     # Using actual data shape is less fragile than relying on .get_num_channels()
     N = recording.get_total_samples()
-    print(f'number of samples: {N}')
+    logger.info(f'number of samples: {N}')
     c = recording.get_traces(start_frame=0, end_frame=1, segment_index=0).shape[1]
-    print(f'number of channels: {c}')
+    logger.info(f'number of channels: {c}')
     s = recording.get_num_segments()
-    print(f'numbef of segments: {s}')
+    logger.info(f'numbef of segments: {s}')
     fs = recording.get_sampling_frequency()
-    print(f'sampling rate: {fs}')
+    logger.info(f'sampling rate: {fs}')
     dtype = recording.get_dtype()
-    print(f'dtype: {dtype}')
+    logger.info(f'dtype: {dtype}')
 
     # Determine start/end indices for each segment
     indices = []
@@ -803,19 +807,23 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
 
     y = np.memmap(binary_filename, dtype=dtype, mode='w+', shape=(N,c))
     total_chunks = len(indices)
-    print('='*40)
-    print(f'Converting {total_chunks} data chunks '
-          f'with a chunksize of {chunksize} samples...')
+    logger.info('='*40)
+    logger.info(
+        f'Converting {total_chunks} data chunks '
+        f'with a chunksize of {chunksize} samples...'
+        )
     with ThreadPoolExecutor(max_workers=max_workers) as exe:
         futures = [exe.submit(copy_chunk, y, i, j, k) for i, j, k in indices]
         # TODO: every some-amount-of-time, check list of futures
         #       for completion
         while exe._work_queue.qsize() > 0:
             time.sleep(10)
-            print(f'{total_chunks - exe._work_queue.qsize()} of {total_chunks}'
-                   ' chunks converted...')
-    print(f'Data conversion finished.')
-    print('='*40)
+            logger.info(
+                f'{total_chunks - exe._work_queue.qsize()} of {total_chunks}'
+                ' chunks converted...'
+                )
+    logger.info(f'Data conversion finished.')
+    logger.info('='*40)
 
     del(y)  # Close memmap after copying
 
@@ -826,7 +834,7 @@ def spikeinterface_to_binary(recording, filepath, data_name='data.bin',
                 pg = recording.get_probegroup()
                 write_prb(probe_filename, pg)
             except ValueError:
-                print(
+                logger.info(
                     'SpikeInterface recording contains no probe information,\n'
                     'could not write .prb file.'
                 )
@@ -886,8 +894,10 @@ class RecordingExtractorAsArray:
             try:
                 import spikeinterface as si
                 self.recording = si.concatenate_recordings([recording_extractor])
-                print('SpikeInterface recording contains more than one segment, '
-                      'segments will be concatenated as if contiguous.')
+                logger.info(
+                    'SpikeInterface recording contains more than one segment, '
+                    'segments will be concatenated as if contiguous.'
+                    )
             except ModuleNotFoundError:
                 raise ModuleNotFoundError(
                     'SpikeInterface could not be imported, but is needed for '
@@ -895,21 +905,21 @@ class RecordingExtractorAsArray:
                     'run `pip install spikeinterface`.'
                 )
 
-        print('='*40)
-        print('Loading recording with SpikeInterface...')
+        logger.info('='*40)
+        logger.info('Loading recording with SpikeInterface...')
         self.recording = recording_extractor
         self.N = self.recording.get_total_samples()
-        print(f'number of samples: {self.N}')
+        logger.info(f'number of samples: {self.N}')
         self.c = self.recording.get_traces(start_frame=0, end_frame=1, segment_index=0).shape[1]
-        print(f'number of channels: {self.c}')
+        logger.info(f'number of channels: {self.c}')
         self.s = self.recording.get_num_segments()
-        print(f'numbef of segments: {self.s}')
+        logger.info(f'numbef of segments: {self.s}')
         self.fs = self.recording.get_sampling_frequency()
-        print(f'sampling rate: {self.fs}')
+        logger.info(f'sampling rate: {self.fs}')
         self.dtype = self.recording.get_dtype()
-        print(f'dtype: {self.dtype}')
+        logger.info(f'dtype: {self.dtype}')
         self.shape = (self.N, self.c)
-        print('='*40)
+        logger.info('='*40)
     
 
     def __getitem__(self, *items):
