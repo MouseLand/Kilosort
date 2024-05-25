@@ -11,6 +11,12 @@ body:
       1) Check if the issue has already been brought up.
       2) Try upgrading to the latest version of Kilosort.
       3) Check relevant pages at kilosort.readthedocs.io
+
+- type: markdown
+  attributes:
+    value: >
+      If the bug occurred during sorting, please also upload the kilosort.log
+      file located in the results directory (v4.0.8 or later).
     
 - type: textarea
   attributes: 
