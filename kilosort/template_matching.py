@@ -38,7 +38,15 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
         xfeat = Xres[iCC[:, iU[stt[:,1:2]]],stt[:,:1] + tiwave] @ ops['wPCA'].T
         xfeat += amps * Ucc[:,stt[:,1]]
 
-        nsp = len(stt)   
+        if ibatch == 0:
+            # Can sometimes get negative spike times for first batch since
+            # we're aligning to nt0min, not nt//2, but these should be discarded.
+            neg_spikes = (stt[:,0] - nt - nt//2 + ops['nt0min']) < 0
+            stt = stt[~neg_spikes,:]
+            xfeat = xfeat[:,~neg_spikes,:]
+            amps = amps[~neg_spikes,:]
+
+        nsp = len(stt) 
         if k+nsp>st.shape[0]:                     
             st = np.concatenate((st, np.zeros_like(st)), 0)
             tF  = torch.cat((tF,  torch.zeros_like(tF)), 0)
@@ -151,7 +159,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
 
         #isort = torch.sort(iX)
 
-        nsp = len(iX)    
+        nsp = len(iX)
         st[k:k+nsp, 0] = iX[:,0]
         st[k:k+nsp, 1] = iY[:,0]
         amps[k:k+nsp] = B[iY,iX] / nm[iY]

@@ -150,7 +150,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     io.save_ops(ops, results_dir)
 
     # Sort spikes and save results
-    st, tF, _, _ = detect_spikes(ops, device, bfile, tic0=tic0,
+    st,tF, _, _ = detect_spikes(ops, device, bfile, tic0=tic0,
                                  progress_bar=progress_bar)
     clu, Wall = cluster_spikes(st, tF, ops, device, bfile, tic0=tic0,
                                progress_bar=progress_bar)
@@ -466,12 +466,6 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
                                                  progress_bar=progress_bar)
     logger.info(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
                 f'total {time.time()-tic0 : .2f}s')
-
-    negative_spikes = (st[:,0] < 0).sum()
-    if negative_spikes > 0:
-        logger.info(f'{negative_spikes} spikes with negative times were detected.')
-        logger.info('We are aware of an issue causing this to happen for a small number of spikes, ')
-        logger.info('and are working on a fix.')
 
     return st, tF, Wall, clu
 
