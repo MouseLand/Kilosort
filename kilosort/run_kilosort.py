@@ -344,6 +344,8 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
 
     logger.info(f'Preprocessing filters computed in {time.time()-tic : .2f}s; ' +
                 f'total {time.time()-tic0 : .2f}s')
+    logger.debug(f'hp_filter shape: {hp_filter.shape}')
+    logger.debug(f'whiten_mat shape: {whiten_mat.shape}')
 
     return ops
 
@@ -395,6 +397,10 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
     bfile.close()
     logger.info(f'drift computed in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
+    logger.debug(f'st shape: {st.shape}')
+    logger.debug(f'yblk shape: {ops["yblk"].shape}')
+    logger.debug(f'dshift shape: {ops["dshift"].shape}')
+    logger.debug(f'iKxx shape: {ops["iKxx"].shape}')
     
     # binary file with drift correction
     bfile = io.BinaryFiltered(
@@ -445,6 +451,8 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     tF = torch.from_numpy(tF)
     logger.info(f'{len(st0)} spikes extracted in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
+    logger.debug(f'st0 shape: {st0.shape}')
+    logger.debug(f'tF shape: {tF.shape}')
     if len(st0) == 0:
         raise ValueError('No spikes detected, cannot continue sorting.')
 
@@ -457,6 +465,8 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     Wall3 = template_matching.postprocess_templates(Wall, ops, clu, st0, device=device)
     logger.info(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' +
                 f'total {time.time()-tic0 : .2f}s')
+    logger.debug(f'clu shape: {clu.shape}')
+    logger.debug(f'Wall shape: {Wall.shape}')
     
     tic = time.time()
     logger.info(' ')
@@ -466,6 +476,10 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
                                                  progress_bar=progress_bar)
     logger.info(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
                 f'total {time.time()-tic0 : .2f}s')
+    logger.debug(f'st shape: {st.shape}')
+    logger.debug(f'tF shape: {tF.shape}')
+    logger.debug(f'iCC shape: {ops["iCC"].shape}')
+    logger.debug(f'iU shape: {ops["iU"].shape}')
 
     return st, tF, Wall, clu
 
@@ -479,6 +493,8 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None):
                                   progress_bar=progress_bar)
     logger.info(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
+    logger.debug(f'clu shape: {clu.shape}')
+    logger.debug(f'Wall shape: {Wall.shape}')
 
     tic = time.time()
     logger.info(' ')
@@ -489,6 +505,8 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None):
     clu = clu.astype('int32')
     logger.info(f'{clu.max()+1} units found, in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
+    logger.debug(f'clu shape: {clu.shape}')
+    logger.debug(f'Wall shape: {Wall.shape}')
 
     bfile.close()
 
