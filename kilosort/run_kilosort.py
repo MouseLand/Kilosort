@@ -195,6 +195,8 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir):
     results_dir = Path(results_dir).resolve() if results_dir is not None else None
     if results_dir is None:
         results_dir = data_dir / 'kilosort4'
+    # Make sure results directory exists
+    results_dir.mkdir(exist_ok=True)
     
     # find probe configuration file and load
     if probe is None:
