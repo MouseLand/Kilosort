@@ -58,7 +58,7 @@ class MessageLogBox(QtWidgets.QGroupBox):
         # values and the values that are actually being used.
         settings_text = "settings = "
         settings = self.gui.settings_box.settings.copy()
-        settings['probe'] = '... (use dump probe)'
+        settings['probe'] = '... (use print probe)'
         s = pprint.pformat(settings, indent=4, sort_dicts=False)
         settings_text += s[0] + '\n ' + s[1:-1] + '\n' + s[-1]
 

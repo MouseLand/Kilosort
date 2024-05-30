@@ -210,6 +210,5 @@ class RunBox(QtWidgets.QGroupBox):
             clu = self.current_worker.clu
             tF = self.current_worker.tF
             is_refractory = self.current_worker.is_refractory
-            device = self.parent.device
             plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
-                                 device)
+                                 settings)

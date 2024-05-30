@@ -1,5 +1,7 @@
+from pathlib import Path
+
 import pyqtgraph as pg
-import scipy
+import pyqtgraph.exporters
 import numpy as np
 import matplotlib
 import torch
@@ -46,6 +48,8 @@ def plot_drift_amount(plot_window, dshift, settings):
         p1.plot(t, dshift[:,i], pen=color)
 
     plot_window.show()
+    save_path = str(Path(settings['results_dir']) / 'drift_amount.png')
+    pg.exporters.ImageExporter(plot_window.plot_widget.scene()).export(save_path)
 
 
 def plot_drift_scatter(plot_window, st0, settings):
@@ -93,6 +97,8 @@ def plot_drift_scatter(plot_window, st0, settings):
     left_ax.setTickPen('k')
 
     plot_window.show()
+    save_path = str(Path(settings['results_dir']) / 'drift_scatter.png')
+    pg.exporters.ImageExporter(plot_window.plot_widget.scene()).export(save_path)
 
 
 def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
@@ -142,10 +148,11 @@ def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
 
     # Finished, draw plot
     plot_window.show()
+    save_path = str(Path(settings['results_dir']) / 'diagnostics.png')
+    pg.exporters.ImageExporter(plot_window.plot_widget.scene()).export(save_path)
 
 
-def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
-                         device=None):
+def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory, settings):
 
     p1 = plot_window.plot_widget.addPlot(
         row=0, col=0, labels={'bottom': 'Depth (um)', 'left': 'Lateral (um)'}
@@ -177,3 +184,5 @@ def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
                                  brush=brushes)
     p1.addItem(scatter)
     plot_window.show()
+    save_path = str(Path(settings['results_dir']) / 'spike_positions.png')
+    pg.exporters.ImageExporter(plot_window.plot_widget.scene()).export(save_path)
