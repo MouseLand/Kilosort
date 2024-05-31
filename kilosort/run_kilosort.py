@@ -112,6 +112,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
             "Interpreting binary file as default dtype='int16'. If data was "
             "saved in a different format, specify `data_dtype`."
             )
+        data_dtype = 'int16'
 
     if not do_CAR:
         logger.info("Skipping common average reference.")
