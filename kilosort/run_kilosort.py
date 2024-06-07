@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 import numpy as np
 import torch
 
+import kilosort
 from kilosort import (
     preprocessing,
     datashift,
@@ -104,6 +105,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir)
     setup_logger(results_dir)
+    logger.info(f"Kilosort version {kilosort.__version__}")
     logger.info(f"Sorting {filename}")
     logger.info('-'*40)
 
