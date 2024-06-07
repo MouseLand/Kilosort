@@ -85,19 +85,30 @@ def get_waves(ops, device=torch.device('cuda')):
     return wPCA, wTEMP
 
 def template_centers(ops):
-    xmin, xmax, ymin, ymax = ops['xc'].min(), ops['xc'].max(), \
-                             ops['yc'].min(), ops['yc'].max()
-
+    shank_idx = ops['kcoords']
+    xc = ops['xc']
+    yc = ops['yc']
     dmin = ops['settings']['dmin']
     if dmin is None:
         # Try to determine a good value automatically based on contact positions.
-        dmin = np.median(np.diff(np.unique(ops['yc'])))
+        dmin = np.median(np.diff(np.unique(yc)))
     ops['dmin'] = dmin
-    ops['yup'] = np.arange(ymin, ymax+.00001, dmin/2)
-
     ops['dminx'] = dminx = ops['settings']['dminx']
-    nx = np.round((xmax - xmin) / (dminx/2)) + 1
-    ops['xup'] = np.linspace(xmin, xmax, int(nx))
+
+    # Iteratively determine template placement for each shank separately.
+    yup = np.array([])
+    xup = np.array([])
+    for i in np.unique(shank_idx):
+        xc_i = xc[shank_idx == i]
+        yc_i = yc[shank_idx == i]
+        xmin, xmax, ymin, ymax = xc_i.min(), xc_i.max(), yc_i.min(), yc_i.max()
+
+        yup = np.concatenate([yup, np.arange(ymin, ymax+.00001, dmin/2)])
+        nx = np.round((xmax - xmin) / (dminx/2)) + 1
+        xup = np.concatenate([xup, np.linspace(xmin, xmax, int(nx))])
+
+    ops['yup'] = yup
+    ops['xup'] = xup
 
     # Set max channel distance based on dmin, dminx, use whichever is greater.
     if ops.get('max_channel_distance', None) is None:

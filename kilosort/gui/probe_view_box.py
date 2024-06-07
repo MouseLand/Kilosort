@@ -94,7 +94,8 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     def get_template_spots(self, nC, dmin, dminx, max_dist, x_centers, device):
         ops = {
             'yc': self.yc, 'xc': self.xc, 'max_channel_distance': max_dist,
-            'x_centers': x_centers, 'settings': {'dmin': dmin, 'dminx': dminx}
+            'x_centers': x_centers, 'settings': {'dmin': dmin, 'dminx': dminx},
+            'kcoords': self.kcoords
             }
         ops = template_centers(ops)
         [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
