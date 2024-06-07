@@ -90,7 +90,12 @@ def load_probe(probe_path):
         probe['xc'] = mat['xcoords'].ravel().astype(np.float32)[connected]
         nc = len(probe['xc'])
         probe['yc'] = mat['ycoords'].ravel().astype(np.float32)[connected]
-        probe['kcoords'] = mat.get('kcoords', np.zeros(nc)).ravel().astype(np.float32)
+        kc = mat.get('kcoords', None)
+        if kc is None:
+            kc = np.zeros(nc).ravel().astype(np.float32)
+        else:
+            kc = kc.ravel().astype(np.float32)[connected]
+        probe['kcoords'] = kc
         probe['chanMap'] = (mat['chanMap'] - 1).ravel().astype(np.int32)[connected]  # NOTE: 0-indexing in Python
         probe['n_chan'] = (mat['chanMap'] - 1).ravel().astype(np.int32).shape[0]  # NOTE: should match the # of columns in the raw data
 
