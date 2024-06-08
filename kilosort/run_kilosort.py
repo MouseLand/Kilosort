@@ -288,7 +288,9 @@ def get_run_parameters(ops) -> list:
         ops['probe']['yc'],
         ops['settings']['tmin'],
         ops['settings']['tmax'],
-        ops['settings']['artifact_threshold']
+        ops['settings']['artifact_threshold'],
+        ops['settings']['shift'],
+        ops['settings']['scale']
     ]
 
     return parameters
@@ -322,7 +324,7 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     logger.info('-'*40)
 
     n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, \
-        xc, yc, tmin, tmax, artifact = get_run_parameters(ops)
+        xc, yc, tmin, tmax, artifact, shift, scale = get_run_parameters(ops)
     nskip = ops['settings']['nskip']
     whitening_range = ops['settings']['whitening_range']
     
@@ -333,7 +335,7 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
                               chan_map, hp_filter, device=device, do_CAR=do_CAR,
                               invert_sign=invert, dtype=dtype, tmin=tmin,
                               tmax=tmax, artifact_threshold=artifact,
-                              file_object=file_object)
+                              shift=shift, scale=scale, file_object=file_object)
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip,
                                                     nrange=whitening_range)
 
@@ -387,7 +389,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
     logger.info('-'*40)
 
     n_chan_bin, fs, NT, nt, twav_min, chan_map, dtype, do_CAR, invert, \
-        _, _, tmin, tmax, artifact = get_run_parameters(ops)
+        _, _, tmin, tmax, artifact, shift, scale = get_run_parameters(ops)
     hp_filter = ops['preprocessing']['hp_filter']
     whiten_mat = ops['preprocessing']['whiten_mat']
 
@@ -395,7 +397,8 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
         hp_filter=hp_filter, whiten_mat=whiten_mat, device=device, do_CAR=do_CAR,
         invert_sign=invert, dtype=dtype, tmin=tmin, tmax=tmax,
-        artifact_threshold=artifact, file_object=file_object
+        artifact_threshold=artifact, shift=shift, scale=scale,
+        file_object=file_object
         )
 
     ops, st = datashift.run(ops, bfile, device=device, progress_bar=progress_bar)
@@ -413,7 +416,8 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
         hp_filter=hp_filter, whiten_mat=whiten_mat, device=device,
         dshift=ops['dshift'], do_CAR=do_CAR, dtype=dtype, tmin=tmin, tmax=tmax,
-        artifact_threshold=artifact, file_object=file_object
+        artifact_threshold=artifact, shift=shift, scale=scale,
+        file_object=file_object
         )
 
     return ops, bfile, st

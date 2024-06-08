@@ -486,7 +486,10 @@ class SettingsBox(QtWidgets.QGroupBox):
         if not self.check_valid_binary_path(self.data_file_path):
             return False
 
-        none_allowed = ['dmin', 'nt0min', 'max_channel_distance', 'x_centers']
+        none_allowed = [
+            'dmin', 'nt0min', 'max_channel_distance', 'x_centers',
+            'shift', 'scale'
+            ]
         for k, v in self.settings.items():
             if v is None and k not in none_allowed:
                 print(f'`None` not allowed for parameter {k}.')

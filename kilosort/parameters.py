@@ -112,6 +112,34 @@ EXTRA_PARAMETERS = {
             """
     },
 
+    'shift': {
+        'gui_name': 'shift', 'type': float, 'min': -np.inf, 'max': np.inf,
+        'exclude': [], 'default': None, 'step': 'data',
+        'description':
+            """
+            Scalar shift to apply to data before all other operations. In most
+            cases this should be left as None, but may be necessary for float32
+            data for example. If needed, `shift` and `scale` should be set such
+            that data is roughly in the range -100 to +100.
+            
+            If set, data will be `data = data*scale + shift`.
+            """
+    },
+
+    'scale': {
+        'gui_name': 'scale', 'type': float, 'min': -np.inf, 'max': np.inf,
+        'exclude': [], 'default': None, 'step': 'data',
+        'description':
+            """
+            Scaling factor to apply to data before all other operations. In most
+            cases this should be left as None, but may be necessary for float32
+            data for example. If needed, `shift` and `scale` should be set such
+            that data is roughly in the range -100 to +100.
+            
+            If set, data will be `data = data*scale + shift`.
+            """
+    },
+
     ### PREPROCESSING
     'artifact_threshold': {
         'gui_name': 'artifact threshold', 'type': float, 'min': 0, 'max': np.inf,

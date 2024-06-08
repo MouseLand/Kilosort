@@ -337,7 +337,7 @@ class BinaryRWFile:
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = None, write: bool = False,
                  dtype: str = None, tmin: float = 0.0, tmax: float = np.inf,
-                 file_object=None):
+                 shift=None, scale=None, file_object=None):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -363,6 +363,8 @@ class BinaryRWFile:
         self.NT = NT 
         self.nt = nt 
         self.nt0min = nt0min
+        self.shift = shift
+        self.scale = scale
         if device is None:
             if torch.cuda.is_available():
                 device = torch.device('cuda')
@@ -482,10 +484,17 @@ class BinaryRWFile:
         # Shift indices by minimum sample index.
         sample_indices = self._get_shifted_indices(idx)
         samples = self.file[sample_indices]
-        # Shift data to +/- 2**15
+        
         if self.dtype == 'uint16':
+            # Shift data to +/- 2**15
             samples = samples.astype('float32')
             samples = samples - 2**15
+
+        # Typically only need to be used with float32 data
+        if self.scale is not None:
+            samples = samples * self.scale
+        if self.shift is not None:
+            samples = samples + self.shift
 
         return samples
     
@@ -526,10 +535,17 @@ class BinaryRWFile:
             bend = min(self.imax, np.uint64(bstart + self.NT + 2*self.nt))
         data = self.file[bstart : bend]
         data = data.T
-        # Shift data to +/- 2**15
+
         if self.dtype == 'uint16':
+            # Shift data to +/- 2**15
             data = data.astype('float32')
             data = data - 2**15
+
+        # Typically only need to be used with float32 data
+        if self.scale is not None:
+            data = data * self.scale
+        if self.shift is not None:
+            data = data + self.shift
 
         nsamp = data.shape[-1]
         X = torch.zeros((self.n_chan_bin, self.NT + 2*self.nt), device=self.device)
@@ -550,7 +566,7 @@ class BinaryRWFile:
                 bend += self.nt
             else:
                 X[:] = torch.from_numpy(data).to(self.device).float()
-    
+
         inds = [bstart, bend]
         if return_inds:
             return X, inds
@@ -661,10 +677,12 @@ class BinaryFiltered(BinaryRWFile):
                  whiten_mat: torch.Tensor = None, dshift: torch.Tensor = None,
                  device: torch.device = None, do_CAR: bool = True,
                  artifact_threshold: float = np.inf, invert_sign: bool = False,
-                 dtype=None, tmin: float = 0.0, tmax: float = np.inf, file_object=None):
+                 dtype=None, tmin: float = 0.0, tmax: float = np.inf,
+                 shift=None, scale=None, file_object=None):
 
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device,
-                         dtype=dtype, tmin=tmin, tmax=tmax, file_object=file_object) 
+                         dtype=dtype, tmin=tmin, tmax=tmax, shift=shift,
+                         scale=scale, file_object=file_object) 
         self.chan_map = chan_map
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter
