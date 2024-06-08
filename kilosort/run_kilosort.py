@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+import pprint
 import logging
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,14 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
 
     tic0 = time.time()
     ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign, device)
+    # Remove some stuff that doesn't need to be printed twice, then pretty-print
+    # format for log file.
+    ops_copy = ops.copy()
+    _ = ops_copy.pop('settings')
+    _ = ops_copy.pop('probe')
+    print_ops = pprint.pformat(ops_copy, indent=4, sort_dicts=False)
+    logger.debug(f"Initial ops:\n{print_ops}\n")
+
 
     # Set preprocessing and drift correction parameters
     ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
@@ -147,10 +156,10 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         ops, device, tic0=tic0, progress_bar=progress_bar,
         file_object=file_object
         )
-    
-    # TODO: don't think we need to do this actually
-    # Save intermediate `ops` for use by GUI plots
-    io.save_ops(ops, results_dir)
+
+    # Check scale of data for log file
+    b1 = bfile.padded_batch_to_torch(0).cpu().numpy()
+    logger.debug(f"First batch min, max: {b1.min(), b1.max()}")
 
     # Sort spikes and save results
     st,tF, _, _ = detect_spikes(ops, device, bfile, tic0=tic0,
