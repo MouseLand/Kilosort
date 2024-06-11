@@ -12,6 +12,8 @@ Start by selecting a binary data file (.bin, .bat, .dat, or .raw) to load, by cl
 .. image:: https://www.kilosort.org/static/images/gui_select_binary.png
    :width: 600
 
+Note that binary files should be in row-major (or 'C') order. This is the default for NumPy arrays.
+
 
 Convert from other formats (optional)
 -------------------------------------
