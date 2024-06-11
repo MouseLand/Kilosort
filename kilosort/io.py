@@ -112,6 +112,17 @@ def load_probe(probe_path):
     for n in required_keys:
         assert n in probe.keys()
 
+    # Verify that all arrays have the same size.
+    size = None
+    for k, v in probe.items():
+        if isinstance(v, np.ndarray):
+            if size is None:
+                size = v.size
+            elif size != v.size:
+                raise ValueError(
+                    f"All probe variables must have the same length."
+                )
+
     return probe
 
   
@@ -140,12 +151,23 @@ def save_probe(probe_dict, filepath):
         )
 
     d = probe_dict.copy()
-    # Convert arrays to lists, since arrays aren't json-able
+    # Convert arrays to lists, since arrays aren't json-able.
     for k in list(d.keys()):
         v = d[k]
         if isinstance(v, np.ndarray):
             d[k] = v.tolist()
-    
+
+    # Verify that all lists are the same length.
+    length = None
+    for k, v in d.items():
+        if isinstance(v, list):
+            if length is None:
+                length = len(v)
+            elif length != len(v):
+                raise ValueError(
+                    f"All probe variables must have the same length."
+                )
+
     with open(filepath, 'w') as f:
         f.write(json.dumps(d))
 
