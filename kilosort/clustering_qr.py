@@ -262,9 +262,9 @@ def x_centers(ops):
         approx_centers = [edges[p] for p in peaks]
 
         # Use these as initial guesses for centroids in k-means to get
-        # a more accurate value for the actual centers. Or, if there's only 1,
+        # a more accurate value for the actual centers. If there's one or none,
         # just look for one centroid.
-        if len(approx_centers) == 1: approx_centers = 1
+        if len(approx_centers) <= 1: approx_centers = 1
 
     centers, distortion = kmeans(ops['xc'], approx_centers, seed=5330)
 

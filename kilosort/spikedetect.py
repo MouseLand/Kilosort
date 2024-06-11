@@ -91,7 +91,11 @@ def template_centers(ops):
     dmin = ops['settings']['dmin']
     if dmin is None:
         # Try to determine a good value automatically based on contact positions.
-        dmin = np.median(np.diff(np.unique(yc)))
+        y_uniq = np.unique(yc)
+        if y_uniq.size == 1:
+            dmin = 1
+        else:
+            dmin = np.median(np.diff(np.unique(y_uniq)))
     ops['dmin'] = dmin
     ops['dminx'] = dminx = ops['settings']['dminx']
 
