@@ -23,9 +23,11 @@ class RunBox(QtWidgets.QGroupBox):
 
         self.run_all_button = QtWidgets.QPushButton("Run")
         self.spike_sort_button = QtWidgets.QPushButton("Spikesort")
-        
+        self.save_preproc_check = QtWidgets.QCheckBox("Save Preprocessed Copy")
+        self.save_preproc_check.setCheckState(QtCore.Qt.CheckState.Unchecked)
+
         self.buttons = [
-            self.run_all_button,
+            self.run_all_button
         ]
 
         self.data_path = None
@@ -43,7 +45,7 @@ class RunBox(QtWidgets.QGroupBox):
         self.remote_widgets = None
 
         self.progress_bar = QtWidgets.QProgressBar()
-        self.layout.addWidget(self.progress_bar, 2, 0, 2, 2)
+        self.layout.addWidget(self.progress_bar, 3, 0, 2, 2)
 
         self.setup()
 
@@ -56,6 +58,7 @@ class RunBox(QtWidgets.QGroupBox):
         )
 
         self.layout.addWidget(self.run_all_button, 0, 0, 2, 2)
+        self.layout.addWidget(self.save_preproc_check, 2, 0, 1, 2)
         
         self.setLayout(self.layout)
 
@@ -74,8 +77,12 @@ class RunBox(QtWidgets.QGroupBox):
     def disable_all_input(self, value):
         if value:
             self.disable_all_buttons()
+            # This is done separate from other buttons so that it can be checked
+            # on or off without needing to load data.
+            self.save_preproc_check.setEnabled(False)
         else:
             self.reenable_buttons()
+            self.save_preproc_check.setEnabled(True)
 
     def set_data_path(self, data_path):
         self.data_path = data_path

@@ -142,7 +142,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         )
 
     tic0 = time.time()
-    ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign, device)
+    ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
+                         device, save_preprocessed_copy)
     # Remove some stuff that doesn't need to be printed twice, then pretty-print
     # format for log file.
     ops_copy = ops.copy()
@@ -162,12 +163,12 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         file_object=file_object
         )
 
-    if save_preprocessed_copy:
-        io.save_preprocessing(results_dir / 'temp_wh.dat', ops, bfile)
-
     # Check scale of data for log file
     b1 = bfile.padded_batch_to_torch(0).cpu().numpy()
     logger.debug(f"First batch min, max: {b1.min(), b1.max()}")
+
+    if save_preprocessed_copy:
+        io.save_preprocessing(results_dir / 'temp_wh.dat', ops, bfile)
 
     # Sort spikes and save results
     st,tF, _, _ = detect_spikes(ops, device, bfile, tic0=tic0,
@@ -264,7 +265,8 @@ def setup_logger(results_dir):
     numba_log.setLevel(logging.INFO)
 
 
-def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign, device) -> dict:
+def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
+                   device, save_preprocesed_copy) -> dict:
     """Package settings and probe information into a single `ops` dictionary."""
 
     if settings['nt0min'] is None:
@@ -280,6 +282,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign, device) -> 
     ops['Nchan'] = len(probe['chanMap'])
     ops['n_chan_bin'] = settings['n_chan_bin']
     ops['torch_device'] = str(device)
+    ops['save_preprocessed_copy'] = save_preprocesed_copy
 
     if not settings['templates_from_data'] and settings['nt'] != 61:
         raise ValueError('If using pre-computed universal templates '

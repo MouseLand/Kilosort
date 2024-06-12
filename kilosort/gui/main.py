@@ -332,6 +332,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.num_channels = settings["n_chan_bin"]
 
         params = settings.copy()
+        params['save_preprocessed_copy'] = self.run_box.save_preproc_check.isChecked()
 
         assert params
 
