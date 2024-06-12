@@ -25,7 +25,8 @@ from kilosort.parameters import DEFAULT_SETTINGS
 def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dir=None, file_object=None, results_dir=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
-                 progress_bar=None, save_extra_vars=False):
+                 progress_bar=None, save_extra_vars=False,
+                 save_preprocessed_copy=False):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -80,6 +81,10 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         not need to specify this.
     save_extra_vars : bool; default=False.
         If True, save tF and Wall to disk after sorting.
+    save_preprocessed_copy : bool; default=False.
+        If True, save a pre-processed copy of the data (including drift
+        correction) to `temp_wh.dat` in the results directory and format Phy
+        output to use that copy of the data.
     
     Raises
     ------
@@ -89,7 +94,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
 
     Returns
     -------
-    ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate
+    ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate, kept_spikes
         Description TODO
 
     """
@@ -157,6 +162,9 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         file_object=file_object
         )
 
+    if save_preprocessed_copy:
+        io.save_preprocessing(results_dir / 'temp_wh.dat', ops, bfile)
+
     # Check scale of data for log file
     b1 = bfile.padded_batch_to_torch(0).cpu().numpy()
     logger.debug(f"First batch min, max: {b1.min(), b1.max()}")
@@ -168,7 +176,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                                progress_bar=progress_bar)
     ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
         save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0,
-                     save_extra_vars=save_extra_vars)
+                     save_extra_vars=save_extra_vars,
+                     save_preprocessed_copy=save_preprocessed_copy)
 
     return ops, st, clu, tF, Wall, similar_templates, \
            is_ref, est_contam_rate, kept_spikes
@@ -533,7 +542,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None):
 
 
 def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
-                 save_extra_vars=False):  
+                 save_extra_vars=False, save_preprocessed_copy=False):  
     """Save sorting results, and format them for use with Phy
 
     Parameters
@@ -556,6 +565,12 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
         be shifted forward by this number.
     tic0 : float; default=np.nan.
         Start time of `run_kilosort`.
+    save_extra_vars : bool; default=False.
+        If True, save tF and Wall to disk after sorting.
+    save_preprocessed_copy : bool; default=False.
+        If True, save a pre-processed copy of the data (including drift
+        correction) to `temp_wh.dat` in the results directory and format Phy
+        output to use that copy of the data.
 
     Returns
     -------
@@ -563,6 +578,7 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     similar_templates : np.ndarray
     is_ref : np.ndarray
     est_contam_rate : np.ndarray
+    kept_spikes : np.ndarray
     
     """
 
@@ -572,7 +588,8 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     results_dir, similar_templates, is_ref, est_contam_rate, kept_spikes = \
         io.save_to_phy(
             st, clu, tF, Wall, ops['probe'], ops, imin, results_dir=results_dir,
-            data_dtype=ops['data_dtype'], save_extra_vars=save_extra_vars
+            data_dtype=ops['data_dtype'], save_extra_vars=save_extra_vars,
+            save_preprocessed_copy=save_preprocessed_copy
             )
     logger.info(f'{int(is_ref.sum())} units found with good refractory periods')
     
