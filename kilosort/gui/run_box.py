@@ -24,7 +24,6 @@ class RunBox(QtWidgets.QGroupBox):
         self.run_all_button = QtWidgets.QPushButton("Run")
         self.spike_sort_button = QtWidgets.QPushButton("Spikesort")
         self.save_preproc_check = QtWidgets.QCheckBox("Save Preprocessed Copy")
-        self.save_preproc_check.setCheckState(QtCore.Qt.CheckState.Unchecked)
 
         self.buttons = [
             self.run_all_button
@@ -52,10 +51,18 @@ class RunBox(QtWidgets.QGroupBox):
     def setup(self):
         self.run_all_button.clicked.connect(self.spikesort)
         self.spike_sort_button.clicked.connect(self.spikesort)
-        
         self.run_all_button.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
         )
+
+        self.save_preproc_check.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        preproc_text = """
+            If enabled, a whitened, filtered, and drift-corrected copy of the
+            data will be saved to 'temp_wh.dat' in the results directory. This
+            will also reformat the results for Phy so that the preprocessed copy
+            is used instead of the raw binary file.
+            """
+        self.save_preproc_check.setToolTip(preproc_text)
 
         self.layout.addWidget(self.run_all_button, 0, 0, 2, 2)
         self.layout.addWidget(self.save_preproc_check, 2, 0, 1, 2)

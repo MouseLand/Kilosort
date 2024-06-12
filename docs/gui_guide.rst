@@ -65,6 +65,8 @@ After loading the data, a heatmap will appear on the right half of the GUI showi
 .. image:: https://www.kilosort.org/static/images/gui_run_sorting.png
    :width: 600
 
+Not pictured: you can now check the "Save Preprocessed Copy" under the "Run" button to save a filtered, whitened, and drift-corrected copy of the data to "temp_wh.dat" in the results directory. This will also reformat the results for Phy so that the preprocessed copy is used instead of the raw binary file.
+
 If you run into errors or the results look strange, you may need to tweak some of the other settings. A handful are shown below 'number of channels' and 'sampling frequency,' or you can click "Extra settings" to open a new window with more options. Mousing over the name of a setting for about half a second will show a description of what the setting does, along with information about which values are allowed. For more detailed suggestions, see :ref:`parameters`
 
 .. image:: https://www.kilosort.org/static/images/gui_extra_settings.png
