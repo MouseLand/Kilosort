@@ -266,7 +266,7 @@ def setup_logger(results_dir):
 
 
 def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
-                   device, save_preprocesed_copy) -> dict:
+                   device, save_preprocessed_copy) -> dict:
     """Package settings and probe information into a single `ops` dictionary."""
 
     if settings['nt0min'] is None:
@@ -282,7 +282,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
     ops['Nchan'] = len(probe['chanMap'])
     ops['n_chan_bin'] = settings['n_chan_bin']
     ops['torch_device'] = str(device)
-    ops['save_preprocessed_copy'] = save_preprocesed_copy
+    ops['save_preprocessed_copy'] = save_preprocessed_copy
 
     if not settings['templates_from_data'] and settings['nt'] != 61:
         raise ValueError('If using pre-computed universal templates '
