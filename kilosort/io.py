@@ -37,7 +37,7 @@ def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
     # TODO: Why give this preference? Not all binary files will have this tag.
     # If there are multiple binary files, find one with "ap" tag
     if len(filenames) > 1:
-        filenames = [f for f in filenames if 'ap' in f.as_posix()]
+        filenames = [f for f in filenames if 'ap.bin' in f.as_posix()]
 
     # If there is still more than one, raise an error, user needs to specify
     # full path.
