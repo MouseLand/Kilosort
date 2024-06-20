@@ -54,8 +54,8 @@ This is the number of nearest channels and template locations, respectively, use
 The number of x-positions to use when determining centers for template groupings. Specifically, this is the number of centroids to look for when using k-means to cluster the x-positions for the probe. In most cases you should not need to specify this. However, **for probes with contacts arranged in a 2D grid**, we recommend setting ``x_centers`` such that centers are placed every 200-300um so that there are not too many templates in each group. For example, for an array that is 2000um in width, try ``x_centers = 10``. If contacts are very densely spaced, you may need to use a higher value for better performance.
 
 
-``duplicate_spike_bins``
+``duplicate_spike_ms``
 ------------------------
-After sorting has finished, spikes that occur within this number of bins of each other, from the same unit, are assumed to be artifacts and removed. The default of 7 bins corresponds to approximately 0.25ms for a sampling rate of 30000hz. If your sampling rate is different, you may need to increase or decrease this accordingly. If you see otherwise good neurons with large peaks around 0ms when viewing correlograms in Phy, increasing this value can help remove those artifacts.
+After sorting has finished, spikes that occur within this many ms of each other, from the same unit, are assumed to be artifacts and removed. If you see otherwise good neurons with large peaks around 0ms when viewing correlograms in Phy, increasing this value can help remove those artifacts.
 
 **Warning!!!** Do not increase this value beyond 0.5ms as it will interfere with the ACG and CCG refractory period estimations (which normally ignores the central 1ms of the correlogram).
