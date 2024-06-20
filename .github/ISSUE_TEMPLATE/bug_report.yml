@@ -6,8 +6,8 @@ body:
 - type: markdown
   attributes:
     value: >
-      Thank you for taking the time to file a bug report. Before creating a new
-      issue, please take a few minutes to try these steps:
+      Thank you for taking the time to file a bug report.
+      **Please take a few minutes to try these steps before creating a new issue**:
       1) Check if the issue has already been brought up.
       2) Try upgrading to the latest version of Kilosort4.
       3) Check for relevant documentation at kilosort.readthedocs.io.
@@ -32,14 +32,14 @@ body:
     label: "Reproduce the bug:"
     description: >
       A short code example that reproduces the problem/missing feature,
-      if applicable.
+      if applicable, or a description of how you encountered it.
     render: python
   
 - type: textarea
   attributes:
     label: "Error message:"
     description: >
-      Please include full error message, if any.
+      Please include the full statement of all error messages, if any.
     render: shell
 
 - type: textarea
@@ -50,16 +50,3 @@ body:
       software versions you think might be relevant to the bug (e.g. CUDA toolkit).
   validations:
     required: true
-
-- type: textarea
-  attributes:
-    label: "Context for the issue:"
-    description: |
-      Please explain how this issue affects your work or why it should be prioritized.
-
-- type: textarea
-  attributes:
-    label: "Experiment information:"
-    description: >
-      Type of probe used, species and brain area recorded from, etc, if your bug
-      is related to "strange/unexpected results."
