@@ -260,9 +260,13 @@ def setup_logger(results_dir):
     # add the console handler to the root logger
     logging.getLogger('').addHandler(console)
 
-    # Set numba logger to INFO or above only, so that it doesn't spam the log file
+    # Set 3rd party loggers to INFO or above only,
+    # so that it doesn't spam the log file
     numba_log = logging.getLogger('numba')
     numba_log.setLevel(logging.INFO)
+
+    mpl_log = logging.getLogger('matplotlib')
+    mpl_log.setLevel(logging.INFO)
 
 
 def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
