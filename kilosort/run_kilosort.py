@@ -275,9 +275,18 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
 
     if settings['nt0min'] is None:
         settings['nt0min'] = int(20 * settings['nt']/61)
+
+    if 'duplicate_spike_bins' in settings:
+        raise DeprecationWarning(
+            "The `duplicate_spike_bins` parameter has been replaced with "
+            "`duplicate_spike_ms`. Specifying the former will have no effect, "
+            "since it gets overwritten based on sampling rate."
+        )
+    dup_bins = int(settings['duplicate_spike_ms'] * (settings['fs']/1000))
+
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
     ops = settings  
-    ops['settings'] = settings 
+    ops['settings'] = settings
     ops['probe'] = probe
     ops['data_dtype'] = data_dtype
     ops['do_CAR'] = do_CAR
@@ -285,6 +294,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
     ops['NTbuff'] = ops['batch_size'] + 2 * ops['nt']
     ops['Nchan'] = len(probe['chanMap'])
     ops['n_chan_bin'] = settings['n_chan_bin']
+    ops['duplicate_spike_bins'] = dup_bins
     ops['torch_device'] = str(device)
     ops['save_preprocessed_copy'] = save_preprocessed_copy
 

@@ -375,13 +375,17 @@ EXTRA_PARAMETERS = {
 
 
     ### POSTPROCESSING
-    'duplicate_spike_bins': {
-        'gui_name': 'duplicate spike bins', 'type': int, 'min': 0, 'max': np.inf,
-        'exclude': [], 'default': 7, 'step': 'postprocessing',
+    'duplicate_spike_ms': {
+        'gui_name': 'duplicate spike ms', 'type': float, 'min': 0, 'max': np.inf,
+        'exclude': [], 'default': 0.25, 'step': 'postprocessing',
         'description':
             """
-            Number of bins for which subsequent spikes from the same cluster are
+            Time in ms for which subsequent spikes from the same cluster are
             assumed to be artifacts. A value of 0 disables this step.
+
+            NOTE: this was formerly handled by `duplicate_spike_bins`, which has
+            been deprecated. The new default of 0.25ms is equivalent to the old
+            default of 7 bins for a 30kHz sampling rate.
             """
     },
 }

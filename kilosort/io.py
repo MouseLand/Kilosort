@@ -209,7 +209,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     amplitudes = ((tF**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
     # remove duplicate (artifact) spikes
     spike_times, spike_clusters, kept_spikes = remove_duplicates(
-        spike_times, spike_clusters, dt=ops['settings']['duplicate_spike_bins']
+        spike_times, spike_clusters, dt=ops['duplicate_spike_bins']
     )
     amp = amplitudes[kept_spikes]
     spike_templates = spike_templates[kept_spikes]
