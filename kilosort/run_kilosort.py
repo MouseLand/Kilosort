@@ -2,6 +2,7 @@ import time
 from pathlib import Path
 import pprint
 import logging
+import warnings
 logger = logging.getLogger(__name__)
 
 import numpy as np
@@ -276,12 +277,22 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
     if settings['nt0min'] is None:
         settings['nt0min'] = int(20 * settings['nt']/61)
 
+    if settings['nearest_chans'] > len(probe['chanMap']):
+        msg = f"""
+            Parameter `nearest_chans` must be less than or equal to the number 
+            of data channels being sorted.\n
+            Changing from {settings['nearest_chans']} to {len(probe['chanMap'])}.
+            """
+        warnings.warn(msg, UserWarning)
+        settings['nearest_chans'] = len(probe['chanMap'])
+
     if 'duplicate_spike_bins' in settings:
-        raise DeprecationWarning(
-            "The `duplicate_spike_bins` parameter has been replaced with "
-            "`duplicate_spike_ms`. Specifying the former will have no effect, "
-            "since it gets overwritten based on sampling rate."
-        )
+        msg = """
+            The `duplicate_spike_bins` parameter has been replaced with 
+            `duplicate_spike_ms`. Specifying the former will have no effect, 
+            since it gets overwritten based on sampling rate.
+            """
+        warnings.warn(msg, DeprecationWarning)
     dup_bins = int(settings['duplicate_spike_ms'] * (settings['fs']/1000))
 
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
