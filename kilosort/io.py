@@ -431,12 +431,7 @@ class BinaryRWFile:
 
         self.imin = max(int(tmin*fs), 0)
         self.imax = total_samples if tmax==np.inf else min(int(tmax*fs), total_samples)
-
         self.n_batches = int(np.ceil(self.n_samples / self.NT))
-
-        logger.info(f'N samples: {total_samples}')
-        logger.info(f'N seconds: {total_samples/fs}')
-        logger.info(f'N batches: {self.n_batches}')
 
         mode = 'w+' if write else 'r'
         # Must use total samples for file shape, otherwise the end of the data

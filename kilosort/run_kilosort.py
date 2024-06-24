@@ -382,6 +382,11 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
                               invert_sign=invert, dtype=dtype, tmin=tmin,
                               tmax=tmax, artifact_threshold=artifact,
                               shift=shift, scale=scale, file_object=file_object)
+
+    logger.info(f'N samples: {bfile.n_samples}')
+    logger.info(f'N seconds: {bfile.n_samples/fs}')
+    logger.info(f'N batches: {bfile.n_batches}')
+
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip,
                                                     nrange=whitening_range)
 
