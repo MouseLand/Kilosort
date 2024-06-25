@@ -104,13 +104,10 @@ def refract(iclust2, st0, acg_threshold=0.2, ccg_threshold=0.25):
     for kk in range(Nfilt):    
         ix = iclust2==kk
         st1 = st0[ix]
-        if len(st1)>10:
+
+        if (len(st1) > 10) and ((st1.max() - st1.min()) != 0):
             is_refractory[kk], cross_refractory[kk], Q12[kk] = check_CCG(
                 st1, acg_threshold=acg_threshold, ccg_threshold=ccg_threshold
                 )
-
-        #if kk%100==0:
-        #    print(kk, is_refractory.sum())
-    #print(kk, is_refractory.sum())
 
     return is_refractory, Q12
