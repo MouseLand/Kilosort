@@ -195,9 +195,10 @@ EXTRA_PARAMETERS = {
         'description':
             """
             Amount of gaussian smoothing to apply to the spatiotemporal drift
-            estimation, for x,y,time axes in units of registration blocks
-            (for x,y axes) and batch size (for time axis). The x,y smoothing has
-            no effect for `nblocks = 1`.
+            estimation, for correlation, time (units of registration blocks),
+            and y (units of batches) axes. The y smoothing has no effect
+            for `nblocks = 1`. Adjusting smoothing for the correlation axis
+            is not recommended.
             """
     },
 
