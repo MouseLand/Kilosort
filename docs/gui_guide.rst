@@ -40,7 +40,7 @@ To select a probe, click the drop-down menu just below "Select Probe Layout." Th
 .. image:: https://www.kilosort.org/static/images/gui_select_probe.png
    :width: 600
 
-If you need to create a new probe layout, select "[new]" to open the probe creation tool. Values for 'x-coordinates' and 'y-coordinates' need to be in microns, and can be specified with numpy expressions. For example, a 1-shank linear probe with 4 channels could have `np.ones(4)` in the 'x-coordinates' field instead of `1, 1, 1, 1`. Each field (except name) must have the same number of elements, corresponding to the number of ephys channels in the data. WHen you are finished setting the values, click "Check" to verify that your inputs are valid. If they are not, an error message will be displayed. Otherwise, the "OK" button will become clickable, which will save the probe to the Kilosort4 probes directory.
+If you need to create a new probe layout, select "[new]" to open the probe creation tool. Values for 'x-coordinates' and 'y-coordinates' need to be in microns, and can be specified with numpy expressions. For example, a 1-shank linear probe with 4 channels could have `np.ones(4)` in the 'x-coordinates' field instead of `1, 1, 1, 1`. Each field (except name) must have the same number of elements, corresponding to the number of ephys channels in the data. When you are finished setting the values, click "Check" to verify that your inputs are valid. If they are not, an error message will be displayed. Otherwise, the "OK" button will become clickable, which will save the probe to the Kilosort4 probes directory.
 
 .. image:: https://www.kilosort.org/static/images/gui_make_probe.png
    :width: 600

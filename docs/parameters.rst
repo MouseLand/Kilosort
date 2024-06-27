@@ -39,6 +39,8 @@ This is the number of time samples used to represent spike waveforms, as well as
 ----------------------
 These adjust the vertical and lateral spacing, respectively, of the universal templates used during spike detection, as well as the vertical and lateral sizes of channel neighborhoods used for clustering. By default, Kilosort will attempt to determine a good value for ``dmin`` based on the median distance between contacts, which tends to work well for Neuropixels-like probes. However, if contacts are irregularly spaced, you may need to specify this manually. The default for ``dminx`` is 32um, which is also well suited to Neuropixels probes. For other probes, try setting ``dminx`` to the median lateral distance between contacts as a starting point.
 
+Note that as of version 4.0.11, the ``kcoords`` variable in the probe layout will be used to restrict template placement within each shank. Each shank should have a unique ``kcoords`` value that is the same for all contacts on that shank.
+
 ``min_template_size``
 ---------------------
 This sets the standard deviation of the smallest Gaussian spatial envelope used to generate universal templates, with a default of 10 microns. You may need to increase this for probes with wider spaces between contacts.
