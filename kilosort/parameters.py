@@ -170,6 +170,15 @@ EXTRA_PARAMETERS = {
             """
     },
 
+    'highpass_cutoff': {
+        'gui_name': 'highpass cutoff', 'type': float, 'min': 0, 'max': np.inf,
+        'exclude': [], 'default': 300, 'step': 'preprocessing',
+        'description':
+            """
+            Critical frequency for highpass Butterworth filter applied to data.
+            """
+    },
+
     'binning_depth': {
         'gui_name': 'binning_depth', 'type': float, 'min': 0, 'max': np.inf,
         'exclude': [0], 'default': 5, 'step': 'preprocessing',

@@ -358,6 +358,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
     def load_binary_files(self):
         n_channels = self.params["n_chan_bin"]
         sample_rate = self.params["fs"]
+        cutoff = self.params['highpass_cutoff']
         chan_map = self.probe_layout["chanMap"]
         xc = self.probe_layout["xc"]
         yc = self.probe_layout["yc"]
@@ -394,6 +395,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         self.context.highpass_filter = preprocessing.get_highpass_filter(
             fs=sample_rate,
+            cutoff=cutoff,
             device=self.device
         )
 

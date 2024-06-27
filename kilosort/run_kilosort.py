@@ -375,7 +375,8 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     whitening_range = ops['settings']['whitening_range']
     
     # Compute high pass filter
-    hp_filter = preprocessing.get_highpass_filter(ops['settings']['fs'], device=device)
+    cutoff = ops['settings']['highpass_cutoff']
+    hp_filter = preprocessing.get_highpass_filter(fs, cutoff, device=device)
     # Compute whitening matrix
     bfile = io.BinaryFiltered(ops['filename'], n_chan_bin, fs, NT, nt, twav_min,
                               chan_map, hp_filter, device=device, do_CAR=do_CAR,
