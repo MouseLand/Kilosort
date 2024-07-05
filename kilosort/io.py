@@ -172,6 +172,41 @@ def save_probe(probe_dict, filepath):
         f.write(json.dumps(d))
 
 
+def remove_bad_channels(probe, bad_channels):
+    """Creates a new probe dictionary with listed channels (data rows) removed.
+    
+    Parameters
+    ----------
+    probe : dict.
+        A Kilosort4 probe dictionary, as returned by `kilosort.io.load_probe`.
+    bad_channels : list.
+        A list of channel indices (rows in the binary file) that should not be
+        included in sorting. Listing channels here is equivalent to excluding
+        them from the probe dictionary.
+
+    Returns
+    -------
+    probe : dict.
+    
+    """
+    probe = probe.copy()
+
+    bad_idx = np.empty_like(bad_channels, dtype=int)
+    for i, k in enumerate(bad_channels):
+        try:
+            idx = np.where(probe['chanMap'] == k)[0][0]
+        except IndexError:
+            raise IndexError(f"Channel '{k}' was not in probe['chanMap']")
+        bad_idx[i] = idx
+    probe['xc'] = np.delete(probe['xc'], bad_idx)
+    probe['yc'] = np.delete(probe['yc'], bad_idx)
+    probe['kcoords'] = np.delete(probe['kcoords'], bad_idx)
+    probe['chanMap'] = np.delete(probe['chanMap'], bad_idx)
+    probe['n_chan'] = probe['n_chan'] - bad_idx.size
+
+    return probe
+
+
 def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
                 data_dtype=None, save_extra_vars=False,
                 save_preprocessed_copy=False):

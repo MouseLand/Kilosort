@@ -27,7 +27,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dir=None, file_object=None, results_dir=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False,
-                 save_preprocessed_copy=False):
+                 save_preprocessed_copy=False, bad_channels=None):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -86,6 +86,10 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         If True, save a pre-processed copy of the data (including drift
         correction) to `temp_wh.dat` in the results directory and format Phy
         output to use that copy of the data.
+    bad_channels : list; optional.
+        A list of channel indices (rows in the binary file) that should not be
+        included in sorting. Listing channels here is equivalent to excluding
+        them from the probe dictionary.
     
     Raises
     ------
@@ -193,7 +197,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
            is_ref, est_contam_rate, kept_spikes
 
 
-def set_files(settings, filename, probe, probe_name, data_dir, results_dir):
+def set_files(settings, filename, probe, probe_name,
+              data_dir, results_dir, bad_channels):
     """Parse file and directory information for data, probe, and results."""
 
     # Check for filename 
@@ -244,6 +249,9 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir):
         # with some pytorch functions.
         probe['xc'] = probe['xc'].astype(np.float32)
         probe['yc'] = probe['yc'].astype(np.float32)
+
+    if bad_channels is not None:
+        probe = io.remove_bad_channels(probe, bad_channels)
 
     return filename, data_dir, results_dir, probe
 
