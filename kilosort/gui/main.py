@@ -11,7 +11,7 @@ from kilosort.gui import (
     DataConversionBox
 )
 from kilosort.gui.logger import setup_logger
-from kilosort.io import BinaryFiltered
+from kilosort.io import BinaryFiltered, remove_bad_channels
 from kilosort.utils import DOWNLOADS_DIR, download_probes
 from qtpy import QtCore, QtGui, QtWidgets
 
@@ -324,10 +324,12 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def set_parameters(self):
         settings = self.settings_box.settings
+        bad_channels = self.settings_box._bad_channels
 
         self.data_path = settings["data_file_path"]
         self.results_directory = settings["results_dir"]
-        self.probe_layout = settings["probe"]
+        self.probe_layout = remove_bad_channels(settings["probe"], bad_channels)
+        # TODO: cache copy without channels removed for use by probe view?
         self.probe_name = settings["probe_name"]
         self.num_channels = settings["n_chan_bin"]
 
@@ -479,7 +481,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def update_probe_view(self):
-        self.probe_view_box.set_layout(self.context)
+        self.probe_view_box.set_layout()
 
     def update_data_view(self):
         self.data_view_box.set_whitening_matrix(self.context.whitening_matrix)

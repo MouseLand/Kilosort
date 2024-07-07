@@ -71,9 +71,9 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         layout.addWidget(self.spot_scale)
         self.setLayout(layout)
 
-    def set_layout(self, context):
+    def set_layout(self):
         self.probe_view.clear()
-        probe = context.raw_probe
+        probe = self.gui.probe_layout
         template_args = self.gui.settings_box.get_probe_template_args()
         self.set_active_layout(probe, template_args)
         self.update_probe_view()
@@ -126,7 +126,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     @QtCore.Slot()
     def refresh_plot(self):
         template_args = self.gui.settings_box.get_probe_template_args()
-        self.preview_probe(self.gui.settings_box.probe_layout, template_args)
+        self.preview_probe(template_args)
 
     @QtCore.Slot(str, int)
     def synchronize_data_view_mode(self, mode: str):
@@ -187,9 +187,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     def update_probe_view(self):
         self.create_plot()
 
-    @QtCore.Slot(object, object)
-    def preview_probe(self, probe, template_args):
+    @QtCore.Slot(object)
+    def preview_probe(self, template_args):
         self.probe_view.clear()
+        probe = self.gui.probe_layout
         self.set_active_layout(probe, template_args)
         self.create_plot()
 
