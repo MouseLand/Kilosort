@@ -114,7 +114,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     settings = {**DEFAULT_SETTINGS, **settings}
     # NOTE: This modifies settings in-place
     filename, data_dir, results_dir, probe = \
-        set_files(settings, filename, probe, probe_name, data_dir, results_dir)
+        set_files(settings, filename, probe, probe_name, data_dir, results_dir, bad_channels)
     setup_logger(results_dir)
 
     try:
