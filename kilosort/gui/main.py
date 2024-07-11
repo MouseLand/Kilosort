@@ -324,7 +324,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
     def set_parameters(self):
         settings = self.settings_box.settings
-        bad_channels = self.settings_box._bad_channels
+        bad_channels = self.settings_box.bad_channels
 
         self.data_path = settings["data_file_path"]
         self.results_directory = settings["results_dir"]

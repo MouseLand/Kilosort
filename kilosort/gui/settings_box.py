@@ -71,12 +71,12 @@ class SettingsBox(QtWidgets.QGroupBox):
             bad_channels = self.gui.qt_settings.value('bad_channels')
             if bad_channels is not None:
                 # List of ints gets cached as list of strings, so have to convert.
-                self._bad_channels = [int(s) for s in bad_channels]
-                self.bad_channels_input.setText(str(self._bad_channels))
+                self.bad_channels = [int(s) for s in bad_channels]
+                self.bad_channels_input.setText(str(self.bad_channels))
             else:
-                self._bad_channels = []
+                self.bad_channels = []
         else:
-            self._bad_channels = []
+            self.bad_channels = []
 
         self.dtype_selector_text = QtWidgets.QLabel("Data dtype:")
         self.dtype_selector = QtWidgets.QComboBox()
@@ -676,16 +676,25 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.gui.qt_settings.setValue('probe_layout', layout)
         self.gui.qt_settings.setValue('probe_name', name)
 
-    @QtCore.Slot()
-    def update_bad_channels(self):
-        # Remove brackets and white space if present, convert to list of ints.
+    def get_bad_channels(self):
         text = self.bad_channels_input.text()
         text = text.replace(']','').replace('[','').replace(' ','')
         if len(text) > 0:
-            self._bad_channels = [int(s) for s in text.split(',')]
+            bad_channels = [int(s) for s in text.split(',')]
         else:
-            self._bad_channels = []
-        self.gui.qt_settings.setValue('bad_channels', self._bad_channels)
+            bad_channels = []
+        
+        return bad_channels
+
+    def set_bad_channels(self, bad_channels):
+        self.bad_channels_input.setText(str(bad_channels))
+        self.bad_channels_input.editingFinished.emit()
+
+    @QtCore.Slot()
+    def update_bad_channels(self):
+        # Remove brackets and white space if present, convert to list of ints.
+        self.bad_channels = self.get_bad_channels()
+        self.gui.qt_settings.setValue('bad_channels', self.bad_channels)
 
         # Trigger update so that probe layout in main gets updated, then
         # refresh probe view.
