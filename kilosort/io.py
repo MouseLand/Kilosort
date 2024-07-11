@@ -168,6 +168,8 @@ def save_probe(probe_dict, filepath):
                     f"All probe variables must have the same length."
                 )
 
+    # Create parent directories if they do not exist, then save probe.
+    Path(filepath).parent.mkdir(parents=True, exist_ok=True)
     with open(filepath, 'w') as f:
         f.write(json.dumps(d))
 
