@@ -12,39 +12,95 @@ from kilosort import hierarchical, swarmsplitter
 
 
 def neigh_mat(Xd, nskip=10, n_neigh=30):
-    # Xd is spikes by PCA features in a local neighborhood
-    # finding n_neigh neighbors of each spike to a subset of every nskip spike
 
-    # subsampling the feature matrix 
-    Xsub = Xd[::nskip]
+    # TODO: separate Xd and Xsub into evenly spaced pieces in time, do clustering
+    #       as usual on each piece, then combine results into a single matrix
 
-    # n_samples is the number of spikes, dim is number of features
-    n_samples, dim = Xd.shape
+    # TODO: How to split up into pieces? I don't have info about actual spike time.
+    #       Check if Xd spikes are sorted in time, then I don't have to worry about that.
+    #       --->  yes, st and igood are both sorted in clustering_qr, so Xd should also
+    #             be sorted in time. That means we can just split it based on proportion.
+    #       --->  Could also split based on number of spikes or number of seconds
+    #             in each chunk. Also doesn't *have* to be a uniform split, so could
+    #             add an option to specify where the splits happen.
 
-    # n_nodes are the # subsampled spikes
-    n_nodes = Xsub.shape[0]
+    # TODO: should make sure subsampling is random though. Taking every nth spike
+    #       can be biased if sorted.
+    #       --->  Since data is sorted, how to do this efficiently? Can either
+    #             shuffle the data after splitting it up, or use a different method
+    #             for subsampling. First discuss with Marius, maybe this isn't
+    #             as much of a problem as I'm imagining.
 
-    # search is much faster if array is contiguous
-    Xd = np.ascontiguousarray(Xd)
-    Xsub = np.ascontiguousarray(Xsub)
 
-    # exact neighbor search ("brute force")
-    # results is dn and kn, kn is n_samples by n_neigh, contains integer indices into Xsub
-    index = faiss.IndexFlatL2(dim)   # build the index
-    index.add(Xsub)    # add vectors to the index
-    _, kn = index.search(Xd, n_neigh)     # actual search
+    # TODO: how to recombine? I guess we want a union of neighbors somehow...
+    #       I guess I would use the split indices to put the integer indices in
+    #       individual kns back into an absolute reference?
+    #       --->  No, that's not right, bc those are for Xd, subsampling messes that up.
+    #             Although, I guess I can just multiply by 25 first.
+    #       --->  Regardless, need to know when the same neighbor shows up in
+    #             multiple kn.
+    #       --->  Also, a simple union would result in more than n_neigh
+    #             neighbors. Is that a problem?
+    #       --->  Potential problems with too few spikes after splitting? I.e.
+    #             extreme case for illustration, if there are only 10 spikes then
+    #             those will be the 10 neighbors, but might not be anything alike.
+
+    all_Xd, splits, chunk_size = split_data(Xd, 10)
+    all_kn = []
+    for Xd in all_Xd:
+        # Xd is spikes by PCA features in a local neighborhood
+        # finding n_neigh neighbors of each spike to a subset of every nskip spike
+
+        # subsampling the feature matrix 
+        Xsub = Xd[::nskip]
+
+        # n_samples is the number of spikes, dim is number of features
+        n_samples, dim = Xd.shape
+
+        # n_nodes are the # subsampled spikes
+        n_nodes = Xsub.shape[0]
+
+        # search is much faster if array is contiguous
+        Xd = np.ascontiguousarray(Xd)
+        Xsub = np.ascontiguousarray(Xsub)
+
+        # exact neighbor search ("brute force")
+        # results is dn and kn, kn is n_samples by n_neigh, contains integer indices into Xsub
+        index = faiss.IndexFlatL2(dim)   # build the index
+        index.add(Xsub)    # add vectors to the index
+        _, kn = index.search(Xd, n_neigh)     # actual search
+        all_kn.append(kn)
+
+
+    # TODO: should this part be done on the splits as well? or after recombining?
+    #       seems like we could merge everything into a single kn first and then
+    #       do this as normal.
 
     # create sparse matrix version of kn with ones where the neighbors are
     # M is n_samples by n_nodes
     dexp = np.ones(kn.shape, np.float32)    
     rows = np.tile(np.arange(n_samples)[:, np.newaxis], (1, n_neigh)).flatten()
     M   = csr_matrix((dexp.flatten(), (rows, kn.flatten())),
-                   (kn.shape[0], n_nodes))
+                     (kn.shape[0], n_nodes))
 
     # self connections are set to 0!
     M[np.arange(0,n_samples,nskip), np.arange(n_nodes)] = 0
 
     return kn, M
+
+
+def split_data(Xd, n_splits):
+    # Splits Xd into 2*n_splits - 1 chunks, where the additional chunks are
+    # overlapping offsets.
+    n_spikes = list(Xd.size())[0]
+    chunk_size = n_spikes // n_splits
+    splits = [[i*(chunk_size//2), (i+2)*(chunk_size//2)]
+              for i in range(2*n_splits-1)]
+    # Make sure last split goes to end of data.
+    splits[-1][1] = n_spikes
+    data = [Xd[s[0]:s[1], ...] for s in splits]
+
+    return data, splits, chunk_size
 
 
 def assign_mu(iclust, Xg, cols_mu, tones, nclust = None, lpow = 1):
@@ -208,6 +264,7 @@ def compute_score(mu, mu2, N, ccN, lam):
     return score
 
 
+# TODO: never used? delete this?
 def run_one(Xd, st0, nskip = 20, lam = 0):
     iclust, iclust0, M = cluster(Xd,nskip = nskip, lam = 0, seed = 5)
     xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
