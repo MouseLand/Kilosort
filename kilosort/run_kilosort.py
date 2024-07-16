@@ -102,6 +102,10 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate, kept_spikes
         Description TODO
 
+    Notes
+    -----
+    For documentation of saved files, see `kilosort.io.save_to_phy`.
+
     """
 
     # Configure settings, ops, and file paths
@@ -631,6 +635,10 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     est_contam_rate : np.ndarray
     kept_spikes : np.ndarray
     
+    Notes
+    -----
+    For documentation of saved files, see `kilosort.io.save_to_phy`.
+
     """
 
     logger.info(' ')

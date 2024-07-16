@@ -212,6 +212,85 @@ def remove_bad_channels(probe, bad_channels):
 def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
                 data_dtype=None, save_extra_vars=False,
                 save_preprocessed_copy=False):
+    """Save sorting results to disk in a format readable by Phy.
+
+    Parameters
+    ----------
+    TODO
+
+    Returns
+    -------
+    TODO
+    results_dir, similar_templates, is_ref, est_contam_rate, kept_spikes
+
+
+    TODO: add note to clarify that "templates" here actually means average
+          spike waveforms after whitening and highpass filtering and drift correction
+          for each cluster.
+
+    Notes
+    -----
+    The following files will be saved in `results_dir`:
+
+    amplitudes.npy : shape (n_spikes,)
+        Per-spike amplitudes, computed as the L2 norm of the PC features
+        for each spike.
+    channel_map.npy : shape (n_channels,)
+        Same as probe['chanMap']. Integer indices into rows of binary file
+        that map the data to the contacts listed in the probe file.
+    channel_positions.npy : shape (n_channels,2)
+        Same as probe['xc'] and probe['yc'], but combined in a single array.
+        Indicates x- and y- positions (in microns) of probe contacts.
+    cluster_Amplitude.tsv : shape (n_clusters,)
+        Per-cluster amplitudes, computed as the L2 norm of the template
+        matched to each cluster.
+    cluster_ContamPct.tsv : shape (n_clusters,)
+        Contamination rate for each template, computed as fraction of refractory
+        period violations relative to expectation based on a Poisson process.
+    cluster_KSLabel.tsv : shape (n_clusters,)
+        Label indicating whether each cluster is 'mua' (multi-unit activity)
+        or 'good' (refractory).
+    cluster_group.tsv : shape (n_clusters,)
+        Same as `cluster_KSLabel.tsv`.
+    kept_spikes.npy : shape (n_spikes,)
+        Boolean mask that is False for spikes that were removed by
+        `kilosort.postprocessing.remove_duplicate_spikes` and True otherwise.
+    ops.npy : shape N/A
+        Dictionary containing a number of state variables saved throughout
+        the sorting process (see `run_kilosort`). We recommend loading with
+        `kilosort.io.load_ops`.
+    params.py : shape N/A
+        Settings used by Phy, like data location and sampling rate.
+    similar_templates.npy : shape (n_clusters, n_clusters)
+        Similarity score between each pair of templates, computed as correlation
+        between templates.
+    spike_clusters.npy : shape (n_spikes,)
+        For each spike, integer indicating which cluster it was assigned to.
+    spike_templates.npy : shape (n_spikes,2)
+        Same as `spike_clusters.npy`.
+    spike_positions.npy : shape (n_spikes,2)
+        Estimated (x,y) position relative to probe geometry, in microns,
+        for each spike.
+    spike_times.npy : shape (n_spikes,)
+        Sample index of the waveform peak for each spike.
+    templates.npy : shape (n_clusters, nt, n_channels)
+        TODO not quite right, more like average spikes  (I did this in one other spot as well)
+        Template shapes matched to each cluster.
+    templates_ind.npy : shape (n_clusters, n_channels)
+        Channel indices on which each cluster is defined. For KS4, this is always
+        all channels, but Phy requires this file.
+    whitening_mat.npy : shape (n_channels, n_channels)
+        Matrix applied to data for whitening.
+    whitening_mat_inv.npy : shape (n_channels, n_channels)
+        Inverse of whitening matrix.
+    whitening_mat_dat.npy : shape (n_channels, n_channels)
+        matrix applied to data for whitening. Currently this is the same as
+        `whitening_mat.npy`, but was added because the latter was previously
+        altered before saving for Phy, so this ensured the original was still
+        saved. It's kept in for now because we may need to change the version
+        used by Phy again in the future.
+
+    """
 
     if results_dir is None:
         results_dir = ops['data_dir'].joinpath('kilosort4')
