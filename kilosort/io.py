@@ -216,21 +216,67 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
 
     Parameters
     ----------
-    TODO
-
+    st : np.ndarray
+        3-column array of peak time (in samples), template, and amplitude for
+        each spike.
+    clu : np.ndarray
+        1D vector of cluster ids indicating which spike came from which cluster,
+        same shape as `st[:,0]`.
+    tF : np.ndarray
+        PC features for each spike, with shape
+        (n_spikes, nearest_chans, n_pcs)
+    Wall : np.ndarray
+        PC feature representation of spike waveforms for each cluster, with shape
+        (n_clusters, n_channels, n_pcs).
+    probe : dict; optional.
+        A Kilosort4 probe dictionary, as returned by `kilosort.io.load_probe`.
+    ops : dict
+        Dictionary storing settings and results for all algorithmic steps.
+    imin : int
+        Minimum sample index used by BinaryRWFile, exported spike times will
+        be shifted forward by this number.
+    results_dir : pathlib.Path; optional.
+        Directory where results should be saved.
+    data_dtype : str or type; optional.
+        dtype of data in binary file, like `'int32'` or `np.uint16`. By default,
+        dtype is assumed to be `'int16'`.
+    save_extra_vars : bool; default=False.
+        If True, save tF and Wall to disk along with copies of st, clu and
+        amplitudes with no postprocessing applied.
+    save_preprocessed_copy : bool; default=False.
+        If True, save a pre-processed copy of the data (including drift
+        correction) to `temp_wh.dat` in the results directory and format Phy
+        output to use that copy of the data.
+    
     Returns
     -------
-    TODO
-    results_dir, similar_templates, is_ref, est_contam_rate, kept_spikes
-
-
-    TODO: add note to clarify that "templates" here actually means average
-          spike waveforms after whitening and highpass filtering and drift correction
-          for each cluster.
+    results_dir : pathlib.Path.
+        Directory where results are saved.
+    similar_templates : np.ndarray.
+        Similarity score between each pair of clusters, computed as correlation
+        between clusters. Shape (n_clusters, n_clusters).
+    is_ref : np.ndarray.
+        1D boolean array with shape (n_clusters,) indicating whether each
+        cluster is refractory.
+    est_contam_rate : np.ndarray.
+        Contamination rate for each cluster, computed as fraction of refractory
+        period violations relative to expectation based on a Poisson process.
+        Shape (n_clusters,).
+    kept_spikes : np.ndarray.
+        Boolean mask with shape (n_spikes,) that is False for spikes that were
+        removed by `kilosort.postprocessing.remove_duplicate_spikes`
+        and True otherwise.
 
     Notes
     -----
-    The following files will be saved in `results_dir`:
+    The following files will be saved in `results_dir`. Note that 'template'
+    here does *not* refer to the universal or learned templates used for spike
+    detection, as it did in some past versions of Kilosort. Instead, it refers
+    to the average spike waveform (after whitening, filtering, and drift
+    correction) for all spikes assigned to each cluster, which are template-like
+    in shape. We use the term 'template' anyway for this section because that is
+    how they are treated in Phy. Elsewhere in the Kilosort4 code, we would refer
+    to these as 'clusters.'
 
     amplitudes.npy : shape (n_spikes,)
         Per-spike amplitudes, computed as the L2 norm of the PC features
@@ -241,16 +287,15 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     channel_positions.npy : shape (n_channels,2)
         Same as probe['xc'] and probe['yc'], but combined in a single array.
         Indicates x- and y- positions (in microns) of probe contacts.
-    cluster_Amplitude.tsv : shape (n_clusters,)
-        Per-cluster amplitudes, computed as the L2 norm of the template
-        matched to each cluster.
-    cluster_ContamPct.tsv : shape (n_clusters,)
+    cluster_Amplitude.tsv : shape (n_templates,)
+        Per-template amplitudes, computed as the L2 norm of the template.
+    cluster_ContamPct.tsv : shape (n_templates,)
         Contamination rate for each template, computed as fraction of refractory
         period violations relative to expectation based on a Poisson process.
-    cluster_KSLabel.tsv : shape (n_clusters,)
-        Label indicating whether each cluster is 'mua' (multi-unit activity)
+    cluster_KSLabel.tsv : shape (n_templates,)
+        Label indicating whether each template is 'mua' (multi-unit activity)
         or 'good' (refractory).
-    cluster_group.tsv : shape (n_clusters,)
+    cluster_group.tsv : shape (n_templates,)
         Same as `cluster_KSLabel.tsv`.
     kept_spikes.npy : shape (n_spikes,)
         Boolean mask that is False for spikes that were removed by
@@ -261,11 +306,11 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         `kilosort.io.load_ops`.
     params.py : shape N/A
         Settings used by Phy, like data location and sampling rate.
-    similar_templates.npy : shape (n_clusters, n_clusters)
+    similar_templates.npy : shape (n_templates, n_templates)
         Similarity score between each pair of templates, computed as correlation
         between templates.
     spike_clusters.npy : shape (n_spikes,)
-        For each spike, integer indicating which cluster it was assigned to.
+        For each spike, integer indicating which template it was assigned to.
     spike_templates.npy : shape (n_spikes,2)
         Same as `spike_clusters.npy`.
     spike_positions.npy : shape (n_spikes,2)
@@ -273,10 +318,9 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         for each spike.
     spike_times.npy : shape (n_spikes,)
         Sample index of the waveform peak for each spike.
-    templates.npy : shape (n_clusters, nt, n_channels)
-        TODO not quite right, more like average spikes  (I did this in one other spot as well)
-        Template shapes matched to each cluster.
-    templates_ind.npy : shape (n_clusters, n_channels)
+    templates.npy : shape (n_templates, nt, n_channels)
+        Full time x channels template shapes.
+    templates_ind.npy : shape (n_templates, n_channels)
         Channel indices on which each cluster is defined. For KS4, this is always
         all channels, but Phy requires this file.
     whitening_mat.npy : shape (n_channels, n_channels)
