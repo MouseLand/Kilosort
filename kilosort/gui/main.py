@@ -329,7 +329,6 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.data_path = settings["data_file_path"]
         self.results_directory = settings["results_dir"]
         self.probe_layout = remove_bad_channels(settings["probe"], bad_channels)
-        # TODO: cache copy without channels removed for use by probe view?
         self.probe_name = settings["probe_name"]
         self.num_channels = settings["n_chan_bin"]
 
