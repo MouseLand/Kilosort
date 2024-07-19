@@ -16,21 +16,6 @@ def neigh_mat(Xd, nskip=10, n_neigh=30):
     # TODO: separate Xd and Xsub into evenly spaced pieces in time, do clustering
     #       as usual on each piece, then combine results into a single matrix
 
-    # TODO: How to split up into pieces? I don't have info about actual spike time.
-    #       Check if Xd spikes are sorted in time, then I don't have to worry about that.
-    #       --->  yes, st and igood are both sorted in clustering_qr, so Xd should also
-    #             be sorted in time. That means we can just split it based on proportion.
-    #       --->  Could also split based on number of spikes or number of seconds
-    #             in each chunk. Also doesn't *have* to be a uniform split, so could
-    #             add an option to specify where the splits happen.
-
-    # TODO: should make sure subsampling is random though. Taking every nth spike
-    #       can be biased if sorted.
-    #       --->  Since data is sorted, how to do this efficiently? Can either
-    #             shuffle the data after splitting it up, or use a different method
-    #             for subsampling. First discuss with Marius, maybe this isn't
-    #             as much of a problem as I'm imagining.
-
 
     # TODO: how to recombine? I guess we want a union of neighbors somehow...
     #       I guess I would use the split indices to put the integer indices in
@@ -44,6 +29,14 @@ def neigh_mat(Xd, nskip=10, n_neigh=30):
     #       --->  Potential problems with too few spikes after splitting? I.e.
     #             extreme case for illustration, if there are only 10 spikes then
     #             those will be the 10 neighbors, but might not be anything alike.
+
+    #        Actually a lot of this doesn't matter now that I know I'm splitting
+    #        things up wrong. Each spike only searches one index, can just
+    #        concatenate the kns, then form the M as normal. Still need to shift
+    #        indices in kn by offset of each chunk.
+
+    #        TODO: do need to add a step to figure out which index each spike
+    #              searches in.
 
     all_Xd, splits, chunk_size = split_data(Xd, 10)
     all_kn = []
