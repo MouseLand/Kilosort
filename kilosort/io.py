@@ -222,10 +222,10 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st[:,0]`.
-    tF : np.ndarray
+    tF : torch.Tensor
         PC features for each spike, with shape
         (n_spikes, nearest_chans, n_pcs)
-    Wall : np.ndarray
+    Wall : torch.Tensor
         PC feature representation of spike waveforms for each cluster, with shape
         (n_clusters, n_channels, n_pcs).
     probe : dict; optional.
