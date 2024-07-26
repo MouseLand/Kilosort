@@ -11,10 +11,7 @@ from tqdm import tqdm
 from kilosort import hierarchical, swarmsplitter 
 
 
-def neigh_mat(Xd, nskip=10, n_neigh=30):
-
-    # TODO: separate Xd and Xsub into evenly spaced pieces in time, do clustering
-    #       as usual on each piece, then combine results into a single matrix
+def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1):
 
 
     # TODO: how to recombine? I guess we want a union of neighbors somehow...
@@ -35,39 +32,40 @@ def neigh_mat(Xd, nskip=10, n_neigh=30):
     #        concatenate the kns, then form the M as normal. Still need to shift
     #        indices in kn by offset of each chunk.
 
-    #        TODO: do need to add a step to figure out which index each spike
-    #              searches in.
 
-    all_Xd, splits, chunk_size = split_data(Xd, 10)
+    # TODO: remove me! THIS IS ONLY HERE FOR TESTING
+    n_splits = 10
+
+
+    # Xd is spikes by PCA features in a local neighborhood. Want to find n_neigh
+    # neighbors of each spike to a subset of every nskip spikes, subsampling the
+    # feature matrix 
+    index_spikes = Xd[::nskip]
+    # Split index spikes into multiple sets in time, so that only spikes that
+    # are close together in time can be neighbors. This improves clustering
+    # accuracy for long recordings, when waveform shapes may change over time.
+    all_Xsub, splits = split_data(index_spikes, n_splits)
+    sample_ranges = map_to_index(splits, nskip)
+
     all_kn = []
-    for Xd in all_Xd:
-        # Xd is spikes by PCA features in a local neighborhood
-        # finding n_neigh neighbors of each spike to a subset of every nskip spike
-
-        # subsampling the feature matrix 
-        Xsub = Xd[::nskip]
-
+    for Xsub, (start, stop) in zip(all_Xsub, sample_ranges):
         # n_samples is the number of spikes, dim is number of features
         n_samples, dim = Xd.shape
 
         # n_nodes are the # subsampled spikes
         n_nodes = Xsub.shape[0]
 
+        # Only search spikes that are assigned to this portion of the index.
+        search_spikes = Xd[start:stop, ...]
         # search is much faster if array is contiguous
-        Xd = np.ascontiguousarray(Xd)
-        Xsub = np.ascontiguousarray(Xsub)
+        search_spikes = np.ascontiguousarray(search_spikes)
 
         # exact neighbor search ("brute force")
         # results is dn and kn, kn is n_samples by n_neigh, contains integer indices into Xsub
         index = faiss.IndexFlatL2(dim)   # build the index
         index.add(Xsub)    # add vectors to the index
-        _, kn = index.search(Xd, n_neigh)     # actual search
+        _, kn = index.search(search_spikes, n_neigh)     # actual search
         all_kn.append(kn)
-
-
-    # TODO: should this part be done on the splits as well? or after recombining?
-    #       seems like we could merge everything into a single kn first and then
-    #       do this as normal.
 
     # create sparse matrix version of kn with ones where the neighbors are
     # M is n_samples by n_nodes
@@ -79,21 +77,69 @@ def neigh_mat(Xd, nskip=10, n_neigh=30):
     # self connections are set to 0!
     M[np.arange(0,n_samples,nskip), np.arange(n_nodes)] = 0
 
+    
+    # TODO: when this is all working, also get some kind of matplotlib visualization
+    #       up to make sure splits are working correctly.
+
     return kn, M
 
 
-def split_data(Xd, n_splits):
-    # Splits Xd into 2*n_splits - 1 chunks, where the additional chunks are
-    # overlapping offsets.
-    n_spikes = list(Xd.size())[0]
-    chunk_size = n_spikes // n_splits
-    splits = [[i*(chunk_size//2), (i+2)*(chunk_size//2)]
-              for i in range(2*n_splits-1)]
-    # Make sure last split goes to end of data.
-    splits[-1][1] = n_spikes
-    data = [Xd[s[0]:s[1], ...] for s in splits]
+# TODO: I think I'm getting spike indices and spike times mixed up here, need
+#       to review both of these. Ugh.
 
-    return data, splits, chunk_size
+def split_data(data, n_splits):
+    if n_splits == 1:
+        # Use all spikes for a single index
+        split_data = [data]
+        splits = [(0,data.shape[0])]
+        chunk_size = data.shape[0]
+    else:
+        # Splits index spikes into 2*n_splits - 1 chunks, where the additional
+        # chunks are overlapping offsets.
+        n_spikes = list(data.size())[0]
+        chunk_size = n_spikes // n_splits
+        splits = [
+            [i*(chunk_size//2), (i+2)*(chunk_size//2)]
+            for i in range(2*n_splits-1)
+            ]
+        # Make sure last split goes to end of data.
+        splits[-1][1] = n_spikes
+        split_data = [np.ascontiguousarray(data[s[0]:s[1], ...]) for s in splits]
+
+    return split_data, splits
+
+
+def map_to_index(splits,  nskip, n_all_spikes):
+    if len(splits) == 1:
+        # Only one split, all spikes get assigned to the only index.
+        sample_ranges = splits
+    else:
+        # For first and last split, need to include leading and ending quarter.
+        # For all others, only include middle half.
+        sample_ranges = []
+        for i, (start, stop) in enumerate(splits):
+            if i == 0:
+                # First split also includes the leading 25% of that portion.
+                sample_ranges.append([0, int(stop*0.75)])
+            elif i == (len(splits) - 1):
+                # Last split also includes the trailing 25% of that portion.
+                # +1 is added so that `< stop` can be used in `neigh_mat` without
+                # needing to check special cases.
+                previous_stop = sample_ranges[-1][1]
+                sample_ranges.append([previous_stop, n_all_spikes])
+            else:
+                # Otherwise, only assign spikes to the middle 50% of each portion
+                # of the index.
+                size = int((stop - start)*0.5)
+                previous_stop = sample_ranges[-1][1]
+                sample_ranges.append([previous_stop, previous_stop + size])
+
+    # Convert from subsampled indices back to full spike indices
+    sample_ranges = [(i*nskip, j*nskip) for i, j in sample_ranges]
+
+
+    
+    return sample_ranges
 
 
 def assign_mu(iclust, Xg, cols_mu, tones, nclust = None, lpow = 1):
