@@ -470,6 +470,13 @@ class BinaryRWFile:
         self.imax = total_samples if tmax==np.inf else min(int(tmax*fs), total_samples)
         self.n_batches = int(np.ceil(self.n_samples / self.NT))
 
+        # Check if last batch is too small. If so, drop those samples.
+        a, b = self.get_batch_edges(self.n_batches-1)
+        batch_size = int(b - a - self.nt)  # Unclear why this casts to float
+        if batch_size < self.nt:
+            self.n_batches -= 1
+            self.imax -= batch_size
+
         mode = 'w+' if write else 'r'
         # Must use total samples for file shape, otherwise the end of the data
         # gets cut off if tmin,tmax are set.
@@ -587,11 +594,7 @@ class BinaryRWFile:
 
         return tuple(new_idx)
 
-    def padded_batch_to_torch(self, ibatch, return_inds=False):
-        """ read batches from file """
-        if self.file is None:
-            raise ValueError('Binary file has been closed, data not accessible.')
-
+    def get_batch_edges(self, ibatch):
         if ibatch==0:
             bstart = self.imin
             bend = self.imin + self.NT + self.nt
@@ -602,6 +605,15 @@ class BinaryRWFile:
             ibatch = np.uint64(ibatch)
             bstart = np.uint64(self.imin + (ibatch * self.NT) - self.nt)
             bend = min(self.imax, np.uint64(bstart + self.NT + 2*self.nt))
+
+        return bstart, bend
+
+    def padded_batch_to_torch(self, ibatch, return_inds=False):
+        """ read batches from file """
+        if self.file is None:
+            raise ValueError('Binary file has been closed, data not accessible.')
+
+        bstart, bend = self.get_batch_edges(ibatch)
         data = self.file[bstart : bend]
         data = data.T
 
