@@ -12,49 +12,22 @@ from kilosort import hierarchical, swarmsplitter
 
 
 def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1):
-
-
-    # TODO: how to recombine? I guess we want a union of neighbors somehow...
-    #       I guess I would use the split indices to put the integer indices in
-    #       individual kns back into an absolute reference?
-    #       --->  No, that's not right, bc those are for Xd, subsampling messes that up.
-    #             Although, I guess I can just multiply by 25 first.
-    #       --->  Regardless, need to know when the same neighbor shows up in
-    #             multiple kn.
-    #       --->  Also, a simple union would result in more than n_neigh
-    #             neighbors. Is that a problem?
-    #       --->  Potential problems with too few spikes after splitting? I.e.
-    #             extreme case for illustration, if there are only 10 spikes then
-    #             those will be the 10 neighbors, but might not be anything alike.
-
-    #        Actually a lot of this doesn't matter now that I know I'm splitting
-    #        things up wrong. Each spike only searches one index, can just
-    #        concatenate the kns, then form the M as normal. Still need to shift
-    #        indices in kn by offset of each chunk.
-
-
-    # TODO: remove me! THIS IS ONLY HERE FOR TESTING
-    n_splits = 10
-
-
     # Xd is spikes by PCA features in a local neighborhood. Want to find n_neigh
     # neighbors of each spike to a subset of every nskip spikes, subsampling the
     # feature matrix 
     index_spikes = Xd[::nskip]
+    # n_samples is the number of spikes, dim is number of features,
+    # n_nodes is the number of subsampled spikes
+    n_samples, dim = Xd.shape
+    n_nodes = list(index_spikes.shape)[0]
     # Split index spikes into multiple sets in time, so that only spikes that
     # are close together in time can be neighbors. This improves clustering
     # accuracy for long recordings, when waveform shapes may change over time.
     all_Xsub, splits = split_data(index_spikes, n_splits)
-    sample_ranges = map_to_index(splits, nskip)
+    sample_ranges = map_to_index(splits, nskip, list(Xd.shape)[0])
 
     all_kn = []
     for Xsub, (start, stop) in zip(all_Xsub, sample_ranges):
-        # n_samples is the number of spikes, dim is number of features
-        n_samples, dim = Xd.shape
-
-        # n_nodes are the # subsampled spikes
-        n_nodes = Xsub.shape[0]
-
         # Only search spikes that are assigned to this portion of the index.
         search_spikes = Xd[start:stop, ...]
         # search is much faster if array is contiguous
@@ -67,6 +40,8 @@ def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1):
         _, kn = index.search(search_spikes, n_neigh)     # actual search
         all_kn.append(kn)
 
+    # Combine neighbors from split indices for form one big graph.
+    kn = np.concatenate(all_kn)
     # create sparse matrix version of kn with ones where the neighbors are
     # M is n_samples by n_nodes
     dexp = np.ones(kn.shape, np.float32)    
@@ -76,10 +51,6 @@ def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1):
 
     # self connections are set to 0!
     M[np.arange(0,n_samples,nskip), np.arange(n_nodes)] = 0
-
-    
-    # TODO: when this is all working, also get some kind of matplotlib visualization
-    #       up to make sure splits are working correctly.
 
     return kn, M
 
@@ -126,7 +97,7 @@ def map_to_index(splits,  nskip, n_all_spikes):
                 # +1 is added so that `< stop` can be used in `neigh_mat` without
                 # needing to check special cases.
                 previous_stop = sample_ranges[-1][1]
-                sample_ranges.append([previous_stop, n_all_spikes])
+                sample_ranges.append([previous_stop, 0])  # changed after loop
             else:
                 # Otherwise, only assign spikes to the middle 50% of each portion
                 # of the index.
@@ -135,9 +106,8 @@ def map_to_index(splits,  nskip, n_all_spikes):
                 sample_ranges.append([previous_stop, previous_stop + size])
 
     # Convert from subsampled indices back to full spike indices
-    sample_ranges = [(i*nskip, j*nskip) for i, j in sample_ranges]
-
-
+    sample_ranges = [[i*nskip, j*nskip] for i, j in sample_ranges]
+    sample_ranges[-1][1] = n_all_spikes
     
     return sample_ranges
 
