@@ -99,8 +99,38 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
 
     Returns
     -------
-    ops, st, clu, tF, Wall, similar_templates, is_ref, est_contam_rate, kept_spikes
-        Description TODO
+    ops : dict
+        Dictionary storing settings and results for all algorithmic steps.
+    st : np.ndarray
+        3-column array of peak time (in samples), template, and amplitude for
+        each spike.
+    clu : np.ndarray
+        1D vector of cluster ids indicating which spike came from which cluster,
+        same shape as `st[:,0]`.
+    tF : torch.Tensor
+        PC features for each spike, with shape
+        (n_spikes, nearest_chans, n_pcs)
+    Wall : torch.Tensor
+        PC feature representation of spike waveforms for each cluster, with shape
+        (n_clusters, n_channels, n_pcs).
+    similar_templates : np.ndarray.
+        Similarity score between each pair of clusters, computed as correlation
+        between clusters. Shape (n_clusters, n_clusters).
+    is_ref : np.ndarray.
+        1D boolean array with shape (n_clusters,) indicating whether each
+        cluster is refractory.
+    est_contam_rate : np.ndarray.
+        Contamination rate for each cluster, computed as fraction of refractory
+        period violations relative to expectation based on a Poisson process.
+        Shape (n_clusters,).
+    kept_spikes : np.ndarray.
+        Boolean mask with shape (n_spikes,) that is False for spikes that were
+        removed by `kilosort.postprocessing.remove_duplicate_spikes`
+        and True otherwise.
+
+    Notes
+    -----
+    For documentation of saved files, see `kilosort.io.save_to_phy`.
 
     """
 
@@ -447,8 +477,12 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
     Returns
     -------
     ops : dict
+        Dictionary storing settings and results for all algorithmic steps.
     bfile : kilosort.io.BinaryFiltered
         Wrapped file object for handling data.
+    st0 : np.ndarray.
+        Intermediate spike times variable with 6 columns. This is only used
+        for generating the 'Drift Scatter' plot through the GUI.
     
     """
 
@@ -493,7 +527,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
 
 
 def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
-    """Run spike sorting algorithm and save intermediate results to `ops`.
+    """Detect spikes via template deconvolution.
     
     Parameters
     ----------
@@ -511,14 +545,17 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
     Returns
     -------
     st : np.ndarray
-        1D vector of spike times for all clusters.
+        3-column array of peak time (in samples), template, and amplitude for
+        each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st`.
-    tF : np.ndarray
-        TODO
-    Wall : np.ndarray
-        TODO
+    tF : torch.Tensor
+        PC features for each spike, with shape
+        (n_spikes, nearest_chans, n_pcs)
+    Wall : torch.Tensor
+        PC feature representation of spike waveforms for each cluster, with shape
+        (n_clusters, n_channels, n_pcs).
 
     """
 
@@ -564,6 +601,37 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None):
 
 
 def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None):
+    """Cluster spikes using graph-based methods.
+    
+    Parameters
+    ----------
+    st : np.ndarray
+        3-column array of peak time (in samples), template, and amplitude for
+        each spike.
+    tF : torch.Tensor
+        PC features for each spike, with shape
+        (n_spikes, nearest_chans, n_pcs)
+    ops : dict
+        Dictionary storing settings and results for all algorithmic steps.
+    device : torch.device
+        Indicates whether `pytorch` operations should be run on cpu or gpu.
+    bfile : kilosort.io.BinaryFiltered
+        Wrapped file object for handling data.
+    tic0 : float; default=np.nan.
+        Start time of `run_kilosort`.
+    progress_bar : TODO; optional.
+        Informs `tqdm` package how to report progress, type unclear.
+
+    Returns
+    -------
+    clu : np.ndarray
+        1D vector of cluster ids indicating which spike came from which cluster,
+        same shape as `st`.
+    Wall : torch.Tensor
+        PC feature representation of spike waveforms for each cluster, with shape
+        (n_clusters, n_channels, n_pcs).
+    
+    """
     tic = time.time()
     logger.info(' ')
     logger.info('Final clustering')
@@ -603,21 +671,25 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     results_dir : pathlib.Path
         Directory where results should be saved.
     st : np.ndarray
-        1D vector of spike times for all clusters.
+        3-column array of peak time (in samples), template, and amplitude for
+        each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
-        same shape as `st`.
-    tF : np.ndarray
-        TODO
-    Wall : np.ndarray
-        TODO
+        same shape as `st[:,0]`.
+    tF : torch.Tensor
+        PC features for each spike, with shape
+        (n_spikes, nearest_chans, n_pcs)
+    Wall : torch.Tensor
+        PC feature representation of spike waveforms for each cluster, with shape
+        (n_clusters, n_channels, n_pcs).
     imin : int
         Minimum sample index used by BinaryRWFile, exported spike times will
         be shifted forward by this number.
     tic0 : float; default=np.nan.
         Start time of `run_kilosort`.
     save_extra_vars : bool; default=False.
-        If True, save tF and Wall to disk after sorting.
+        If True, save tF and Wall to disk along with copies of st, clu and
+        amplitudes with no postprocessing applied.
     save_preprocessed_copy : bool; default=False.
         If True, save a pre-processed copy of the data (including drift
         correction) to `temp_wh.dat` in the results directory and format Phy
@@ -626,11 +698,26 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     Returns
     -------
     ops : dict
-    similar_templates : np.ndarray
-    is_ref : np.ndarray
-    est_contam_rate : np.ndarray
-    kept_spikes : np.ndarray
-    
+        Dictionary storing settings and results for all algorithmic steps.
+    similar_templates : np.ndarray.
+        Similarity score between each pair of clusters, computed as correlation
+        between clusters. Shape (n_clusters, n_clusters).
+    is_ref : np.ndarray.
+        1D boolean array with shape (n_clusters,) indicating whether each
+        cluster is refractory.
+    est_contam_rate : np.ndarray.
+        Contamination rate for each cluster, computed as fraction of refractory
+        period violations relative to expectation based on a Poisson process.
+        Shape (n_clusters,).
+    kept_spikes : np.ndarray.
+        Boolean mask with shape (n_spikes,) that is False for spikes that were
+        removed by `kilosort.postprocessing.remove_duplicate_spikes`
+        and True otherwise.
+
+    Notes
+    -----
+    For documentation of saved files, see `kilosort.io.save_to_phy`.
+
     """
 
     logger.info(' ')
