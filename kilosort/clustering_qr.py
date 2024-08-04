@@ -182,11 +182,11 @@ def Mstats(M, device=torch.device('cuda')):
     return m, ki, kj
 
 
-def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200, 
-            seed = 1, niter = 200, lam = 0, device=torch.device('cuda')):    
+def cluster(Xd, iclust=None, kn=None, nskip=20, n_neigh=10, nclust=200, seed=1,
+            niter=200, lam=0, n_splits=1, device=torch.device('cuda')):    
 
     if kn is None:
-        kn, M = neigh_mat(Xd, nskip = nskip, n_neigh = n_neigh)
+        kn, M = neigh_mat(Xd, nskip=nskip, n_neigh=n_neigh, n_splits=n_splits)
 
     m, ki, kj = Mstats(M, device=device)
 
@@ -381,6 +381,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     dmin = ops['dmin']
     dminx = ops['dminx']
     nskip = ops['settings']['cluster_downsampling']
+    n_splits = ops['settings']['cluster_splits']
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
@@ -427,8 +428,10 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
                     st0 = None
 
                 # find new clusters
-                iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
-                                                        seed=5, device=device)
+                iclust, iclust0, M, iclust_init = cluster(
+                    Xd, nskip=nskip, lam=1, seed=5, n_splits=n_splits,
+                    device=device
+                    )
 
                 xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
