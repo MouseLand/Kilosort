@@ -55,7 +55,11 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         if self.qt_settings.contains('auto_load'):
             auto_load = self.qt_settings.value('auto_load')
-            if auto_load.lower() == 'false':
+            # Check for str and bool, seems like cache can store different types
+            # depending on Qt version or OS.
+            if isinstance(auto_load, str) and auto_load.lower() == 'false':
+                self.auto_load = False
+            elif isinstance(auto_load, bool) and auto_load is False:
                 self.auto_load = False
             else:
                 self.auto_load = True
@@ -64,7 +68,9 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         if self.qt_settings.contains('show_plots'):
             show_plots = self.qt_settings.value('show_plots')
-            if show_plots.lower() == 'false':
+            if isinstance(show_plots, str) and show_plots.lower() == 'false':
+                self.show_plots = False
+            elif isinstance(show_plots, bool) and show_plots is False:
                 self.show_plots = False
             else:
                 self.show_plots = True
