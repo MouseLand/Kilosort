@@ -46,7 +46,7 @@ If you have an older `kilosort` environment you can remove it with `conda env re
 2. Open an anaconda prompt / command prompt which has `conda` for **python 3** in the path
 3. Create a new environment with `conda create --name kilosort python=3.9`. Python 3.10 should work as well.
 4. To activate this new environment, run `conda activate kilosort`
-5. To install kilosort and the GUI, run `python -m pip install kilosort[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install 'kilosort[gui]'.
+5. To install kilosort and the GUI, run `python -m pip install kilosort[gui]`. If you're on a zsh server, you may need to use `python -m pip install "kilosort[gui]" `.
 6. Instead of 5, you can install the minimal version of kilosort with `python -m pip install kilosort`.  
 7. Next, if the CPU version of pytorch was installed (will happen on Windows), remove it with `pip uninstall torch`
 8. Then install the GPU version of pytorch `conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia`
