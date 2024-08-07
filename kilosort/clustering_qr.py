@@ -7,6 +7,7 @@ from scipy.signal import find_peaks
 from scipy.cluster.vq import kmeans
 import faiss
 from tqdm import tqdm 
+import gc
 
 from kilosort import hierarchical, swarmsplitter 
 
@@ -363,6 +364,9 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
                 # find new clusters
                 iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
                                                         seed=5, device=device)
+                # clear the GPU cache, this keeps the GPU reserved memory down
+                gc.collect()
+                torch.cuda.empty_cache()
 
                 xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
