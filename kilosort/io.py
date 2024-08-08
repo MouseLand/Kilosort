@@ -287,6 +287,8 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     channel_positions.npy : shape (n_channels,2)
         Same as probe['xc'] and probe['yc'], but combined in a single array.
         Indicates x- and y- positions (in microns) of probe contacts.
+    channel_shanks.npy : shape (n_channels,)
+        Indicates shank index for each channel on the probe.
     cluster_Amplitude.tsv : shape (n_templates,)
         Per-template amplitudes, computed as the L2 norm of the template.
     cluster_ContamPct.tsv : shape (n_templates,)
@@ -346,6 +348,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     channel_positions = np.stack((probe['xc'], probe['yc']), axis=-1)
     np.save((results_dir / 'channel_map.npy'), chan_map)
     np.save((results_dir / 'channel_positions.npy'), channel_positions)
+    np.save((results_dir / 'channel_shanks.npy'), probe['kcoords'])
 
     # whitening matrix
     whitening_mat = ops['Wrot']
