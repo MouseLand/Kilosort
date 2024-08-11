@@ -194,7 +194,8 @@ def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):
     yct = (cF0 * yy[:,xy[:,0]]).sum(0)
     return yct
 
-def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):        
+def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
+        clear_cache=False):        
     sig = ops['settings']['min_template_size']
     nsizes = ops['settings']['template_sizes'] 
 

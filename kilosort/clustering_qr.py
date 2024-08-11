@@ -1,3 +1,5 @@
+import gc
+
 import numpy as np
 import torch
 from torch import sparse_coo_tensor as coo
@@ -301,7 +303,8 @@ def y_centers(ops):
     return centers
 
 
-def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_bar=None):
+def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
+        progress_bar=None, clear_cache=False):
 
     if mode == 'template':
         xy, iC = xy_templates(ops)
@@ -362,11 +365,16 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
 
                 # find new clusters
                 iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
-                                                        seed=5, device=device)
+                                                          seed=5, device=device)
+                if clear_cache:
+                    gc.collect()
+                    torch.cuda.empty_cache()
 
                 xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
-                xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust, my_clus, meta = st0)
+                xtree, tstat = swarmsplitter.split(
+                    Xd.numpy(), xtree, tstat,iclust, my_clus, meta=st0
+                    )
 
                 iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
 
