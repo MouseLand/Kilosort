@@ -27,22 +27,25 @@ def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1):
     sample_ranges = map_to_index(splits, nskip, list(Xd.shape)[0])
 
     all_kn = []
-    for Xsub, (start, stop) in zip(all_Xsub, sample_ranges):
+    for Xsub, (start, stop), (i, _) in zip(all_Xsub, sample_ranges, splits):
         # Only search spikes that are assigned to this portion of the index.
         search_spikes = Xd[start:stop, ...]
         # search is much faster if array is contiguous
         search_spikes = np.ascontiguousarray(search_spikes)
 
-        # exact neighbor search ("brute force")
-        # results is dn and kn, kn is n_samples by n_neigh, contains integer indices into Xsub
-        index = faiss.IndexFlatL2(dim)   # build the index
-        index.add(Xsub)    # add vectors to the index
-        _, kn = index.search(search_spikes, n_neigh)     # actual search
+        # Exact neighbor search ("brute force")
+        # Result is dn and kn, kn is n_samples by n_neigh,
+        # contains integer indices into Xsub
+        index = faiss.IndexFlatL2(dim)                # build the index
+        index.add(Xsub)                               # add vectors to index
+        _, kn = index.search(search_spikes, n_neigh)  # actual search
+        # Shift indices by start of split to get absolute reference frame
+        kn += i
         all_kn.append(kn)
 
     # Combine neighbors from split indices for form one big graph.
     kn = np.concatenate(all_kn)
-    # create sparse matrix version of kn with ones where the neighbors are
+    # Create sparse matrix version of kn with ones where the neighbors are
     # M is n_samples by n_nodes
     dexp = np.ones(kn.shape, np.float32)    
     rows = np.tile(np.arange(n_samples)[:, np.newaxis], (1, n_neigh)).flatten()
@@ -54,9 +57,6 @@ def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1):
 
     return kn, M
 
-
-# TODO: I think I'm getting spike indices and spike times mixed up here, need
-#       to review both of these. Ugh.
 
 def split_data(data, n_splits):
     if n_splits == 1:
