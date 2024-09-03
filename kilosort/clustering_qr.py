@@ -212,7 +212,7 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda'), clea
         vexp0[ix] = vexp[ix,imax]
         iclust[ix] = j
 
-        if clear_cache:
+        if clear_cache and (Xg.element_size() * Xg.nelement() )/ (1024 ** 3) > 4: # we explicitly delete only if tensor is bigger than 4GB
             del vexp, dexp
 
     return iclust
