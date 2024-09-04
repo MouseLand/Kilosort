@@ -164,7 +164,13 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
 
 def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
     #Xg = torch.from_numpy(Xd).to(dev)    
-    vtot = (Xg**2).sum(1)
+    Xg_squared = Xg ** 2 
+    
+    vtot = Xg_squared.sum(1)
+    
+    del Xg_squared
+    gc.collect() 
+    torch.cuda.empty_cache()  
 
     n1 = vtot.shape[0]
     if n1 > 2**24:
@@ -199,7 +205,10 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
             isamp = torch.multinomial(v2, ntry)
         
         Xc = Xg[isamp]    
-        vexp = 2 * Xg @ Xc.T - (Xc**2).sum(1)
+        Xc_squared_sum = (Xc ** 2).sum(1)
+        vexp = Xg @ Xc.T
+        vexp.mul_(2)
+        vexp = vexp - Xc_squared_sum
         
         dexp = vexp - vexp0.unsqueeze(1)
         dexp = torch.relu(dexp)
