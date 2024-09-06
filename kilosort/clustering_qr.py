@@ -394,7 +394,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
 
                 # find new clusters
                 iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
-                                                          seed=5, device=device)
+                                                          seed=5, device=device, clear_cache=clear_cache)
                 if clear_cache:
                     gc.collect()
                     torch.cuda.empty_cache()
