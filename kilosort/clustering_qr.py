@@ -120,7 +120,7 @@ def Mstats(M, device=torch.device('cuda')):
 
 
 def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200, 
-            seed = 1, niter = 200, lam = 0, device=torch.device('cuda')):    
+            seed = 1, niter = 200, lam = 0, device=torch.device('cuda'), clear_cache=False):    
 
     if kn is None:
         kn, M = neigh_mat(Xd, nskip = nskip, n_neigh = n_neigh)
@@ -140,7 +140,7 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
     tones2 = torch.ones((NN, n_neigh), device = device)
 
     if iclust is None:
-        iclust_init =  kmeans_plusplus(Xg, niter = nclust, seed = seed, device=device)
+        iclust_init =  kmeans_plusplus(Xg, niter = nclust, seed = seed, device=device, clear_cache=clear_cache)
         iclust = iclust_init.clone()
     else:
         iclust_init = iclust.clone()
@@ -162,15 +162,16 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
     return iclust, isub, M, iclust_init
 
 
-def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
+def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda'), clear_cache=False):
     #Xg = torch.from_numpy(Xd).to(dev)    
     Xg_squared = Xg ** 2 
     
     vtot = Xg_squared.sum(1)
-    
-    del Xg_squared
-    gc.collect() 
-    torch.cuda.empty_cache()  
+
+    if clear_cache:
+        del Xg_squared
+        gc.collect() 
+        torch.cuda.empty_cache()  
 
     n1 = vtot.shape[0]
     if n1 > 2**24:
