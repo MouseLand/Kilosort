@@ -120,15 +120,13 @@ def Mstats(M, device=torch.device('cuda')):
 
 
 def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200, 
-            seed = 1, niter = 200, lam = 0, device=torch.device('cuda'), clear_cache=False):    
+            seed = 1, niter = 200, lam = 0, device=torch.device('cuda')):    
 
     if kn is None:
         kn, M = neigh_mat(Xd, nskip = nskip, n_neigh = n_neigh)
 
     m, ki, kj = Mstats(M, device=device)
 
-    #Xg = torch.from_numpy(Xd).to(dev)
-    Xg = Xd.to(device)
     kn = torch.from_numpy(kn).to(device)
 
     n_neigh = kn.shape[1]
@@ -140,7 +138,7 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
     tones2 = torch.ones((NN, n_neigh), device = device)
 
     if iclust is None:
-        iclust_init =  kmeans_plusplus(Xg, niter = nclust, seed = seed, device=device, clear_cache=clear_cache)
+        iclust_init =  kmeans_plusplus(Xd, niter = nclust, seed = seed, device=device)
         iclust = iclust_init.clone()
     else:
         iclust_init = iclust.clone()
@@ -162,10 +160,12 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
     return iclust, isub, M, iclust_init
 
 
-def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda'), clear_cache=False):
-    #Xg = torch.from_numpy(Xd).to(dev)    
-    Xg_squared = (Xg ** 2).cpu()
-    vtot = Xg_squared.sum(1).to(Xg.device)
+def kmeans_plusplus(Xd, niter = 200, seed = 1, device=torch.device('cuda')):
+    
+    Xg = Xd.to(device)
+
+    Xd_squared = (Xd ** 2)
+    vtot = Xd_squared.sum(1).to(device)
 
     n1 = vtot.shape[0]
     if n1 > 2**24:
@@ -388,7 +388,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
 
                 # find new clusters
                 iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
-                                                          seed=5, device=device, clear_cache=clear_cache)
+                                                          seed=5, device=device)
                 if clear_cache:
                     gc.collect()
                     torch.cuda.empty_cache()
