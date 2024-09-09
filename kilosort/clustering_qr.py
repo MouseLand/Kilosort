@@ -11,7 +11,7 @@ from tqdm import tqdm
 from kilosort import hierarchical, swarmsplitter 
 
 
-def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1):
+def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1, overlap=0.5):
     # Xd is spikes by PCA features in a local neighborhood. Want to find n_neigh
     # neighbors of each spike to a subset of every nskip spikes, subsampling the
     # feature matrix 
@@ -23,7 +23,7 @@ def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1):
     # Split index spikes into multiple sets in time, so that only spikes that
     # are close together in time can be neighbors. This improves clustering
     # accuracy for long recordings, when waveform shapes may change over time.
-    all_Xsub, splits = split_data(index_spikes, n_splits)
+    all_Xsub, splits = split_data(index_spikes, n_splits, overlap=overlap)
     sample_ranges = map_to_index(splits, nskip, list(Xd.shape)[0])
 
     all_kn = []
@@ -58,7 +58,7 @@ def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1):
     return kn, M
 
 
-def split_data(data, n_splits):
+def split_data(data, n_splits, overlap):
     if n_splits == 1:
         # Use all spikes for a single index
         split_data = [data]
@@ -68,12 +68,22 @@ def split_data(data, n_splits):
         # Splits index spikes into 2*n_splits - 1 chunks, where the additional
         # chunks are overlapping offsets.
         n_spikes = list(data.size())[0]
-        chunk_size = n_spikes // n_splits
+        chunk_size = int(n_spikes / ((1-overlap)*n_splits + overlap))
+        # Increment split indices based on chunk size and proportion of overlap
+        # such that there are equal size splits with even spacing.
         splits = [
-            [i*(chunk_size//2), (i+2)*(chunk_size//2)]
-            for i in range(2*n_splits-1)
+            [int(i*(1-overlap)*chunk_size), int(i*(1-overlap)*chunk_size) + chunk_size]
+            for i in range(n_splits)
             ]
-        # Make sure last split goes to end of data.
+
+        # n_spikes = list(data.size())[0]
+        # chunk_size = n_spikes // n_splits
+        # splits = [
+        #     [i*(chunk_size//2), (i+2)*(chunk_size//2)]
+        #     for i in range(2*n_splits-1)
+        #     ]
+
+        # Make sure last split goes to end of data, can be off from rounding.
         splits[-1][1] = n_spikes
         split_data = [np.ascontiguousarray(data[s[0]:s[1], ...]) for s in splits]
 
