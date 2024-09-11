@@ -130,7 +130,7 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
     kn = torch.from_numpy(kn).to(device)
 
     n_neigh = kn.shape[1]
-    NN, nfeat = Xg.shape
+    NN, nfeat = Xd.shape
     nsub = (NN-1)//nskip + 1
 
     rows_neigh = torch.arange(NN, device = device).unsqueeze(-1).tile((1,n_neigh))
