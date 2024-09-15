@@ -255,6 +255,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.header_box.reset_gui_button.clicked.connect(self.reset_gui)
         self.settings_box.settingsUpdated.connect(self.load_data)
         self.settings_box.previewProbe.connect(self.probe_view_box.preview_probe)
+        self.settings_box.previewProbe.connect(self.set_parameters)
         # Don't allow spike sorting to run until new data has actually
         # been loaded.
         self.settings_box.dataChanged.connect(self.disable_run)

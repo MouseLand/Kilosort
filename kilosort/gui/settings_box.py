@@ -515,7 +515,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             ]
         for k, v in self.settings.items():
             if v is None and k not in none_allowed:
-                print(f'`None` not allowed for parameter {k}.')
+                logger.info(f'`None` not allowed for parameter {k}.')
                 return False
         return True
     
@@ -549,7 +549,10 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     @QtCore.Slot()
     def show_probe_layout(self):
-        self.previewProbe.emit(self.get_probe_template_args())
+        if self.check_settings:
+            self.previewProbe.emit(self.get_probe_template_args())
+        else:
+            logger.info("Cannot preview probe layout, invalid settings.")
 
     @QtCore.Slot(str)
     def on_probe_layout_selected(self, name):
