@@ -378,9 +378,18 @@ EXTRA_PARAMETERS = {
             Number of non-overlapping portions to split spike data into when
             clustering. Using `cluster_splits > 1` will force the search for
             nearest neighbors to only match spikes within a smaller temporal
-            window instead of the entire recording. The actual window size will
-            be roughly (recording duration) / (2*cluster_splits - 1), depending
-            on how spike times are distributed.
+            window instead of the entire recording, where adjacent windows
+            overlap according to `cluster_overlap`.
+            """
+    },
+
+    'cluster_overlap': {
+        'gui_name': 'cluster overlap', 'type': float, 'min': 0, 'max': 1,
+        'exclude': [0,1], 'default': 0.5, 'step': 'clustering',
+        'description':
+            """
+            Proportion of overlap between subsequent splits when
+            `cluster_splits > 1`.
             """
     },
 

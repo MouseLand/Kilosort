@@ -98,22 +98,23 @@ def map_to_index(splits,  nskip, n_all_spikes):
         # For first and last split, need to include leading and ending quarter.
         # For all others, only include middle half.
         sample_ranges = []
-        for i, (start, stop) in enumerate(splits):
-            if i == 0:
-                # First split also includes the leading 25% of that portion.
-                sample_ranges.append([0, int(stop*0.75)])
-            elif i == (len(splits) - 1):
-                # Last split also includes the trailing 25% of that portion.
-                # +1 is added so that `< stop` can be used in `neigh_mat` without
-                # needing to check special cases.
-                previous_stop = sample_ranges[-1][1]
-                sample_ranges.append([previous_stop, 0])  # changed after loop
+        for k, _ in enumerate(splits):
+
+            if k == 0:
+                i = 0
             else:
-                # Otherwise, only assign spikes to the middle 50% of each portion
-                # of the index.
-                size = int((stop - start)*0.5)
-                previous_stop = sample_ranges[-1][1]
-                sample_ranges.append([previous_stop, previous_stop + size])
+                # Start from the end of the previous range
+                i = sample_ranges[-1][1]
+            
+            # Stop at midpoint between end of this split and start of next split.
+            stop = splits[k][1]
+            if k == len(splits) -1:
+                j = stop
+            else:
+                next_start = splits[k+1][0]
+                j = int(next_start + (stop - next_start)/2)
+            
+            sample_ranges.append([i, j])
 
     # Convert from subsampled indices back to full spike indices
     sample_ranges = [[i*nskip, j*nskip] for i, j in sample_ranges]
@@ -193,10 +194,11 @@ def Mstats(M, device=torch.device('cuda')):
 
 
 def cluster(Xd, iclust=None, kn=None, nskip=20, n_neigh=10, nclust=200, seed=1,
-            niter=200, lam=0, n_splits=1, device=torch.device('cuda')):    
+            niter=200, lam=0, n_splits=1, overlap=0.5, device=torch.device('cuda')):    
 
     if kn is None:
-        kn, M = neigh_mat(Xd, nskip=nskip, n_neigh=n_neigh, n_splits=n_splits)
+        kn, M = neigh_mat(Xd, nskip=nskip, n_neigh=n_neigh, n_splits=n_splits,
+                          overlap=overlap)
 
     m, ki, kj = Mstats(M, device=device)
 
@@ -392,6 +394,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     dminx = ops['dminx']
     nskip = ops['settings']['cluster_downsampling']
     n_splits = ops['settings']['cluster_splits']
+    overlap = ops['settings']['cluster_overlap']
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
@@ -440,7 +443,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
                 # find new clusters
                 iclust, iclust0, M, iclust_init = cluster(
                     Xd, nskip=nskip, lam=1, seed=5, n_splits=n_splits,
-                    device=device
+                    overlap=overlap, device=device
                     )
 
                 xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
