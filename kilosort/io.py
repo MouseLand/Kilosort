@@ -30,7 +30,7 @@ def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
                 + list(data_dir.glob('*.dat')) + list(data_dir.glob('*.raw'))
     if len(filenames) == 0:
         raise FileNotFoundError(
-            'No binary file found in folder. Expected extensions are:\n'
+            f'No binary file found in {data_dir}. Expected extensions are:\n'
             '*.bin, *.bat, *.dat, or *.raw.'
             )
 
