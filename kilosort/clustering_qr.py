@@ -1,4 +1,5 @@
 import gc
+import logging
 
 import numpy as np
 import torch
@@ -10,7 +11,10 @@ from scipy.cluster.vq import kmeans
 import faiss
 from tqdm import tqdm 
 
-from kilosort import hierarchical, swarmsplitter 
+from kilosort import hierarchical, swarmsplitter
+from kilosort.utils import log_performance
+
+logger = logging.getLogger(__name__)
 
 
 def neigh_mat(Xd, nskip=10, n_neigh=30):
@@ -364,12 +368,15 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                    mininterval=10 if progress_bar else None):
         for jj in np.arange(len(xcent)):
             # Get data for all templates that were closest to this x,y center.
-            ii = ii = kk + jj*ycent.size
+            ii = kk + jj*ycent.size
             ix = (minimum_distance == ii)
             Xd, ch_min, ch_max, igood  = get_data_cpu(
                 ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj], dmin=dmin,
                 dminx=dminx, ix=ix
                 )
+
+            if ii % 10 == 0:
+                log_performance(logger, header=f'Cluster center: {ii}')
 
             if Xd is None:
                 nearby_chans_empty += 1

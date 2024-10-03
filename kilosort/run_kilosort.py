@@ -21,6 +21,7 @@ from kilosort import (
     PROBE_DIR
 )
 from kilosort.parameters import DEFAULT_SETTINGS
+from kilosort.utils import log_performance, log_cuda_details
 
 
 def run_kilosort(settings, probe=None, probe_name=None, filename=None,
@@ -465,6 +466,8 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     logger.debug(f'hp_filter shape: {hp_filter.shape}')
     logger.debug(f'whiten_mat shape: {whiten_mat.shape}')
 
+    log_performance(logger, 'info', 'Resource usage after preprocessing')
+
     return ops
 
 
@@ -536,6 +539,9 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         artifact_threshold=artifact, shift=shift, scale=scale,
         file_object=file_object
         )
+
+    log_performance(logger, 'info', 'Resource usage after drift correction')
+    log_cuda_details(logger)
 
     return ops, bfile, st
 
@@ -617,6 +623,9 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.debug(f'iCC shape: {ops["iCC"].shape}')
     logger.debug(f'iU shape: {ops["iU"].shape}')
 
+    log_performance(logger, 'info', 'Resource usage after spike detection')
+    log_cuda_details(logger)
+
     return st, tF, Wall, clu
 
 
@@ -679,6 +688,9 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.debug(f'Wall shape: {Wall.shape}')
 
     bfile.close()
+
+    log_performance(logger, 'info', 'Resource usage after clustering')
+    log_cuda_details(logger)
 
     return clu, Wall
 
@@ -765,6 +777,9 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     ops['runtime'] = runtime 
     io.save_ops(ops, results_dir)
     logger.info(f'Sorting output saved in: {results_dir}.')
+
+    log_performance(logger, 'info', 'Resource usage after saving')
+    log_cuda_details(logger)
 
     return ops, similar_templates, is_ref, est_contam_rate, kept_spikes
 

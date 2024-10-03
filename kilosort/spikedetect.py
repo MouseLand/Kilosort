@@ -9,7 +9,7 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import TruncatedSVD
 from tqdm import tqdm
 
-from kilosort.utils import template_path
+from kilosort.utils import template_path, log_performance
 
 device = torch.device('cuda')
 
@@ -248,8 +248,11 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     s = StringIO()
     for ibatch in tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
                         mininterval=60 if progress_bar else None):
-        X = bfile.padded_batch_to_torch(ibatch, ops)
+        
+        if ibatch % 100 == 0:
+            log_performance(logger, 'debug', f'Batch {ibatch}')
 
+        X = bfile.padded_batch_to_torch(ibatch, ops)
         xy, imax, amp, adist = template_match(X, ops, iC, iC2, weigh, device=device)
         yct = yweighted(yc, iC, adist, xy, device=device)
         nsp = len(xy)
@@ -274,6 +277,8 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
         if progress_bar is not None:
             progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
             
+    log_performance(logger, 'debug', f'Batch {ibatch}')
+
     st = st[:k]
     tF = tF[:k]
     ops['iC'] = iC
