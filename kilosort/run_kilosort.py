@@ -230,7 +230,12 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                 save_extra_vars=save_extra_vars,
                 save_preprocessed_copy=save_preprocessed_copy
                 )
-    except:
+    except Exception as e:
+        if isinstance(e, torch.cuda.OutOfMemoryError):
+            logger.exception('Out of memory error, printing performance...')
+            log_performance(logger, level='info')
+            log_cuda_details(logger)
+
         # This makes sure the full traceback is written to log file.
         logger.exception('Encountered error in `run_kilosort`:')
         # Annoyingly, this will print the error message twice for console, but

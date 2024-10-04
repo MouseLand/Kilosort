@@ -1,5 +1,7 @@
 from io import StringIO
+import os
 import logging
+import warnings
 logger = logging.getLogger(__name__)
 
 from torch.nn.functional import max_pool2d, avg_pool2d, conv1d, max_pool1d
@@ -10,8 +12,6 @@ from sklearn.decomposition import TruncatedSVD
 from tqdm import tqdm
 
 from kilosort.utils import template_path, log_performance
-
-device = torch.device('cuda')
 
 
 def my_max2d(X, dt):
@@ -72,9 +72,16 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, Th_single_ch=6, nskip=25,
     model = TruncatedSVD(n_components=ops['settings']['n_pcs']).fit(clips)
     wPCA = torch.from_numpy(model.components_).to(device).float()
 
-    model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
-    wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
-    wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="")
+        # Prevents memory leak for KMeans when using MKL on Windows
+        msg = 'KMeans is known to have a memory leak on Windows with MKL'
+        nthread = os.environ.get('OMP_NUM_THREADS', msg)
+        os.environ['OMP_NUM_THREADS'] = '7'
+        model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
+        wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
+        wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
+        os.environ['OMP_NUM_THREADS'] = nthread
 
     return wPCA, wTEMP
 
