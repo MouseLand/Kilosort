@@ -1,0 +1,37 @@
+name: kilosort
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.9.*
+  - pip
+  - psutil
+  - numpy>=1.20.0,<2.0.0
+  - scipy
+  - scikit-learn
+  - tqdm
+  - numba
+  - faiss-cpu
+  - libblas=*=*mkl
+  - pytest
+  # CUDA
+  - pytorch-cuda=11.8
+  - pytorch
+  - pynvml
+  # GUI
+  - matplotlib
+  - pip:
+    - pyqtgraph>=0.13.0
+    - qtpy
+    - pyqt6
+    - pyqt6.sip
+
+
+# TODO first thing tomorrow, create fresh env from this now that I've made all
+# the adjustments. Goal is should only need to do the following:
+# ```
+# conda create -f environment.yml
+# conda activate kilosort
+# pip install -e .
+# ```

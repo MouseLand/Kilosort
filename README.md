@@ -102,18 +102,12 @@ phy template-gui params.py
 
 ## Developer instructions
 
-To get the most up-to-date changes to the code, clone the repository and install in editable mode in your Kilosort environment, along with the other installation steps mentioned above.
+To get the most up-to-date changes to the code, clone the repository and install in editable mode in your Kilosort environment, along with the other installation steps mentioned above. Using the included `environment.yml` to create your environment is recommended, which will also install pytest and the cuda version of Pytorch.
 ~~~
 git clone git@github.com:MouseLand/Kilosort.git
+conda env create -f environment.yml
 conda activate kilosort
 pip install -e Kilosort[gui]
-pip uninstall torch
-conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia
-~~~
-
-For unit testing, you will need to install pytest
-~~~
-pip install pytest
 ~~~
 
 Then run all tests with:
