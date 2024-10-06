@@ -28,7 +28,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dir=None, file_object=None, results_dir=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False, clear_cache=False,
-                 save_preprocessed_copy=False, bad_channels=None):
+                 save_preprocessed_copy=False, bad_channels=None,
+                 verbose_console=False):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -97,6 +98,10 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         A list of channel indices (rows in the binary file) that should not be
         included in sorting. Listing channels here is equivalent to excluding
         them from the probe dictionary.
+    verbose_console : bool; default=False.
+        If True, set logging level for console output to `DEBUG` instead
+        of `INFO`, so that additional information normally only saved to the
+        log file will also show up in real time while sorting.
     
     Raises
     ------
@@ -152,7 +157,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     # NOTE: This modifies settings in-place
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir, bad_channels)
-    setup_logger(results_dir)
+    setup_logger(results_dir, verbose_console=verbose_console)
 
     try:
         logger.info(f"Kilosort version {kilosort.__version__}")
@@ -305,7 +310,7 @@ def set_files(settings, filename, probe, probe_name,
     return filename, data_dir, results_dir, probe
 
 
-def setup_logger(results_dir):
+def setup_logger(results_dir, verbose_console=False):
     # Adapted from
     # https://docs.python.org/2/howto/logging-cookbook.html#logging-to-multiple-destinations
     # In summary: only send logging.debug statements to log file, not console.
@@ -319,7 +324,10 @@ def setup_logger(results_dir):
 
     # define a Handler which writes INFO messages or higher to the sys.stderr
     console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
+    if verbose_console:
+        console.setLevel(logging.DEBUG)
+    else:
+        console.setLevel(logging.INFO)
     # set a format which is simpler for console use
     console_formatter = logging.Formatter('%(name)-12s: %(message)s')
     console.setFormatter(console_formatter)

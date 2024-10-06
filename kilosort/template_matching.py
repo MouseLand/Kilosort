@@ -31,40 +31,48 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     st = np.zeros((10**6, 3), 'float64')
     tF  = torch.zeros((10**6, nC , ops['settings']['n_pcs']))
     k = 0
-    for ibatch in tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
-                        mininterval=60 if progress_bar else None):
-        if ibatch % 100 == 0:
-            log_performance(logger, 'debug', f'Batch {ibatch}')
+    prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
+                mininterval=60 if progress_bar else None)
+    
+    try:
+        for ibatch in prog:
+            if ibatch % 100 == 0:
+                log_performance(logger, 'debug', f'Batch {ibatch}')
 
-        X = bfile.padded_batch_to_torch(ibatch, ops)
-        stt, amps, Xres = run_matching(ops, X, U, ctc, device=device)
-        xfeat = Xres[iCC[:, iU[stt[:,1:2]]],stt[:,:1] + tiwave] @ ops['wPCA'].T
-        xfeat += amps * Ucc[:,stt[:,1]]
+            X = bfile.padded_batch_to_torch(ibatch, ops)
+            stt, amps, Xres = run_matching(ops, X, U, ctc, device=device)
+            xfeat = Xres[iCC[:, iU[stt[:,1:2]]],stt[:,:1] + tiwave] @ ops['wPCA'].T
+            xfeat += amps * Ucc[:,stt[:,1]]
 
-        if ibatch == 0:
-            # Can sometimes get negative spike times for first batch since
-            # we're aligning to nt0min, not nt//2, but these should be discarded.
-            neg_spikes = (stt[:,0] - nt - nt//2 + ops['nt0min']) < 0
-            stt = stt[~neg_spikes,:]
-            xfeat = xfeat[:,~neg_spikes,:]
-            amps = amps[~neg_spikes,:]
+            if ibatch == 0:
+                # Can sometimes get negative spike times for first batch since
+                # we're aligning to nt0min, not nt//2, but these should be discarded.
+                neg_spikes = (stt[:,0] - nt - nt//2 + ops['nt0min']) < 0
+                stt = stt[~neg_spikes,:]
+                xfeat = xfeat[:,~neg_spikes,:]
+                amps = amps[~neg_spikes,:]
 
-        nsp = len(stt) 
-        if k+nsp>st.shape[0]:                     
-            st = np.concatenate((st, np.zeros_like(st)), 0)
-            tF  = torch.cat((tF,  torch.zeros_like(tF)), 0)
+            nsp = len(stt) 
+            if k+nsp>st.shape[0]:                     
+                st = np.concatenate((st, np.zeros_like(st)), 0)
+                tF  = torch.cat((tF,  torch.zeros_like(tF)), 0)
 
-        stt = stt.double()
-        st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['batch_size'])).cpu().numpy() - nt//2 + ops['nt0min']
-        st[k:k+nsp,1] = stt[:,1].cpu().numpy()
-        st[k:k+nsp,2] = amps[:,0].cpu().numpy()
-        
-        tF[k:k+nsp]  = xfeat.transpose(0,1).cpu()
+            stt = stt.double()
+            st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['batch_size'])).cpu().numpy() - nt//2 + ops['nt0min']
+            st[k:k+nsp,1] = stt[:,1].cpu().numpy()
+            st[k:k+nsp,2] = amps[:,0].cpu().numpy()
+            
+            tF[k:k+nsp]  = xfeat.transpose(0,1).cpu()
 
-        k+= nsp
-        
-        if progress_bar is not None:
-            progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
+            k+= nsp
+            
+            if progress_bar is not None:
+                progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
+    except:
+        logger.exception(f'Error in template_matching.extract on batch {ibatch}')
+        logger.debug(f'X shape: {X.shape}')
+        logger.debug(f'stt shape: {stt.shape}')
+        raise
 
     log_performance(logger, 'debug', f'Batch {ibatch}')
 

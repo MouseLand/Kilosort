@@ -363,62 +363,71 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
     nearby_chans_empty = 0
     nmax = 0
-
-    for kk in tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None,
-                   mininterval=10 if progress_bar else None):
-        for jj in np.arange(len(xcent)):
-            # Get data for all templates that were closest to this x,y center.
-            ii = kk + jj*ycent.size
-            ix = (minimum_distance == ii)
-            Xd, ch_min, ch_max, igood  = get_data_cpu(
-                ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj], dmin=dmin,
-                dminx=dminx, ix=ix
-                )
-
-            if ii % 10 == 0:
-                log_performance(logger, header=f'Cluster center: {ii}')
-
-            if Xd is None:
-                nearby_chans_empty += 1
-                continue
-            elif Xd.shape[0]<1000:
-                iclust = torch.zeros((Xd.shape[0],))
-            else:
-                if mode == 'template':
-                    st0 = st[igood,0]/ops['fs']
-                else:
-                    st0 = None
-
-                # find new clusters
-                iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
-                                                          seed=5, device=device)
-                if clear_cache:
-                    gc.collect()
-                    torch.cuda.empty_cache()
-
-                xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
-
-                xtree, tstat = swarmsplitter.split(
-                    Xd.numpy(), xtree, tstat,iclust, my_clus, meta=st0
+    prog = tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None,
+                mininterval=10 if progress_bar else None)
+    
+    try:
+        for kk in prog:
+            for jj in np.arange(len(xcent)):
+                # Get data for all templates that were closest to this x,y center.
+                ii = kk + jj*ycent.size
+                ix = (minimum_distance == ii)
+                Xd, ch_min, ch_max, igood  = get_data_cpu(
+                    ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj],
+                    dmin=dmin, dminx=dminx, ix=ix
                     )
 
-                iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
+                if ii % 10 == 0:
+                    log_performance(logger, header=f'Cluster center: {ii}')
 
-            clu[igood] = iclust + nmax
-            Nfilt = int(iclust.max() + 1)
-            nmax += Nfilt
+                if Xd is None:
+                    nearby_chans_empty += 1
+                    continue
+                elif Xd.shape[0]<1000:
+                    iclust = torch.zeros((Xd.shape[0],))
+                else:
+                    if mode == 'template':
+                        st0 = st[igood,0]/ops['fs']
+                    else:
+                        st0 = None
 
-            # we need the new templates here         
-            W = torch.zeros((Nfilt, ops['Nchan'], ops['settings']['n_pcs']))
-            for j in range(Nfilt):
-                w = Xd[iclust==j].mean(0)
-                W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['n_pcs'])).cpu()
-            
-            Wall = torch.cat((Wall, W), 0)
+                    # find new clusters
+                    iclust, iclust0, M, _ = cluster(
+                        Xd, nskip=nskip, lam=1, seed=5, device=device
+                        )
+                    if clear_cache:
+                        gc.collect()
+                        torch.cuda.empty_cache()
 
-            if progress_bar is not None:
-                progress_bar.emit(int((kk+1) / len(ycent) * 100))
-            
+                    xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
+
+                    xtree, tstat = swarmsplitter.split(
+                        Xd.numpy(), xtree, tstat,iclust, my_clus, meta=st0
+                        )
+
+                    iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
+
+                clu[igood] = iclust + nmax
+                Nfilt = int(iclust.max() + 1)
+                nmax += Nfilt
+
+                # we need the new templates here         
+                W = torch.zeros((Nfilt, ops['Nchan'], ops['settings']['n_pcs']))
+                for j in range(Nfilt):
+                    w = Xd[iclust==j].mean(0)
+                    W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['n_pcs'])).cpu()
+                
+                Wall = torch.cat((Wall, W), 0)
+
+                if progress_bar is not None:
+                    progress_bar.emit(int((kk+1) / len(ycent) * 100))
+    except:
+        logger.exception(f'Error in clustering_qr.run on center {ii}')
+        logger.debug(f'Xd shape: {Xd.shape}')
+        logger.debug(f'iclust shape: {iclust.shape}')
+        logger.debug(f'clu shape: {clu.shape}')
+        logger.debug(f'Nfilt: {Nfilt}')
+        raise
 
     if nearby_chans_empty == len(ycent):
         raise ValueError(

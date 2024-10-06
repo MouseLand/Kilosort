@@ -253,37 +253,43 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     nt = ops['nt']
     tarange = torch.arange(-(nt//2),nt//2+1, device = device)
     s = StringIO()
+    prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
+                mininterval=60 if progress_bar else None)
     logger.info('Detecting spikes...')
-    for ibatch in tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
-                        mininterval=60 if progress_bar else None):
-        
-        if ibatch % 100 == 0:
-            log_performance(logger, 'debug', f'Batch {ibatch}')
+    try:
+        for ibatch in prog:
+            if ibatch % 100 == 0:
+                log_performance(logger, 'debug', f'Batch {ibatch}')
 
-        X = bfile.padded_batch_to_torch(ibatch, ops)
-        xy, imax, amp, adist = template_match(X, ops, iC, iC2, weigh, device=device)
-        yct = yweighted(yc, iC, adist, xy, device=device)
-        nsp = len(xy)
+            X = bfile.padded_batch_to_torch(ibatch, ops)
+            xy, imax, amp, adist = template_match(X, ops, iC, iC2, weigh, device=device)
+            yct = yweighted(yc, iC, adist, xy, device=device)
+            nsp = len(xy)
 
-        if k+nsp>st.shape[0]    :
-            st = np.concatenate((st, np.zeros_like(st)), 0)
-            tF = np.concatenate((tF, np.zeros_like(tF)), 0)
+            if k+nsp>st.shape[0]    :
+                st = np.concatenate((st, np.zeros_like(st)), 0)
+                tF = np.concatenate((tF, np.zeros_like(tF)), 0)
 
-        xsub = X[iC[:,xy[:,:1]], xy[:,1:2] + tarange]
-        xfeat = xsub @ ops['wPCA'].T
-        tF[k:k+nsp] = xfeat.transpose(0,1).cpu().numpy()
+            xsub = X[iC[:,xy[:,:1]], xy[:,1:2] + tarange]
+            xfeat = xsub @ ops['wPCA'].T
+            tF[k:k+nsp] = xfeat.transpose(0,1).cpu().numpy()
 
-        st[k:k+nsp,0] = ((xy[:,1].cpu().numpy()-nt)/ops['fs'] + ibatch * (ops['batch_size']/ops['fs']))
-        st[k:k+nsp,1] = yct.cpu().numpy()
-        st[k:k+nsp,2] = amp.cpu().numpy()
-        st[k:k+nsp,3] = imax.cpu().numpy()
-        st[k:k+nsp,4] = ibatch
-        st[k:k+nsp,5] = xy[:,0].cpu().numpy()
+            st[k:k+nsp,0] = ((xy[:,1].cpu().numpy()-nt)/ops['fs'] + ibatch * (ops['batch_size']/ops['fs']))
+            st[k:k+nsp,1] = yct.cpu().numpy()
+            st[k:k+nsp,2] = amp.cpu().numpy()
+            st[k:k+nsp,3] = imax.cpu().numpy()
+            st[k:k+nsp,4] = ibatch
+            st[k:k+nsp,5] = xy[:,0].cpu().numpy()
 
-        k = k + nsp
-        
-        if progress_bar is not None:
-            progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
+            k = k + nsp
+            
+            if progress_bar is not None:
+                progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
+    except:
+        logger.exception(f'Error in spikedetect.run on batch {ibatch}')
+        logger.debug(f'X shape: {X.shape}')
+        logger.debug(f'xy shape: {xy.shape}')
+        raise
             
     log_performance(logger, 'debug', f'Batch {ibatch}')
 
