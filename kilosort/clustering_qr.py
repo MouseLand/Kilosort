@@ -326,6 +326,24 @@ def y_centers(ops):
     return centers
 
 
+def get_nearest_centers(xy, xcent, ycent):
+    # Get positions of all grouping centers
+    ycent_pos, xcent_pos = np.meshgrid(ycent, xcent)
+    ycent_pos = torch.from_numpy(ycent_pos.flatten())
+    xcent_pos = torch.from_numpy(xcent_pos.flatten())
+    # Compute distances from templates
+    center_distance = (
+        (xy[0,:] - xcent_pos.unsqueeze(-1))**2
+        + (xy[1,:] - ycent_pos.unsqueeze(-1))**2
+        )
+    # Add some randomness in case of ties
+    center_distance += 1e-20*torch.rand(center_distance.shape)
+    # Get flattened index of x-y center that is closest to template
+    minimum_distance = torch.min(center_distance, 0).indices
+
+    return minimum_distance
+
+
 def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
         progress_bar=None, clear_cache=False):
 
@@ -344,20 +362,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
-
-    # Get positions of all grouping centers
-    ycent_pos, xcent_pos = np.meshgrid(ycent, xcent)
-    ycent_pos = torch.from_numpy(ycent_pos.flatten())
-    xcent_pos = torch.from_numpy(xcent_pos.flatten())
-    # Compute distances from templates
-    center_distance = (
-        (xy[0,:] - xcent_pos.unsqueeze(-1))**2
-        + (xy[1,:] - ycent_pos.unsqueeze(-1))**2
-        )
-    # Add some randomness in case of ties
-    center_distance += 1e-20*torch.rand(center_distance.shape)
-    # Get flattened index of x-y center that is closest to template
-    minimum_distance = torch.min(center_distance, 0).indices
+    nearest_center = get_nearest_centers(xy, xcent, ycent)
     
     clu = np.zeros(nsp, 'int32')
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
@@ -371,7 +376,10 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
             for jj in np.arange(len(xcent)):
                 # Get data for all templates that were closest to this x,y center.
                 ii = kk + jj*ycent.size
-                ix = (minimum_distance == ii)
+                if ii not in nearest_center:
+                    # No templates are nearest to this center, skip it.
+                    continue
+                ix = (nearest_center == ii)
                 Xd, ch_min, ch_max, igood  = get_data_cpu(
                     ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj],
                     dmin=dmin, dminx=dminx, ix=ix

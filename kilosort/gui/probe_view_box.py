@@ -1,9 +1,10 @@
 from qtpy import QtCore, QtWidgets
 import numpy as np
 import pyqtgraph as pg
+import torch
 
 from kilosort.spikedetect import template_centers, nearest_chans
-from kilosort.clustering_qr import x_centers, y_centers
+from kilosort.clustering_qr import x_centers, y_centers, get_nearest_centers
 from kilosort.gui.logger import setup_logger
 
 
@@ -29,8 +30,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.yc = None
         self.xcup = None
         self.ycup = None
-        self.xcent_pos = None
-        self.ycent_pos = None
+        self.center_positions = None
         self.total_channels = None
         self.channel_map = None
         self.channel_map_dict = {}
@@ -87,7 +87,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.xc, self.yc = probe['xc'], probe['yc']
         if self.template_toggle.isChecked() or self.center_toggle.isChecked():
             self.xcup, self.ycup, self.ops = self.get_template_spots(*template_args)
-            self.xcent_pos, self.ycent_pos = self.get_center_spots()
+            self.center_positions = self.get_center_spots()
 
         # Change xc, yc back to original probe for plotting all channels.
         self.xc, self.yc = self.active_layout["xc"], self.active_layout["yc"]
@@ -121,12 +121,20 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     def get_center_spots(self):
         ycent = y_centers(self.ops)
         xcent = x_centers(self.ops)
+        xy = np.vstack((self.ops['xcup'], self.ops['ycup']))
+        xy = torch.from_numpy(xy)
+        nearest_center = get_nearest_centers(xy, xcent, ycent)
 
-        ycent_pos, xcent_pos = np.meshgrid(ycent, xcent)
-        ycent_pos = ycent_pos.flatten()
-        xcent_pos = xcent_pos.flatten()
+        center_positions = []
+        for kk in np.arange(len(ycent)):
+            for jj in np.arange(len(xcent)):
+                ii = kk + jj*ycent.size
+                if ii in nearest_center:
+                    center_positions.append((xcent[jj], ycent[kk]))
+                else:
+                    continue
 
-        return xcent_pos, ycent_pos
+        return center_positions
 
     @QtCore.Slot()
     def refresh_plot(self):
@@ -180,11 +188,11 @@ class ProbeViewBox(QtWidgets.QGroupBox):
                     })
         self.template_spots = template_spots
 
-        if self.xcent_pos is not None:
+        if self.center_positions is not None:
             size = 20 * self.spot_scale.value()/4
             symbol = "o"
             color = "y"
-            for x, y in zip(self.xcent_pos, self.ycent_pos):
+            for x, y in self.center_positions:
                 pen = pg.mkPen(color=color)
                 brush = None
                 center_spots.append({
