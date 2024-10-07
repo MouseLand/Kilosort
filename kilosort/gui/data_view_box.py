@@ -9,7 +9,6 @@ logger = setup_logger(__name__)
 
 class DataViewBox(QtWidgets.QGroupBox):
     channelChanged = QtCore.Signal(int, int)
-    modeChanged = QtCore.Signal(str, int)
     updateContext = QtCore.Signal(object)
     intervalUpdated = QtCore.Signal()
 
