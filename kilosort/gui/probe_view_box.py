@@ -32,7 +32,6 @@ class ProbeViewBox(QtWidgets.QGroupBox):
             "export": False
         }
 
-        self.active_data_view_mode = "colormap"
 
     def setup(self):
         self.aspect_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
@@ -212,10 +211,6 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     def reset(self):
         self.clear_plot()
         self.reset_current_probe_layout()
-        self.reset_active_data_view_mode()
-
-    def reset_active_data_view_mode(self):
-        self.active_data_view_mode = "colormap"
 
     def reset_current_probe_layout(self):
         self.active_layout = None
