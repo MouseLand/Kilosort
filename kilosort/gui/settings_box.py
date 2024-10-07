@@ -22,7 +22,7 @@ _ALLOWED_FILE_TYPES = ['.bin', '.dat', '.bat', '.raw']  # For binary data
 
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.Signal()
-    previewProbe = QtCore.Signal(object)
+    previewProbe = QtCore.Signal()
     dataChanged = QtCore.Signal()
 
     def __init__(self, parent):
@@ -550,7 +550,7 @@ class SettingsBox(QtWidgets.QGroupBox):
     @QtCore.Slot()
     def show_probe_layout(self):
         if self.check_settings:
-            self.previewProbe.emit(self.get_probe_template_args())
+            self.previewProbe.emit()
         else:
             logger.info("Cannot preview probe layout, invalid settings.")
 
@@ -702,7 +702,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         # Trigger update so that probe layout in main gets updated, then
         # refresh probe view.
         self.update_settings()
-        self.previewProbe.emit(self.get_probe_template_args)
+        self.previewProbe.emit()
 
 
     def on_data_dtype_selected(self, data_dtype):

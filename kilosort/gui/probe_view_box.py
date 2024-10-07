@@ -24,19 +24,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.spot_scale = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.setup()
 
-        self.active_layout = None
-        self.kcoords = None
-        self.xc = None
-        self.yc = None
-        self.xcup = None
-        self.ycup = None
-        self.center_positions = None
-        self.total_channels = None
-        self.channel_map = None
-        self.channel_map_dict = {}
-        self.channel_spots = None
-        self.template_spots = None
-        self.center_spots = None
+        self.reset_spots_variables()
 
         self.sorting_status = {
             "preprocess": False,
@@ -48,18 +36,18 @@ class ProbeViewBox(QtWidgets.QGroupBox):
 
     def setup(self):
         self.aspect_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.aspect_toggle.stateChanged.connect(self.refresh_plot)
+        self.aspect_toggle.stateChanged.connect(self.set_layout)
         self.template_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.template_toggle.stateChanged.connect(self.refresh_plot)
+        self.template_toggle.stateChanged.connect(self.set_layout)
         self.center_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.center_toggle.stateChanged.connect(self.refresh_plot)
+        self.center_toggle.stateChanged.connect(self.set_layout)
 
         self.spot_scale.setMinimum(0)
         # Actually want 0 to 10 scaling, but these are multiplied by 4
         # to get 0.25 increments.
         self.spot_scale.setMaximum(40)
         self.spot_scale.setValue(4)
-        self.spot_scale.valueChanged.connect(self.refresh_plot)
+        self.spot_scale.valueChanged.connect(self.set_layout)
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(QtWidgets.QLabel('Left click to toggle excluded channels'))
@@ -70,21 +58,37 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         layout.addWidget(self.spot_scale)
         self.setLayout(layout)
 
+    def reset_spots_variables(self):
+        self.active_layout = None
+        self.kcoords = None
+        self.xc = None
+        self.yc = None
+        self.xcup = None
+        self.ycup = None
+        self.center_positions = None
+        self.total_channels = None
+        self.channel_spots = None
+        self.template_spots = None
+        self.center_spots = None
+        self.channel_map = None
+        self.channel_map_dict = {}
+
     def set_layout(self):
         self.probe_view.clear()
+        self.reset_spots_variables()
         probe = self.gui.settings_box.probe_layout  # original, no removed chans
         template_args = self.gui.settings_box.get_probe_template_args()
-        self.set_active_layout(probe, template_args)
-        self.update_probe_view()
+        self.update_spots_variables(probe, template_args)
+        self.create_plot()
 
-    def set_active_layout(self, probe, template_args):
+    def update_spots_variables(self, probe, template_args):
         self.active_layout = probe
-        self.kcoords = self.active_layout["kcoords"]
         # Set xc, yc based on revised probe (with bad channels removed) for
         # determining template and center positions, since that's how they would
         # be placed during sorting.
         probe = self.gui.probe_layout
         self.xc, self.yc = probe['xc'], probe['yc']
+        self.kcoords = probe['kcoords']
         if self.template_toggle.isChecked() or self.center_toggle.isChecked():
             self.xcup, self.ycup, self.ops = self.get_template_spots(*template_args)
             self.center_positions = self.get_center_spots()
@@ -135,18 +139,6 @@ class ProbeViewBox(QtWidgets.QGroupBox):
                     continue
 
         return center_positions
-
-    @QtCore.Slot()
-    def refresh_plot(self):
-        template_args = self.gui.settings_box.get_probe_template_args()
-        self.preview_probe(template_args)
-
-    @QtCore.Slot(str, int)
-    def synchronize_data_view_mode(self, mode: str):
-        if self.active_data_view_mode != mode:
-            self.probe_view.clear()
-            self.update_probe_view()
-            self.active_data_view_mode = mode
 
     def change_sorting_status(self, status_dict):
         self.sorting_status = status_dict
@@ -200,18 +192,6 @@ class ProbeViewBox(QtWidgets.QGroupBox):
                     'symbol': symbol
                 })
         self.center_spots = center_spots
-
-
-    @QtCore.Slot(int, int)
-    def update_probe_view(self):
-        self.create_plot()
-
-    @QtCore.Slot(object)
-    def preview_probe(self, template_args):
-        self.probe_view.clear()
-        probe = self.gui.settings_box.probe_layout
-        self.set_active_layout(probe, template_args)
-        self.create_plot()
 
     def create_plot(self):
         self.generate_spots_list()
@@ -271,4 +251,4 @@ class ProbeViewBox(QtWidgets.QGroupBox):
             bad_channels.append(channel)
         self.gui.settings_box.set_bad_channels(bad_channels)
 
-        self.refresh_plot()        
+        self.set_layout()
