@@ -23,6 +23,11 @@ from kilosort import (
 from kilosort.parameters import DEFAULT_SETTINGS
 from kilosort.utils import log_performance, log_cuda_details
 
+RECOGNIZED_SETTINGS = list(DEFAULT_SETTINGS.keys())
+RECOGNIZED_SETTINGS.extend([
+    'filename', 'data_dir', 'results_dir', 'probe_name', 'probe_path'
+])
+
 
 def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dir=None, file_object=None, results_dir=None,
@@ -367,6 +372,18 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
             """
         warnings.warn(msg, DeprecationWarning)
     dup_bins = int(settings['duplicate_spike_ms'] * (settings['fs']/1000))
+
+    # Raise an error if there are unrecognized settings entries to make users
+    # aware if they've made a typo, are using a deprecated setting, etc.
+    unrecognized = []
+    for k, _ in settings.items():
+        if k not in RECOGNIZED_SETTINGS:
+            unrecognized.append(k)
+    if len(unrecognized) > 0:
+        logger.info('Unrecognized keys found in `settings`')
+        logger.info('See `kilosort.run_kilosort.RECOGNIZED_SETTINGS`')
+        raise ValueError(f'Unrecognized settings: {unrecognized}')
+
 
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
     ops = settings  
