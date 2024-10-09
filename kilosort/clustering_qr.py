@@ -481,7 +481,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
 
                     # find new clusters
                     iclust, iclust0, M, _ = cluster(
-                        Xd, nskip=nskip, lam=1, seed=5, n_splits=n_splits, overlap=overlap device=device
+                        Xd, nskip=nskip, lam=1, seed=5, n_splits=n_splits,
+                        overlap=overlap, device=device
                         )
                     if clear_cache:
                         gc.collect()
