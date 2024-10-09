@@ -82,13 +82,6 @@ def split_data(data, n_splits, overlap):
             for i in range(n_splits)
             ]
 
-        # n_spikes = list(data.size())[0]
-        # chunk_size = n_spikes // n_splits
-        # splits = [
-        #     [i*(chunk_size//2), (i+2)*(chunk_size//2)]
-        #     for i in range(2*n_splits-1)
-        #     ]
-
         # Make sure last split goes to end of data, can be off from rounding.
         splits[-1][1] = n_spikes
         split_data = [np.ascontiguousarray(data[s[0]:s[1], ...]) for s in splits]
