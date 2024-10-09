@@ -24,6 +24,9 @@ class RunBox(QtWidgets.QGroupBox):
         self.run_all_button = QtWidgets.QPushButton("Run")
         self.spike_sort_button = QtWidgets.QPushButton("Spikesort")
         self.save_preproc_check = QtWidgets.QCheckBox("Save Preprocessed Copy")
+        self.clear_cache_check = QtWidgets.QCheckBox("Clear PyTorch Cache")
+        self.do_CAR_check = QtWidgets.QCheckBox("CAR")
+        self.invert_sign_check = QtWidgets.QCheckBox("Invert Sign")
 
         self.buttons = [
             self.run_all_button
@@ -44,7 +47,7 @@ class RunBox(QtWidgets.QGroupBox):
         self.remote_widgets = None
 
         self.progress_bar = QtWidgets.QProgressBar()
-        self.layout.addWidget(self.progress_bar, 3, 0, 2, 2)
+        self.layout.addWidget(self.progress_bar, 5, 0, 3, 4)
 
         self.setup()
 
@@ -64,8 +67,36 @@ class RunBox(QtWidgets.QGroupBox):
             """
         self.save_preproc_check.setToolTip(preproc_text)
 
-        self.layout.addWidget(self.run_all_button, 0, 0, 2, 2)
-        self.layout.addWidget(self.save_preproc_check, 2, 0, 1, 2)
+        self.clear_cache_check.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        cache_text = """
+            If enabled, force pytorch to free up memory reserved for its cache in
+            between memory-intensive operations.
+            Note that setting `clear_cache=True` is NOT recommended unless you
+            encounter GPU out-of-memory errors, since this can result in slower
+            sorting.
+            """
+        self.clear_cache_check.setToolTip(cache_text)
+
+        self.do_CAR_check.setCheckState(QtCore.Qt.CheckState.Checked)
+        car_text = """
+            If enabled, apply common average reference during preprocessing
+            (recommended).
+            """
+        self.do_CAR_check.setToolTip(car_text)
+
+        self.invert_sign_check.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        invert_sign_text = """
+            If enabled, flip positive/negative values in data to conform to
+            standard expected by Kilosort4. This is NOT recommended unless you
+            know your data is using the opposite sign.
+            """
+        self.invert_sign_check.setToolTip(invert_sign_text)
+
+        self.layout.addWidget(self.run_all_button, 0, 0, 3, 4)
+        self.layout.addWidget(self.save_preproc_check, 3, 0, 1, 2)
+        self.layout.addWidget(self.clear_cache_check, 3, 2, 1, 2)
+        self.layout.addWidget(self.do_CAR_check, 4, 0, 1, 2)
+        self.layout.addWidget(self.invert_sign_check, 4, 2, 1, 2)
         
         self.setLayout(self.layout)
 

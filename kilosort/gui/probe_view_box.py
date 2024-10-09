@@ -1,9 +1,10 @@
 from qtpy import QtCore, QtWidgets
 import numpy as np
 import pyqtgraph as pg
+import torch
 
 from kilosort.spikedetect import template_centers, nearest_chans
-from kilosort.clustering_qr import x_centers, y_centers
+from kilosort.clustering_qr import x_centers, y_centers, get_nearest_centers
 from kilosort.gui.logger import setup_logger
 
 
@@ -23,20 +24,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.spot_scale = QtWidgets.QSlider(QtCore.Qt.Horizontal)
         self.setup()
 
-        self.active_layout = None
-        self.kcoords = None
-        self.xc = None
-        self.yc = None
-        self.xcup = None
-        self.ycup = None
-        self.xcent_pos = None
-        self.ycent_pos = None
-        self.total_channels = None
-        self.channel_map = None
-        self.channel_map_dict = {}
-        self.channel_spots = None
-        self.template_spots = None
-        self.center_spots = None
+        self.reset_spots_variables()
 
         self.sorting_status = {
             "preprocess": False,
@@ -44,22 +32,21 @@ class ProbeViewBox(QtWidgets.QGroupBox):
             "export": False
         }
 
-        self.active_data_view_mode = "colormap"
 
     def setup(self):
         self.aspect_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.aspect_toggle.stateChanged.connect(self.refresh_plot)
+        self.aspect_toggle.stateChanged.connect(self.set_layout)
         self.template_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.template_toggle.stateChanged.connect(self.refresh_plot)
+        self.template_toggle.stateChanged.connect(self.set_layout)
         self.center_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.center_toggle.stateChanged.connect(self.refresh_plot)
+        self.center_toggle.stateChanged.connect(self.set_layout)
 
         self.spot_scale.setMinimum(0)
         # Actually want 0 to 10 scaling, but these are multiplied by 4
         # to get 0.25 increments.
         self.spot_scale.setMaximum(40)
         self.spot_scale.setValue(4)
-        self.spot_scale.valueChanged.connect(self.refresh_plot)
+        self.spot_scale.valueChanged.connect(self.set_layout)
 
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(QtWidgets.QLabel('Left click to toggle excluded channels'))
@@ -70,24 +57,40 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         layout.addWidget(self.spot_scale)
         self.setLayout(layout)
 
+    def reset_spots_variables(self):
+        self.active_layout = None
+        self.kcoords = None
+        self.xc = None
+        self.yc = None
+        self.xcup = None
+        self.ycup = None
+        self.center_positions = None
+        self.total_channels = None
+        self.channel_spots = None
+        self.template_spots = None
+        self.center_spots = None
+        self.channel_map = None
+        self.channel_map_dict = {}
+
     def set_layout(self):
         self.probe_view.clear()
+        self.reset_spots_variables()
         probe = self.gui.settings_box.probe_layout  # original, no removed chans
         template_args = self.gui.settings_box.get_probe_template_args()
-        self.set_active_layout(probe, template_args)
-        self.update_probe_view()
+        self.update_spots_variables(probe, template_args)
+        self.create_plot()
 
-    def set_active_layout(self, probe, template_args):
+    def update_spots_variables(self, probe, template_args):
         self.active_layout = probe
-        self.kcoords = self.active_layout["kcoords"]
         # Set xc, yc based on revised probe (with bad channels removed) for
         # determining template and center positions, since that's how they would
         # be placed during sorting.
         probe = self.gui.probe_layout
         self.xc, self.yc = probe['xc'], probe['yc']
+        self.kcoords = probe['kcoords']
         if self.template_toggle.isChecked() or self.center_toggle.isChecked():
             self.xcup, self.ycup, self.ops = self.get_template_spots(*template_args)
-            self.xcent_pos, self.ycent_pos = self.get_center_spots()
+            self.center_positions = self.get_center_spots()
 
         # Change xc, yc back to original probe for plotting all channels.
         self.xc, self.yc = self.active_layout["xc"], self.active_layout["yc"]
@@ -121,24 +124,20 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     def get_center_spots(self):
         ycent = y_centers(self.ops)
         xcent = x_centers(self.ops)
+        xy = np.vstack((self.ops['xcup'], self.ops['ycup']))
+        xy = torch.from_numpy(xy)
+        nearest_center = get_nearest_centers(xy, xcent, ycent)
 
-        ycent_pos, xcent_pos = np.meshgrid(ycent, xcent)
-        ycent_pos = ycent_pos.flatten()
-        xcent_pos = xcent_pos.flatten()
+        center_positions = []
+        for kk in np.arange(len(ycent)):
+            for jj in np.arange(len(xcent)):
+                ii = kk + jj*ycent.size
+                if ii in nearest_center:
+                    center_positions.append((xcent[jj], ycent[kk]))
+                else:
+                    continue
 
-        return xcent_pos, ycent_pos
-
-    @QtCore.Slot()
-    def refresh_plot(self):
-        template_args = self.gui.settings_box.get_probe_template_args()
-        self.preview_probe(template_args)
-
-    @QtCore.Slot(str, int)
-    def synchronize_data_view_mode(self, mode: str):
-        if self.active_data_view_mode != mode:
-            self.probe_view.clear()
-            self.update_probe_view()
-            self.active_data_view_mode = mode
+        return center_positions
 
     def change_sorting_status(self, status_dict):
         self.sorting_status = status_dict
@@ -180,11 +179,11 @@ class ProbeViewBox(QtWidgets.QGroupBox):
                     })
         self.template_spots = template_spots
 
-        if self.xcent_pos is not None:
+        if self.center_positions is not None:
             size = 20 * self.spot_scale.value()/4
             symbol = "o"
             color = "y"
-            for x, y in zip(self.xcent_pos, self.ycent_pos):
+            for x, y in self.center_positions:
                 pen = pg.mkPen(color=color)
                 brush = None
                 center_spots.append({
@@ -192,18 +191,6 @@ class ProbeViewBox(QtWidgets.QGroupBox):
                     'symbol': symbol
                 })
         self.center_spots = center_spots
-
-
-    @QtCore.Slot(int, int)
-    def update_probe_view(self):
-        self.create_plot()
-
-    @QtCore.Slot(object)
-    def preview_probe(self, template_args):
-        self.probe_view.clear()
-        probe = self.gui.settings_box.probe_layout
-        self.set_active_layout(probe, template_args)
-        self.create_plot()
 
     def create_plot(self):
         self.generate_spots_list()
@@ -224,10 +211,6 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     def reset(self):
         self.clear_plot()
         self.reset_current_probe_layout()
-        self.reset_active_data_view_mode()
-
-    def reset_active_data_view_mode(self):
-        self.active_data_view_mode = "colormap"
 
     def reset_current_probe_layout(self):
         self.active_layout = None
@@ -263,4 +246,4 @@ class ProbeViewBox(QtWidgets.QGroupBox):
             bad_channels.append(channel)
         self.gui.settings_box.set_bad_channels(bad_channels)
 
-        self.refresh_plot()        
+        self.set_layout()
