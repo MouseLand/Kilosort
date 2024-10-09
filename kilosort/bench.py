@@ -85,10 +85,10 @@ def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None)
   
     # high-pass filtering in the Fourier domain (much faster than filtfilt etc)
     if fwav is not None:
-        if isinstance(fwav, np.ndarray):
-            #fwav = torch.from_numpy(fwav).to(dev)
-            hp_filter = preprocessing.get_highpass_filter()
-            fwav = preprocessing.fft_highpass(hp_filter, X.shape[1])
+        # if isinstance(fwav, np.ndarray):
+        #     #fwav = torch.from_numpy(fwav).to(dev)
+        #     hp_filter = preprocessing.get_highpass_filter()
+        fwav = preprocessing.fft_highpass(fwav, X.shape[1])
         X = torch.real(ifft(fft(X) * torch.conj(fwav)))
         X = fftshift(X, dim = -1)
 
@@ -131,6 +131,11 @@ def avg_wav(filename, Wsub, nn, ops, ibatch, st_i, clu, Nfilt):
     return Wsub, nn
 
 def clu_ypos(filename, ops, st_i, clu):
+    # This got renamed, adding it this way so that old results can still be
+    # benchmarked.
+    if 'nwaves' not in ops:
+        ops['nwaves'] = ops['n_pcs']
+
     Nfilt = clu.max()+1
     Wsub = torch.zeros((Nfilt, ops['nwaves'], ops['Nchan']), device = dev)
     nn   = torch.zeros((Nfilt, ), device = dev)

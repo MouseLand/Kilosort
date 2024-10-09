@@ -17,40 +17,116 @@ from kilosort.utils import log_performance
 logger = logging.getLogger(__name__)
 
 
-def neigh_mat(Xd, nskip=10, n_neigh=30):
-    # Xd is spikes by PCA features in a local neighborhood
-    # finding n_neigh neighbors of each spike to a subset of every nskip spike
-
-    # subsampling the feature matrix 
-    Xsub = Xd[::nskip]
-
-    # n_samples is the number of spikes, dim is number of features
+def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1, overlap=0.5):
+    # Xd is spikes by PCA features in a local neighborhood. Want to find n_neigh
+    # neighbors of each spike to a subset of every nskip spikes, subsampling the
+    # feature matrix 
+    index_spikes = Xd[::nskip]
+    # n_samples is the number of spikes, dim is number of features,
+    # n_nodes is the number of subsampled spikes
     n_samples, dim = Xd.shape
+    n_nodes = list(index_spikes.shape)[0]
+    # Split index spikes into multiple sets in time, so that only spikes that
+    # are close together in time can be neighbors. This improves clustering
+    # accuracy for long recordings, when waveform shapes may change over time.
+    all_Xsub, splits = split_data(index_spikes, n_splits, overlap=overlap)
+    sample_ranges = map_to_index(splits, nskip, list(Xd.shape)[0])
 
-    # n_nodes are the # subsampled spikes
-    n_nodes = Xsub.shape[0]
+    all_kn = []
+    for Xsub, (start, stop), (i, _) in zip(all_Xsub, sample_ranges, splits):
+        # Only search spikes that are assigned to this portion of the index.
+        search_spikes = Xd[start:stop, ...]
+        # search is much faster if array is contiguous
+        search_spikes = np.ascontiguousarray(search_spikes)
 
-    # search is much faster if array is contiguous
-    Xd = np.ascontiguousarray(Xd)
-    Xsub = np.ascontiguousarray(Xsub)
+        # Exact neighbor search ("brute force")
+        # Result is dn and kn, kn is n_samples by n_neigh,
+        # contains integer indices into Xsub
+        index = faiss.IndexFlatL2(dim)                # build the index
+        index.add(Xsub)                               # add vectors to index
+        _, kn = index.search(search_spikes, n_neigh)  # actual search
+        # Shift indices by start of split to get absolute reference frame
+        kn += i
+        all_kn.append(kn)
 
-    # exact neighbor search ("brute force")
-    # results is dn and kn, kn is n_samples by n_neigh, contains integer indices into Xsub
-    index = faiss.IndexFlatL2(dim)   # build the index
-    index.add(Xsub)    # add vectors to the index
-    _, kn = index.search(Xd, n_neigh)     # actual search
-
-    # create sparse matrix version of kn with ones where the neighbors are
+    # Combine neighbors from split indices for form one big graph.
+    kn = np.concatenate(all_kn)
+    # Create sparse matrix version of kn with ones where the neighbors are
     # M is n_samples by n_nodes
     dexp = np.ones(kn.shape, np.float32)    
     rows = np.tile(np.arange(n_samples)[:, np.newaxis], (1, n_neigh)).flatten()
     M   = csr_matrix((dexp.flatten(), (rows, kn.flatten())),
-                   (kn.shape[0], n_nodes))
+                     (kn.shape[0], n_nodes))
 
     # self connections are set to 0!
     M[np.arange(0,n_samples,nskip), np.arange(n_nodes)] = 0
 
     return kn, M
+
+
+def split_data(data, n_splits, overlap):
+    if n_splits == 1:
+        # Use all spikes for a single index
+        split_data = [data]
+        splits = [(0,data.shape[0])]
+        chunk_size = data.shape[0]
+    else:
+        # Splits index spikes into 2*n_splits - 1 chunks, where the additional
+        # chunks are overlapping offsets.
+        n_spikes = list(data.size())[0]
+        chunk_size = int(n_spikes / ((1-overlap)*n_splits + overlap))
+        # Increment split indices based on chunk size and proportion of overlap
+        # such that there are equal size splits with even spacing.
+        splits = [
+            [int(i*(1-overlap)*chunk_size), int(i*(1-overlap)*chunk_size) + chunk_size]
+            for i in range(n_splits)
+            ]
+
+        # n_spikes = list(data.size())[0]
+        # chunk_size = n_spikes // n_splits
+        # splits = [
+        #     [i*(chunk_size//2), (i+2)*(chunk_size//2)]
+        #     for i in range(2*n_splits-1)
+        #     ]
+
+        # Make sure last split goes to end of data, can be off from rounding.
+        splits[-1][1] = n_spikes
+        split_data = [np.ascontiguousarray(data[s[0]:s[1], ...]) for s in splits]
+
+    return split_data, splits
+
+
+def map_to_index(splits,  nskip, n_all_spikes):
+    if len(splits) == 1:
+        # Only one split, all spikes get assigned to the only index.
+        sample_ranges = splits
+    else:
+        # For first and last split, need to include leading and ending quarter.
+        # For all others, only include middle half.
+        sample_ranges = []
+        for k, _ in enumerate(splits):
+
+            if k == 0:
+                i = 0
+            else:
+                # Start from the end of the previous range
+                i = sample_ranges[-1][1]
+            
+            # Stop at midpoint between end of this split and start of next split.
+            stop = splits[k][1]
+            if k == len(splits) -1:
+                j = stop
+            else:
+                next_start = splits[k+1][0]
+                j = int(next_start + (stop - next_start)/2)
+            
+            sample_ranges.append([i, j])
+
+    # Convert from subsampled indices back to full spike indices
+    sample_ranges = [[i*nskip, j*nskip] for i, j in sample_ranges]
+    sample_ranges[-1][1] = n_all_spikes
+    
+    return sample_ranges
 
 
 def assign_mu(iclust, Xg, cols_mu, tones, nclust = None, lpow = 1):
@@ -123,11 +199,12 @@ def Mstats(M, device=torch.device('cuda')):
     return m, ki, kj
 
 
-def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200, 
-            seed = 1, niter = 200, lam = 0, device=torch.device('cuda')):    
+def cluster(Xd, iclust=None, kn=None, nskip=20, n_neigh=10, nclust=200, seed=1,
+            niter=200, lam=0, n_splits=1, overlap=0.5, device=torch.device('cuda')):    
 
     if kn is None:
-        kn, M = neigh_mat(Xd, nskip = nskip, n_neigh = n_neigh)
+        kn, M = neigh_mat(Xd, nskip=nskip, n_neigh=n_neigh, n_splits=n_splits,
+                          overlap=overlap)
 
     m, ki, kj = Mstats(M, device=device)
 
@@ -233,6 +310,7 @@ def compute_score(mu, mu2, N, ccN, lam):
     return score
 
 
+# TODO: never used? delete this?
 def run_one(Xd, st0, nskip = 20, lam = 0):
     iclust, iclust0, M = cluster(Xd,nskip = nskip, lam = 0, seed = 5)
     xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
@@ -359,6 +437,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     dmin = ops['dmin']
     dminx = ops['dminx']
     nskip = ops['settings']['cluster_downsampling']
+    n_splits = ops['settings']['cluster_splits']
+    overlap = ops['settings']['cluster_overlap']
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
@@ -401,7 +481,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
 
                     # find new clusters
                     iclust, iclust0, M, _ = cluster(
-                        Xd, nskip=nskip, lam=1, seed=5, device=device
+                        Xd, nskip=nskip, lam=1, seed=5, n_splits=n_splits, overlap=overlap device=device
                         )
                     if clear_cache:
                         gc.collect()
