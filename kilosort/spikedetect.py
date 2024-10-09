@@ -253,9 +253,9 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     nt = ops['nt']
     tarange = torch.arange(-(nt//2),nt//2+1, device = device)
     s = StringIO()
+    logger.info('Detecting spikes...')
     prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
                 mininterval=60 if progress_bar else None)
-    logger.info('Detecting spikes...')
     try:
         for ibatch in prog:
             if ibatch % 100 == 0:
