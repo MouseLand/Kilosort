@@ -13,8 +13,8 @@ from kilosort.run_kilosort import (
     setup_logger, initialize_ops, compute_preprocessing, compute_drift_correction,
     detect_spikes, cluster_spikes, save_sorting
     )
-
 from kilosort.io import save_preprocessing
+from kilosort.utils import log_performance, log_cuda_details
 
 #logger = setup_logger(__name__)
 
@@ -52,16 +52,12 @@ class KiloSortWorker(QtCore.QThread):
             try:
                 logger.info(f"Kilosort version {kilosort.__version__}")
                 logger.info(f"Sorting {self.data_path}")
+                clear_cache = settings['clear_cache']
+                if clear_cache:
+                    logger.info('clear_cache=True')
                 logger.info('-'*40)
 
                 tic0 = time.time()
-
-                # TODO: make these options in GUI
-                do_CAR=True
-                invert_sign=False
-
-                if not do_CAR:
-                    logger.info("Skipping common average reference.")
 
                 if probe['chanMap'].max() >= settings['n_chan_bin']:
                     raise ValueError(
@@ -74,9 +70,13 @@ class KiloSortWorker(QtCore.QThread):
                 data_dtype = settings['data_dtype']
                 device = self.device
                 save_preprocessed_copy = settings['save_preprocessed_copy']
+                do_CAR = settings['do_CAR']
+                invert_sign = settings['invert_sign']
+                if not do_CAR:
+                    logger.info("Skipping common average reference.")
 
                 ops = initialize_ops(settings, probe, data_dtype, do_CAR,
-                                    invert_sign, device, save_preprocessed_copy)
+                                     invert_sign, device, save_preprocessed_copy)
                 # Remove some stuff that doesn't need to be printed twice,
                 # then pretty-print format for log file.
                 ops_copy = ops.copy()
@@ -94,7 +94,7 @@ class KiloSortWorker(QtCore.QThread):
                 torch.random.manual_seed(1)
                 ops, bfile, st0 = compute_drift_correction(
                     ops, self.device, tic0=tic0, progress_bar=self.progress_bar,
-                    file_object=self.file_object
+                    file_object=self.file_object, clear_cache=clear_cache
                     )
 
                 # Check scale of data for log file
@@ -113,7 +113,7 @@ class KiloSortWorker(QtCore.QThread):
                 # Sort spikes and save results
                 st, tF, Wall0, clu0 = detect_spikes(
                     ops, self.device, bfile, tic0=tic0,
-                    progress_bar=self.progress_bar
+                    progress_bar=self.progress_bar, clear_cache=clear_cache
                     )
 
                 self.Wall0 = Wall0
@@ -123,12 +123,16 @@ class KiloSortWorker(QtCore.QThread):
 
                 clu, Wall = cluster_spikes(
                     st, tF, ops, self.device, bfile, tic0=tic0,
-                    progress_bar=self.progress_bar
+                    progress_bar=self.progress_bar, clear_cache=clear_cache
                     )
                 ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
                     save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
 
-            except:
+            except Exception as e:
+                if isinstance(e, torch.cuda.OutOfMemoryError):
+                    logger.exception('Out of memory error, printing performance...')
+                    log_performance(logger, level='info')
+                    log_cuda_details(logger)
                 # This makes sure the full traceback is written to log file.
                 logger.exception('Encountered error in `run_kilosort`:')
                 # Annoyingly, this will print the error message twice for console

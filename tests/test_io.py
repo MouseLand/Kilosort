@@ -1,4 +1,4 @@
-import json
+import pytest
 import tempfile
 from pathlib import Path
 
@@ -61,6 +61,24 @@ channel_groups = {
         # Remove temporary files
         json_file.unlink()
         prb_file.unlink()
+
+
+def test_bad_channels():
+    probe = {
+        'xc': np.zeros(5), 'yc': np.arange(5)*10, 'kcoords': np.zeros(5),
+        'chanMap': np.arange(5), 'n_chan': 5
+        }
+    bad_channels = [2, 4]
+    probe2 = io.remove_bad_channels(probe, bad_channels)
+    assert probe2['n_chan'] == 3
+    for k in ['xc', 'yc', 'kcoords']:
+        assert probe2[k].size == 3
+    assert np.all(probe2['chanMap'] == [0, 1, 3])
+    assert np.all(probe['chanMap'] == [0, 1, 2, 3, 4])  # original unchanged
+
+    with pytest.raises(IndexError):
+        # These are not in the channel map.
+        _ = io.remove_bad_channels(probe, [5, 6])
 
 
 def test_bat_extension(torch_device, data_directory):

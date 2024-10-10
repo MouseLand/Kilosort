@@ -78,7 +78,7 @@ def data_directory(download, capture_mgr, gpu):
             binary_path.unlink()
     if not binary_path.is_file():
         with capture_mgr.global_and_fixture_disabled():
-            print('\nDownloading test data ...')
+            print(f'\nDownloading test data to {binary_path}...')
             download_data(binary_path, binary_url)
 
     if gpu:

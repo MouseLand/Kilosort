@@ -1,5 +1,7 @@
 from io import StringIO
+import os
 import logging
+import warnings
 logger = logging.getLogger(__name__)
 
 from torch.nn.functional import max_pool2d, avg_pool2d, conv1d, max_pool1d
@@ -9,9 +11,7 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import TruncatedSVD
 from tqdm import tqdm
 
-from kilosort.utils import template_path
-
-device = torch.device('cuda')
+from kilosort.utils import template_path, log_performance
 
 
 def my_max2d(X, dt):
@@ -72,9 +72,16 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, Th_single_ch=6, nskip=25,
     model = TruncatedSVD(n_components=ops['settings']['n_pcs']).fit(clips)
     wPCA = torch.from_numpy(model.components_).to(device).float()
 
-    model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
-    wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
-    wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="")
+        # Prevents memory leak for KMeans when using MKL on Windows
+        msg = 'KMeans is known to have a memory leak on Windows with MKL'
+        nthread = os.environ.get('OMP_NUM_THREADS', msg)
+        os.environ['OMP_NUM_THREADS'] = '7'
+        model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
+        wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
+        wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
+        os.environ['OMP_NUM_THREADS'] = nthread
 
     return wPCA, wTEMP
 
@@ -194,7 +201,8 @@ def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):
     yct = (cF0 * yy[:,xy[:,0]]).sum(0)
     return yct
 
-def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):        
+def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
+        clear_cache=False):        
     sig = ops['settings']['min_template_size']
     nsizes = ops['settings']['template_sizes'] 
 
@@ -245,34 +253,46 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None):
     nt = ops['nt']
     tarange = torch.arange(-(nt//2),nt//2+1, device = device)
     s = StringIO()
-    for ibatch in tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
-                        mininterval=60 if progress_bar else None):
-        X = bfile.padded_batch_to_torch(ibatch, ops)
+    logger.info('Detecting spikes...')
+    prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
+                mininterval=60 if progress_bar else None)
+    try:
+        for ibatch in prog:
+            if ibatch % 100 == 0:
+                log_performance(logger, 'debug', f'Batch {ibatch}')
 
-        xy, imax, amp, adist = template_match(X, ops, iC, iC2, weigh, device=device)
-        yct = yweighted(yc, iC, adist, xy, device=device)
-        nsp = len(xy)
+            X = bfile.padded_batch_to_torch(ibatch, ops)
+            xy, imax, amp, adist = template_match(X, ops, iC, iC2, weigh, device=device)
+            yct = yweighted(yc, iC, adist, xy, device=device)
+            nsp = len(xy)
 
-        if k+nsp>st.shape[0]    :
-            st = np.concatenate((st, np.zeros_like(st)), 0)
-            tF = np.concatenate((tF, np.zeros_like(tF)), 0)
+            if k+nsp>st.shape[0]    :
+                st = np.concatenate((st, np.zeros_like(st)), 0)
+                tF = np.concatenate((tF, np.zeros_like(tF)), 0)
 
-        xsub = X[iC[:,xy[:,:1]], xy[:,1:2] + tarange]
-        xfeat = xsub @ ops['wPCA'].T
-        tF[k:k+nsp] = xfeat.transpose(0,1).cpu().numpy()
+            xsub = X[iC[:,xy[:,:1]], xy[:,1:2] + tarange]
+            xfeat = xsub @ ops['wPCA'].T
+            tF[k:k+nsp] = xfeat.transpose(0,1).cpu().numpy()
 
-        st[k:k+nsp,0] = ((xy[:,1].cpu().numpy()-nt)/ops['fs'] + ibatch * (ops['batch_size']/ops['fs']))
-        st[k:k+nsp,1] = yct.cpu().numpy()
-        st[k:k+nsp,2] = amp.cpu().numpy()
-        st[k:k+nsp,3] = imax.cpu().numpy()
-        st[k:k+nsp,4] = ibatch
-        st[k:k+nsp,5] = xy[:,0].cpu().numpy()
+            st[k:k+nsp,0] = ((xy[:,1].cpu().numpy()-nt)/ops['fs'] + ibatch * (ops['batch_size']/ops['fs']))
+            st[k:k+nsp,1] = yct.cpu().numpy()
+            st[k:k+nsp,2] = amp.cpu().numpy()
+            st[k:k+nsp,3] = imax.cpu().numpy()
+            st[k:k+nsp,4] = ibatch
+            st[k:k+nsp,5] = xy[:,0].cpu().numpy()
 
-        k = k + nsp
-        
-        if progress_bar is not None:
-            progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
+            k = k + nsp
             
+            if progress_bar is not None:
+                progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
+    except:
+        logger.exception(f'Error in spikedetect.run on batch {ibatch}')
+        logger.debug(f'X shape: {X.shape}')
+        logger.debug(f'xy shape: {xy.shape}')
+        raise
+            
+    log_performance(logger, 'debug', f'Batch {ibatch}')
+
     st = st[:k]
     tF = tF[:k]
     ops['iC'] = iC

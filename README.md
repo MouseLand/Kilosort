@@ -46,7 +46,7 @@ If you have an older `kilosort` environment you can remove it with `conda env re
 2. Open an anaconda prompt / command prompt which has `conda` for **python 3** in the path
 3. Create a new environment with `conda create --name kilosort python=3.9`. Python 3.10 should work as well.
 4. To activate this new environment, run `conda activate kilosort`
-5. To install kilosort and the GUI, run `python -m pip install kilosort[gui]`. If you're on a zsh server, you may need to use ' ' around the kilosort[gui] call: `python -m pip install 'kilosort[gui]'.
+5. To install kilosort and the GUI, run `python -m pip install kilosort[gui]`. If you're on a zsh server, you may need to use `python -m pip install "kilosort[gui]" `.
 6. Instead of 5, you can install the minimal version of kilosort with `python -m pip install kilosort`.  
 7. Next, if the CPU version of pytorch was installed (will happen on Windows), remove it with `pip uninstall torch`
 8. Then install the GPU version of pytorch `conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia`
@@ -60,7 +60,7 @@ If step 8 does not work, you need to make sure the NVIDIA driver for your GPU is
 If pytorch installation still fails, follow the instructions [here](https://pytorch.org/get-started/locally/) to determine what version of pytorch to install. The Anaconda install is strongly recommended on Windows, and then choose the CUDA version that is supported by your GPU (newer GPUs may need newer CUDA versions > 10.2). For instance this command will install the 11.8 version on Linux and Windows (note the `torchvision` and `torchaudio` commands are removed because kilosort doesn't require them):
 
 ``
-conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia
+conda install pytorch pytorch-cuda=11.8 pynvml -c pytorch -c nvidia
 ``
 
 This [video](https://www.youtube.com/watch?v=gsixIQYvj3U) has step-by-step installation instructions for NVIDIA drivers and pytorch in Windows (ignore the environment creation step with the .yml file, we have an environment already, to activate it use `conda activate kilosort`).
@@ -102,18 +102,12 @@ phy template-gui params.py
 
 ## Developer instructions
 
-To get the most up-to-date changes to the code, clone the repository and install in editable mode in your Kilosort environment, along with the other installation steps mentioned above.
+To get the most up-to-date changes to the code, clone the repository and install in editable mode in your Kilosort environment, along with the other installation steps mentioned above. Using the included `environment.yml` to create your environment is recommended, which will also install pytest and the cuda version of Pytorch.
 ~~~
 git clone git@github.com:MouseLand/Kilosort.git
+conda env create -f environment.yml
 conda activate kilosort
 pip install -e Kilosort[gui]
-pip uninstall torch
-conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia
-~~~
-
-For unit testing, you will need to install pytest
-~~~
-pip install pytest
 ~~~
 
 Then run all tests with:

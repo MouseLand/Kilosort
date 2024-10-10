@@ -1,3 +1,6 @@
+import gc
+import logging
+
 import numpy as np
 import torch
 from torch import sparse_coo_tensor as coo
@@ -8,7 +11,10 @@ from scipy.cluster.vq import kmeans
 import faiss
 from tqdm import tqdm 
 
-from kilosort import hierarchical, swarmsplitter 
+from kilosort import hierarchical, swarmsplitter
+from kilosort.utils import log_performance
+
+logger = logging.getLogger(__name__)
 
 
 def neigh_mat(Xd, nskip=10, n_neigh=30):
@@ -164,6 +170,22 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
     #Xg = torch.from_numpy(Xd).to(dev)    
     vtot = (Xg**2).sum(1)
 
+    n1 = vtot.shape[0]
+    if n1 > 2**24:
+        # Need to subsample v2, torch.multinomial doesn't allow more than 2**24
+        # elements. We're just using this to sample some spikes, so it's fine to
+        # not use all of them.
+        n2 = n1 - 2**24   # number of spikes to remove before sampling
+        remove = np.round(np.linspace(0, n1-1, n2)).astype(int)
+        idx = np.ones(n1, dtype=bool)
+        idx[remove] = False
+        # Also need to map the indices from the subset back to indices for
+        # the full tensor.
+        rev_idx = idx.nonzero()[0]
+        subsample = True
+    else:
+        subsample = False
+
     torch.manual_seed(seed)
     np.random.seed(seed)
 
@@ -174,8 +196,11 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
 
     iclust = torch.zeros((NN,), dtype = torch.int, device = device)
     for j in range(niter):
-        v2 = torch.relu(vtot - vexp0) 
-        isamp = torch.multinomial(v2, ntry)
+        v2 = torch.relu(vtot - vexp0)
+        if subsample:
+            isamp = rev_idx[torch.multinomial(v2[idx], ntry)]
+        else:
+            isamp = torch.multinomial(v2, ntry)
         
         Xc = Xg[isamp]    
         vexp = 2 * Xg @ Xc.T - (Xc**2).sum(1)
@@ -301,7 +326,26 @@ def y_centers(ops):
     return centers
 
 
-def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_bar=None):
+def get_nearest_centers(xy, xcent, ycent):
+    # Get positions of all grouping centers
+    ycent_pos, xcent_pos = np.meshgrid(ycent, xcent)
+    ycent_pos = torch.from_numpy(ycent_pos.flatten())
+    xcent_pos = torch.from_numpy(xcent_pos.flatten())
+    # Compute distances from templates
+    center_distance = (
+        (xy[0,:] - xcent_pos.unsqueeze(-1))**2
+        + (xy[1,:] - ycent_pos.unsqueeze(-1))**2
+        )
+    # Add some randomness in case of ties
+    center_distance += 1e-20*torch.rand(center_distance.shape)
+    # Get flattened index of x-y center that is closest to template
+    minimum_distance = torch.min(center_distance, 0).indices
+
+    return minimum_distance
+
+
+def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
+        progress_bar=None, clear_cache=False):
 
     if mode == 'template':
         xy, iC = xy_templates(ops)
@@ -318,73 +362,80 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'), progress_b
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
-
-    # Get positions of all grouping centers
-    ycent_pos, xcent_pos = np.meshgrid(ycent, xcent)
-    ycent_pos = torch.from_numpy(ycent_pos.flatten())
-    xcent_pos = torch.from_numpy(xcent_pos.flatten())
-    # Compute distances from templates
-    center_distance = (
-        (xy[0,:] - xcent_pos.unsqueeze(-1))**2
-        + (xy[1,:] - ycent_pos.unsqueeze(-1))**2
-        )
-    # Add some randomness in case of ties
-    center_distance += 1e-20*torch.rand(center_distance.shape)
-    # Get flattened index of x-y center that is closest to template
-    minimum_distance = torch.min(center_distance, 0).indices
+    nearest_center = get_nearest_centers(xy, xcent, ycent)
     
     clu = np.zeros(nsp, 'int32')
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
     nearby_chans_empty = 0
     nmax = 0
+    prog = tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None,
+                mininterval=10 if progress_bar else None)
+    
+    try:
+        for kk in prog:
+            for jj in np.arange(len(xcent)):
+                # Get data for all templates that were closest to this x,y center.
+                ii = kk + jj*ycent.size
+                if ii not in nearest_center:
+                    # No templates are nearest to this center, skip it.
+                    continue
+                ix = (nearest_center == ii)
+                Xd, ch_min, ch_max, igood  = get_data_cpu(
+                    ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj],
+                    dmin=dmin, dminx=dminx, ix=ix
+                    )
 
-    for kk in tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None,
-                   mininterval=10 if progress_bar else None):
-        for jj in np.arange(len(xcent)):
-            # Get data for all templates that were closest to this x,y center.
-            ii = ii = kk + jj*ycent.size
-            ix = (minimum_distance == ii)
-            Xd, ch_min, ch_max, igood  = get_data_cpu(
-                ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj], dmin=dmin,
-                dminx=dminx, ix=ix
-                )
+                if ii % 10 == 0:
+                    log_performance(logger, header=f'Cluster center: {ii}')
 
-            if Xd is None:
-                nearby_chans_empty += 1
-                continue
-            elif Xd.shape[0]<1000:
-                iclust = torch.zeros((Xd.shape[0],))
-            else:
-                if mode == 'template':
-                    st0 = st[igood,0]/ops['fs']
+                if Xd is None:
+                    nearby_chans_empty += 1
+                    continue
+                elif Xd.shape[0]<1000:
+                    iclust = torch.zeros((Xd.shape[0],))
                 else:
-                    st0 = None
+                    if mode == 'template':
+                        st0 = st[igood,0]/ops['fs']
+                    else:
+                        st0 = None
 
-                # find new clusters
-                iclust, iclust0, M, iclust_init = cluster(Xd, nskip=nskip, lam=1,
-                                                        seed=5, device=device)
+                    # find new clusters
+                    iclust, iclust0, M, _ = cluster(
+                        Xd, nskip=nskip, lam=1, seed=5, device=device
+                        )
+                    if clear_cache:
+                        gc.collect()
+                        torch.cuda.empty_cache()
 
-                xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
+                    xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
-                xtree, tstat = swarmsplitter.split(Xd.numpy(), xtree, tstat, iclust, my_clus, meta = st0)
+                    xtree, tstat = swarmsplitter.split(
+                        Xd.numpy(), xtree, tstat,iclust, my_clus, meta=st0
+                        )
 
-                iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
+                    iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
 
-            clu[igood] = iclust + nmax
-            Nfilt = int(iclust.max() + 1)
-            nmax += Nfilt
+                clu[igood] = iclust + nmax
+                Nfilt = int(iclust.max() + 1)
+                nmax += Nfilt
 
-            # we need the new templates here         
-            W = torch.zeros((Nfilt, ops['Nchan'], ops['settings']['n_pcs']))
-            for j in range(Nfilt):
-                w = Xd[iclust==j].mean(0)
-                W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['n_pcs'])).cpu()
-            
-            Wall = torch.cat((Wall, W), 0)
+                # we need the new templates here         
+                W = torch.zeros((Nfilt, ops['Nchan'], ops['settings']['n_pcs']))
+                for j in range(Nfilt):
+                    w = Xd[iclust==j].mean(0)
+                    W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['n_pcs'])).cpu()
+                
+                Wall = torch.cat((Wall, W), 0)
 
-            if progress_bar is not None:
-                progress_bar.emit(int((kk+1) / len(ycent) * 100))
-            
+                if progress_bar is not None:
+                    progress_bar.emit(int((kk+1) / len(ycent) * 100))
+    except:
+        logger.exception(f'Error in clustering_qr.run on center {ii}')
+        logger.debug(f'Xd shape: {Xd.shape}')
+        logger.debug(f'iclust shape: {iclust.shape}')
+        logger.debug(f'clu shape: {clu.shape}')
+        logger.debug(f'Nfilt: {Nfilt}')
+        raise
 
     if nearby_chans_empty == len(ycent):
         raise ValueError(
