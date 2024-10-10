@@ -110,7 +110,8 @@ def load_probe(probe_path):
                 probe[k] = np.array(v, dtype=dtype)
 
     for n in required_keys:
-        assert n in probe.keys()
+        if n not in probe.keys():
+            raise ValueError(f'Missing required key: {n} after loading probe.')
 
     # Verify that all arrays have the same size.
     size = None
