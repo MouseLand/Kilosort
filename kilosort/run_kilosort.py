@@ -3,6 +3,7 @@ from pathlib import Path
 import pprint
 import logging
 import warnings
+import platform
 logger = logging.getLogger(__name__)
 
 import numpy as np
@@ -166,10 +167,28 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
 
     try:
         logger.info(f"Kilosort version {kilosort.__version__}")
-        logger.info(f"Sorting {filename}")
-        if clear_cache:
-            logger.info('clear_cache=True')
+        logger.info(f"Python version {platform.python_version()}")
         logger.info('-'*40)
+
+        logger.info('System information:')
+        logger.info(f'{platform.platform()} {platform.machine()}')
+        logger.info(platform.processor())
+        if device is None:
+            if torch.cuda.is_available():
+                logger.info('Using GPU for PyTorch computations. '
+                            'Specify `device` to change this.')
+                device = torch.device('cuda')
+            else:
+                logger.info('Using CPU for PyTorch computations. '
+                            'Specify `device` to change this.')
+                device = torch.device('cpu')
+
+        if device != torch.device('cpu'):
+            memory = torch.cuda.get_device_properties(device).total_memory/1024**3
+            logger.info(f'Using CUDA device: {torch.cuda.get_device_name()} {memory:.2f}GB')
+
+        logger.info('-'*40)
+        logger.info(f"Sorting {filename}")
 
         if data_dtype is None:
             logger.info(
@@ -180,16 +199,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
 
         if not do_CAR:
             logger.info("Skipping common average reference.")
-
-        if device is None:
-            if torch.cuda.is_available():
-                logger.info('Using GPU for PyTorch computations. '
-                            'Specify `device` to change this.')
-                device = torch.device('cuda')
-            else:
-                logger.info('Using CPU for PyTorch computations. '
-                            'Specify `device` to change this.')
-                device = torch.device('cpu')
+        if clear_cache:
+            logger.info('clear_cache=True')
 
         if probe['chanMap'].max() >= settings['n_chan_bin']:
             raise ValueError(
