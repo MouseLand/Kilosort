@@ -109,6 +109,12 @@ def load_probe(probe_path):
                 dtype = np.int32 if k == 'chanMap' else np.float32
                 probe[k] = np.array(v, dtype=dtype)
 
+    else:
+        raise ValueError(
+            f"Unrecognized extension for probe: {probe_path.name}\n"
+            "Recognized extensions are .mat, .prb, or .json."
+            )
+
     for n in required_keys:
         if n not in probe.keys():
             raise ValueError(f'Missing required key: {n} after loading probe.')
