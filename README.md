@@ -22,7 +22,7 @@ Example notebooks are provided in the `docs/source/tutorials` folder and in the 
   3. `make_probe`:  making a custom probe configuration.
 
 **If you use Kilosort1-4, please cite the [paper](https://www.nature.com/articles/s41592-024-02232-7):**     
-Pachitariu, M., Sridhar, S., Pennington, J., & Stringer, C. (2024). Spike sorting with Kilosort4.
+Pachitariu, M., Sridhar, S., Pennington, J., & Stringer, C. (2024). Spike sorting with Kilosort4. _Nature Methods_ , 21, pages 914–921
 
 **Reusing parameters from previous versions**: This probably will not work well. Kilosort4 is a new algorithm, and the main parameters (the thresholds) can affect the results in a different way for your data. Please start with the default parameters and adjust from there based on what you see in Phy. For descriptions of Kilosort4's parameters, you can mouse-over their names in the GUI or look at `kilosort.parameters.py`.
 
