@@ -532,6 +532,36 @@ def load_ops(ops_path, device=None):
     return ops
 
 
+def bfile_from_ops(ops=None, ops_path=None, filename=None, device=None):
+    if device is None:
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
+
+    if ops is None:
+        if ops_path is not None:
+            ops = load_ops(ops_path, device=device)
+        else:
+            raise ValueError('Must specify either `ops` or `ops_path`.')
+    
+    if filename is None:
+        # Separate so that the same settings can be applied to the same binary
+        # file at a new path, like when running pytests.
+        filename = ops['filename']
+    
+    bfile = BinaryFiltered(
+        filename, ops['n_chan_bin'], fs=ops['fs'], NT=ops['batch_size'],
+        nt=ops['nt'], nt0min=ops['nt0min'], chan_map=ops['probe']['chanMap'],
+        hp_filter=ops['fwav'], whiten_mat=ops['Wrot'], dshift=ops['dshift'],
+        device=device, do_CAR=ops['do_CAR'], artifact_threshold=ops['artifact_threshold'],
+        invert_sign=ops['invert_sign'], dtype=ops['data_dtype'], tmin=ops['tmin'],
+        tmax=ops['tmax'], shift=ops['shift'], scale=ops['scale']
+        )
+
+    return bfile
+
+
 class BinaryRWFile:
 
     supported_dtypes = ['int16', 'uint16', 'int32', 'float32']
