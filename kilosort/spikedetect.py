@@ -1,4 +1,3 @@
-from io import StringIO
 import os
 import logging
 import warnings
@@ -220,10 +219,10 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
         ops['wPCA'], ops['wTEMP'] = get_waves(ops, device=device)
 
     ops = template_centers(ops)
-    [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
+    [ys, xs] = np.meshgrid(np.unique(ops['yup']), np.unique(ops['xup']))
     ys, xs = ys.flatten(), xs.flatten()
+    logger.info(f'Number of universal templates: {ys.size}')
     xc, yc = ops['xc'], ops['yc']
-    Nfilt = len(ys)
 
     nC = ops['settings']['nearest_chans']
     nC2 = ops['settings']['nearest_templates']
@@ -238,7 +237,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     xs = xs[igood]
     ops['ycup'], ops['xcup'] = ys, xs
 
-    iC2, ds2 = nearest_chans(ys, ys, xs, xs, nC2, device=device)
+    iC2, _ = nearest_chans(ys, ys, xs, xs, nC2, device=device)
 
     ds_torch = torch.from_numpy(ds).to(device).float()
     template_sizes = sig * (1+torch.arange(nsizes, device=device))
@@ -252,7 +251,6 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     k = 0
     nt = ops['nt']
     tarange = torch.arange(-(nt//2),nt//2+1, device = device)
-    s = StringIO()
     logger.info('Detecting spikes...')
     prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
                 mininterval=60 if progress_bar else None)
@@ -266,7 +264,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
             yct = yweighted(yc, iC, adist, xy, device=device)
             nsp = len(xy)
 
-            if k+nsp>st.shape[0]    :
+            if k+nsp>st.shape[0]:
                 st = np.concatenate((st, np.zeros_like(st)), 0)
                 tF = np.concatenate((tF, np.zeros_like(tF)), 0)
 
