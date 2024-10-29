@@ -26,7 +26,9 @@ from kilosort.utils import log_performance, log_cuda_details
 
 RECOGNIZED_SETTINGS = list(DEFAULT_SETTINGS.keys())
 RECOGNIZED_SETTINGS.extend([
-    'filename', 'data_dir', 'results_dir', 'probe_name', 'probe_path'
+    'filename', 'data_dir', 'results_dir', 'probe_name', 'probe_path',
+    'data_file_path', 'probe', 'data_dtype', 'save_preprocessed_copy',
+    'clear_cache', 'do_CAR', 'invert_sign'
 ])
 
 
