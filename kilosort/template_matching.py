@@ -164,9 +164,8 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
             #print('iter %d'%t)
             break
         elif len(xs) > 0 and t == max_peels - 1:
-            logger.debug(f'Reached last iteration of matching pursuit with {len(xs)} spikes detected.'
-                'Consider increasing the \'max_peels\' parameter' 
-            )
+            logger.debug(f'Reached last iteration of matching pursuit with {len(xs)} spikes detected.')
+            logger.debug(f'Consider increasing the \'max_peels\' parameter. Current value = {max_peels}')
 
         iX = xs[:,:1]
         iY = imax[iX]
