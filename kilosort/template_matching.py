@@ -140,8 +140,8 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
 
     Xres = X.clone()
     lam = 20
-
-    for t in range(100):
+    max_peels = ops['settings']['max_peels']
+    for t in range(max_peels):
         # Cf = 2 * B - nm.unsqueeze(-1) 
         Cf = torch.relu(B)**2 /nm.unsqueeze(-1)
         #a = 1 + lam
@@ -163,6 +163,10 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
         if len(xs)==0:
             #print('iter %d'%t)
             break
+        elif len(xs) > 0 and t == max_peels - 1:
+            logger.debug(f'Reached last iteration of matching pursuit with {len(xs)} spikes detected.'
+                'Consider increasing the \'max_peels\' parameter' 
+            )
 
         iX = xs[:,:1]
         iY = imax[iX]

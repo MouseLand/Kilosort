@@ -49,13 +49,16 @@ def extract_snippets(X, nt, twav_min, Th_single_ch, loc_range=[4,5],
 def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, Th_single_ch=6, nskip=25,
                        device=torch.device('cuda')):
 
+    loc_range = ops['settings']['loc_range']
+    long_range = ops['settings']['long_range']
     clips = np.zeros((500000,nt), 'float32')
     i = 0
     for j in range(0, bfile.n_batches, nskip):
         X = bfile.padded_batch_to_torch(j, ops)
         
         clips_new = extract_snippets(X, nt=nt, twav_min=twav_min,
-                                     Th_single_ch=Th_single_ch, device=device)
+                                     Th_single_ch=Th_single_ch, device=device,
+                                     loc_range=loc_range,long_range=long_range)
 
         nnew = len(clips_new)
 
