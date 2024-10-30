@@ -304,6 +304,8 @@ class SettingsBox(QtWidgets.QGroupBox):
                     # List of floats gets cached as list of strings, so
                     # have to convert back.
                     d = str([float(s) for s in v])
+                elif k == 'loc_range' or k == 'long_range':
+                    d = str([int(s) for s in v])
                 else:
                     d = str(v)
             else:
