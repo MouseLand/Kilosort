@@ -882,7 +882,7 @@ class BinaryFileGroup:
             n_samples = f.shape[0]
             if time_idx.start < k:
                 # At least part of the data is in this file
-                t = slice(time_idx.start - shift, time_idx.stop - shift)
+                t = slice(int(time_idx.start - shift), int(time_idx.stop - shift))
                 data.append(f[t, channel_idx])
                 if time_idx.stop <= k:
                     # This is the end of the data to be retrieved
@@ -911,7 +911,7 @@ class BinaryFileGroup:
                           shape=(n_samples, n_channels))
             files.append(f)
         
-        return files
+        return BinaryFileGroup(files)
 
 
 class BinaryFiltered(BinaryRWFile):
