@@ -285,8 +285,13 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
                 progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
     except:
         logger.exception(f'Error in spikedetect.run on batch {ibatch}')
-        logger.debug(f'X shape: {X.shape}')
-        logger.debug(f'xy shape: {xy.shape}')
+        try:
+            logger.debug(f'X shape: {X.shape}')
+            logger.debug(f'xy shape: {xy.shape}')
+        except UnboundLocalError:
+            # Error happened before one or both of these was assigned,
+            # no need to raise an additional error for this.
+            pass
         raise
             
     log_performance(logger, 'debug', f'Batch {ibatch}')
