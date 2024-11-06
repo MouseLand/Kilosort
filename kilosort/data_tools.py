@@ -33,9 +33,6 @@ def mean_waveform(cluster_id, results_dir, n_spikes=np.inf, bfile=None, best=Tru
     
     """
     results_dir = Path(results_dir)
-
-    ops = io.load_ops(results_dir / 'ops.npy')
-    whitening_mat_inv = np.load(results_dir / 'whitening_mat_inv.npy')
     spike_times = np.load(results_dir / 'spike_times.npy')
     spike_clusters = np.load(results_dir / 'spike_clusters.npy')
 
@@ -44,14 +41,12 @@ def mean_waveform(cluster_id, results_dir, n_spikes=np.inf, bfile=None, best=Tru
         chan = (templates**2).sum(axis=1).argmax(axis=-1)[cluster_id]
     else:
         chan = None
-    if bfile is None:
-        bfile = io.bfile_from_ops(ops)
 
     spikes = get_cluster_spikes(
         cluster_id, spike_times, spike_clusters, n_spikes=n_spikes
         )
     waves = get_spike_waveforms(
-        spikes, bfile, whitening_mat_inv=whitening_mat_inv, chan=chan
+        spikes, results_dir, chan=chan
         )
     mean_wave = waves.mean(axis=-1)
 
@@ -65,19 +60,127 @@ def get_cluster_spikes(cluster_id, spike_times, spike_clusters, n_spikes=np.inf)
     return spikes
 
 
-def get_spike_waveforms(spikes, bfile, whitening_mat_inv=None, chan=None):
+def get_spike_waveforms(spikes, results_dir, bfile=None, chan=None):
     """Get waveform for each spike in `spikes`, multi- or single-channel."""
+    if isinstance(spikes, int):
+        spikes = [spikes]
+
+    if bfile is None:
+        ops = io.load_ops(results_dir / 'ops.npy')
+        bfile = io.bfile_from_ops(ops)
+    whitening_mat_inv = np.load(results_dir / 'whitening_mat_inv.npy')
+
     waves = []
     for t in spikes:
         tmin = t - bfile.nt0min
-        tmax = t + (bfile.nt - bfile.nt0min) + 1
+        tmax = t + (bfile.nt - bfile.nt0min)
         w = bfile[tmin:tmax].cpu().numpy()
         if whitening_mat_inv is not None:
             w = whitening_mat_inv @ w
-        waves.append(w)
+        if w.shape[1] == bfile.nt:
+            # Don't include spikes at the start or end of the recording that
+            # get truncated to fewer time points.
+            waves.append(w)
     waves = np.stack(waves, axis=-1)
 
     if chan is not None:
         waves = waves[chan,:]
+    
+    bfile.close()
 
     return waves
+
+
+def cluster_templates(cluster_id, results_dir, mean=False, best=True):
+    """Get templates assigned to all spikes assigned this `cluster_id.`
+    
+    Parameters
+    ----------
+    cluster_id : int
+        Cluster index to reference from `spike_clusters.npy` in the results
+        directory. Only waveforms from spikes assigned to this cluster will
+        be used.
+    results_dir : str or Path
+        Path to directory where Kilosort4 sorting results were saved.
+    mean : bool; default=False
+        If True, return the mean across templates.
+    best : bool; default=True
+        If True, return single channel template(s) for this cluster_id using
+        the channel with the largest norm.
+
+    Return
+    ------
+    mean_temps : np.ndarray
+        Array of templates with shape `(n_templates, nt, n_channels)`, or
+        with shape `(nt, n_channels)` if `mean=True`.
+        
+    """
+    results_dir = Path(results_dir)
+    spike_clusters = np.load(results_dir / 'spike_clusters.npy')
+    spike_idx = spike_clusters[spike_clusters == cluster_id]
+    temps = get_templates(spike_idx, results_dir)
+    if best:
+        chan = (temps**2).sum(axis=1).sum(axis=0).argmax(axis=-1)
+        temps = temps[:,:,chan]
+    if mean:
+        return temps.mean(axis=0)
+
+    return temps
+
+
+def get_templates(spike_idx, results_dir):
+    """Get learned templates assigned to one or more spikes.
+    
+    Parameters
+    ----------
+    spike_idx : int or array-like.
+        Index or list/array of indices into `spike_times.npy`
+    results_dir : str or Path
+        Path to directory where Kilosort4 sorting results were saved.
+    
+    Returns
+    -------
+    scaled : np.ndarray
+        Array of templates with shape `(len(spike_idx), nt, n_channels)`.
+        Templates are scaled using `amplitude.npy` to match the scale of
+        unwhitened spike waveforms.
+
+    """
+    results_dir = Path(results_dir)
+    if isinstance(spike_idx, int):
+        spike_idx = [spike_idx]
+    templates = np.load(results_dir / 'templates.npy')
+    spike_templates = np.load(results_dir / 'spike_templates.npy')
+    amplitudes = np.load(results_dir / 'amplitudes.npy')
+
+    template_idx = spike_templates[spike_idx]
+    temps = templates[template_idx, :, :]
+    scaled = amplitudes[spike_idx, np.newaxis, np.newaxis] * temps
+
+    return scaled
+
+
+def get_good_cluster(results_dir, n=1):
+    """Pick `n` random cluster ids with a label of 'good.'"""
+    labels = get_labels(results_dir)
+    labels = [x for x in labels if x[1] == 'good']
+    rows = np.random.choice(
+        np.arange(len(labels)), size=min(n, len(labels)), replace=False
+        )
+    cluster_ids = [int(labels[r][0]) for r in rows]
+    if n == 1:
+        cluster_ids = cluster_ids[0]
+
+    return cluster_ids
+
+
+def get_labels(results_dir):
+    """Load good/mua labels as a list of ['cluster', 'label'] pairs."""
+    results_dir = Path(results_dir)
+    filename = results_dir / 'cluster_KSLabel.tsv'
+    with open(filename) as f:
+        text = f.read()
+    rows = text.split('\n')
+    labels = [r.split('\t') for r in rows[1:]][:-1]
+
+    return labels
