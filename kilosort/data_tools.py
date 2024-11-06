@@ -17,7 +17,7 @@ def mean_waveform(cluster_id, results_dir, n_spikes=np.inf, bfile=None, best=Tru
     n_spikes : int; default=np.inf
         Number of spikes to use for computing mean. By default, all spikes
         assigned to `cluster_id` are used.
-    bfile : kilosort.io.BinaryFiltered; optional.
+    bfile : kilosort.io.BinaryFiltered; optional
         Kilosort4 data file object. By default, this will be loaded using the
         information in `ops.npy` in the saved results.
     best : bool; default=True
@@ -33,35 +33,62 @@ def mean_waveform(cluster_id, results_dir, n_spikes=np.inf, bfile=None, best=Tru
     
     """
     results_dir = Path(results_dir)
-    spike_times = np.load(results_dir / 'spike_times.npy')
-    spike_clusters = np.load(results_dir / 'spike_clusters.npy')
-
     if best:
-        templates = np.load(results_dir / 'templates.npy')
-        chan = (templates**2).sum(axis=1).argmax(axis=-1)[cluster_id]
+        chan = get_best_channel(cluster_id, results_dir)
     else:
         chan = None
 
-    spikes = get_cluster_spikes(
-        cluster_id, spike_times, spike_clusters, n_spikes=n_spikes
-        )
-    waves = get_spike_waveforms(
-        spikes, results_dir, chan=chan
-        )
+    spikes = get_cluster_spikes(cluster_id, results_dir, n_spikes=n_spikes)
+    waves = get_spike_waveforms(spikes, results_dir, chan=chan)
     mean_wave = waves.mean(axis=-1)
 
     return mean_wave
 
 
-def get_cluster_spikes(cluster_id, spike_times, spike_clusters, n_spikes=np.inf):
+def get_best_channel(cluster_id, results_dir):
+    """Get channel number with largest template norm for this cluster."""
+    templates = np.load(results_dir / 'templates.npy')
+    chan = (templates**2).sum(axis=1).argmax(axis=-1)[cluster_id]
+    return chan
+
+
+def get_cluster_spikes(cluster_id, results_dir, n_spikes=np.inf):
     """Get `n_spikes` random spike times assigned to `cluster_id`."""
+    spike_times = np.load(results_dir / 'spike_times.npy')
+    spike_clusters = np.load(results_dir / 'spike_clusters.npy')
     spikes = spike_times[spike_clusters == cluster_id]
-    spikes = np.random.choice(spikes, min(spikes.size, n_spikes), replace=False)
+    if n_spikes != np.inf:
+        spikes = np.random.choice(
+            spikes, min(spikes.size, n_spikes), replace=False
+            )
+        spikes.sort()
+
     return spikes
 
 
 def get_spike_waveforms(spikes, results_dir, bfile=None, chan=None):
-    """Get waveform for each spike in `spikes`, multi- or single-channel."""
+    """Get waveform for each spike in `spikes`, multi- or single-channel.
+    
+    Parameters
+    ----------
+    spikes : list or array-like
+        Spike times (in units of samples) for the desired waveforms, from
+        `spike_times.npy`.
+    results_dir : str or Path
+        Path to directory where Kilosort4 sorting results were saved.
+    bfile : kilosort.io.BinaryFiltered; optional
+        Kilosort4 data file object. By default, this will be loaded using the
+        information in `ops.npy` in the saved results.
+    chan : int; optional.
+        Channel to use for single-channel waveforms. If not specified, all
+        channels will be returned.
+
+    Returns
+    -------
+    waves : np.ndarray
+        Array of spike waveforms with shape `(nt, len(spikes))`.
+    
+    """
     if isinstance(spikes, int):
         spikes = [spikes]
 
@@ -133,7 +160,7 @@ def get_templates(spike_idx, results_dir):
     
     Parameters
     ----------
-    spike_idx : int or array-like.
+    spike_idx : int or array-like
         Index or list/array of indices into `spike_times.npy`
     results_dir : str or Path
         Path to directory where Kilosort4 sorting results were saved.
