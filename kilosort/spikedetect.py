@@ -122,32 +122,25 @@ def template_centers(ops):
 
     # Set max channel distance based on dmin, dminx, use whichever is greater.
     if ops.get('max_channel_distance', None) is None:
-        ops['max_channel_distance'] = max(dmin, dminx)
+        ops['max_channel_distance'] = min(dmin, dminx)
 
     return ops
 
 
 def template_match(X, ops, iC, iC2, weigh, device=torch.device('cuda')):
-    NT = X.shape[-1]
     nt = ops['nt']
-    Nchan = ops['Nchan']
+    nt0 = ops['settings']['nt0min']
+    nk = ops['settings']['n_templates']
+    NT = X.shape[-1]
     Nfilt = iC.shape[1]
-
-    tch0 = torch.zeros(1,device = device)
-    tch1 = torch.ones(1,device = device)
+    niter = 40
+    nb = (NT-1)//niter+1
 
     W = ops['wTEMP'].unsqueeze(1)
     B = conv1d(X.unsqueeze(1), W, padding=nt//2)
-
-    nt0 = ops['settings']['nt0min']
-    nk = ops['settings']['n_templates']
-
-    niter = 40
-    nb = (NT-1)//niter+1
     As    = torch.zeros((Nfilt, NT), device=device)
     Amaxs = torch.zeros((Nfilt, NT), device=device)
     imaxs = torch.zeros((Nfilt, NT), dtype = torch.int64, device=device)
-
     ti = torch.arange(Nfilt, device = device)
     tj = torch.arange(nb, device = device)
 
