@@ -111,7 +111,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         ys, xs = ys.flatten(), xs.flatten()
         iC, ds = nearest_chans(ys, self.yc, xs, self.xc, nC, device=device)
 
-        igood = ds[0,:] <= ops['max_channel_distance']**2
+        igood = ds[0,:] <= max_dist**2
         iC = iC[:,igood]
         ds = ds[:,igood]
         ys = ys[igood]

@@ -289,7 +289,7 @@ EXTRA_PARAMETERS = {
 
     'max_channel_distance': {
         'gui_name': 'max channel distance', 'type': float, 'min': 1,
-        'max': np.inf, 'exclude': [], 'default': None, 'step': 'spike detection',
+        'max': np.inf, 'exclude': [], 'default': 32, 'step': 'spike detection',
         'description':
             """
             Templates farther away than this from their nearest channel will
