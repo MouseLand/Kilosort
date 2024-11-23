@@ -520,7 +520,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             return False
 
         none_allowed = [
-            'dmin', 'nt0min', 'x_centers', 'shift', 'scale'
+            'dmin', 'nt0min', 'x_centers', 'shift', 'scale', 'max_channel_distance'
             ]
         for k, v in self.settings.items():
             if v is None and k not in none_allowed:

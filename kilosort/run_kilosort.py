@@ -367,6 +367,10 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
 
     if settings['nt0min'] is None:
         settings['nt0min'] = int(20 * settings['nt']/61)
+    if settings['max_channel_distance'] is None:
+        # Default used to be None, now it's a constant. Adding this so that
+        # cached settings values in the GUI don't cause disruption.
+        settings['max_channel_distance'] = DEFAULT_SETTINGS['max_channel_distance']
 
     if settings['nearest_chans'] > len(probe['chanMap']):
         msg = f"""
