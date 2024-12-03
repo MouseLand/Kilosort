@@ -11,7 +11,7 @@ from qtpy import QtCore
 import kilosort
 from kilosort.run_kilosort import (
     setup_logger, initialize_ops, compute_preprocessing, compute_drift_correction,
-    detect_spikes, cluster_spikes, save_sorting
+    detect_spikes, cluster_spikes, save_sorting, close_logger
     )
 from kilosort.io import save_preprocessing
 from kilosort.utils import log_performance, log_cuda_details
@@ -138,6 +138,9 @@ class KiloSortWorker(QtCore.QThread):
                 # Annoyingly, this will print the error message twice for console
                 # but I haven't found a good way around that.
                 raise
+
+            finally:
+                close_logger()
 
             self.ops = ops
             self.st = st[kept_spikes]

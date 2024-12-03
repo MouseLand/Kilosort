@@ -2,7 +2,7 @@ import sys
 from urllib.error import HTTPError
 
 import pyqtgraph as pg
-from kilosort.gui import DarkPalette, KiloSortGUI
+from kilosort.gui import DarkPalette, KilosortGUI
 from qtpy import QtWidgets, QtGui, QtCore
 from kilosort.utils import DOWNLOADS_DIR, download_url_to_file
 
@@ -17,7 +17,7 @@ _QSS = """
 """
 
 
-def launcher(filename=None):
+def launcher(filename=None, reset=False):
     kilosort_application = QtWidgets.QApplication(sys.argv)
     kilosort_application.setStyle("Fusion")
     kilosort_application.setPalette(DarkPalette())
@@ -52,8 +52,7 @@ def launcher(filename=None):
     pg.setConfigOption("foreground", "w")
     pg.setConfigOption("useOpenGL", True)
 
-    kilosort_gui = KiloSortGUI(kilosort_application, filename=filename)
-    # kilosort_gui.showMaximized()
+    kilosort_gui = KilosortGUI(kilosort_application, filename=filename, reset=reset)
     kilosort_gui.show()
 
     sys.exit(kilosort_application.exec_())
