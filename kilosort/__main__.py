@@ -14,6 +14,10 @@ if __name__ == "__main__":
         '--reset', action='store_true',
         help='Clears all cached settings before opening the GUI.'
     )
+    parser.add_argument(
+        '--skip_load', action='store_true',
+        help="Don't load data upon opening GUI, even if auto-load is enabled."
+    )
 
     args = parser.parse_args()
-    launcher(args.filename, args.reset)
+    launcher(args.filename, args.reset, args.skip_load)

@@ -17,7 +17,7 @@ _QSS = """
 """
 
 
-def launcher(filename=None, reset=False):
+def launcher(filename=None, reset=False, skip_load=False):
     kilosort_application = QtWidgets.QApplication(sys.argv)
     kilosort_application.setStyle("Fusion")
     kilosort_application.setPalette(DarkPalette())
@@ -52,7 +52,9 @@ def launcher(filename=None, reset=False):
     pg.setConfigOption("foreground", "w")
     pg.setConfigOption("useOpenGL", True)
 
-    kilosort_gui = KilosortGUI(kilosort_application, filename=filename, reset=reset)
+    kilosort_gui = KilosortGUI(
+        kilosort_application, filename=filename, reset=reset, skip_load=skip_load
+        )
     kilosort_gui.show()
 
     sys.exit(kilosort_application.exec_())

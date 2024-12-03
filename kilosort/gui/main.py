@@ -19,7 +19,8 @@ logger = setup_logger(__name__)
 
 
 class KilosortGUI(QtWidgets.QMainWindow):
-    def __init__(self, application, filename=None, reset=False, **kwargs):
+    def __init__(self, application, filename=None, reset=False, skip_load=False,
+                 **kwargs):
         super(KilosortGUI, self).__init__(**kwargs)
 
         self.app = application
@@ -118,7 +119,7 @@ class KilosortGUI(QtWidgets.QMainWindow):
         # sub-widgets.
         self.move(100, 100)
 
-        if self.auto_load:
+        if self.auto_load and not skip_load:
             self.settings_box.update_settings()
 
 
