@@ -63,8 +63,10 @@ def load_probe(probe_path):
         # !DOES NOT WORK FOR PHASE3A PROBES WITH DISCONNECTED CHANNELS!
         # Also does not remove reference channel in PHASE3B probes
         contents = probe_path.read_text()
-        metadata = {}
+        metadata = {'np': np}
         exec(contents, {}, metadata)
+        # TODO: Figure out an alternative for exec, it's a security risk.
+
         probe['chanMap'] = []
         probe['xc'] = []
         probe['yc'] = []
