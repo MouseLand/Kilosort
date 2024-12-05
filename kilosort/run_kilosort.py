@@ -336,27 +336,30 @@ def setup_logger(results_dir, verbose_console=False):
     ks_log = logging.getLogger('kilosort')
     ks_log.setLevel(logging.DEBUG)
 
-    # Add file handler at debug level, include timestamps and logging level
-    # in text output.
-    file = logging.FileHandler(results_dir / 'kilosort4.log', mode='w')
-    file.setLevel(logging.DEBUG)
-    text_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-    file_formatter = logging.Formatter(text_format)
-    file.setFormatter(file_formatter)
+    # Skip this if the handlers were already added, like when running multiple
+    # times in a single session.
+    if not ks_log.handlers:
+        # Add file handler at debug level, include timestamps and logging level
+        # in text output.
+        file = logging.FileHandler(results_dir / 'kilosort4.log', mode='w')
+        file.setLevel(logging.DEBUG)
+        text_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+        file_formatter = logging.Formatter(text_format)
+        file.setFormatter(file_formatter)
 
-    # Add console handler at info level with shorter messages,
-    # unless verbose is requested.
-    console = logging.StreamHandler()
-    if verbose_console:
-        console.setLevel(logging.DEBUG)
-        console.setFormatter(file_formatter)
-    else:
-        console.setLevel(logging.INFO)
-        console_formatter = logging.Formatter('%(name)-12s: %(message)s')
-        console.setFormatter(console_formatter)
+        # Add console handler at info level with shorter messages,
+        # unless verbose is requested.
+        console = logging.StreamHandler()
+        if verbose_console:
+            console.setLevel(logging.DEBUG)
+            console.setFormatter(file_formatter)
+        else:
+            console.setLevel(logging.INFO)
+            console_formatter = logging.Formatter('%(name)-12s: %(message)s')
+            console.setFormatter(console_formatter)
 
-    ks_log.addHandler(file)
-    ks_log.addHandler(console)
+        ks_log.addHandler(file)
+        ks_log.addHandler(console)
 
 
 def close_logger():
