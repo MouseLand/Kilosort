@@ -22,7 +22,9 @@ from kilosort import (
     PROBE_DIR
 )
 from kilosort.parameters import DEFAULT_SETTINGS
-from kilosort.utils import log_performance, log_cuda_details
+from kilosort.utils import (
+    log_performance, log_cuda_details, probe_as_string, ops_as_string
+    )
 
 RECOGNIZED_SETTINGS = list(DEFAULT_SETTINGS.keys())
 RECOGNIZED_SETTINGS.extend([
@@ -213,13 +215,11 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         tic0 = time.time()
         ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
                             device, save_preprocessed_copy)
+        
         # Remove some stuff that doesn't need to be printed twice, then pretty-print
         # format for log file.
-        ops_copy = ops.copy()
-        _ = ops_copy.pop('settings')
-        _ = ops_copy.pop('probe')
-        print_ops = pprint.pformat(ops_copy, indent=4, sort_dicts=False)
-        logger.debug(f"Initial ops:\n{print_ops}\n")
+        logger.debug(f"Initial ops:\n\n{ops_as_string(ops)}\n")
+        logger.debug(f"Probe dictionary:\n\n{probe_as_string(ops['probe'])}\n")
 
         # Set preprocessing and drift correction parameters
         ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
