@@ -338,7 +338,7 @@ def setup_logger(results_dir, verbose_console=False):
 
     # Add file handler at debug level, include timestamps and logging level
     # in text output.
-    file = logging.FileHandler(results_dir / 'kilosort4.log')
+    file = logging.FileHandler(results_dir / 'kilosort4.log', mode='w')
     file.setLevel(logging.DEBUG)
     text_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     file_formatter = logging.Formatter(text_format)
