@@ -31,6 +31,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.gui = parent
         self.load_enabled = False
         self.use_file_object = False
+        self.path_check = None
         
         self.select_data_file = QtWidgets.QPushButton("Select Binary File")
         self.data_file_path = self.gui.data_path
@@ -438,16 +439,17 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.disable_load()
 
     def on_data_file_path_changed(self):
+        self.path_check = None
         data_file_path = Path(self.data_file_path_input.text())
         try:
             assert self.check_valid_binary_path(data_file_path)
+            self.data_file_path = data_file_path
+            self.gui.qt_settings.setValue('data_file_path', data_file_path)
 
             parent_folder = data_file_path.parent
             results_folder = parent_folder / "kilosort4"
             self.results_directory_input.setText(results_folder.as_posix())
             self.results_directory_input.editingFinished.emit()
-            self.data_file_path = data_file_path
-            self.gui.qt_settings.setValue('data_file_path', data_file_path)
 
             if self.check_settings():
                 self.enable_load()
@@ -458,20 +460,28 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.disable_load()
 
     def check_valid_binary_path(self, filename):
+        if self.path_check is not None:
+            # Flag is set to False when path changes, this is to avoid checking
+            # the path repeatedly for no reason.
+            return self.path_check
+
         if filename is None:
             print('Binary path is None.')
-            return False
+            check = False
         else:
             f = Path(filename)
             if f.exists() and f.is_file():
                 if f.suffix in _ALLOWED_FILE_TYPES or self.use_file_object:
-                    return True
+                    check = True
                 else:
                     print(f'Binary file has invalid suffix. Must be {_ALLOWED_FILE_TYPES}')
-                    return False
+                    check = False
             else:
                 print('Binary file does not exist at that path.')
-                return False
+                check = False
+        
+        self.path_check = check
+        return check
 
     def disable_all_input(self, value):
         for button in self.buttons:
@@ -510,8 +520,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             return False
 
         none_allowed = [
-            'dmin', 'nt0min', 'max_channel_distance', 'x_centers',
-            'shift', 'scale'
+            'dmin', 'nt0min', 'x_centers', 'shift', 'scale', 'max_channel_distance'
             ]
         for k, v in self.settings.items():
             if v is None and k not in none_allowed:
@@ -796,6 +805,7 @@ class SettingsBox(QtWidgets.QGroupBox):
     def reset(self):
         self.data_file_path_input.clear()
         self.data_file_path = None
+        self.path_check = None
         self.gui.qt_settings.setValue('data_file_path', None)
         self.results_directory_input.clear()
         self.results_directory_path = None

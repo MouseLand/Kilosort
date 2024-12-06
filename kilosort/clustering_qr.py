@@ -473,6 +473,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                         st0 = None
 
                     # find new clusters
+                    logger.debug(f'Num spikes for this center: {Xd.shape[0]}')
                     iclust, iclust0, M, _ = cluster(
                         Xd, nskip=nskip, lam=1, seed=5, n_splits=n_splits,
                         overlap=overlap, device=device

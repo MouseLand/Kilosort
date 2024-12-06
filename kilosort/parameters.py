@@ -289,7 +289,7 @@ EXTRA_PARAMETERS = {
 
     'max_channel_distance': {
         'gui_name': 'max channel distance', 'type': float, 'min': 1,
-        'max': np.inf, 'exclude': [], 'default': None, 'step': 'spike detection',
+        'max': np.inf, 'exclude': [], 'default': 32, 'step': 'spike detection',
         'description':
             """
             Templates farther away than this from their nearest channel will
@@ -443,3 +443,33 @@ main_defaults = {k: v['default'] for k, v in MAIN_PARAMETERS.items()}
 extra_defaults = {k: v['default'] for k, v in EXTRA_PARAMETERS.items()}
 # In the format expected by `run_kilosort`
 DEFAULT_SETTINGS = {**main_defaults, **extra_defaults}
+
+
+def compare_settings(settings):
+    """Find settings values that differ from the defaults.
+    
+    Parameters
+    ----------
+    settings : dict
+        Formatted the same as `DEFAULT_SETTINGS`.
+    
+    Returns
+    -------
+    modified_settings : dict
+        Formatted as above, but only contains keys with values that differ
+        from the defaults.
+    extra_keys : list
+        List of keys that appear in `settings` but not `DEFAULT_SETTINGS`.
+        These keys are *not* included in `modified_settings`.
+
+    """
+    modified_settings = {}
+    extra_keys = []
+
+    for k, v in settings.items():
+        if k in DEFAULT_SETTINGS:
+            if v != DEFAULT_SETTINGS[k]:
+                modified_settings[k] = v
+        else:
+            extra_keys.append(k)
+    return modified_settings, extra_keys

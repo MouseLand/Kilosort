@@ -41,9 +41,7 @@ class HeaderBox(QtWidgets.QWidget):
         self.help_button.clicked.connect(self.open_help_link)
 
         self.reset_gui_button = QtWidgets.QPushButton("Reset GUI")
-        
         self.clear_cache_button = QtWidgets.QPushButton("Clear Cache")
-        self.clear_cache_button.clicked.connect(self.clear_cache)
 
         # self.layout.addWidget(self.kilosort_text)
         self.layout.addStretch(0)
@@ -67,10 +65,6 @@ class HeaderBox(QtWidgets.QWidget):
         self.gui.show_plots = self.show_plots_check.isChecked()
         self.gui.qt_settings.setValue('show_plots', self.gui.show_plots)
 
-    @QtCore.Slot()
-    def clear_cache(self):
-        self.gui.qt_settings.clear()
-        
     @QtCore.Slot()
     def open_controls_link(self):
         webbrowser.open('https://kilosort.readthedocs.io/en/latest/gui_guide.html')

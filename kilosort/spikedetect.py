@@ -1,4 +1,3 @@
-from io import StringIO
 import os
 import logging
 import warnings
@@ -118,37 +117,26 @@ def template_centers(ops):
         nx = np.round((xmax - xmin) / (dminx/2)) + 1
         xup = np.concatenate([xup, np.linspace(xmin, xmax, int(nx))])
 
-    ops['yup'] = yup
-    ops['xup'] = xup
-
-    # Set max channel distance based on dmin, dminx, use whichever is greater.
-    if ops.get('max_channel_distance', None) is None:
-        ops['max_channel_distance'] = max(dmin, dminx)
+    ops['yup'] = np.unique(yup)
+    ops['xup'] = np.unique(xup)
 
     return ops
 
 
 def template_match(X, ops, iC, iC2, weigh, device=torch.device('cuda')):
-    NT = X.shape[-1]
     nt = ops['nt']
-    Nchan = ops['Nchan']
+    nt0 = ops['settings']['nt0min']
+    nk = ops['settings']['n_templates']
+    NT = X.shape[-1]
     Nfilt = iC.shape[1]
-
-    tch0 = torch.zeros(1,device = device)
-    tch1 = torch.ones(1,device = device)
+    niter = 40
+    nb = (NT-1)//niter+1
 
     W = ops['wTEMP'].unsqueeze(1)
     B = conv1d(X.unsqueeze(1), W, padding=nt//2)
-
-    nt0 = ops['settings']['nt0min']
-    nk = ops['settings']['n_templates']
-
-    niter = 40
-    nb = (NT-1)//niter+1
     As    = torch.zeros((Nfilt, NT), device=device)
     Amaxs = torch.zeros((Nfilt, NT), device=device)
     imaxs = torch.zeros((Nfilt, NT), dtype = torch.int64, device=device)
-
     ti = torch.arange(Nfilt, device = device)
     tj = torch.arange(nb, device = device)
 
@@ -222,8 +210,8 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     ops = template_centers(ops)
     [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
     ys, xs = ys.flatten(), xs.flatten()
+    logger.info(f'Number of universal templates: {ys.size}')
     xc, yc = ops['xc'], ops['yc']
-    Nfilt = len(ys)
 
     nC = ops['settings']['nearest_chans']
     nC2 = ops['settings']['nearest_templates']
@@ -238,7 +226,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     xs = xs[igood]
     ops['ycup'], ops['xcup'] = ys, xs
 
-    iC2, ds2 = nearest_chans(ys, ys, xs, xs, nC2, device=device)
+    iC2, _ = nearest_chans(ys, ys, xs, xs, nC2, device=device)
 
     ds_torch = torch.from_numpy(ds).to(device).float()
     template_sizes = sig * (1+torch.arange(nsizes, device=device))
@@ -252,7 +240,6 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     k = 0
     nt = ops['nt']
     tarange = torch.arange(-(nt//2),nt//2+1, device = device)
-    s = StringIO()
     logger.info('Detecting spikes...')
     prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
                 mininterval=60 if progress_bar else None)
@@ -266,7 +253,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
             yct = yweighted(yc, iC, adist, xy, device=device)
             nsp = len(xy)
 
-            if k+nsp>st.shape[0]    :
+            if k+nsp>st.shape[0]:
                 st = np.concatenate((st, np.zeros_like(st)), 0)
                 tF = np.concatenate((tF, np.zeros_like(tF)), 0)
 
@@ -287,8 +274,13 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
                 progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
     except:
         logger.exception(f'Error in spikedetect.run on batch {ibatch}')
-        logger.debug(f'X shape: {X.shape}')
-        logger.debug(f'xy shape: {xy.shape}')
+        try:
+            logger.debug(f'X shape: {X.shape}')
+            logger.debug(f'xy shape: {xy.shape}')
+        except UnboundLocalError:
+            # Error happened before one or both of these was assigned,
+            # no need to raise an additional error for this.
+            pass
         raise
             
     log_performance(logger, 'debug', f'Batch {ibatch}')

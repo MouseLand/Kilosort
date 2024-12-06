@@ -63,8 +63,10 @@ def load_probe(probe_path):
         # !DOES NOT WORK FOR PHASE3A PROBES WITH DISCONNECTED CHANNELS!
         # Also does not remove reference channel in PHASE3B probes
         contents = probe_path.read_text()
-        metadata = {}
+        metadata = {'np': np}
         exec(contents, {}, metadata)
+        # TODO: Figure out an alternative for exec, it's a security risk.
+
         probe['chanMap'] = []
         probe['xc'] = []
         probe['yc'] = []
@@ -109,8 +111,15 @@ def load_probe(probe_path):
                 dtype = np.int32 if k == 'chanMap' else np.float32
                 probe[k] = np.array(v, dtype=dtype)
 
+    else:
+        raise ValueError(
+            f"Unrecognized extension for probe: {probe_path.name}\n"
+            "Recognized extensions are .mat, .prb, or .json."
+            )
+
     for n in required_keys:
-        assert n in probe.keys()
+        if n not in probe.keys():
+            raise ValueError(f'Missing required key: {n} after loading probe.')
 
     # Verify that all arrays have the same size.
     size = None
@@ -525,6 +534,36 @@ def load_ops(ops_path, device=None):
     return ops
 
 
+def bfile_from_ops(ops=None, ops_path=None, filename=None, device=None):
+    if device is None:
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
+
+    if ops is None:
+        if ops_path is not None:
+            ops = load_ops(ops_path, device=device)
+        else:
+            raise ValueError('Must specify either `ops` or `ops_path`.')
+    
+    if filename is None:
+        # Separate so that the same settings can be applied to the same binary
+        # file at a new path, like when running pytests.
+        filename = ops['filename']
+    
+    bfile = BinaryFiltered(
+        filename, ops['n_chan_bin'], fs=ops['fs'], NT=ops['batch_size'],
+        nt=ops['nt'], nt0min=ops['nt0min'], chan_map=ops['probe']['chanMap'],
+        hp_filter=ops['fwav'], whiten_mat=ops['Wrot'], dshift=ops['dshift'],
+        device=device, do_CAR=ops['do_CAR'], artifact_threshold=ops['artifact_threshold'],
+        invert_sign=ops['invert_sign'], dtype=ops['data_dtype'], tmin=ops['tmin'],
+        tmax=ops['tmax'], shift=ops['shift'], scale=ops['scale']
+        )
+
+    return bfile
+
+
 class BinaryRWFile:
 
     supported_dtypes = ['int16', 'uint16', 'int32', 'float32']
@@ -845,7 +884,7 @@ class BinaryFileGroup:
             n_samples = f.shape[0]
             if time_idx.start < k:
                 # At least part of the data is in this file
-                t = slice(time_idx.start - shift, time_idx.stop - shift)
+                t = slice(int(time_idx.start - shift), int(time_idx.stop - shift))
                 data.append(f[t, channel_idx])
                 if time_idx.stop <= k:
                     # This is the end of the data to be retrieved
@@ -874,7 +913,7 @@ class BinaryFileGroup:
                           shape=(n_samples, n_channels))
             files.append(f)
         
-        return files
+        return BinaryFileGroup(files)
 
 
 class BinaryFiltered(BinaryRWFile):
