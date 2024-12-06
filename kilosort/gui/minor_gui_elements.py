@@ -162,6 +162,11 @@ class ProbeBuilder(QtWidgets.QDialog):
 
             x_coords = eval(self.x_coords_value.text())
             y_coords = eval(self.y_coords_value.text())
+            if isinstance(x_coords, int):
+                # For single-channel probes, need to force a list.
+                x_coords = [x_coords]
+                y_coords = [y_coords]
+
             x_coords = np.array(x_coords, dtype=np.float64)
             y_coords = np.array(y_coords, dtype=np.float64)
             assert len(x_coords) == len(y_coords), \
@@ -171,7 +176,10 @@ class ProbeBuilder(QtWidgets.QDialog):
             if k_coords == "":
                 k_coords = np.ones_like(x_coords, dtype=np.float64)
             else:
-                k_coords = np.array(eval(k_coords), dtype=np.float64)
+                kc = eval(k_coords)
+                if isinstance(kc, int):
+                    kc = [kc]
+                k_coords = np.array(kc, dtype=np.float64)
                 assert x_coords.size == k_coords.size, \
                        'contact positions and shank indices must have same size'
 
@@ -179,7 +187,10 @@ class ProbeBuilder(QtWidgets.QDialog):
             if channel_map == "":
                 channel_map = np.arange(x_coords.size)
             else:
-                channel_map = np.array(eval(channel_map), dtype=np.int32)
+                cm = eval(channel_map)
+                if isinstance(cm, int):
+                    cm = [cm]
+                channel_map = np.array(cm, dtype=np.int32)
                 assert x_coords.size == channel_map.size, \
                        'contact positions and channel map must be same size'
                 assert channel_map.size == np.unique(channel_map).size, \
@@ -201,19 +212,14 @@ class ProbeBuilder(QtWidgets.QDialog):
 
             self.construct_probe()
 
-    # TODO: use `Probe` from pykilosort/params.py
     def construct_probe(self):
-        probe = {
+        self.probe = {
             "xc": self.x_coords,
             "yc": self.y_coords,
             "kcoords": self.k_coords,
             "chanMap": self.channel_map,
             "n_chan": len(self.x_coords)
         }
-
-        probe["chanMapBackup"] = probe["chanMap"].copy()
-
-        self.probe = probe
 
     def get_map_name(self):
         return self.map_name

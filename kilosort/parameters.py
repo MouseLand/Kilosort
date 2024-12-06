@@ -369,6 +369,29 @@ EXTRA_PARAMETERS = {
             (can be 1, but that slows down the optimization). 
             """
     },
+    
+    'cluster_splits': {
+        'gui_name': 'cluster splits', 'type': int, 'min': 1, 'max': np.inf,
+        'exclude': [], 'default': 1, 'step': 'clustering',
+        'description':
+            """
+            Number of non-overlapping portions to split spike data into when
+            clustering. Using `cluster_splits > 1` will force the search for
+            nearest neighbors to only match spikes within a smaller temporal
+            window instead of the entire recording, where adjacent windows
+            overlap according to `cluster_overlap`.
+            """
+    },
+
+    'cluster_overlap': {
+        'gui_name': 'cluster overlap', 'type': float, 'min': 0, 'max': 1,
+        'exclude': [0,1], 'default': 0.5, 'step': 'clustering',
+        'description':
+            """
+            Proportion of overlap between subsequent splits when
+            `cluster_splits > 1`.
+            """
+    },
 
     'x_centers': {
         'gui_name': 'x centers', 'type': int, 'min': 1,
