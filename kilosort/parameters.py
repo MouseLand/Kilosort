@@ -385,7 +385,7 @@ EXTRA_PARAMETERS = {
 
     'cluster_overlap': {
         'gui_name': 'cluster overlap', 'type': float, 'min': 0, 'max': 1,
-        'exclude': [0,1], 'default': 0.5, 'step': 'clustering',
+        'exclude': [0,1], 'default': 0.75, 'step': 'clustering',
         'description':
             """
             Proportion of overlap between subsequent splits when
