@@ -1,4 +1,4 @@
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets, QtGui
 import numpy as np
 import pyqtgraph as pg
 import torch
@@ -6,7 +6,6 @@ import torch
 from kilosort.spikedetect import template_centers, nearest_chans
 from kilosort.clustering_qr import x_centers, y_centers, get_nearest_centers
 from kilosort.gui.logger import setup_logger
-
 
 logger = setup_logger(__name__)
 
@@ -18,7 +17,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.setTitle("Probe View")
         self.gui = parent
         self.probe_view = pg.PlotWidget()
+        self.channel_toggle = QtWidgets.QCheckBox('Show Channels')
         self.template_toggle = QtWidgets.QCheckBox('Universal Templates')
+        self.color_toggle = QtWidgets.QCheckBox('Color by Group')
+        self.number_toggle = QtWidgets.QCheckBox('Number')
         self.center_toggle = QtWidgets.QCheckBox('Grouping Centers')
         self.aspect_toggle = QtWidgets.QCheckBox('True Aspect Ratio')
         self.spot_scale = QtWidgets.QSlider(QtCore.Qt.Horizontal)
@@ -35,11 +37,17 @@ class ProbeViewBox(QtWidgets.QGroupBox):
 
     def setup(self):
         self.aspect_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.aspect_toggle.stateChanged.connect(self.set_layout)
+        self.aspect_toggle.stateChanged.connect(self.create_plot)
+        self.channel_toggle.setCheckState(QtCore.Qt.CheckState.Checked)
+        self.channel_toggle.stateChanged.connect(self.create_plot)
         self.template_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.template_toggle.stateChanged.connect(self.set_layout)
+        self.template_toggle.stateChanged.connect(self.create_plot)
         self.center_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
-        self.center_toggle.stateChanged.connect(self.set_layout)
+        self.center_toggle.stateChanged.connect(self.create_plot)
+        self.color_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        self.color_toggle.stateChanged.connect(self.create_plot)
+        self.number_toggle.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        self.number_toggle.stateChanged.connect(self.create_plot)
 
         self.spot_scale.setMinimum(0)
         # Actually want 0 to 10 scaling, but these are multiplied by 4
@@ -51,9 +59,16 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(QtWidgets.QLabel('Left click to toggle excluded channels'))
         layout.addWidget(self.probe_view, 95)
-        layout.addWidget(self.aspect_toggle)
+        chan_box = QtWidgets.QHBoxLayout()
+        chan_box.addWidget(self.aspect_toggle)
+        chan_box.addWidget(self.channel_toggle)
+        layout.addLayout(chan_box)
         layout.addWidget(self.template_toggle)
         layout.addWidget(self.center_toggle)
+        op_box = QtWidgets.QHBoxLayout()
+        op_box.addWidget(self.color_toggle)
+        op_box.addWidget(self.number_toggle)
+        layout.addLayout(op_box)
         layout.addWidget(self.spot_scale)
         self.setLayout(layout)
 
@@ -88,9 +103,10 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         probe = self.gui.probe_layout
         self.xc, self.yc = probe['xc'], probe['yc']
         self.kcoords = probe['kcoords']
-        if self.template_toggle.isChecked() or self.center_toggle.isChecked():
-            self.xcup, self.ycup, self.ops = self.get_template_spots(*template_args)
-            self.center_positions = self.get_center_spots()
+        #if self.template_toggle.isChecked() or self.center_toggle.isChecked():
+        self.xcup, self.ycup, self.ops = self.get_template_spots(*template_args)
+        self.center_positions, self.skipped_centers, self.nearest_centers = \
+            self.get_center_spots()
 
         # Change xc, yc back to original probe for plotting all channels.
         self.xc, self.yc = self.active_layout["xc"], self.active_layout["yc"]
@@ -126,31 +142,35 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         xcent = x_centers(self.ops)
         xy = np.vstack((self.ops['xcup'], self.ops['ycup']))
         xy = torch.from_numpy(xy)
-        nearest_center = get_nearest_centers(xy, xcent, ycent)
+        nearest_center, x_pos, y_pos = get_nearest_centers(xy, xcent, ycent)
+        center_pos = list(zip(x_pos.cpu().numpy(), y_pos.cpu().numpy()))
 
-        center_positions = []
+        skipped_centers = []
         for kk in np.arange(len(ycent)):
             for jj in np.arange(len(xcent)):
                 ii = kk + jj*ycent.size
-                if ii in nearest_center:
-                    center_positions.append((xcent[jj], ycent[kk]))
+                if ii not in nearest_center:
+                    skipped_centers.append(ii)
                 else:
                     continue
 
-        return center_positions
+        return center_pos, skipped_centers, nearest_center
 
     def change_sorting_status(self, status_dict):
         self.sorting_status = status_dict
 
     def generate_spots_list(self):
-        channel_spots = []
-        template_spots = []
-        center_spots = []
+        self.channel_spots = []
+        self.template_spots = []
+        self.center_spots = []
+        self.number_spots = []
         bad_channels = self.gui.settings_box.get_bad_channels()
+        channel_size = 10 * self.spot_scale.value()/4
+        template_size = 5 * self.spot_scale.value()/4
+        center_size = 20 * self.spot_scale.value()/4
+        colors = ["w", "b", "r", "c", "y", "m"]
 
-        if self.xc is not None:
-            size = 10 * self.spot_scale.value()/4
-            symbol = "s"
+        if self.channel_toggle.isChecked():
             for x_pos, y_pos in zip(self.xc, self.yc):
                 index = self.channel_map_dict[(x_pos, y_pos)]
                 channel = self.channel_map[index]
@@ -160,50 +180,61 @@ class ProbeViewBox(QtWidgets.QGroupBox):
                     color = "g"
                 pen = pg.mkPen(0.5)
                 brush = pg.mkBrush(color)
-                channel_spots.append({
-                    'pos': (x_pos, y_pos), 'size': size, 'pen': pen, 'brush': brush,
-                    'symbol': symbol
+                self.channel_spots.append({
+                    'pos': (x_pos, y_pos), 'size': channel_size,
+                    'pen': pen, 'brush': brush, 'symbol': "s"
                     })
-        self.channel_spots = channel_spots
 
-        if self.xcup is not None:
-            size = 5 * self.spot_scale.value()/4
-            symbol = "o"
-            color = "w"
-            for x, y in zip(self.xcup, self.ycup):
+        if self.template_toggle.isChecked():
+            for i, (x, y) in enumerate(zip(self.xcup, self.ycup)):
                 pen = pg.mkPen(0.5)
-                brush = pg.mkBrush(color)
-                template_spots.append({
-                    'pos': (x,y), 'size': size, 'pen': pen, 'brush': brush,
-                    'symbol': symbol
-                    })
-        self.template_spots = template_spots
+                if self.color_toggle.isChecked():
+                    j = self.nearest_centers[i]
+                    brush = pg.mkBrush(colors[j % len(colors)])
+                else:
+                    brush = pg.mkBrush("w")
 
-        if self.center_positions is not None:
-            size = 20 * self.spot_scale.value()/4
-            symbol = "o"
-            color = "y"
-            for x, y in self.center_positions:
-                pen = pg.mkPen(color=color)
-                brush = None
-                center_spots.append({
-                    'pos': (x,y), 'size': size, 'pen': pen, 'brush': brush,
-                    'symbol': symbol
+                self.template_spots.append({
+                    'pos': (x,y), 'size': template_size, 'pen': pg.mkPen(0.5),
+                    'brush': brush, 'symbol': "o"
+                    })
+        
+        if self.center_toggle.isChecked():
+            for j, (x, y) in enumerate(self.center_positions):
+                if j in self.skipped_centers:
+                    continue
+                if self.color_toggle.isChecked():
+                    c = colors[j % len(colors)]
+                    pen1 = pg.mkPen(color=c)
+                else:
+                    c = "y"
+                    pen1 = pg.mkPen(color=c)
+                self.center_spots.append({
+                    'pos': (x,y), 'size': center_size,
+                    'pen': pen1, 'brush': None, 'symbol': "o"
                 })
-        self.center_spots = center_spots
+                
+                if self.number_toggle.isChecked():
+                    pen2 = pg.mkPen(color=c)
+                    symbol, scale = create_label(str(j), center_size)
+                    self.number_spots.append({
+                        'pos': (x,y), 'size': 0.1/scale,
+                        'pen': pen2, 'brush': None, 'symbol': symbol
+                    })
+
 
     def create_plot(self):
         self.generate_spots_list()
         spots = self.channel_spots
-        if self.template_toggle.isChecked():
-            spots += self.template_spots
-        if self.center_toggle.isChecked():
-            spots += self.center_spots
+        spots += self.template_spots
+        spots += self.center_spots
+        spots += self.number_spots
         if self.aspect_toggle.isChecked():
             self.probe_view.setAspectLocked()
         else:
             self.probe_view.setAspectLocked(lock=False)
 
+        self.probe_view.clear()
         scatter_plot = pg.ScatterPlotItem(spots)
         scatter_plot.sigClicked.connect(self.on_points_clicked)
         self.probe_view.addItem(scatter_plot)
@@ -247,3 +278,24 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.gui.settings_box.set_bad_channels(bad_channels)
 
         self.set_layout()
+
+
+def create_label(label, size):
+    # Adapted from:
+    # https://www.geeksforgeeks.org/pyqtgraph-show-text-as-spots-on-scatter-plot-graph/
+    
+    # Create QPainterPath to use as custom symbol shape
+    symbol = QtGui.QPainterPath()
+    f = QtGui.QFont()
+    f.setPointSize(size*5)
+    # For pyqtgraph, custom symbol shapes must be centered at (0,0)
+    p = QtCore.QPointF(0,0)
+    symbol.addText(p, f, label)
+    # Also must be scaled to width and height of 1.0
+    br = symbol.boundingRect()
+    scale = min(1. / br.width(), 1. / br.height())
+    tr = QtGui.QTransform()
+    tr.scale(scale, scale)
+    tr.translate(-br.x() - br.width() / 2., -br.y() - br.height() / 2.)
+
+    return tr.map(symbol), scale
