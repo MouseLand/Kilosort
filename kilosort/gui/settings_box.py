@@ -203,7 +203,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         row_count += rspan
         layout.addWidget(self.probe_layout_selector, row_count, col1, rspan, dbl)
-        self.probe_layout_selector.currentTextChanged.connect(
+        self.probe_layout_selector.textActivated.connect(
             self.on_probe_layout_selected
         )
 
