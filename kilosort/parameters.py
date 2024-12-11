@@ -298,6 +298,16 @@ EXTRA_PARAMETERS = {
             """
     },
 
+    'max_peels': {
+        'gui_name': 'max peels', 'type': int, 'min': 1, 'max': 10000, 'exclude': [],
+        'default': 100, 'step': 'spike detection',
+        'description':
+        """
+        Number of iterations to do over each batch of data in the matching
+        pursuit step. More iterations should detect more overlapping spikes.
+        """
+    },
+
     'templates_from_data': {
         'gui_name': 'templates from data', 'type': bool, 'min': None, 'max': None,
         'exclude': [], 'default': True, 'step': 'spike detection',
@@ -305,6 +315,28 @@ EXTRA_PARAMETERS = {
             """
             Indicates whether spike shapes used in universal templates should be 
             estimated from the data or loaded from the predefined templates.
+            """
+    },
+
+    'loc_range': {
+        'gui_name': 'loc range', 'type': list, 'min': None, 'max': None,
+        'exclude': [], 'default': [4, 5], 'step': 'spike detection',
+        'description':
+            """
+            Number of channels and time steps, respectively, to use for local
+            maximum detection when detecting spikes to compute universal
+            templates from data (only used if templates_from_data is True).
+            """
+    },
+
+    'long_range': {
+        'gui_name': 'loc range', 'type': list, 'min': None, 'max': None,
+        'exclude': [], 'default': [6, 30], 'step': 'spike detection',
+        'description':
+            """
+            Number of channels and time steps, respectively, to use for peak
+            isolation when detecting spikes to compute universal templates from
+            data (only used if templates_from_data is True).
             """
     },
 
@@ -383,6 +415,19 @@ EXTRA_PARAMETERS = {
             """
     },
 
+
+    'drift_smoothing': {
+        'gui_name': 'drift smoothing', 'type': list, 'min': None, 'max': None,
+        'exclude': [], 'default': [0.5, 0.5, 0.5], 'step': 'preprocessing',
+        'description':
+            """
+            Amount of gaussian smoothing to apply to the spatiotemporal drift
+            estimation, for correlation, time (units of registration blocks),
+            and y (units of batches) axes. The y smoothing has no effect
+            for `nblocks = 1`. Adjusting smoothing for the correlation axis
+            is not recommended.
+            """
+    },
 
     ### POSTPROCESSING
     'duplicate_spike_ms': {
