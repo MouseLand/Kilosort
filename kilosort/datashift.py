@@ -73,7 +73,7 @@ def align_block2(F, ysamp, ops, device=torch.device('cuda')):
     dt = np.arange(-n,n+1,1)
 
     # batch fingerprints are mean subtracted along depth
-    Fg = torch.from_numpy(F).to(device).float() 
+    Fg = torch.from_numpy(F.astype('float32')).to(device)
     Fg = Fg - Fg.mean(1).unsqueeze(1)
 
     # the template fingerprint is initialized with batch 300 if that exists
@@ -156,7 +156,7 @@ def align_block2(F, ysamp, ops, device=torch.device('cuda')):
         imin[:,j] = dall.sum(0)
 
     # Fg gets reinitialized with the un-corrected F without subtracting the mean across depth.      
-    Fg = torch.from_numpy(F).float()
+    Fg = torch.from_numpy(F.astype('float32'))
     imax = dall[:niter-1].sum(0)
 
     # Fg gets aligned again to compute the non-mean subtracted fingerprint    

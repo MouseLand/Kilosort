@@ -69,7 +69,7 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, Th_single_ch=6, nskip=25,
     clips /= (clips**2).sum(1, keepdims=True)**.5
 
     model = TruncatedSVD(n_components=ops['settings']['n_pcs']).fit(clips)
-    wPCA = torch.from_numpy(model.components_).to(device).float()
+    wPCA = torch.from_numpy(model.components_.astype('float32')).to(device)
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="")
@@ -78,7 +78,7 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, Th_single_ch=6, nskip=25,
         nthread = os.environ.get('OMP_NUM_THREADS', msg)
         os.environ['OMP_NUM_THREADS'] = '7'
         model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
-        wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
+        wTEMP = torch.from_numpy(model.cluster_centers_.astype('float32')).to(device)
         wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
         os.environ['OMP_NUM_THREADS'] = nthread
 
@@ -228,7 +228,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
 
     iC2, _ = nearest_chans(ys, ys, xs, xs, nC2, device=device)
 
-    ds_torch = torch.from_numpy(ds).to(device).float()
+    ds_torch = torch.from_numpy(ds.astype('float32')).to(device)
     template_sizes = sig * (1+torch.arange(nsizes, device=device))
     weigh = torch.exp(-ds_torch.unsqueeze(-1) / template_sizes**2)
     weigh = torch.permute(weigh, (2, 0, 1)).contiguous()

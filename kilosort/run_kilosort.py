@@ -179,17 +179,25 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         logger.info(platform.processor())
         if device is None:
             if torch.cuda.is_available():
-                logger.info('Using GPU for PyTorch computations. '
+                logger.info('Using GPU (cuda) for PyTorch computations. '
                             'Specify `device` to change this.')
                 device = torch.device('cuda')
+            elif torch.backends.mps.is_available():
+                logger.info('Using GPU (mps) for PyTorch computations. '
+                            'Specify `device` to change this.')
+                device = torch.device('mps')
             else:
                 logger.info('Using CPU for PyTorch computations. '
                             'Specify `device` to change this.')
                 device = torch.device('cpu')
 
         if device != torch.device('cpu'):
-            memory = torch.cuda.get_device_properties(device).total_memory/1024**3
-            logger.info(f'Using CUDA device: {torch.cuda.get_device_name()} {memory:.2f}GB')
+            if device == torch.device('cuda'):
+                memory = torch.cuda.get_device_properties(device).total_memory/1024**3
+                logger.info(f'Using CUDA device: {torch.cuda.get_device_name()} {memory:.2f}GB')
+            elif device == torch.device('mps'):
+                memory = torch.mps.recommended_max_memory()/1024**3
+                logger.info(f'Using MPS, recommended max memory: {memory:.2f}GB')
 
         logger.info('-'*40)
         logger.info(f"Sorting {filename}")
@@ -225,6 +233,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
         np.random.seed(1)
         torch.cuda.manual_seed_all(1)
+        torch.mps.manual_seed(1)
         torch.random.manual_seed(1)
         ops, bfile, st0 = compute_drift_correction(
             ops, device, tic0=tic0, progress_bar=progress_bar,
@@ -258,6 +267,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
             logger.exception('Out of memory error, printing performance...')
             log_performance(logger, level='info')
             log_cuda_details(logger)
+            # No equivalent error code for mps
 
         # This makes sure the full traceback is written to log file.
         logger.exception('Encountered error in `run_kilosort`:')
@@ -905,6 +915,8 @@ def load_sorting(results_dir, device=None, load_extra_vars=False):
     if device is None:
         if torch.cuda.is_available():
             device = torch.device('cuda')
+        elif torch.backends.mps.is_available():
+            device = torch.device('mps')
         else:
             device = torch.device('cpu')
 

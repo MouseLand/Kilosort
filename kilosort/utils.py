@@ -177,6 +177,9 @@ def log_cuda_details(log):
     """Log a detailed summary of cuda stats from `torch.cuda.memory_summary`."""
     if torch.cuda.is_available():
         log.debug(f'\n\n{torch.cuda.memory_summary(abbreviated=True)}\n')
+    elif torch.backends.mps.is_available():
+        memory = torch.mps.driver_allocated_memory()/1024**3
+        log.debug(f'\n\nMPS driver allocated memory: {memory:.2f}GB\n')
 
 
 def probe_as_string(probe):
