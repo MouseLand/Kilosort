@@ -51,6 +51,8 @@ def get_best_channels(results_dir):
     best_chans = (templates**2).sum(axis=1).argmax(axis=-1)
     return best_chans
 
+def get_best_channel(results_dir, cluster_id):
+    return get_best_channels(results_dir)[cluster_id]
 
 def get_cluster_spikes(cluster_id, results_dir, n_spikes=np.inf):
     """Get `n_spikes` random spike times assigned to `cluster_id`."""
