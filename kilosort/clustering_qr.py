@@ -96,8 +96,15 @@ def assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,ki,kj, device=torch.dev
     cols = iclust.unsqueeze(-1).tile((1, n_neigh))
     iis = torch.vstack((kn.flatten(), cols.flatten()))
 
-    xS = coo(iis, tones2.flatten(), (nsub, nclust))
-    xS = xS.to_dense()
+    if device == torch.device('mps'):
+        xS = torch.zeros((nsub,nclust), device = device)
+        unique_idx, inverse_idx = torch.unique(torch.stack([kn.flatten(), cols.flatten()], dim=1), dim=0, return_inverse=True)
+        aggregated_values = torch.zeros(len(unique_idx), device = device)
+        aggregated_values.index_add_(0, inverse_idx, tones2.flatten())
+        xS[unique_idx[:, 0], unique_idx[:, 1]] = aggregated_values
+    else:
+        xS = coo(iis, tones2.flatten(), (nsub, nclust))
+        xS = xS.to_dense()
 
     if lam > 0:
         tones = torch.ones(len(ki), device = device)

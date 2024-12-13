@@ -73,14 +73,20 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, Th_single_ch=6, nskip=25,
 
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="")
-        # Prevents memory leak for KMeans when using MKL on Windows
-        msg = 'KMeans is known to have a memory leak on Windows with MKL'
-        nthread = os.environ.get('OMP_NUM_THREADS', msg)
-        os.environ['OMP_NUM_THREADS'] = '7'
-        model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
-        wTEMP = torch.from_numpy(model.cluster_centers_.astype('float32')).to(device)
-        wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
-        os.environ['OMP_NUM_THREADS'] = nthread
+        num_threads_ = '7'
+        if device == torch.device('mps'):
+            os.environ['OMP_NUM_THREADS'] = num_threads_
+            model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
+            wTEMP = torch.from_numpy(model.cluster_centers_.astype('float32')).to(device)
+            wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
+        else: # Prevents memory leak for KMeans when using MKL on Windows
+            msg = 'KMeans is known to have a memory leak on Windows with MKL'
+            nthread = os.environ.get('OMP_NUM_THREADS', msg)
+            os.environ['OMP_NUM_THREADS'] = num_threads_
+            model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
+            wTEMP = torch.from_numpy(model.cluster_centers_.astype('float32')).to(device)
+            wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
+            os.environ['OMP_NUM_THREADS'] = nthread
 
     return wPCA, wTEMP
 
