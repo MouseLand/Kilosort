@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 import numpy as np
 import torch
 
+import os
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+
 import kilosort
 from kilosort import (
     preprocessing,
@@ -198,6 +201,9 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
             elif device == torch.device('mps'):
                 memory = torch.mps.recommended_max_memory()/1024**3
                 logger.info(f'Using MPS, recommended max memory: {memory:.2f}GB')
+                torch.mps.set_per_process_memory_fraction(1.0)
+            else:
+                raise ValueError(f'Invalid device: {device}, only cuda and mps are supported.')
 
         logger.info('-'*40)
         logger.info(f"Sorting {filename}")

@@ -75,8 +75,13 @@ def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj, device=t
     NN = kn.shape[0]
 
     ij = torch.vstack((rows_neigh.flatten(), isub[kn].flatten()))
-    xN = coo(ij, tones2.flatten(), (NN, nclust))
-    xN = xN.to_dense()
+    if device == torch.device('mps'):
+        xN_ = coo(ij, tones2.flatten(), (NN, nclust), device = torch.device('cpu'))
+        xN_ = xN_.to_dense()
+        xN = xN_.to(device)
+    else:
+        xN = coo(ij, tones2.flatten(), (NN, nclust))
+        xN = xN.to_dense()
 
     if lam > 0:
         tones = torch.ones(len(kj), device = device)
@@ -95,13 +100,11 @@ def assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,ki,kj, device=torch.dev
     n_neigh = kn.shape[1]
     cols = iclust.unsqueeze(-1).tile((1, n_neigh))
     iis = torch.vstack((kn.flatten(), cols.flatten()))
-
+    
     if device == torch.device('mps'):
-        xS = torch.zeros((nsub,nclust), device = device)
-        unique_idx, inverse_idx = torch.unique(torch.stack([kn.flatten(), cols.flatten()], dim=1), dim=0, return_inverse=True)
-        aggregated_values = torch.zeros(len(unique_idx), device = device)
-        aggregated_values.index_add_(0, inverse_idx, tones2.flatten())
-        xS[unique_idx[:, 0], unique_idx[:, 1]] = aggregated_values
+        xS_ = coo(iis, tones2.flatten(), (nsub, nclust), device = torch.device('cpu'))
+        xS_ = xS_.to_dense()
+        xS = xS_.to(device)
     else:
         xS = coo(iis, tones2.flatten(), (nsub, nclust))
         xS = xS.to_dense()
