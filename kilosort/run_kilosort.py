@@ -202,6 +202,9 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                 memory = torch.mps.recommended_max_memory()/1024**3
                 logger.info(f'Using MPS, recommended max memory: {memory:.2f}GB')
                 torch.mps.set_per_process_memory_fraction(1.0)
+                if settings.get('batch_size') > 65000:
+                    settings['batch_size'] = 65000
+                    logger.warning('Reducing batch size to 65000 for MPS.')
             else:
                 raise ValueError(f'Invalid device: {device}, only cuda and mps are supported.')
 
