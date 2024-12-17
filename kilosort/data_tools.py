@@ -34,7 +34,7 @@ def mean_waveform(cluster_id, results_dir, n_spikes=np.inf, bfile=None, best=Tru
     """
     results_dir = Path(results_dir)
     if best:
-        chan = get_best_channel(cluster_id, results_dir)
+        chan = get_best_channels(results_dir)[cluster_id]
     else:
         chan = None
 
@@ -45,12 +45,14 @@ def mean_waveform(cluster_id, results_dir, n_spikes=np.inf, bfile=None, best=Tru
     return mean_wave
 
 
-def get_best_channel(cluster_id, results_dir):
-    """Get channel number with largest template norm for this cluster."""
+def get_best_channels(results_dir):
+    """Get channel numbers with largest template norm for each cluster."""
     templates = np.load(results_dir / 'templates.npy')
-    chan = (templates**2).sum(axis=1).argmax(axis=-1)[cluster_id]
-    return chan
+    best_chans = (templates**2).sum(axis=1).argmax(axis=-1)
+    return best_chans
 
+def get_best_channel(results_dir, cluster_id):
+    return get_best_channels(results_dir)[cluster_id]
 
 def get_cluster_spikes(cluster_id, results_dir, n_spikes=np.inf):
     """Get `n_spikes` random spike times assigned to `cluster_id`."""
