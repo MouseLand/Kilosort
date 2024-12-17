@@ -59,17 +59,23 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(QtWidgets.QLabel('Left click to toggle excluded channels'))
         layout.addWidget(self.probe_view, 95)
+
         chan_box = QtWidgets.QHBoxLayout()
         chan_box.addWidget(self.aspect_toggle)
         chan_box.addWidget(self.channel_toggle)
         layout.addLayout(chan_box)
-        layout.addWidget(self.template_toggle)
-        layout.addWidget(self.center_toggle)
-        op_box = QtWidgets.QHBoxLayout()
-        op_box.addWidget(self.color_toggle)
-        op_box.addWidget(self.number_toggle)
-        layout.addLayout(op_box)
+
+        temp_box = QtWidgets.QHBoxLayout()
+        temp_box.addWidget(self.template_toggle)
+        temp_box.addWidget(self.color_toggle)
+        layout.addLayout(temp_box)
+
+        center_box = QtWidgets.QHBoxLayout()
+        center_box.addWidget(self.center_toggle)
+        center_box.addWidget(self.number_toggle)
+        layout.addLayout(center_box)
         layout.addWidget(self.spot_scale)
+        
         self.setLayout(layout)
 
     def reset_spots_variables(self):
