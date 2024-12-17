@@ -122,7 +122,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         for ind, (xc, yc) in enumerate(zip(self.xc, self.yc)):
             self.channel_map_dict[(xc, yc)] = ind
 
-    def get_template_spots(self, nC, dmin, dminx, max_dist, x_centers, device):
+    def get_template_spots(self, nC, dmin, dminx, max_dist, x_centers):
         ops = {
             'yc': self.yc, 'xc': self.xc, 'max_channel_distance': max_dist,
             'x_centers': x_centers, 'settings': {'dmin': dmin, 'dminx': dminx},
@@ -131,7 +131,9 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         ops = template_centers(ops)
         [ys, xs] = np.meshgrid(ops['yup'], ops['xup'])
         ys, xs = ys.flatten(), xs.flatten()
-        iC, ds = nearest_chans(ys, self.yc, xs, self.xc, nC, device=device)
+        iC, ds = nearest_chans(
+            ys, self.yc, xs, self.xc, nC, device=self.gui.device
+            )
 
         igood = ds[0,:] <= max_dist**2
         iC = iC[:,igood]
