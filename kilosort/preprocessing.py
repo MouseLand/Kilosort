@@ -86,7 +86,7 @@ def get_fwav(NT = 30122, fs = 30000, device=torch.device('cuda')):
     
     # symmetric filter from scipy
     wav = filtfilt(b,a , x).copy()
-    wav = torch.from_numpy(wav).to(device).float()
+    wav = torch.from_numpy(wav.astype('float32')).to(device)
 
     # the filter will be used directly in the Fourier domain
     fwav = fft(wav)
@@ -132,7 +132,7 @@ def get_highpass_filter(fs=30000, cutoff=300, device=torch.device('cuda')):
     # symmetric filter from scipy
     hp_filter = filtfilt(b, a , x).copy()
     
-    hp_filter = torch.from_numpy(hp_filter).to(device).float()
+    hp_filter = torch.from_numpy(hp_filter.astype('float32')).to(device)
     return hp_filter
 
 def fft_highpass(hp_filter, NT=30122):
