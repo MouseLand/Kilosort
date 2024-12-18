@@ -33,9 +33,13 @@ def remove_duplicates(spike_times, spike_clusters, dt=15):
 def compute_spike_positions(st, tF, ops):
     '''Get x,y positions of spikes relative to probe.'''
     tmass = (tF**2).sum(-1)
-    tmass = tmass / tmass.sum(1, keepdim=True)
     xc = torch.from_numpy(ops['xc']).to(tmass.device)
     yc = torch.from_numpy(ops['yc']).to(tmass.device)
+    # TODO: also store distance to each of these channels, and multiply by
+    #       tmass before summing so that far away channels are ~0
+    tmask = ops['iCC_mask'][:, ops['iU'][st[:,1]]]  # 1 if close enough, 0 if too far away (tbd, maybe 100ish um)
+    tmass = tmass * tmask
+    tmass = tmass / tmass.sum(1, keepdim=True)
     chs = ops['iCC'][:, ops['iU'][st[:,1]]].cpu()
     xc0 = xc[chs.T]
     yc0 = yc[chs.T]

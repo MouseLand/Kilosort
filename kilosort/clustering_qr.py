@@ -366,6 +366,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     
     clu = np.zeros(nsp, 'int32')
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
+    Nfilt = None
     nearby_chans_empty = 0
     nmax = 0
     prog = tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None,
@@ -433,9 +434,13 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     except:
         logger.exception(f'Error in clustering_qr.run on center {ii}')
         logger.debug(f'Xd shape: {Xd.shape}')
-        logger.debug(f'iclust shape: {iclust.shape}')
-        logger.debug(f'clu shape: {clu.shape}')
         logger.debug(f'Nfilt: {Nfilt}')
+        logger.debug(f'num spikes: {nsp}')
+        try:
+            logger.debug(f'iclust shape: {iclust.shape}')
+        except UnboundLocalError:
+            logger.debug('iclust not yet assigned')
+            pass
         raise
 
     if nearby_chans_empty == len(ycent):

@@ -14,15 +14,25 @@ logger = logging.getLogger(__name__)
 def prepare_extract(ops, U, nC, device=torch.device('cuda')):
     ds = (ops['xc'] - ops['xc'][:, np.newaxis])**2 +  (ops['yc'] - ops['yc'][:, np.newaxis])**2 
     iCC = np.argsort(ds, 0)[:nC]
-    iCC = torch.from_numpy(iCC).to(device)
+    iCC = torch.from_numpy(iCC, device=device)
+    iCC_mask = np.sorg(ds, 0)[:nC]
+    iCC_mask = iCC_mask < 10000  # 100um squared
+    iCC_mask = torch.from_numpy(iCC_mask, device=device)
     iU = torch.argmax((U**2).sum(1), -1)
     Ucc = U[torch.arange(U.shape[0]),:,iCC[:,iU]]
-    return iCC, iU, Ucc
+
+    # iCC: nC nearest channels to each channel
+    # iCC_mask: 1 if above is within 100um of channel, 0 otherwise
+    # iU: index of max channel for each template
+    # Ucc: spatial PC features corresponding to iCC for each template
+
+    return iCC, iCC_mask, iU, Ucc
 
 def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     nC = ops['settings']['nearest_chans']
-    iCC, iU, Ucc = prepare_extract(ops, U, nC, device=device)
+    iCC, iCC_mask, iU, Ucc = prepare_extract(ops, U, nC, device=device)
     ops['iCC'] = iCC
+    ops['iCC_mask'] = iCC_mask
     ops['iU'] = iU
     nt = ops['nt']
     
