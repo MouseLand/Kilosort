@@ -4,12 +4,13 @@ import logging
 import numpy as np
 import torch
 from torch import sparse_coo_tensor as coo
-from scipy.sparse import csr_matrix
-from scipy.ndimage import gaussian_filter
-from scipy.signal import find_peaks
-from scipy.cluster.vq import kmeans
+import scipy.sparse
+import scipy.ndimage
+import scipy.signal
+import scipy.cluster.vq
 import faiss
-from tqdm import tqdm 
+from tqdm import tqdm
+from numba import njit
 
 from kilosort import hierarchical, swarmsplitter
 from kilosort.utils import log_performance
@@ -26,12 +27,37 @@ def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1, overlap=0.75):
     # n_nodes is the number of subsampled spikes
     n_samples, dim = Xd.shape
     n_nodes = list(index_spikes.shape)[0]
-    # Split index spikes into multiple sets in time, so that only spikes that
-    # are close together in time can be neighbors. This improves clustering
-    # accuracy for long recordings, when waveform shapes may change over time.
-    all_Xsub, splits = split_data(index_spikes, n_splits, overlap=overlap)
-    sample_ranges = map_to_index(splits, nskip, list(Xd.shape)[0])
 
+
+    # First, always do this with a single split (global neighbor finding).
+    all_Xsub1 = [index_spikes]
+    splits1 = [(0,index_spikes.shape[0])]
+    sample_ranges1 = [[0, n_samples]]
+    kn1 = _find_neighbors(Xd, all_Xsub1, sample_ranges1, splits1, n_neigh, dim)
+
+    if n_splits > 1:
+        # Split index spikes into multiple sets in time, so that only spikes that
+        # are close together in time can be neighbors. This improves clustering
+        # accuracy for long recordings, when waveform shapes may change over time.
+        all_Xsub2, splits2 = split_data(index_spikes, n_splits, overlap=overlap)
+        sample_ranges2 = map_to_index(splits2, nskip, n_samples)
+        kn2 = _find_neighbors(Xd, all_Xsub2, sample_ranges2, splits2, n_neigh, dim)
+
+        kn = _build_intersection(kn1, kn2)
+    else:
+        kn = kn1
+
+    M = _get_connection_matrix(kn, n_samples, n_neigh, n_nodes)
+    # self connections are set to 0
+    M[np.arange(0,n_samples,nskip), np.arange(n_nodes)] = 0
+
+    # TODO: check whether kn supposed to be sorted by L2 norm, if so make sure
+    #       _build_intersection preserves that. On the other hand, does it matter?
+
+    return kn, M
+
+
+def _find_neighbors(Xd, all_Xsub, sample_ranges, splits, n_neigh, dim):
     all_kn = []
     for Xsub, (start, stop), (i, _) in zip(all_Xsub, sample_ranges, splits):
         # Only search spikes that are assigned to this portion of the index.
@@ -51,17 +77,57 @@ def neigh_mat(Xd, nskip=10, n_neigh=30, n_splits=1, overlap=0.75):
 
     # Combine neighbors from split indices for form one big graph.
     kn = np.concatenate(all_kn)
+    
+    return kn
+
+
+# TODO: doesn't seem to like intersect1d even though it's supposed to be supported.
+#       just try it without the njit for now, if it works can worry about making it
+#       fast later.
+#@njit("(int64[:], int64[:])")
+def _build_intersection(kn1, kn2):
+    kn = np.zeros_like(kn1)
+    for i in range(kn.shape[0]):
+        a = np.intersect1d(kn1[i], kn2[i])
+        n = a.size
+        kn[i,0:n] = a
+
+        # Pick alternating values that aren't in intersection, starting
+        # with the strongest match.
+        # Indices tracked separately so that values aren't checked
+        # multiple times.
+        k1 = 0
+        k2 = 0
+        for j in range(10-n):
+            if ((j % 2 == 0) or (k2 == n)) and k1 != n:
+                v = kn1[i,k1]
+                while v in a:
+                    k1 += 1
+                    v = kn1[i,k1]
+                # Otherwise, will keep adding the current v on next iters.
+                k1 += 1
+            else:
+                v = kn2[i,k2]
+                while v in a:
+                    k2 += 1
+                    v = kn2[i,k2]
+                k2 += 1
+            kn[i,j+n] = v
+
+    return kn
+
+
+def _get_connection_matrix(kn, n_samples, n_neigh, n_nodes):
     # Create sparse matrix version of kn with ones where the neighbors are
     # M is n_samples by n_nodes
     dexp = np.ones(kn.shape, np.float32)    
     rows = np.tile(np.arange(n_samples)[:, np.newaxis], (1, n_neigh)).flatten()
-    M   = csr_matrix((dexp.flatten(), (rows, kn.flatten())),
-                     (kn.shape[0], n_nodes))
+    M   = scipy.sparse.csr_matrix(
+        (dexp.flatten(), (rows, kn.flatten())),
+        (kn.shape[0], n_nodes)
+        )
 
-    # self connections are set to 0!
-    M[np.arange(0,n_samples,nskip), np.arange(n_nodes)] = 0
-
-    return kn, M
+    return M
 
 
 def split_data(data, n_splits, overlap):
@@ -69,7 +135,6 @@ def split_data(data, n_splits, overlap):
         # Use all spikes for a single index
         split_data = [data]
         splits = [(0,data.shape[0])]
-        chunk_size = data.shape[0]
     else:
         # Splits index spikes into 2*n_splits - 1 chunks, where the additional
         # chunks are overlapping offsets.
@@ -89,7 +154,7 @@ def split_data(data, n_splits, overlap):
     return split_data, splits
 
 
-def map_to_index(splits,  nskip, n_all_spikes):
+def map_to_index(splits,  nskip, n_samples):
     if len(splits) == 1:
         # Only one split, all spikes get assigned to the only index.
         sample_ranges = splits
@@ -117,7 +182,7 @@ def map_to_index(splits,  nskip, n_all_spikes):
 
     # Convert from subsampled indices back to full spike indices
     sample_ranges = [[i*nskip, j*nskip] for i, j in sample_ranges]
-    sample_ranges[-1][1] = n_all_spikes
+    sample_ranges[-1][1] = n_samples
     
     return sample_ranges
 
@@ -362,8 +427,8 @@ def x_centers(ops):
         bins = np.linspace(min_x - bin_width*2, max_x + bin_width*2, num_bins)
         hist, edges = np.histogram(ops['xc'], bins=bins)
         # Apply smoothing to make peak-finding simpler.
-        smoothed = gaussian_filter(hist, sigma=0.5)
-        peaks, _ = find_peaks(smoothed)
+        smoothed = scipy.ndimage.gaussian_filter(hist, sigma=0.5)
+        peaks, _ = scipy.signal.find_peaks(smoothed)
         # peaks are indices, translate back to position in microns
         approx_centers = [edges[p] for p in peaks]
 
@@ -372,16 +437,7 @@ def x_centers(ops):
         # just look for one centroid.
         if len(approx_centers) <= 1: approx_centers = 1
 
-    centers, distortion = kmeans(ops['xc'], approx_centers, seed=5330)
-
-    # TODO: Maybe use distortion to raise warning if it seems too large?
-    # "The mean (non-squared) Euclidean distance between the observations passed
-    #  and the centroids generated. Note the difference to the standard definition
-    #  of distortion in the context of the k-means algorithm, which is the sum of
-    #  the squared distances."
-
-    # For example, could raise a warning if this is greater than dminx*2?
-    # Most probes should satisfy that criteria.
+    centers, _ = scipy.cluster.vq.kmeans(ops['xc'], approx_centers, seed=5330)
 
     return centers
 
@@ -438,6 +494,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     nearest_center = get_nearest_centers(xy, xcent, ycent)
     
     clu = np.zeros(nsp, 'int32')
+    Nfilt = None  # just to avoid an annoyance with logging
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
     nearby_chans_empty = 0
     nmax = 0
@@ -507,9 +564,13 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     except:
         logger.exception(f'Error in clustering_qr.run on center {ii}')
         logger.debug(f'Xd shape: {Xd.shape}')
-        logger.debug(f'iclust shape: {iclust.shape}')
-        logger.debug(f'clu shape: {clu.shape}')
         logger.debug(f'Nfilt: {Nfilt}')
+        logger.debug(f'num spikes: {nsp}')
+        try:
+            logger.debug(f'iclust shape: {iclust.shape}')
+        except UnboundLocalError:
+            logger.debug('iclust not yet assigned')
+            pass
         raise
 
     if nearby_chans_empty == len(ycent):
