@@ -341,7 +341,7 @@ def get_nearest_centers(xy, xcent, ycent):
     # Get flattened index of x-y center that is closest to template
     minimum_distance = torch.min(center_distance, 0).indices
 
-    return minimum_distance
+    return minimum_distance, xcent_pos, ycent_pos
 
 
 def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
@@ -362,7 +362,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
-    nearest_center = get_nearest_centers(xy, xcent, ycent)
+    nearest_center, _, _ = get_nearest_centers(xy, xcent, ycent)
     
     clu = np.zeros(nsp, 'int32')
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
@@ -400,6 +400,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                         st0 = None
 
                     # find new clusters
+                    logger.debug(f'Num spikes for this center: {Xd.shape[0]}')
                     iclust, iclust0, M, _ = cluster(
                         Xd, nskip=nskip, lam=1, seed=5, device=device
                         )

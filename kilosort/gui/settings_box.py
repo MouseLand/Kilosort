@@ -19,6 +19,9 @@ logger = setup_logger(__name__)
 
 _DEFAULT_DTYPE = 'int16'
 _ALLOWED_FILE_TYPES = ['.bin', '.dat', '.bat', '.raw']  # For binary data
+_PROBE_SETTINGS = [
+    'nearest_chans', 'dmin', 'dminx', 'max_channel_distance', 'x_centers'
+    ]
 
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.Signal()
@@ -203,7 +206,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         row_count += rspan
         layout.addWidget(self.probe_layout_selector, row_count, col1, rspan, dbl)
-        self.probe_layout_selector.currentTextChanged.connect(
+        self.probe_layout_selector.textActivated.connect(
             self.on_probe_layout_selected
         )
 
@@ -247,6 +250,8 @@ class SettingsBox(QtWidgets.QGroupBox):
                 )
             inp = getattr(self, f'{k}_input')
             inp.editingFinished.connect(self.update_parameter)
+            if k in _PROBE_SETTINGS:
+                inp.editingFinished.connect(self.show_probe_layout())
 
         row_count += rspan
         layout.addWidget(
@@ -520,8 +525,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             return False
 
         none_allowed = [
-            'dmin', 'nt0min', 'max_channel_distance', 'x_centers',
-            'shift', 'scale'
+            'dmin', 'nt0min', 'x_centers', 'shift', 'scale', 'max_channel_distance'
             ]
         for k, v in self.settings.items():
             if v is None and k not in none_allowed:
@@ -551,10 +555,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def get_probe_template_args(self):
         epw = self.extra_parameters_window
-        template_args = [
-            epw.nearest_chans, epw.dmin, epw.dminx, 
-            epw.max_channel_distance, epw.x_centers, self.gui.device
-            ]
+        template_args = [getattr(epw, k) for k in _PROBE_SETTINGS]
         return template_args
 
     @QtCore.Slot()
@@ -863,6 +864,8 @@ class ExtraParametersWindow(QtWidgets.QWidget):
             layout.addWidget(getattr(self, f'{k}_input'), row_count, col+3, 1, 2)
             inp = getattr(self, f'{k}_input')
             inp.editingFinished.connect(self.update_parameter)
+            if k in _PROBE_SETTINGS:
+                inp.editingFinished.connect(self.main_settings.show_probe_layout)
 
         self.setLayout(layout)
 

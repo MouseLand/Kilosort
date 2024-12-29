@@ -13,5 +13,5 @@ from .settings_box import SettingsBox
 # from .sorter import filter_and_whiten, get_predicted_traces, KiloSortWorker
 # from .sanity_plots import SanityPlotWidget
 
-from .main import KiloSortGUI
+from .main import KilosortGUI
 from .launch import launcher

@@ -31,8 +31,11 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     st = np.zeros((10**6, 4), 'float64')
     tF  = torch.zeros((10**6, nC , ops['settings']['n_pcs']))
     k = 0
-    prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
-                mininterval=60 if progress_bar else None)
+    prog = tqdm(
+        np.arange(bfile.n_batches, dtype=np.int64),
+        miniters=200 if progress_bar else None, 
+        mininterval=60 if progress_bar else None
+        )
     
     try:
         for ibatch in prog:

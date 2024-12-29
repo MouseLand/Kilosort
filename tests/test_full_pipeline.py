@@ -22,6 +22,7 @@ def test_pipeline(data_directory, results_directory, saved_ops, torch_device, ca
             filename=bin_file, device=torch_device,
             settings={'n_chan_bin': 385},
             probe_name='neuropixPhase3B1_kilosortChanMap.mat',
+            verbose_console=True
             )
 
     st = st[kept_spikes,0]  # only first column is spike times

@@ -1,8 +1,10 @@
 import os, tempfile, shutil, pathlib, psutil
 import importlib.util
 import logging
+import pprint
 logger = logging.getLogger(__name__)
 
+import numpy as np
 from tqdm import tqdm
 from urllib.request import urlopen
 from urllib.error import HTTPError
@@ -175,3 +177,47 @@ def log_cuda_details(log):
     """Log a detailed summary of cuda stats from `torch.cuda.memory_summary`."""
     if torch.cuda.is_available():
         log.debug(f'\n\n{torch.cuda.memory_summary(abbreviated=True)}\n')
+
+
+def probe_as_string(probe):
+    """Format probe dictionary as copy-pasteable-to-code string."""
+
+    # Set numpy to print full arrays
+    opt = np.get_printoptions()
+    np.set_printoptions(threshold=np.inf)
+    
+    p = pprint.pformat(probe, indent=4, sort_dicts=False)
+    # insert `np.` so that text can be copied directly to code
+    p = 'np.array'.join(p.split('array'))
+    p = 'dtype=np.'.join(p.split('dtype='))
+    probe_text = "probe = "
+    # Put curly braces on separate lines
+    probe_text += p[0] + '\n ' + p[1:-1] + '\n' + p[-1]
+
+    # Revert numpy settings
+    np.set_printoptions(**opt)
+
+    return probe_text
+
+
+def ops_as_string(ops):
+    """Format ops dictionary as copy-pasteable-to-code string.
+    
+    Notes
+    -----
+    Keys for `settings` and `probe` are removed since they contain a lot of
+    redundant information and are difficult to format in a nested way. See
+    `probe_as_string` for printing probe information.
+    
+    """
+
+    ops_copy = ops.copy()
+    probe_keys = list(ops['probe'].keys())
+    for k in ['settings', 'probe'] + probe_keys:
+        _ = ops_copy.pop(k)
+    ops_text = "ops = "
+    p = pprint.pformat(ops_copy, indent=4, sort_dicts=False)
+    # Put curly braces on separate lines
+    ops_text += p[0] + '\n ' + p[1:-1] + '\n' + p[-1]
+
+    return ops_text
