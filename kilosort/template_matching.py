@@ -43,7 +43,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
                 log_performance(logger, 'debug', f'Batch {ibatch}')
 
             X = bfile.padded_batch_to_torch(ibatch, ops)
-            stt, amps, Xres, th_amps = run_matching(ops, X, U, ctc, device=device)
+            stt, amps, th_amps, Xres = run_matching(ops, X, U, ctc, device=device)
             xfeat = Xres[iCC[:, iU[stt[:,1:2]]],stt[:,:1] + tiwave] @ ops['wPCA'].T
             xfeat += amps * Ucc[:,stt[:,1]]
 
@@ -196,7 +196,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
     amps = amps[:k]
     th_amps = th_amps[:k]
 
-    return  st, amps, Xres, th_amps
+    return  st, amps, th_amps, Xres
 
 
 def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.device('cuda')):

@@ -226,7 +226,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     Parameters
     ----------
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
+        4-column array of peak time (in samples), template, amplitude, and threshold amplitude for
         each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
