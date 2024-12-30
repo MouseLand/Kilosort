@@ -11,18 +11,56 @@ from kilosort.utils import log_performance
 logger = logging.getLogger(__name__)
 
 
-def prepare_extract(ops, U, nC, device=torch.device('cuda')):
-    ds = (ops['xc'] - ops['xc'][:, np.newaxis])**2 +  (ops['yc'] - ops['yc'][:, np.newaxis])**2 
+def prepare_extract(xc, yc, U, nC, position_limit, device=torch.device('cuda')):
+    """Identify desired channels based on distances and template norms.
+    
+    Parameters
+    ----------
+    xc : np.ndarray
+        X-coordinates of contact positions on probe.
+    yc : np.ndarray
+        Y-coordinates of contact positions on probe.
+    U : torch.Tensor
+        TODO
+    nC : int
+        Number of nearest channels to use.
+    position_limit : float
+        Max distance (in microns) between channels that are used to estimate
+        spike positions in `postprocessing.compute_spike_positions`.
+
+    Returns
+    -------
+    iCC : np.ndarray
+        For each channel, indices of nC nearest channels.
+    iCC_mask : np.ndarray
+        For each channel, a 1 if the channel is within 100um and a 0 otherwise.
+        Used to control spike position estimate in post-processing.
+    iU : torch.Tensor
+        For each template, index of channel with greatest norm.
+    Ucc : torch.Tensor
+        For each template, spatial PC features corresponding to iCC.
+    
+    """
+    ds = (xc - xc[:, np.newaxis])**2 +  (yc - yc[:, np.newaxis])**2 
     iCC = np.argsort(ds, 0)[:nC]
     iCC = torch.from_numpy(iCC).to(device)
+    iCC_mask = np.sort(ds, 0)[:nC]
+    iCC_mask = iCC_mask < position_limit**2
+    iCC_mask = torch.from_numpy(iCC_mask).to(device)
     iU = torch.argmax((U**2).sum(1), -1)
     Ucc = U[torch.arange(U.shape[0]),:,iCC[:,iU]]
-    return iCC, iU, Ucc
+
+    return iCC, iCC_mask, iU, Ucc
+
 
 def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     nC = ops['settings']['nearest_chans']
-    iCC, iU, Ucc = prepare_extract(ops, U, nC, device=device)
+    position_limit = ops['settings']['position_limit']
+    iCC, iCC_mask, iU, Ucc = prepare_extract(
+        ops['xc'], ops['yc'], U, nC, position_limit, device=device
+        )
     ops['iCC'] = iCC
+    ops['iCC_mask'] = iCC_mask
     ops['iU'] = iU
     nt = ops['nt']
     
@@ -85,6 +123,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
 
     return st, tF, ops
 
+
 def align_U(U, ops, device=torch.device('cuda')):
     Uex = torch.einsum('xyz, zt -> xty', U.to(device), ops['wPCA'])
     X = Uex.reshape(-1, ops['Nchan']).T
@@ -108,6 +147,7 @@ def postprocess_templates(Wall, ops, clu, st, device=torch.device('cuda')):
     Wall3 = Wall3.transpose(1,2).to(device)
     return Wall3
 
+
 def prepare_matching(ops, U):
     nt = ops['nt']
     W = ops['wPCA'].contiguous()
@@ -121,6 +161,7 @@ def prepare_matching(ops, U):
     ctc = torch.einsum('ijkm, kml -> ijl', UtU, WtW)
 
     return ctc
+
 
 def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
     Th = ops['Th_learned']
