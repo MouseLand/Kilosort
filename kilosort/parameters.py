@@ -398,6 +398,18 @@ EXTRA_PARAMETERS = {
             default of 7 bins for a 30kHz sampling rate.
             """
     },
+
+    'position_limit': {
+        'gui_name': 'position limit', 'type': float, 'min': 0, 'max': np.inf,
+        'exclude': [], 'default': 100, 'step': 'postprocessing',
+        'description':
+            """
+            Maximum distance (in microns) between channels that can be used
+            to estimate spike positions in `postprocessing.compute_spike_positions`.
+            This does not affect spike sorting, only how positions are estimated
+            after sorting is complete.
+            """
+    },
 }
 
 # Add default values to descriptions

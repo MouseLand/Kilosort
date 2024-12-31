@@ -32,14 +32,22 @@ def remove_duplicates(spike_times, spike_clusters, dt=15):
 
 def compute_spike_positions(st, tF, ops):
     '''Get x,y positions of spikes relative to probe.'''
+    # Determine channel weightings for nearest channels
+    # based on norm of PC features. Channels that are far away have 0 weight,
+    # determined by `ops['settings']['position_limit']`.
     tmass = (tF**2).sum(-1)
+    tmask = ops['iCC_mask'][:, ops['iU'][st[:,1]]].T.to(tmass.device)
+    tmass = tmass * tmask
     tmass = tmass / tmass.sum(1, keepdim=True)
+
+    # Get x,y coordinates of nearest channels.
     xc = torch.from_numpy(ops['xc']).to(tmass.device)
     yc = torch.from_numpy(ops['yc']).to(tmass.device)
     chs = ops['iCC'][:, ops['iU'][st[:,1]]].cpu()
     xc0 = xc[chs.T]
     yc0 = yc[chs.T]
 
+    # Estimate spike positions as weighted sum of coordinates of nearby channels.
     xs = (xc0 * tmass).sum(1).cpu().numpy()
     ys = (yc0 * tmass).sum(1).cpu().numpy()
 
