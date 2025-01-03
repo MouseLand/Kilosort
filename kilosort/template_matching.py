@@ -54,6 +54,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
                 stt = stt[~neg_spikes,:]
                 xfeat = xfeat[:,~neg_spikes,:]
                 amps = amps[~neg_spikes,:]
+                th_amps = th_amps[~neg_spikes,:]
 
             nsp = len(stt) 
             if k+nsp>st.shape[0]:                     
