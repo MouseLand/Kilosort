@@ -332,6 +332,8 @@ def set_files(settings, filename, probe, probe_name,
 
 
 def setup_logger(results_dir, verbose_console=False):
+    results_dir = Path(results_dir)
+    
     # Get root logger for Kilosort application
     ks_log = logging.getLogger('kilosort')
     ks_log.setLevel(logging.DEBUG)
