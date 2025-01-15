@@ -81,7 +81,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
                 log_performance(logger, 'debug', f'Batch {ibatch}')
 
             X = bfile.padded_batch_to_torch(ibatch, ops)
-            stt, amps, Xres = run_matching(ops, X, U, ctc, device=device)
+            stt, amps, th_amps, Xres = run_matching(ops, X, U, ctc, device=device)
             xfeat = Xres[iCC[:, iU[stt[:,1:2]]],stt[:,:1] + tiwave] @ ops['wPCA'].T
             xfeat += amps * Ucc[:,stt[:,1]]
 
@@ -92,6 +92,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
                 stt = stt[~neg_spikes,:]
                 xfeat = xfeat[:,~neg_spikes,:]
                 amps = amps[~neg_spikes,:]
+                th_amps = th_amps[~neg_spikes,:]
 
             nsp = len(stt) 
             if k+nsp>st.shape[0]:                     
@@ -101,7 +102,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
             stt = stt.double()
             st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['batch_size'])).cpu().numpy() - nt//2 + ops['nt0min']
             st[k:k+nsp,1] = stt[:,1].cpu().numpy()
-            st[k:k+nsp,2] = amps[:,0].cpu().numpy()
+            st[k:k+nsp,2] = th_amps.cpu().numpy().squeeze()
             
             tF[k:k+nsp]  = xfeat.transpose(0,1).cpu()
 
@@ -180,6 +181,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
 
     st = torch.zeros((100000,2), dtype = torch.int64, device = device)
     amps = torch.zeros((100000,1), dtype = torch.float, device = device)
+    th_amps = torch.zeros((100000,1), dtype = torch.float, device = device)
     k = 0
 
     Xres = X.clone()
@@ -187,6 +189,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
 
     for t in range(100):
         # Cf = 2 * B - nm.unsqueeze(-1) 
+        # Cf is shape (n_units, n_times)
         Cf = torch.relu(B)**2 /nm.unsqueeze(-1)
         #a = 1 + lam
         #b = torch.relu(B) + lam * mu.unsqueeze(-1)
@@ -196,7 +199,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
         Cf[:, -nt:] = 0
 
         Cfmax, imax = torch.max(Cf, 0)
-        Cmax  = max_pool1d(Cfmax.unsqueeze(0).unsqueeze(0), (2*nt+1), stride = 1, padding = (nt))
+        Cmax  = max_pool1d(Cfmax.unsqueeze(0).unsqueeze(0), (2*nt+1), stride=1, padding=(nt))
 
         #print(Cfmax.shape)
         #import pdb; pdb.set_trace()
@@ -204,6 +207,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
         cnd2 = torch.abs(Cmax[0,0] - Cfmax) < 1e-9
         xs = torch.nonzero(cnd1 * cnd2)
 
+        
         if len(xs)==0:
             #print('iter %d'%t)
             break
@@ -218,6 +222,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
         st[k:k+nsp, 1] = iY[:,0]
         amps[k:k+nsp] = B[iY,iX] / nm[iY]
         amp = amps[k:k+nsp]
+        th_amps[k:k+nsp] = Cmax[0, 0, iX[:,0], None]**.5
 
         k+= nsp
 
@@ -230,8 +235,9 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
 
     st = st[:k]
     amps = amps[:k]
+    th_amps = th_amps[:k]
 
-    return  st, amps, Xres
+    return  st, amps, th_amps, Xres
 
 
 def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.device('cuda')):
