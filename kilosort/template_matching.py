@@ -66,7 +66,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     
     tiwave = torch.arange(-(nt//2), nt//2+1, device=device) 
     ctc = prepare_matching(ops, U)
-    st = np.zeros((10**6, 4), 'float64')
+    st = np.zeros((10**6, 3), 'float64')
     tF  = torch.zeros((10**6, nC , ops['settings']['n_pcs']))
     k = 0
     prog = tqdm(
@@ -102,8 +102,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
             stt = stt.double()
             st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['batch_size'])).cpu().numpy() - nt//2 + ops['nt0min']
             st[k:k+nsp,1] = stt[:,1].cpu().numpy()
-            st[k:k+nsp,2] = amps.cpu().numpy().squeeze()
-            st[k:k+nsp,3] = th_amps.cpu().numpy().squeeze()
+            st[k:k+nsp,2] = th_amps.cpu().numpy().squeeze()
             
             tF[k:k+nsp]  = xfeat.transpose(0,1).cpu()
 
@@ -200,7 +199,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
         Cf[:, -nt:] = 0
 
         Cfmax, imax = torch.max(Cf, 0)
-        Cmax  = max_pool1d(Cfmax.unsqueeze(0).unsqueeze(0), (2*nt+1), stride = 1, padding = (nt))
+        Cmax  = max_pool1d(Cfmax.unsqueeze(0).unsqueeze(0), (2*nt+1), stride=1, padding=(nt))
 
         #print(Cfmax.shape)
         #import pdb; pdb.set_trace()
@@ -223,7 +222,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
         st[k:k+nsp, 1] = iY[:,0]
         amps[k:k+nsp] = B[iY,iX] / nm[iY]
         amp = amps[k:k+nsp]
-        th_amps[k:k+nsp] = Cmax[0,0,iX[:,0],None]**.5
+        th_amps[k:k+nsp] = Cmax[0, 0, iX[:,0], None]**.5
 
         k+= nsp
 

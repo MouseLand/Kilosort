@@ -124,8 +124,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     ops : dict
         Dictionary storing settings and results for all algorithmic steps.
     st : np.ndarray
-        4-column array of peak time (in samples), template, amplitude, and 
-        threshold amplitude for each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st[:,0]`.
@@ -620,7 +620,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     Returns
     -------
     st : np.ndarray
-        4-column array of peak time (in samples), template, amplitude, and threshold
+        3-column array of peak time (in samples), template, and thresold
         amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
@@ -690,7 +690,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     Parameters
     ----------
     st : np.ndarray
-        4-column array of peak time (in samples), template, amplitud, and threshold
+        3-column array of peak time (in samples), template, and thresold
         amplitude for each spike.
     tF : torch.Tensor
         PC features for each spike, with shape
@@ -760,7 +760,7 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     results_dir : pathlib.Path
         Directory where results should be saved.
     st : np.ndarray
-        4-column array of peak time (in samples), template, amplitude, and thresold
+        3-column array of peak time (in samples), template, and thresold
         amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
@@ -887,7 +887,7 @@ def load_sorting(results_dir, device=None, load_extra_vars=False):
         (n_clusters, n_channels, n_pcs).
     full_st : np.ndarray.
         Only returned if `load_extra_vars` is True.
-        3-column array of peak time (in samples), template, and amplitude for
+        3-column array of peak time (in samples), template, and threshold amplitude for
         each spike.
         Includes spikes removed by `kilosort.postprocessing.remove_duplicate_spikes`.
     full_clu : np.ndarray.
