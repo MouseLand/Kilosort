@@ -166,6 +166,7 @@ def prepare_matching(ops, U):
 def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
     Th = ops['Th_learned']
     nt = ops['nt']
+    max_peels = ops['max_peels']
     W = ops['wPCA'].contiguous()
 
     nm = (U**2).sum(-1).sum(-1)
@@ -185,7 +186,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
     Xres = X.clone()
     lam = 20
 
-    for t in range(100):
+    for t in range(max_peels):
         # Cf = 2 * B - nm.unsqueeze(-1) 
         Cf = torch.relu(B)**2 /nm.unsqueeze(-1)
         #a = 1 + lam
