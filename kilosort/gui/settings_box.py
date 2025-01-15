@@ -102,6 +102,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         self.extra_parameters_window = ExtraParametersWindow(self)
         self.extra_parameters_button = QtWidgets.QPushButton('Extra settings')
+        self.revert_parameters_button = QtWidgets.QPushButton('Use default settings')
         self.import_settings_button = QtWidgets.QPushButton('Import')
         self.export_settings_button = QtWidgets.QPushButton('Export')
 
@@ -255,11 +256,17 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         row_count += rspan
         layout.addWidget(
-            self.extra_parameters_button, row_count, col1, rspan, dbl
+            self.extra_parameters_button, row_count, col1, rspan, cspan1
             )
         self.extra_parameters_button.clicked.connect(
             lambda x: self.extra_parameters_window.show()
             )
+        layout.addWidget(
+            self.revert_parameters_button, row_count, col2, rspan, cspan2
+        )
+        self.revert_parameters_button.clicked.connect(
+            self.set_default_field_values
+        )
         
         row_count += rspan
         layout.addWidget(
