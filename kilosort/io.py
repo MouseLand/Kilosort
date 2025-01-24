@@ -317,6 +317,11 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         `kilosort.io.load_ops`.
     params.py : shape N/A
         Settings used by Phy, like data location and sampling rate.
+    pc_features.npy : shape (n_spikes, n_pcs, nearest_chans)
+        Temporal features for each spike on the nearest channels for the
+        template the spike was assigned to.
+    pc_feature_ind.npy : shape (n_templates, nearest_chans)
+        Channel indices of the nearest channels for each template.
     similar_templates.npy : shape (n_templates, n_templates)
         Similarity score between each pair of templates, computed as correlation
         between templates.
