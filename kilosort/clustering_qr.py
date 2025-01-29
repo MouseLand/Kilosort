@@ -167,11 +167,16 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
 
 
 def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
+    # Xg is number of spikes by number of features
+    # we are finding cluster centroids and assigning each spike to a centroid
+    
     #Xg = torch.from_numpy(Xd).to(dev)    
     vtot = (Xg**2).sum(1)
 
     n1 = vtot.shape[0]
     if n1 > 2**24:
+        # this subsampling step is just for the candidate spikes to be considered as new centroids 
+        
         # Need to subsample v2, torch.multinomial doesn't allow more than 2**24
         # elements. We're just using this to sample some spikes, so it's fine to
         # not use all of them.
@@ -189,32 +194,58 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    ntry = 100
+    ntry = 100 # ntry is the number of potential cluster targets to test on each iteration
     NN, nfeat = Xg.shape    
-    mu = torch.zeros((niter, nfeat), device = device)
-    vexp0 = torch.zeros(NN,device = device)
+    mu = torch.zeros((niter, nfeat), device = device) # this will store cluster means
+    vexp0 = torch.zeros(NN,device = device) # this will store the best variance explained so far for each spike 
 
     iclust = torch.zeros((NN,), dtype = torch.int, device = device)
+    # on every iteration we add one new centroid to the "set" of centroids
+    # we keep track of how well n centroids so far explain each spike
+    # we ask, if we were to add another centroid, which spikes would that increase the explained variance for 
+    # and by how much. We use ntry candidates on each iteration. 
     for j in range(niter):
+        # v2 is the un-explained variance so far for each spike
         v2 = torch.relu(vtot - vexp0)
+
+        # We sample ntry new candidate centroids based on how much un-explained variance they have
+        # more unexplained variance makes it more likely to be selected
+        # Only one of these candidates will be added this iteration. 
         if subsample:
             isamp = rev_idx[torch.multinomial(v2[idx], ntry)]
         else:
             isamp = torch.multinomial(v2, ntry)
-        
+
+        # Xc are the new centroids to be tested. The spikes themselves are used as centroids. 
         Xc = Xg[isamp]    
+
+        # this is how much variance the new centroids would explain for each spike
         vexp = 2 * Xg @ Xc.T - (Xc**2).sum(1)
-        
+
+        # this is the comparison between how much variance the new centroids explain, and the best explained variance so far
         dexp = vexp - vexp0.unsqueeze(1)
+
+        # this gets relu-ed, since only the positive increases will actually re-assign a spike to this new cluster 
         dexp = torch.relu(dexp)
+
+        # we sum all the positive increases to determine how much explained variance each candidate adds 
         vsum = dexp.sum(0)
 
+        # we pick the candidate which increases explained variance the most 
         imax = torch.argmax(vsum)
+
+        # for that particular candidate (Xc[imax]) we determine which spikes actually get more variance from it
         ix = dexp[:, imax] > 0 
 
-        mu[j] = Xg[ix].mean(0)
-        vexp0[ix] = vexp[ix,imax]
-        iclust[ix] = j
+        mu[j] = Xg[ix].mean(0) # this mean is not actually used. We should use it to keep track of Xc
+        # mu[j] = Xc[imax] # this to keep track of the actual centroids used to assign spikes
+        vexp0[ix] = vexp[ix,imax] # update the variance explained for these particular spikes
+        iclust[ix] = j # assign new cluster identity
+
+    # if the clustering above is done on a subset of Xg, then we need to assign all Xgs here to get an iclust 
+    # for ii in range((len(Xg)-1)//nblock +1):
+    #     vexp = 2 * Xg[ii*nblock:(ii+1)*nblock] @ mu.T - (mu**2).sum(1)
+    #     iclust[ii*nblock:(ii+1)*nblock] = torch.argmax(vexp, dim=-1)
 
     return iclust
 
