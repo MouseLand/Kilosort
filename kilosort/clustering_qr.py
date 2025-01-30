@@ -131,12 +131,10 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
 
     m, ki, kj = Mstats(M, device=device)
 
-    #Xg = torch.from_numpy(Xd).to(dev)
-    Xg = Xd.to(device)
     kn = torch.from_numpy(kn).to(device)
 
     n_neigh = kn.shape[1]
-    NN, nfeat = Xg.shape
+    NN, nfeat = Xd.shape
     nsub = (NN-1)//nskip + 1
 
     rows_neigh = torch.arange(NN, device = device).unsqueeze(-1).tile((1,n_neigh))
@@ -144,7 +142,7 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
     tones2 = torch.ones((NN, n_neigh), device = device)
 
     if iclust is None:
-        iclust_init =  kmeans_plusplus(Xg, niter = nclust, seed = seed, device=device)
+        iclust_init =  kmeans_plusplus(Xd, niter = nclust, seed = seed, device=device)
         iclust = iclust_init.clone()
     else:
         iclust_init = iclust.clone()
@@ -165,13 +163,13 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
 
     return iclust, isub, M, iclust_init
 
-
-def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
-    # Xg is number of spikes by number of features
-    # we are finding cluster centroids and assigning each spike to a centroid
+def kmeans_plusplus(Xd, niter = 200, seed = 1, device=torch.device('cuda')):
     
-    #Xg = torch.from_numpy(Xd).to(dev)    
-    vtot = (Xg**2).sum(1)
+    Xg = Xd.to(device)
+
+    Xd_squared = (Xd ** 2)
+    vtot = Xd_squared.sum(1).to(device)
+
 
     n1 = vtot.shape[0]
     if n1 > 2**24:
@@ -219,10 +217,11 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
         # Xc are the new centroids to be tested. The spikes themselves are used as centroids. 
         Xc = Xg[isamp]    
 
-        # this is how much variance the new centroids would explain for each spike
-        vexp = 2 * Xg @ Xc.T - (Xc**2).sum(1)
+        Xc_squared_sum = (Xc ** 2).sum(1)
+        vexp = Xg @ Xc.T
+        vexp.mul_(2)
+        vexp = vexp - Xc_squared_sum
 
-        # this is the comparison between how much variance the new centroids explain, and the best explained variance so far
         dexp = vexp - vexp0.unsqueeze(1)
 
         # this gets relu-ed, since only the positive increases will actually re-assign a spike to this new cluster 
