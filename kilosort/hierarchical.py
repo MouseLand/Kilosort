@@ -1,7 +1,5 @@
 from scipy.sparse import csr_matrix
 import numpy as np
-import faiss
-from sklearn.cluster import KMeans
 
 
 def cluster_qr(M, iclust, iclust0):

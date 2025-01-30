@@ -9,6 +9,7 @@ install_deps = [
     'torch>=1.6',
     'numba',
     'faiss-cpu',
+    'psutil'
 ]
 
 gui_deps = [

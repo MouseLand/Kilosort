@@ -3,6 +3,7 @@ from pathlib import Path
 import pprint
 import logging
 import warnings
+import platform
 logger = logging.getLogger(__name__)
 
 import numpy as np
@@ -21,13 +22,24 @@ from kilosort import (
     PROBE_DIR
 )
 from kilosort.parameters import DEFAULT_SETTINGS
+from kilosort.utils import (
+    log_performance, log_cuda_details, probe_as_string, ops_as_string
+    )
+
+RECOGNIZED_SETTINGS = list(DEFAULT_SETTINGS.keys())
+RECOGNIZED_SETTINGS.extend([
+    'filename', 'data_dir', 'results_dir', 'probe_name', 'probe_path',
+    'data_file_path', 'probe', 'data_dtype', 'save_preprocessed_copy',
+    'clear_cache', 'do_CAR', 'invert_sign'
+])
 
 
 def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dir=None, file_object=None, results_dir=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False, clear_cache=False,
-                 save_preprocessed_copy=False, bad_channels=None):
+                 save_preprocessed_copy=False, bad_channels=None,
+                 verbose_console=False):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -96,6 +108,10 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         A list of channel indices (rows in the binary file) that should not be
         included in sorting. Listing channels here is equivalent to excluding
         them from the probe dictionary.
+    verbose_console : bool; default=False.
+        If True, set logging level for console output to `DEBUG` instead
+        of `INFO`, so that additional information normally only saved to the
+        log file will also show up in real time while sorting.
     
     Raises
     ------
@@ -108,8 +124,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     ops : dict
         Dictionary storing settings and results for all algorithmic steps.
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
-        each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st[:,0]`.
@@ -151,25 +167,16 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     # NOTE: This modifies settings in-place
     filename, data_dir, results_dir, probe = \
         set_files(settings, filename, probe, probe_name, data_dir, results_dir, bad_channels)
-    setup_logger(results_dir)
+    setup_logger(results_dir, verbose_console=verbose_console)
 
     try:
         logger.info(f"Kilosort version {kilosort.__version__}")
-        logger.info(f"Sorting {filename}")
-        if clear_cache:
-            logger.info('clear_cache=True')
+        logger.info(f"Python version {platform.python_version()}")
         logger.info('-'*40)
 
-        if data_dtype is None:
-            logger.info(
-                "Interpreting binary file as default dtype='int16'. If data was "
-                "saved in a different format, specify `data_dtype`."
-                )
-            data_dtype = 'int16'
-
-        if not do_CAR:
-            logger.info("Skipping common average reference.")
-
+        logger.info('System information:')
+        logger.info(f'{platform.platform()} {platform.machine()}')
+        logger.info(platform.processor())
         if device is None:
             if torch.cuda.is_available():
                 logger.info('Using GPU for PyTorch computations. '
@@ -180,6 +187,25 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                             'Specify `device` to change this.')
                 device = torch.device('cpu')
 
+        if device != torch.device('cpu'):
+            memory = torch.cuda.get_device_properties(device).total_memory/1024**3
+            logger.info(f'Using CUDA device: {torch.cuda.get_device_name()} {memory:.2f}GB')
+
+        logger.info('-'*40)
+        logger.info(f"Sorting {filename}")
+
+        if data_dtype is None:
+            logger.info(
+                "Interpreting binary file as default dtype='int16'. If data was "
+                "saved in a different format, specify `data_dtype`."
+                )
+            data_dtype = 'int16'
+
+        if not do_CAR:
+            logger.info("Skipping common average reference.")
+        if clear_cache:
+            logger.info('clear_cache=True')
+
         if probe['chanMap'].max() >= settings['n_chan_bin']:
             raise ValueError(
                 f'Largest value of chanMap exceeds channel count of data, '
@@ -189,13 +215,11 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         tic0 = time.time()
         ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
                             device, save_preprocessed_copy)
+        
         # Remove some stuff that doesn't need to be printed twice, then pretty-print
         # format for log file.
-        ops_copy = ops.copy()
-        _ = ops_copy.pop('settings')
-        _ = ops_copy.pop('probe')
-        print_ops = pprint.pformat(ops_copy, indent=4, sort_dicts=False)
-        logger.debug(f"Initial ops:\n{print_ops}\n")
+        logger.debug(f"Initial ops:\n\n{ops_as_string(ops)}\n")
+        logger.debug(f"Probe dictionary:\n\n{probe_as_string(ops['probe'])}\n")
 
         # Set preprocessing and drift correction parameters
         ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
@@ -229,12 +253,20 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                 save_extra_vars=save_extra_vars,
                 save_preprocessed_copy=save_preprocessed_copy
                 )
-    except:
+    except Exception as e:
+        if isinstance(e, torch.cuda.OutOfMemoryError):
+            logger.exception('Out of memory error, printing performance...')
+            log_performance(logger, level='info')
+            log_cuda_details(logger)
+
         # This makes sure the full traceback is written to log file.
         logger.exception('Encountered error in `run_kilosort`:')
         # Annoyingly, this will print the error message twice for console, but
         # I haven't found a good way around that.
         raise
+    
+    finally:
+        close_logger()
 
     return ops, st, clu, tF, Wall, similar_templates, \
            is_ref, est_contam_rate, kept_spikes
@@ -299,34 +331,43 @@ def set_files(settings, filename, probe, probe_name,
     return filename, data_dir, results_dir, probe
 
 
-def setup_logger(results_dir):
-    # Adapted from
-    # https://docs.python.org/2/howto/logging-cookbook.html#logging-to-multiple-destinations
-    # In summary: only send logging.debug statements to log file, not console.
+def setup_logger(results_dir, verbose_console=False):
+    results_dir = Path(results_dir)
+    
+    # Get root logger for Kilosort application
+    ks_log = logging.getLogger('kilosort')
+    ks_log.setLevel(logging.DEBUG)
 
-    # set up logging to file for root logger
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                        datefmt='%m-%d %H:%M',
-                        filename=results_dir/'kilosort4.log',
-                        filemode='w')
+    # Skip this if the handlers were already added, like when running multiple
+    # times in a single session.
+    if not ks_log.handlers:
+        # Add file handler at debug level, include timestamps and logging level
+        # in text output.
+        file = logging.FileHandler(results_dir / 'kilosort4.log', mode='w')
+        file.setLevel(logging.DEBUG)
+        text_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+        file_formatter = logging.Formatter(text_format)
+        file.setFormatter(file_formatter)
 
-    # define a Handler which writes INFO messages or higher to the sys.stderr
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    # set a format which is simpler for console use
-    console_formatter = logging.Formatter('%(name)-12s: %(message)s')
-    console.setFormatter(console_formatter)
-    # add the console handler to the root logger
-    logging.getLogger('').addHandler(console)
+        # Add console handler at info level with shorter messages,
+        # unless verbose is requested.
+        console = logging.StreamHandler()
+        if verbose_console:
+            console.setLevel(logging.DEBUG)
+            console.setFormatter(file_formatter)
+        else:
+            console.setLevel(logging.INFO)
+            console_formatter = logging.Formatter('%(name)-12s: %(message)s')
+            console.setFormatter(console_formatter)
 
-    # Set 3rd party loggers to INFO or above only,
-    # so that it doesn't spam the log file
-    numba_log = logging.getLogger('numba')
-    numba_log.setLevel(logging.INFO)
+        ks_log.addHandler(file)
+        ks_log.addHandler(console)
 
-    mpl_log = logging.getLogger('matplotlib')
-    mpl_log.setLevel(logging.INFO)
+
+def close_logger():
+    ks_log = logging.getLogger('kilosort')
+    for handler in ks_log.handlers:
+        handler.close()
 
 
 def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
@@ -335,6 +376,10 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
 
     if settings['nt0min'] is None:
         settings['nt0min'] = int(20 * settings['nt']/61)
+    if settings['max_channel_distance'] is None:
+        # Default used to be None, now it's a constant. Adding this so that
+        # cached settings values in the GUI don't cause disruption.
+        settings['max_channel_distance'] = DEFAULT_SETTINGS['max_channel_distance']
 
     if settings['nearest_chans'] > len(probe['chanMap']):
         msg = f"""
@@ -353,6 +398,18 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
             """
         warnings.warn(msg, DeprecationWarning)
     dup_bins = int(settings['duplicate_spike_ms'] * (settings['fs']/1000))
+
+    # Raise an error if there are unrecognized settings entries to make users
+    # aware if they've made a typo, are using a deprecated setting, etc.
+    unrecognized = []
+    for k, _ in settings.items():
+        if k not in RECOGNIZED_SETTINGS:
+            unrecognized.append(k)
+    if len(unrecognized) > 0:
+        logger.info('Unrecognized keys found in `settings`')
+        logger.info('See `kilosort.run_kilosort.RECOGNIZED_SETTINGS`')
+        raise ValueError(f'Unrecognized settings: {unrecognized}')
+
 
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
     ops = settings  
@@ -465,6 +522,8 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     logger.debug(f'hp_filter shape: {hp_filter.shape}')
     logger.debug(f'whiten_mat shape: {whiten_mat.shape}')
 
+    log_performance(logger, 'info', 'Resource usage after preprocessing')
+
     return ops
 
 
@@ -537,6 +596,9 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         file_object=file_object
         )
 
+    log_performance(logger, 'info', 'Resource usage after drift correction')
+    log_cuda_details(logger)
+
     return ops, bfile, st
 
 
@@ -560,8 +622,8 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     Returns
     -------
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
-        each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st`.
@@ -617,6 +679,9 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.debug(f'iCC shape: {ops["iCC"].shape}')
     logger.debug(f'iU shape: {ops["iU"].shape}')
 
+    log_performance(logger, 'info', 'Resource usage after spike detection')
+    log_cuda_details(logger)
+
     return st, tF, Wall, clu
 
 
@@ -627,8 +692,8 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     Parameters
     ----------
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
-        each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     tF : torch.Tensor
         PC features for each spike, with shape
         (n_spikes, nearest_chans, n_pcs)
@@ -680,6 +745,9 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
 
     bfile.close()
 
+    log_performance(logger, 'info', 'Resource usage after clustering')
+    log_cuda_details(logger)
+
     return clu, Wall
 
 
@@ -694,8 +762,8 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     results_dir : pathlib.Path
         Directory where results should be saved.
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
-        each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st[:,0]`.
@@ -766,6 +834,9 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     io.save_ops(ops, results_dir)
     logger.info(f'Sorting output saved in: {results_dir}.')
 
+    log_performance(logger, 'info', 'Resource usage after saving')
+    log_cuda_details(logger)
+
     return ops, similar_templates, is_ref, est_contam_rate, kept_spikes
 
 
@@ -818,7 +889,7 @@ def load_sorting(results_dir, device=None, load_extra_vars=False):
         (n_clusters, n_channels, n_pcs).
     full_st : np.ndarray.
         Only returned if `load_extra_vars` is True.
-        3-column array of peak time (in samples), template, and amplitude for
+        3-column array of peak time (in samples), template, and threshold amplitude for
         each spike.
         Includes spikes removed by `kilosort.postprocessing.remove_duplicate_spikes`.
     full_clu : np.ndarray.

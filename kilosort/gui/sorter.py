@@ -11,10 +11,10 @@ from qtpy import QtCore
 import kilosort
 from kilosort.run_kilosort import (
     setup_logger, initialize_ops, compute_preprocessing, compute_drift_correction,
-    detect_spikes, cluster_spikes, save_sorting
+    detect_spikes, cluster_spikes, save_sorting, close_logger
     )
-
 from kilosort.io import save_preprocessing
+from kilosort.utils import log_performance, log_cuda_details
 
 #logger = setup_logger(__name__)
 
@@ -128,12 +128,19 @@ class KiloSortWorker(QtCore.QThread):
                 ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
                     save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
 
-            except:
+            except Exception as e:
+                if isinstance(e, torch.cuda.OutOfMemoryError):
+                    logger.exception('Out of memory error, printing performance...')
+                    log_performance(logger, level='info')
+                    log_cuda_details(logger)
                 # This makes sure the full traceback is written to log file.
                 logger.exception('Encountered error in `run_kilosort`:')
                 # Annoyingly, this will print the error message twice for console
                 # but I haven't found a good way around that.
                 raise
+
+            finally:
+                close_logger()
 
             self.ops = ops
             self.st = st[kept_spikes]

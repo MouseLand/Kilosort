@@ -289,13 +289,23 @@ EXTRA_PARAMETERS = {
 
     'max_channel_distance': {
         'gui_name': 'max channel distance', 'type': float, 'min': 1,
-        'max': np.inf, 'exclude': [], 'default': None, 'step': 'spike detection',
+        'max': np.inf, 'exclude': [], 'default': 32, 'step': 'spike detection',
         'description':
             """
             Templates farther away than this from their nearest channel will
             not be used. Also limits distance between compared channels during
             clustering.
             """
+    },
+
+    'max_peels': {
+        'gui_name': 'max peels', 'type': int, 'min': 1, 'max': 10000, 'exclude': [],
+        'default': 100, 'step': 'spike detection',
+        'description':
+        """
+        Number of iterations to do over each batch of data in the matching
+        pursuit step. More iterations may detect more overlapping spikes.
+        """
     },
 
     'templates_from_data': {
@@ -398,6 +408,18 @@ EXTRA_PARAMETERS = {
             default of 7 bins for a 30kHz sampling rate.
             """
     },
+
+    'position_limit': {
+        'gui_name': 'position limit', 'type': float, 'min': 0, 'max': np.inf,
+        'exclude': [], 'default': 100, 'step': 'postprocessing',
+        'description':
+            """
+            Maximum distance (in microns) between channels that can be used
+            to estimate spike positions in `postprocessing.compute_spike_positions`.
+            This does not affect spike sorting, only how positions are estimated
+            after sorting is complete.
+            """
+    },
 }
 
 # Add default values to descriptions
@@ -420,3 +442,33 @@ main_defaults = {k: v['default'] for k, v in MAIN_PARAMETERS.items()}
 extra_defaults = {k: v['default'] for k, v in EXTRA_PARAMETERS.items()}
 # In the format expected by `run_kilosort`
 DEFAULT_SETTINGS = {**main_defaults, **extra_defaults}
+
+
+def compare_settings(settings):
+    """Find settings values that differ from the defaults.
+    
+    Parameters
+    ----------
+    settings : dict
+        Formatted the same as `DEFAULT_SETTINGS`.
+    
+    Returns
+    -------
+    modified_settings : dict
+        Formatted as above, but only contains keys with values that differ
+        from the defaults.
+    extra_keys : list
+        List of keys that appear in `settings` but not `DEFAULT_SETTINGS`.
+        These keys are *not* included in `modified_settings`.
+
+    """
+    modified_settings = {}
+    extra_keys = []
+
+    for k, v in settings.items():
+        if k in DEFAULT_SETTINGS:
+            if v != DEFAULT_SETTINGS[k]:
+                modified_settings[k] = v
+        else:
+            extra_keys.append(k)
+    return modified_settings, extra_keys

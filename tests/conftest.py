@@ -5,7 +5,7 @@ import os
 import pytest
 import torch
 
-from kilosort import io
+from kilosort import io, DEFAULT_SETTINGS
 from kilosort.utils import download_probes, DOWNLOADS_DIR
 
 
@@ -78,7 +78,7 @@ def data_directory(download, capture_mgr, gpu):
             binary_path.unlink()
     if not binary_path.is_file():
         with capture_mgr.global_and_fixture_disabled():
-            print('\nDownloading test data ...')
+            print(f'\nDownloading test data to {binary_path}...')
             download_data(binary_path, binary_url)
 
     if gpu:
@@ -214,22 +214,11 @@ def saved_ops(results_directory, torch_device):
 
 @pytest.fixture()
 def bfile(saved_ops, torch_device, data_directory):
-    # TODO: add option to load BinaryFiltered from ops dict, move this code
-    #       to that function
-    settings = saved_ops['settings']
     # Don't get filename from settings, will be different based on OS and which
     # system ran tests originally.
+    ops = {**DEFAULT_SETTINGS, **saved_ops}  # add new keys to old results
     filename = data_directory / 'ZFM-02370_mini.imec0.ap.short.bin'
-
-    # TODO: add option to load BinaryFiltered from ops dict, move this code
-    #       to that function
-    bfile = io.BinaryFiltered(
-        filename, settings['n_chan_bin'], settings['fs'],
-        settings['batch_size'], settings['nt'], settings['nt0min'],
-        saved_ops['probe']['chanMap'], hp_filter=saved_ops['fwav'],
-        whiten_mat=saved_ops['Wrot'], dshift=saved_ops['dshift'],
-        device=torch_device
-        )
+    bfile = io.bfile_from_ops(ops, filename=filename, device=torch_device)
     
     return bfile
 

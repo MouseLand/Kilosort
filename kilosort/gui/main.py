@@ -18,18 +18,20 @@ from qtpy import QtCore, QtGui, QtWidgets
 logger = setup_logger(__name__)
 
 
-class KiloSortGUI(QtWidgets.QMainWindow):
-    def __init__(self, application, filename=None, device=None,
+class KilosortGUI(QtWidgets.QMainWindow):
+    def __init__(self, application, filename=None, reset=False, skip_load=False,
                  **kwargs):
-        super(KiloSortGUI, self).__init__(**kwargs)
+        super(KilosortGUI, self).__init__(**kwargs)
 
         self.app = application
         self.qt_settings = QtCore.QSettings('Janelia', 'Kilosort4')
-        if device is None:
-            if torch.cuda.is_available():
-                device = torch.device('cuda')
-            else:
-                device = torch.device('cpu')
+        if reset:
+            self.qt_settings.clear()
+
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
         self.device = device
 
         if filename is not None:
@@ -117,7 +119,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         # sub-widgets.
         self.move(100, 100)
 
-        if self.auto_load:
+        if self.auto_load and not skip_load:
             self.settings_box.update_settings()
 
 
@@ -253,16 +255,15 @@ class KiloSortGUI(QtWidgets.QMainWindow):
 
         # Connect signals
         self.header_box.reset_gui_button.clicked.connect(self.reset_gui)
+        self.header_box.clear_cache_button.clicked.connect(self.clear_cache)
         self.settings_box.settingsUpdated.connect(self.load_data)
-        self.settings_box.previewProbe.connect(self.probe_view_box.preview_probe)
+        self.settings_box.previewProbe.connect(self.set_parameters)
+        self.settings_box.previewProbe.connect(self.probe_view_box.set_layout)
         # Don't allow spike sorting to run until new data has actually
         # been loaded.
         self.settings_box.dataChanged.connect(self.disable_run)
 
-        self.data_view_box.channelChanged.connect(self.probe_view_box.update_probe_view)
-        self.data_view_box.modeChanged.connect(
-            self.probe_view_box.synchronize_data_view_mode
-        )
+        self.data_view_box.channelChanged.connect(self.probe_view_box.set_layout)
         self.data_view_box.intervalUpdated.connect(self.load_data)
 
         self.run_box.updateContext.connect(self.update_context)
@@ -462,6 +463,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.settings_box.use_file_object = True
         self.settings_box.data_file_path = Path(filename)
         self.settings_box.data_file_path_input.setText(filename)
+        self.settings_box.path_check = True
 
     def setup_data_view(self):
         self.data_view_box.setup_seek(self.context)
@@ -551,6 +553,7 @@ class KiloSortGUI(QtWidgets.QMainWindow):
             if self.context.filt_binary_file is not None:
                 self.context.filt_binary_file.close()
 
+    @QtCore.Slot()
     def reset_gui(self):
         self.num_channels = None
         self.context = None
@@ -559,6 +562,10 @@ class KiloSortGUI(QtWidgets.QMainWindow):
         self.data_view_box.reset()
         self.settings_box.reset()
         self.message_log_box.reset()
+
+    @QtCore.Slot()
+    def clear_cache(self):
+        self.qt_settings.clear()
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         # Make sure all threads and pop-out windows are closed as well.
