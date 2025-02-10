@@ -166,6 +166,16 @@ def log_performance(log=None, level=None, header=None):
         max_alloc = torch.cuda.max_memory_allocated() / 2**30
         max_pct = (max_alloc / gpu_total) * 100
         getattr(log, level)(f'Max alloc:    {max_pct:5.2f} %     |{max_alloc:10.2f}   / {gpu_total:8.2f} GB')
+    elif torch.backends.mps.is_available():
+        mps_max = torch.mps.recommended_max_memory()/1024**3
+        
+        mps_allo = torch.mps.current_allocated_memory()/1024**3
+        mps_allo_pct = (mps_allo / mps_max) * 100
+        getattr(log, level)(f'MPS allocated memory:   {mps_allo_pct:5.2f} %     |{mps_allo:10.2f}   / {mps_max:8.2f} GB')
+        
+        mps_driver = torch.mps.driver_allocated_memory()/1024**3
+        mps_driver_pct = (mps_driver / mps_max) * 100
+        getattr(log, level)(f'MPS driver memory:      {mps_driver_pct:5.2f} %     |{mps_driver:10.2f}   / {mps_max:8.2f} GB')
     else:
         getattr(log, level)('GPU usage:    N/A')
         getattr(log, level)('GPU memory:   N/A')
@@ -178,6 +188,9 @@ def log_cuda_details(log=None):
     if log is None: log = logger
     if torch.cuda.is_available():
         log.debug(f'\n\n{torch.cuda.memory_summary(abbreviated=True)}\n')
+    elif torch.backends.mps.is_available():
+        memory = torch.mps.driver_allocated_memory()/1024**3
+        log.debug(f'\n\nMPS driver allocated memory: {memory:.2f}GB\n')
 
 
 def probe_as_string(probe):

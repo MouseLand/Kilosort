@@ -17,7 +17,7 @@ from kilosort.utils import log_performance
 logger = logging.getLogger(__name__)
 
 
-def neigh_mat(Xd, nskip=10, n_neigh=30):
+def neigh_mat(Xd, nskip=10, n_neigh=30, device=torch.device('cuda')):
     # Xd is spikes by PCA features in a local neighborhood
     # finding n_neigh neighbors of each spike to a subset of every nskip spike
 
@@ -36,6 +36,9 @@ def neigh_mat(Xd, nskip=10, n_neigh=30):
 
     # exact neighbor search ("brute force")
     # results is dn and kn, kn is n_samples by n_neigh, contains integer indices into Xsub
+    if device == torch.device('mps'):
+        # Limit threads for faiss, otherwise, 'index.search(Xd, n_neigh)' causes segmentation fault
+        faiss.omp_set_num_threads(1)
     index = faiss.IndexFlatL2(dim)   # build the index
     index.add(Xsub)    # add vectors to the index
     _, kn = index.search(Xd, n_neigh)     # actual search
@@ -53,19 +56,30 @@ def neigh_mat(Xd, nskip=10, n_neigh=30):
     return kn, M
 
 
-def assign_mu(iclust, Xg, cols_mu, tones, nclust = None, lpow = 1):
+def assign_mu(iclust, Xg, cols_mu, tones, nclust = None, lpow = 1, device=torch.device('cuda')):
     NN, nfeat = Xg.shape
 
     rows = iclust.unsqueeze(-1).tile((1,nfeat))
     ii = torch.vstack((rows.flatten(), cols_mu.flatten()))
     iin = torch.vstack((rows[:,0], cols_mu[:,0]))
     if lpow==1:
+        C_values = Xg.flatten()
         C = coo(ii, Xg.flatten(), (nclust, nfeat))
     else:
+        C_values
         C = coo(ii, (Xg**lpow).flatten(), (nclust, nfeat))
-    N = coo(iin, tones, (nclust, 1))
-    C = C.to_dense()
-    N = N.to_dense()
+    if device == torch.device('mps'):
+        C_ = coo(ii, C_values, (nclust, nfeat), device = torch.device('cpu'))
+        C_ = C_.to_dense()
+        C = C_.to(device)
+        N_ = coo(iin, tones, (nclust, 1), device = torch.device('cpu'))
+        N_ = N_.to_dense()
+        N = N_.to(device)
+    else:
+        C = coo(ii, C_values, (nclust, nfeat))
+        C = C.to_dense()
+        N = coo(iin, tones, (nclust, 1))
+        N = N.to_dense()
     mu = C / (1e-6 + N)
 
     return mu, N
@@ -75,14 +89,25 @@ def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj, device=t
     NN = kn.shape[0]
 
     ij = torch.vstack((rows_neigh.flatten(), isub[kn].flatten()))
-    xN = coo(ij, tones2.flatten(), (NN, nclust))
-    xN = xN.to_dense()
+    if device == torch.device('mps'):
+        xN_ = coo(ij, tones2.flatten(), (NN, nclust), device = torch.device('cpu'))
+        xN_ = xN_.to_dense()
+        xN = xN_.to(device)
+    else:
+        xN = coo(ij, tones2.flatten(), (NN, nclust))
+        xN = xN.to_dense()
 
     if lam > 0:
         tones = torch.ones(len(kj), device = device)
         tzeros = torch.zeros(len(kj), device = device)
         ij = torch.vstack((tzeros, isub))    
-        kN = coo(ij, tones, (1, nclust))
+
+        if device == torch.device('mps'):
+            kN_ = coo(ij, tones, (1, nclust), device = torch.device('cpu'))
+            kN_ = kN_.to_dense()
+            kN = kN_.to(device)
+        else:
+            kN = coo(ij, tones, (1, nclust))
     
         xN = xN - lam/m * (ki.unsqueeze(-1) * kN.to_dense()) 
     
@@ -95,16 +120,28 @@ def assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,ki,kj, device=torch.dev
     n_neigh = kn.shape[1]
     cols = iclust.unsqueeze(-1).tile((1, n_neigh))
     iis = torch.vstack((kn.flatten(), cols.flatten()))
-
-    xS = coo(iis, tones2.flatten(), (nsub, nclust))
-    xS = xS.to_dense()
+    
+    if device == torch.device('mps'):
+        xS_ = coo(iis, tones2.flatten(), (nsub, nclust), device = torch.device('cpu'))
+        xS_ = xS_.to_dense()
+        xS = xS_.to(device)
+    else:
+        xS = coo(iis, tones2.flatten(), (nsub, nclust))
+        xS = xS.to_dense()
 
     if lam > 0:
         tones = torch.ones(len(ki), device = device)
         tzeros = torch.zeros(len(ki), device = device)
         ij = torch.vstack((tzeros, iclust))    
-        kN = coo(ij, tones, (1, nclust))
-        xS = xS - lam / m * (kj.unsqueeze(-1) * kN.to_dense())
+
+        if device == torch.device('mps'):
+            kN_ = coo(ij, tones, (1, nclust), device = torch.device('cpu'))
+            kN_ = kN_.to_dense()
+            kN = kN_.to(device)
+            xS = xS - lam / m * (kj.unsqueeze(-1) * kN)
+        else: 
+            kN = coo(ij, tones, (1, nclust))
+            xS = xS - lam / m * (kj.unsqueeze(-1) * kN.to_dense())
 
     isub = torch.argmax(xS, 1)
     return isub
@@ -127,7 +164,7 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
             seed = 1, niter = 200, lam = 0, device=torch.device('cuda')):    
 
     if kn is None:
-        kn, M = neigh_mat(Xd, nskip = nskip, n_neigh = n_neigh)
+        kn, M = neigh_mat(Xd, nskip = nskip, n_neigh = n_neigh, device = device)
 
     m, ki, kj = Mstats(M, device=device)
 
@@ -140,7 +177,7 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
     nsub = (NN-1)//nskip + 1
 
     rows_neigh = torch.arange(NN, device = device).unsqueeze(-1).tile((1,n_neigh))
-    
+
     tones2 = torch.ones((NN, n_neigh), device = device)
 
     if iclust is None:
@@ -148,14 +185,14 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
         iclust = iclust_init.clone()
     else:
         iclust_init = iclust.clone()
-        
+
     for t in range(niter):
         # given iclust, reassign isub
         isub = assign_isub(iclust, kn, tones2, nclust , nsub, lam, m,ki,kj, device=device)
 
         # given mu and isub, reassign iclust
         iclust = assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj, device=device)
-    
+
     _, iclust = torch.unique(iclust, return_inverse=True)    
     nclust = iclust.max() + 1
     isub = assign_isub(iclust, kn, tones2, nclust , nsub, lam, m,ki,kj, device=device)
@@ -416,10 +453,10 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                     ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj],
                     dmin=dmin, dminx=dminx, ix=ix
                     )
-
+                
                 if ii % 10 == 0:
                     log_performance(logger, header=f'Cluster center: {ii}')
-
+                
                 if Xd is None:
                     nearby_chans_empty += 1
                     continue
@@ -436,10 +473,11 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                     iclust, iclust0, M, _ = cluster(
                         Xd, nskip=nskip, lam=1, seed=5, device=device
                         )
+
                     if clear_cache:
                         gc.collect()
                         torch.cuda.empty_cache()
-
+                    
                     xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
                     xtree, tstat = swarmsplitter.split(
@@ -447,7 +485,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                         )
 
                     iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
-
+                
                 clu[igood] = iclust + nmax
                 Nfilt = int(iclust.max() + 1)
                 nmax += Nfilt
@@ -538,13 +576,17 @@ def get_data_cpu(ops, xy, iC, PID, tF, ycenter, xcenter, dmin=20, dminx=32,
 
 
 
-def assign_clust(rows_neigh, iclust, kn, tones2, nclust):    
+def assign_clust(rows_neigh, iclust, kn, tones2, nclust, device=torch.device('cuda')):    
     NN = len(iclust)
 
     ij = torch.vstack((rows_neigh.flatten(), iclust[kn].flatten()))
-    xN = coo(ij, tones2.flatten(), (NN, nclust))
-    
-    xN = xN.to_dense() 
+    if device == torch.device('mps'):
+        xN_ = coo(ij, tones2.flatten(), (NN, nclust), device = torch.device('cpu'))
+        xN_ = xN_.to_dense()
+        xN = xN_.to(device)
+    else:
+        xN = coo(ij, tones2.flatten(), (NN, nclust))
+        xN = xN.to_dense() 
     iclust = torch.argmax(xN, 1)
 
     return iclust
