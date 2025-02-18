@@ -175,18 +175,12 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
 
     n1 = vtot.shape[0]
     if n1 > 2**24:
-        # this subsampling step is just for the candidate spikes to be considered as new centroids 
-        
-        # Need to subsample v2, torch.multinomial doesn't allow more than 2**24
-        # elements. We're just using this to sample some spikes, so it's fine to
-        # not use all of them.
+        # This subsampling step is just for the candidate spikes to be considered
+        # as new centroids. Sometimes need to subsample v2 since
+        # torch.multinomial doesn't allow more than 2**24 elements. We're just
+        # using this to sample some spikes, so it's fine to not use all of them.
         n2 = n1 - 2**24   # number of spikes to remove before sampling
-        remove = np.round(np.linspace(0, n1-1, n2)).astype(int)
-        idx = np.ones(n1, dtype=bool)
-        idx[remove] = False
-        # Also need to map the indices from the subset back to indices for
-        # the full tensor.
-        rev_idx = idx.nonzero()[0]
+        idx, rev_idx = subsample_idx(n1, n2)
         subsample = True
     else:
         subsample = False
@@ -198,8 +192,8 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
     NN, nfeat = Xg.shape    
     mu = torch.zeros((niter, nfeat), device = device) # this will store cluster means
     vexp0 = torch.zeros(NN,device = device) # this will store the best variance explained so far for each spike 
-
     iclust = torch.zeros((NN,), dtype = torch.int, device = device)
+
     # on every iteration we add one new centroid to the "set" of centroids
     # we keep track of how well n centroids so far explain each spike
     # we ask, if we were to add another centroid, which spikes would that increase the explained variance for 
@@ -207,6 +201,10 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
     for j in range(niter):
         # v2 is the un-explained variance so far for each spike
         v2 = torch.relu(vtot - vexp0)
+
+        # TODO: Where to actually apply subsampling of Xg?
+        #       Okay to draw isamp from the subsample? If not, how to reconcile
+        #       vtot size (all of Xg) vs vexp0 size (subsample size)?
 
         # We sample ntry new candidate centroids based on how much un-explained variance they have
         # more unexplained variance makes it more likely to be selected
@@ -216,31 +214,37 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
         else:
             isamp = torch.multinomial(v2, ntry)
 
-        # Xc are the new centroids to be tested. The spikes themselves are used as centroids. 
-        Xc = Xg[isamp]    
+        try:
+            # Xc are the new centroids to be tested. The spikes themselves are used as centroids. 
+            Xc = Xg[isamp]
 
-        # this is how much variance the new centroids would explain for each spike
-        vexp = 2 * Xg @ Xc.T - (Xc**2).sum(1)
+            # this is how much variance the new centroids would explain for each spike
+            vexp = 2 * Xg @ Xc.T - (Xc**2).sum(1)
 
-        # this is the comparison between how much variance the new centroids explain, and the best explained variance so far
-        dexp = vexp - vexp0.unsqueeze(1)
+            # this is the comparison between how much variance the new centroids explain, and the best explained variance so far
+            dexp = vexp - vexp0.unsqueeze(1)
 
-        # this gets relu-ed, since only the positive increases will actually re-assign a spike to this new cluster 
-        dexp = torch.relu(dexp)
+            # this gets relu-ed, since only the positive increases will actually re-assign a spike to this new cluster 
+            dexp = torch.relu(dexp)
 
-        # we sum all the positive increases to determine how much explained variance each candidate adds 
-        vsum = dexp.sum(0)
+            # we sum all the positive increases to determine how much explained variance each candidate adds 
+            vsum = dexp.sum(0)
 
-        # we pick the candidate which increases explained variance the most 
-        imax = torch.argmax(vsum)
+            # we pick the candidate which increases explained variance the most 
+            imax = torch.argmax(vsum)
 
-        # for that particular candidate (Xc[imax]) we determine which spikes actually get more variance from it
-        ix = dexp[:, imax] > 0 
+            # for that particular candidate (Xc[imax]) we determine which spikes actually get more variance from it
+            ix = dexp[:, imax] > 0 
 
-        mu[j] = Xg[ix].mean(0) # this mean is not actually used. We should use it to keep track of Xc
-        # mu[j] = Xc[imax] # this to keep track of the actual centroids used to assign spikes
-        vexp0[ix] = vexp[ix,imax] # update the variance explained for these particular spikes
-        iclust[ix] = j # assign new cluster identity
+            mu[j] = Xg[ix].mean(0) # this mean is not actually used. We should use it to keep track of Xc
+            # mu[j] = Xc[imax] # this to keep track of the actual centroids used to assign spikes
+            vexp0[ix] = vexp[ix,imax] # update the variance explained for these particular spikes
+            iclust[ix] = j # assign new cluster identity
+        except torch.cuda.OutOfMemoryError:
+            logger.debug(f"OOM in kmeans_plus_plus iter {j}, nsp: {Xg.shape[0]}, "
+                          "size: {Xg.nbytes / (2**30)} gb.")
+            raise
+
 
     # if the clustering above is done on a subset of Xg, then we need to assign all Xgs here to get an iclust 
     # for ii in range((len(Xg)-1)//nblock +1):
@@ -248,6 +252,42 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
     #     iclust[ii*nblock:(ii+1)*nblock] = torch.argmax(vexp, dim=-1)
 
     return iclust
+
+
+def subsample_idx(n1, n2):
+    """Get boolean mask and reverse mapping for evenly distributed subsample.
+    
+    Parameters
+    ----------
+    n1 : int
+        Size of index. Index is assumed to be sequential and not contain any
+        missing values (i.e. 0, 1, 2, ... n1-1).
+    n2 : int
+        Number of indices to remove to create a subsample. Removed indices are
+        evenly spaced across 
+    
+    Returns
+    -------
+    idx : np.ndarray
+        Boolean mask, True for indices to be included in the subset.
+    rev_idx : np.ndarray
+        Map between subset indices and their position in the original index.
+
+    Examples
+    --------
+    >>> subsample_idx(6, 3)
+    array([False,  True, False,  True,  True, False], dtype=bool),
+    array([1, 3, 4], dtype=int64)
+
+    """
+    remove = np.round(np.linspace(0, n1-1, n2)).astype(int)
+    idx = np.ones(n1, dtype=bool)
+    idx[remove] = False
+    # Also need to map the indices from the subset back to indices for
+    # the full tensor.
+    rev_idx = idx.nonzero()[0]
+
+    return idx, rev_idx
 
 
 def compute_score(mu, mu2, N, ccN, lam):
