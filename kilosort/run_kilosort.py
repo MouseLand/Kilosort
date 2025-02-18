@@ -216,8 +216,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
                             device, save_preprocessed_copy)
         
-        # Remove some stuff that doesn't need to be printed twice, then pretty-print
-        # format for log file.
+        # Pretty-print ops and probe for log
         logger.debug(f"Initial ops:\n\n{ops_as_string(ops)}\n")
         logger.debug(f"Probe dictionary:\n\n{probe_as_string(ops['probe'])}\n")
 
