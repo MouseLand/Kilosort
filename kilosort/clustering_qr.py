@@ -454,25 +454,28 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
             for kk in np.arange(len(ycent)):
                 # Get data for all templates that were closest to this x,y center.
                 ii = kk + jj*ycent.size
-                if ii not in nearest_center:
-                    # No templates are nearest to this center, skip it.
-                    continue
-                ix = (nearest_center == ii)
-                Xd, ch_min, ch_max, igood  = get_data_cpu(
-                    ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj],
-                    dmin=dmin, dminx=dminx, ix=ix
-                    )
-
                 if ii % 10 == 0:
                     log_performance(
                         logger,
                         header=f'Cluster center: {ii} of {total_centers}'
                         )
+                if ii not in nearest_center:
+                    # No templates are nearest to this center, skip it.
+                    logger.debug(f'Center {ii} | nsp: 0 | ntemp: 0')
+                    continue
+                ix = (nearest_center == ii)
+                ntemp = ix.sum()
+                Xd, ch_min, ch_max, igood  = get_data_cpu(
+                    ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj],
+                    dmin=dmin, dminx=dminx, ix=ix
+                    )
 
                 if Xd is None:
+                    logger.debug(f'Center {ii} | nsp: 0 | ntemp: {ntemp}')
                     nearby_chans_empty += 1
                     continue
                 elif Xd.shape[0]<1000:
+                    logger.debug(f'Center {ii} | nsp: {Xd.shape[0]} | ntemp: {ntemp}')
                     iclust = torch.zeros((Xd.shape[0],))
                 else:
                     if mode == 'template':
@@ -481,7 +484,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                         st0 = None
 
                     # find new clusters
-                    logger.debug(f'Num spikes for center {ii}: {Xd.shape[0]}')
+                    logger.debug(f'Center {ii} | nsp: {Xd.shape[0]} | ntemp: {ntemp}')
                     iclust, iclust0, M, _ = cluster(
                         Xd, nskip=nskip, lam=1, seed=5, device=device
                         )
