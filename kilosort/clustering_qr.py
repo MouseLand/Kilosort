@@ -167,10 +167,8 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
 
 
 def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
-    # Xg is number of spikes by number of features
-    # we are finding cluster centroids and assigning each spike to a centroid
-    
-    #Xg = torch.from_numpy(Xd).to(dev)    
+    # Xg is number of spikes by number of features.
+    # We are finding cluster centroids and assigning each spike to a centroid.
     vtot = (Xg**2).sum(1)
 
     n1 = vtot.shape[0]
@@ -188,16 +186,20 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    ntry = 100 # ntry is the number of potential cluster targets to test on each iteration
-    NN, nfeat = Xg.shape    
-    mu = torch.zeros((niter, nfeat), device = device) # this will store cluster means
-    vexp0 = torch.zeros(NN,device = device) # this will store the best variance explained so far for each spike 
+    ntry = 100  # number of candidate cluster centroids to test on each iteration
+    NN, nfeat = Xg.shape
+    # Need to store the spike features used for each cluster centroid (mu),
+    # best variance explained so far for each spike (vexp0),
+    # and the cluster assignment for each spike (iclust).
+    mu = torch.zeros((niter, nfeat), device = device)
+    vexp0 = torch.zeros(NN, device = device)
     iclust = torch.zeros((NN,), dtype = torch.int, device = device)
 
-    # on every iteration we add one new centroid to the "set" of centroids
-    # we keep track of how well n centroids so far explain each spike
-    # we ask, if we were to add another centroid, which spikes would that increase the explained variance for 
-    # and by how much. We use ntry candidates on each iteration. 
+    # On every iteration we choose one new centroid to keep.
+    # We track how well n centroids so far explain each spike.
+    # We ask, if we were to add another centroid, which spikes would that
+    # increase the explained variance for and by how much?
+    # We use ntry candidates on each iteration.
     for j in range(niter):
         # v2 is the un-explained variance so far for each spike
         v2 = torch.relu(vtot - vexp0)
@@ -215,38 +217,38 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
             isamp = torch.multinomial(v2, ntry)
 
         try:
-            # Xc are the new centroids to be tested. The spikes themselves are used as centroids. 
+            # The new centroids to be tested, sampled from the spikes in Xg.
             Xc = Xg[isamp]
-
-            # this is how much variance the new centroids would explain for each spike
+            # Variance explained for each spike for the new centroids.
             vexp = 2 * Xg @ Xc.T - (Xc**2).sum(1)
-
-            # this is the comparison between how much variance the new centroids explain, and the best explained variance so far
-            dexp = vexp - vexp0.unsqueeze(1)
-
-            # this gets relu-ed, since only the positive increases will actually re-assign a spike to this new cluster 
-            dexp = torch.relu(dexp)
-
-            # we sum all the positive increases to determine how much explained variance each candidate adds 
+            # Difference between variance explained for new centroids
+            # and best explained variance so far across all iterations.
+            # This gets relu-ed, since only the positive increases will actually
+            # re-assign a spike to this new cluster
+            dexp = torch.relu(vexp - vexp0.unsqueeze(1))
+            # Sum all positive increases to determine additional explained variance
+            # for each candidate centroid.
             vsum = dexp.sum(0)
-
-            # we pick the candidate which increases explained variance the most 
+            # Pick the candidate which increases explained variance the most 
             imax = torch.argmax(vsum)
 
-            # for that particular candidate (Xc[imax]) we determine which spikes actually get more variance from it
+            # For that centroid (Xc[imax]), determine which spikes actually get
+            # more variance from it
             ix = dexp[:, imax] > 0
 
-            mu[j] = Xg[ix].mean(0) # this mean is not actually used. We should use it to keep track of Xc
-            # mu[j] = Xc[imax] # this to keep track of the actual centroids used to assign spikes
-            vexp0[ix] = vexp[ix,imax] # update the variance explained for these particular spikes
-            iclust[ix] = j # assign new cluster identity
+            iclust[ix] = j    # assign new cluster identity
+            mu[j] = Xc[imax]  # spike features used as centroid for cluster j
+            # Update variance explained for the spikes assigned to cluster j
+            vexp0[ix] = vexp[ix, imax]
 
-            # Delete these between iterations to prevent excessive memory reservation.
+            # Delete large variables between iterations
+            # to prevent excessive memory reservation.
             del(vexp)
             del(dexp)
+
         except torch.cuda.OutOfMemoryError:
             logger.debug(f"OOM in kmeans_plus_plus iter {j}, nsp: {Xg.shape[0]}, "
-                          "size: {Xg.nbytes / (2**30)} gb.")
+                         f"size: {Xg.nbytes / (2**30)} gb.")
             raise
 
     # if the clustering above is done on a subset of Xg, then we need to assign all Xgs here to get an iclust 
