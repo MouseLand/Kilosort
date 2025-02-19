@@ -234,17 +234,20 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
             imax = torch.argmax(vsum)
 
             # for that particular candidate (Xc[imax]) we determine which spikes actually get more variance from it
-            ix = dexp[:, imax] > 0 
+            ix = dexp[:, imax] > 0
 
             mu[j] = Xg[ix].mean(0) # this mean is not actually used. We should use it to keep track of Xc
             # mu[j] = Xc[imax] # this to keep track of the actual centroids used to assign spikes
             vexp0[ix] = vexp[ix,imax] # update the variance explained for these particular spikes
             iclust[ix] = j # assign new cluster identity
+
+            # Delete these between iterations to prevent excessive memory reservation.
+            del(vexp)
+            del(dexp)
         except torch.cuda.OutOfMemoryError:
             logger.debug(f"OOM in kmeans_plus_plus iter {j}, nsp: {Xg.shape[0]}, "
                           "size: {Xg.nbytes / (2**30)} gb.")
             raise
-
 
     # if the clustering above is done on a subset of Xg, then we need to assign all Xgs here to get an iclust 
     # for ii in range((len(Xg)-1)//nblock +1):
@@ -433,19 +436,20 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
-    nearest_center, _, _ = get_nearest_centers(xy, xcent, ycent)
+    nearest_center, xcent_pos, _ = get_nearest_centers(xy, xcent, ycent)
+    total_centers = xcent_pos.nelement()
     
     clu = np.zeros(nsp, 'int32')
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
     Nfilt = None
     nearby_chans_empty = 0
     nmax = 0
-    prog = tqdm(np.arange(len(ycent)), miniters=20 if progress_bar else None,
+    prog = tqdm(np.arange(len(xcent)), miniters=20 if progress_bar else None,
                 mininterval=10 if progress_bar else None)
     
     try:
-        for kk in prog:
-            for jj in np.arange(len(xcent)):
+        for jj in prog:
+            for kk in np.arange(len(ycent)):
                 # Get data for all templates that were closest to this x,y center.
                 ii = kk + jj*ycent.size
                 if ii not in nearest_center:
@@ -458,7 +462,10 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                     )
 
                 if ii % 10 == 0:
-                    log_performance(logger, header=f'Cluster center: {ii}')
+                    log_performance(
+                        logger,
+                        header=f'Cluster center: {ii} of {total_centers}'
+                        )
 
                 if Xd is None:
                     nearby_chans_empty += 1
