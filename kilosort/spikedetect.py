@@ -243,9 +243,11 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     logger.info('Detecting spikes...')
     prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
                 mininterval=60 if progress_bar else None)
+    # repeat performance log after every 10 minutes of data
+    log_skip = int(600 / (ops['batch_size'] / ops['fs']))
     try:
         for ibatch in prog:
-            if ibatch % 100 == 0:
+            if ibatch % log_skip == 0:
                 log_performance(logger, 'debug', f'Batch {ibatch}')
 
             X = bfile.padded_batch_to_torch(ibatch, ops)
