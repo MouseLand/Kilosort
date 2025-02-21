@@ -344,6 +344,7 @@ class KilosortGUI(QtWidgets.QMainWindow):
         params['clear_cache'] = self.run_box.clear_cache_check.isChecked()
         params['do_CAR'] = self.run_box.do_CAR_check.isChecked()
         params['invert_sign'] = self.run_box.invert_sign_check.isChecked()
+        params['verbose_log'] = self.run_box.verbose_check.isChecked()
 
         assert params
 

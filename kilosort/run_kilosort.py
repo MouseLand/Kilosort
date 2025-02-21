@@ -30,7 +30,7 @@ RECOGNIZED_SETTINGS = list(DEFAULT_SETTINGS.keys())
 RECOGNIZED_SETTINGS.extend([
     'filename', 'data_dir', 'results_dir', 'probe_name', 'probe_path',
     'data_file_path', 'probe', 'data_dtype', 'save_preprocessed_copy',
-    'clear_cache', 'do_CAR', 'invert_sign'
+    'clear_cache', 'do_CAR', 'invert_sign', 'verbose_log'
 ])
 
 
@@ -218,7 +218,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
 
         tic0 = time.time()
         ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
-                            device, save_preprocessed_copy)
+                             device, save_preprocessed_copy)
         
         # Pretty-print ops and probe for log
         logger.debug(f"Initial ops:\n\n{ops_as_string(ops)}\n")

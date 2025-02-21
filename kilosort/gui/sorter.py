@@ -46,6 +46,7 @@ class KiloSortWorker(QtCore.QThread):
                 results_dir.mkdir(parents=True)
             
             setup_logger(results_dir)
+            verbose = settings['verbose_log']
 
             try:
                 logger.info(f"Kilosort version {kilosort.__version__}")
@@ -108,7 +109,8 @@ class KiloSortWorker(QtCore.QThread):
                 # Sort spikes and save results
                 st, tF, Wall0, clu0 = detect_spikes(
                     ops, self.device, bfile, tic0=tic0,
-                    progress_bar=self.progress_bar, clear_cache=clear_cache
+                    progress_bar=self.progress_bar, clear_cache=clear_cache,
+                    verbose=verbose
                     )
 
                 self.Wall0 = Wall0
@@ -118,7 +120,8 @@ class KiloSortWorker(QtCore.QThread):
 
                 clu, Wall = cluster_spikes(
                     st, tF, ops, self.device, bfile, tic0=tic0,
-                    progress_bar=self.progress_bar, clear_cache=clear_cache
+                    progress_bar=self.progress_bar, clear_cache=clear_cache,
+                    verbose=verbose
                     )
                 ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
                     save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)
