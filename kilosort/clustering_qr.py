@@ -53,6 +53,7 @@ def neigh_mat(Xd, nskip=10, n_neigh=30):
     return kn, M
 
 
+# TODO: unused?
 def assign_mu(iclust, Xg, cols_mu, tones, nclust = None, lpow = 1):
     NN, nfeat = Xg.shape
 
@@ -123,38 +124,51 @@ def Mstats(M, device=torch.device('cuda')):
     return m, ki, kj
 
 
-def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200, 
-            seed = 1, niter = 200, lam = 0, device=torch.device('cuda')):    
+def cluster(Xd, iclust=None, kn=None, nskip=20, n_neigh=10, nclust=200, seed=1,
+            niter=200, lam=0, device=torch.device('cuda'), verbose=False):    
 
     if kn is None:
-        kn, M = neigh_mat(Xd, nskip = nskip, n_neigh = n_neigh)
-
+        kn, M = neigh_mat(Xd, nskip=nskip, n_neigh=n_neigh)
     m, ki, kj = Mstats(M, device=device)
 
-    #Xg = torch.from_numpy(Xd).to(dev)
+    if verbose:
+        logger.debug(f'ki: {ki.nbytes / (2**20):.2f} MB, shape: {ki.shape}')
+        logger.debug(f'kj: {kj.nbytes / (2**20):.2f} MB, shape: {kj.shape}')
+        log_performance(logger, header='clustering_qr.cluster, after Mstats')
+
     Xg = Xd.to(device)
     kn = torch.from_numpy(kn).to(device)
-
     n_neigh = kn.shape[1]
     NN, nfeat = Xg.shape
     nsub = (NN-1)//nskip + 1
+    rows_neigh = torch.arange(NN, device=device).unsqueeze(-1).tile((1,n_neigh))
+    tones2 = torch.ones((NN, n_neigh), device=device)
 
-    rows_neigh = torch.arange(NN, device = device).unsqueeze(-1).tile((1,n_neigh))
-    
-    tones2 = torch.ones((NN, n_neigh), device = device)
+    if verbose:
+        logger.debug(f'Xg: {Xg.nbytes / (2**20):.2f} MB, shape: {Xg.shape}')
+        logger.debug(f'kn: {kn.nbytes / (2**20):.2f} MB, shape: {kn.shape}')
+        logger.debug(f'rows_neigh: {rows_neigh.nbytes / (2**20):.2f} MB')
+        logger.debug(f'tones2: {tones2.nbytes / (2**20):.2f} MB')
+        log_performance(logger, header='clustering_qr.cluster, after var init')
 
     if iclust is None:
-        iclust_init =  kmeans_plusplus(Xg, niter = nclust, seed = seed, device=device)
+        iclust_init =  kmeans_plusplus(Xg, niter=nclust, seed=seed, 
+                                       device=device, verbose=verbose)
         iclust = iclust_init.clone()
     else:
         iclust_init = iclust.clone()
         
     for t in range(niter):
         # given iclust, reassign isub
-        isub = assign_isub(iclust, kn, tones2, nclust , nsub, lam, m,ki,kj, device=device)
-
+        isub = assign_isub(iclust, kn, tones2, nclust, nsub, lam, m,
+                           ki, kj,device=device)
         # given mu and isub, reassign iclust
-        iclust = assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj, device=device)
+        iclust = assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m,
+                               ki, kj, device=device)
+        
+        if verbose and t%20 == 0:
+            logger.debug(f'isub: {isub.nbytes / (2**20):.2f} MB, shape: {isub.shape}')
+            log_performance(logger, header='clustering_qr.cluster, assign loop')
     
     _, iclust = torch.unique(iclust, return_inverse=True)    
     nclust = iclust.max() + 1
@@ -166,7 +180,7 @@ def cluster(Xd, iclust = None, kn = None, nskip = 20, n_neigh = 10, nclust = 200
     return iclust, isub, M, iclust_init
 
 
-def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
+def kmeans_plusplus(Xg, niter=200, seed=1, device=torch.device('cuda'), verbose=False):
     # Xg is number of spikes by number of features.
     # We are finding cluster centroids and assigning each spike to a centroid.
     vtot = (Xg**2).sum(1)
@@ -194,6 +208,9 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
     mu = torch.zeros((niter, nfeat), device = device)
     vexp0 = torch.zeros(NN, device = device)
     iclust = torch.zeros((NN,), dtype = torch.int, device = device)
+
+    if verbose:
+        log_performance(logger, header='clustering_qr.kpp, after var init')
 
     # On every iteration we choose one new centroid to keep.
     # We track how well n centroids so far explain each spike.
@@ -246,9 +263,12 @@ def kmeans_plusplus(Xg, niter = 200, seed = 1, device=torch.device('cuda')):
             del(vexp)
             del(dexp)
 
+            if verbose and j%20 == 0:
+                log_performance(logger, header='clustering_qr.kpp, end of loop')
+
         except torch.cuda.OutOfMemoryError:
             logger.debug(f"OOM in kmeans_plus_plus iter {j}, nsp: {Xg.shape[0]}, "
-                         f"size: {Xg.nbytes / (2**30)} gb.")
+                         f"Xg size: {Xg.nbytes / (2**20):.2f} MB.")
             raise
 
     # if the clustering above is done on a subset of Xg, then we need to assign all Xgs here to get an iclust 
@@ -295,6 +315,7 @@ def subsample_idx(n1, n2):
     return idx, rev_idx
 
 
+# TODO: unused?
 def compute_score(mu, mu2, N, ccN, lam):
     mu_pairs  = ((N*mu).unsqueeze(1)  + N*mu)  / (1e-6 + N+N[:,0]).unsqueeze(-1)
     mu2_pairs = ((N*mu2).unsqueeze(1) + N*mu2) / (1e-6 + N+N[:,0]).unsqueeze(-1)
@@ -309,6 +330,7 @@ def compute_score(mu, mu2, N, ccN, lam):
     return score
 
 
+# TODO: unused?
 def run_one(Xd, st0, nskip = 20, lam = 0):
     iclust, iclust0, M = cluster(Xd,nskip = nskip, lam = 0, seed = 5)
     xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
@@ -421,7 +443,7 @@ def get_nearest_centers(xy, xcent, ycent):
 
 
 def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
-        progress_bar=None, clear_cache=False):
+        progress_bar=None, clear_cache=False, verbose=False):
 
     if mode == 'template':
         xy, iC = xy_templates(ops)
@@ -438,8 +460,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
-    nearest_center, xcent_pos, _ = get_nearest_centers(xy, xcent, ycent)
-    total_centers = xcent_pos.nelement()
+    nearest_center, _, _ = get_nearest_centers(xy, xcent, ycent)
+    total_centers = np.unique(nearest_center).size
     
     clu = np.zeros(nsp, 'int32')
     Wall = torch.zeros((0, ops['Nchan'], ops['settings']['n_pcs']))
@@ -448,26 +470,35 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     nmax = 0
     prog = tqdm(np.arange(len(xcent)), miniters=20 if progress_bar else None,
                 mininterval=10 if progress_bar else None)
+    t = 0
+    v = False
     
     try:
         for jj in prog:
             for kk in np.arange(len(ycent)):
                 # Get data for all templates that were closest to this x,y center.
                 ii = kk + jj*ycent.size
-                if ii % 10 == 0:
-                    log_performance(
-                        logger,
-                        header=f'Cluster center: {ii} of {total_centers}'
-                        )
                 if ii not in nearest_center:
                     # No templates are nearest to this center, skip it.
-                    logger.debug(f'Center {ii} | nsp: 0 | ntemp: 0')
                     continue
+                else:
+                    t += 1
+
+                if t % 10 == 0:
+                    log_performance(
+                        logger,
+                        header=f'Cluster center: {ii} ({t}/{total_centers})'
+                        )
+                    if verbose:
+                        v = True
+                else:
+                    v = False
+
                 ix = (nearest_center == ii)
                 ntemp = ix.sum()
                 Xd, ch_min, ch_max, igood  = get_data_cpu(
                     ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj],
-                    dmin=dmin, dminx=dminx, ix=ix
+                    dmin=dmin, dminx=dminx, ix=ix,
                     )
 
                 if Xd is None:
@@ -486,11 +517,17 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                     # find new clusters
                     logger.debug(f'Center {ii} | nsp: {Xd.shape[0]} | ntemp: {ntemp}')
                     iclust, iclust0, M, _ = cluster(
-                        Xd, nskip=nskip, lam=1, seed=5, device=device
+                        Xd, nskip=nskip, lam=1, seed=5, device=device,
+                        verbose=v
                         )
+
                     if clear_cache:
+                        if v:
+                            log_performance(logger, heading='clustering_qr.run gc')
                         gc.collect()
                         torch.cuda.empty_cache()
+                        if v:
+                            log_performance(logger, heading='clustering_qr.run gc')
 
                     xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
@@ -499,6 +536,9 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                         )
 
                     iclust = swarmsplitter.new_clusters(iclust, my_clus, xtree, tstat)
+
+                if v:
+                    log_performance(logger, header='clustering_qr.run, after iclust')
 
                 clu[igood] = iclust + nmax
                 Nfilt = int(iclust.max() + 1)

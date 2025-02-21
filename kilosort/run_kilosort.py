@@ -39,7 +39,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False, clear_cache=False,
                  save_preprocessed_copy=False, bad_channels=None,
-                 verbose_console=False):
+                 verbose_console=False, verbose_log=False):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -112,6 +112,10 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         If True, set logging level for console output to `DEBUG` instead
         of `INFO`, so that additional information normally only saved to the
         log file will also show up in real time while sorting.
+    verbose_log : bool; default=False.
+        If True, include additional debug-level logging statements for some
+        steps. This provides more detail for debugging, but may impact
+        performance.
     
     Raises
     ------
@@ -240,11 +244,11 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         # Sort spikes and save results
         st,tF, _, _ = detect_spikes(
             ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
-            clear_cache=clear_cache
+            clear_cache=clear_cache, verbose=verbose_log
             )
         clu, Wall = cluster_spikes(
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
-            clear_cache=clear_cache
+            clear_cache=clear_cache, verbose=verbose_log
             )
         ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
             save_sorting(
@@ -602,7 +606,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
 
 
 def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
-                  clear_cache=False):
+                  clear_cache=False, verbose=False):
     """Detect spikes via template deconvolution.
     
     Parameters
@@ -617,6 +621,11 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
         Start time of `run_kilosort`.
     progress_bar : TODO; optional.
         Informs `tqdm` package how to report progress, type unclear.
+    clear_cache : bool; False.
+        If True, force pytorch to clear cached cuda memory after some
+        memory-intensive steps in the pipeline.
+    verbose : bool; False.
+        If true, include additional debug-level logging statements.
 
     Returns
     -------
@@ -657,7 +666,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info('-'*40)
     clu, Wall = clustering_qr.run(
         ops, st0, tF, mode='spikes', device=device, progress_bar=progress_bar,
-        clear_cache=clear_cache
+        clear_cache=clear_cache, verbose=verbose
         )
     Wall3 = template_matching.postprocess_templates(Wall, ops, clu, st0, device=device)
     logger.info(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' +
@@ -685,7 +694,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
 
 
 def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
-                   clear_cache=False):
+                   clear_cache=False, verbose=False):
     """Cluster spikes using graph-based methods.
     
     Parameters
@@ -706,6 +715,11 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
         Start time of `run_kilosort`.
     progress_bar : TODO; optional.
         Informs `tqdm` package how to report progress, type unclear.
+    clear_cache : bool; False.
+        If True, force pytorch to clear cached cuda memory after some
+        memory-intensive steps in the pipeline.
+    verbose : bool; False.
+        If True, include additional debug-level logging statements.
 
     Returns
     -------
@@ -723,7 +737,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info('-'*40)
     clu, Wall = clustering_qr.run(
         ops, st, tF,  mode = 'template', device=device, progress_bar=progress_bar,
-        clear_cache=clear_cache
+        clear_cache=clear_cache, verbose=verbose
         )
     logger.info(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
