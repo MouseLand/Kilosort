@@ -166,9 +166,9 @@ def cluster(Xd, iclust=None, kn=None, nskip=20, n_neigh=10, nclust=200, seed=1,
         iclust = assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m,
                                ki, kj, device=device)
         
-        if verbose and t%20 == 0:
-            logger.debug(f'isub: {isub.nbytes / (2**20):.2f} MB, shape: {isub.shape}')
-            log_performance(logger, header='clustering_qr.cluster, assign loop')
+    if verbose:
+        logger.debug(f'isub: {isub.nbytes / (2**20):.2f} MB, shape: {isub.shape}')
+        log_performance(logger, header='clustering_qr.cluster, after isub loop')
     
     _, iclust = torch.unique(iclust, return_inverse=True)    
     nclust = iclust.max() + 1
@@ -263,13 +263,13 @@ def kmeans_plusplus(Xg, niter=200, seed=1, device=torch.device('cuda'), verbose=
             del(vexp)
             del(dexp)
 
-            if verbose and j%20 == 0:
-                log_performance(logger, header='clustering_qr.kpp, end of loop')
-
         except torch.cuda.OutOfMemoryError:
             logger.debug(f"OOM in kmeans_plus_plus iter {j}, nsp: {Xg.shape[0]}, "
                          f"Xg size: {Xg.nbytes / (2**20):.2f} MB.")
             raise
+
+    if verbose:
+        log_performance(logger, header='clustering_qr.kpp, after loop')
 
     # if the clustering above is done on a subset of Xg, then we need to assign all Xgs here to get an iclust 
     # for ii in range((len(Xg)-1)//nblock +1):
@@ -484,6 +484,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                 else:
                     t += 1
 
+                v = False
                 if t % 10 == 0:
                     log_performance(
                         logger,
@@ -491,8 +492,6 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                         )
                     if verbose:
                         v = True
-                else:
-                    v = False
 
                 ix = (nearest_center == ii)
                 ntemp = ix.sum()
@@ -501,12 +500,14 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                     dmin=dmin, dminx=dminx, ix=ix,
                     )
 
+                logger.debug(f'Center {ii} | Xd shape: {Xd.shape} | ntemp: {ntemp}')
+                if verbose and Xd.nelement() > 10**8:
+                    v = True
+
                 if Xd is None:
-                    logger.debug(f'Center {ii} | nsp: 0 | ntemp: {ntemp}')
                     nearby_chans_empty += 1
                     continue
-                elif Xd.shape[0]<1000:
-                    logger.debug(f'Center {ii} | nsp: {Xd.shape[0]} | ntemp: {ntemp}')
+                elif Xd.shape[0] < 1000:
                     iclust = torch.zeros((Xd.shape[0],))
                 else:
                     if mode == 'template':
@@ -515,7 +516,6 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                         st0 = None
 
                     # find new clusters
-                    logger.debug(f'Center {ii} | nsp: {Xd.shape[0]} | ntemp: {ntemp}')
                     iclust, iclust0, M, _ = cluster(
                         Xd, nskip=nskip, lam=1, seed=5, device=device,
                         verbose=v
