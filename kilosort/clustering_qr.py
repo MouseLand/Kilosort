@@ -523,11 +523,11 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
 
                     if clear_cache:
                         if v:
-                            log_performance(logger, heading='clustering_qr.run gc')
+                            log_performance(logger, header='clustering_qr before gc')
                         gc.collect()
                         torch.cuda.empty_cache()
                         if v:
-                            log_performance(logger, heading='clustering_qr.run gc')
+                            log_performance(logger, header='clustering_qr after gc')
 
                     xtree, tstat, my_clus = hierarchical.maketree(M, iclust, iclust0)
 
