@@ -502,6 +502,9 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
 
                 logger.debug(f'Center {ii} | Xd shape: {Xd.shape} | ntemp: {ntemp}')
                 if verbose and Xd.nelement() > 10**8:
+                    logger.info(f'Resetting cuda memory stats for Center {ii}')
+                    if device == torch.device('cuda'):
+                        torch.cuda.reset_peak_memory_stats(device)
                     v = True
 
                 if Xd is None:

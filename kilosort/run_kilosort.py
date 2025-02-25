@@ -232,6 +232,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         ops, bfile, st0 = compute_drift_correction(
             ops, device, tic0=tic0, progress_bar=progress_bar,
             file_object=file_object, clear_cache=clear_cache,
+            verbose=verbose_log
             )
 
         # Check scale of data for log file
@@ -531,7 +532,7 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
 
 
 def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
-                             file_object=None, clear_cache=False):
+                             file_object=None, clear_cache=False, verbose=False):
     """Compute drift correction parameters and save them to `ops`.
 
     Parameters
@@ -548,6 +549,11 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         Must have 'shape' and 'dtype' attributes and support array-like
         indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
         array or memmap.
+    clear_cache : bool; False.
+        If True, force pytorch to clear cached cuda memory after some
+        memory-intensive steps in the pipeline.
+    verbose : bool; False.
+        If true, include additional debug-level logging statements.
 
     Returns
     -------
@@ -580,7 +586,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         )
 
     ops, st = datashift.run(ops, bfile, device=device, progress_bar=progress_bar,
-                            clear_cache=clear_cache)
+                            clear_cache=clear_cache, verbose=verbose)
     bfile.close()
     logger.info(f'drift computed in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
@@ -650,7 +656,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info('-'*40)
     st0, tF, ops = spikedetect.run(
         ops, bfile, device=device, progress_bar=progress_bar,
-        clear_cache=clear_cache
+        clear_cache=clear_cache, verbose=verbose
         )
     tF = torch.from_numpy(tF)
     logger.info(f'{len(st0)} spikes extracted in {time.time()-tic : .2f}s; ' + 

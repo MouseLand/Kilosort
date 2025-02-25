@@ -184,7 +184,7 @@ def kernel2D(x, y, sig = 1):
     return Kn
 
 def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
-        clear_cache=False):
+        clear_cache=False, verbose=False):
     """ this step computes a drift correction model
     it returns vertical correction amplitudes for each batch, and for multiple blocks in a batch if nblocks > 1. 
     """
@@ -197,7 +197,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     # the first step is to extract all spikes using the universal templates
     st, _, ops  = spikedetect.run(
         ops, bfile, device=device, progress_bar=progress_bar,
-        clear_cache=clear_cache
+        clear_cache=clear_cache, verbose=verbose
         )
 
     # spikes are binned by amplitude and y-position to construct a "fingerprint" for each batch
