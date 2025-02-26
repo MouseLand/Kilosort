@@ -183,7 +183,7 @@ def cluster(Xd, iclust=None, kn=None, nskip=20, n_neigh=10, nclust=200, seed=1,
 def kmeans_plusplus(Xg, niter=200, seed=1, device=torch.device('cuda'), verbose=False):
     # Xg is number of spikes by number of features.
     # We are finding cluster centroids and assigning each spike to a centroid.
-    vtot = (Xg**2).sum(1)
+    vtot = torch.norm(Xg, 2, dim=1)**2
 
     n1 = vtot.shape[0]
     if n1 > 2**24:
@@ -220,10 +220,6 @@ def kmeans_plusplus(Xg, niter=200, seed=1, device=torch.device('cuda'), verbose=
     for j in range(niter):
         # v2 is the un-explained variance so far for each spike
         v2 = torch.relu(vtot - vexp0)
-
-        # TODO: Where to actually apply subsampling of Xg?
-        #       Okay to draw isamp from the subsample? If not, how to reconcile
-        #       vtot size (all of Xg) vs vexp0 size (subsample size)?
 
         # We sample ntry new candidate centroids based on how much un-explained variance they have
         # more unexplained variance makes it more likely to be selected
@@ -271,7 +267,9 @@ def kmeans_plusplus(Xg, niter=200, seed=1, device=torch.device('cuda'), verbose=
     if verbose:
         log_performance(logger, header='clustering_qr.kpp, after loop')
 
-    # if the clustering above is done on a subset of Xg, then we need to assign all Xgs here to get an iclust 
+    # NOTE: For very large datasets, we may end up needing to subsample Xg.
+    # If the clustering above is done on a subset of Xg,
+    # then we need to assign all Xgs here to get an iclust 
     # for ii in range((len(Xg)-1)//nblock +1):
     #     vexp = 2 * Xg[ii*nblock:(ii+1)*nblock] @ mu.T - (mu**2).sum(1)
     #     iclust[ii*nblock:(ii+1)*nblock] = torch.argmax(vexp, dim=-1)
@@ -348,9 +346,6 @@ def xy_templates(ops):
     xcup, ycup = ops['xc'][iU], ops['yc'][iU]
     xy = np.vstack((xcup, ycup))
     xy = torch.from_numpy(xy)
-
-    iU = ops['iU'].cpu().numpy()
-    iC = ops['iCC'][:, ops['iU']]    
 
     return xy, iC
 
@@ -495,7 +490,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
 
                 ix = (nearest_center == ii)
                 ntemp = ix.sum()
-                Xd, ch_min, ch_max, igood  = get_data_cpu(
+                Xd, igood, ichan = get_data_cpu(
                     ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj],
                     dmin=dmin, dminx=dminx, ix=ix,
                     )
@@ -551,7 +546,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                 W = torch.zeros((Nfilt, ops['Nchan'], ops['settings']['n_pcs']))
                 for j in range(Nfilt):
                     w = Xd[iclust==j].mean(0)
-                    W[j, ch_min:ch_max, :] = torch.reshape(w, (-1, ops['settings']['n_pcs'])).cpu()
+                    W[j, ichan, :] = torch.reshape(w, (-1, ops['settings']['n_pcs'])).cpu()
                 
                 Wall = torch.cat((Wall, W), 0)
 
@@ -597,13 +592,11 @@ def get_data_cpu(ops, xy, iC, PID, tF, ycenter, xcenter, dmin=20, dminx=32,
     y0 = ycenter # xy[1].mean() - ycenter
     x0 = xcenter #xy[0].mean() - xcenter
 
-    #print(dmin, dminx)
     if ix is None:
         ix = torch.logical_and(
             torch.abs(xy[1] - y0) < dmin,
             torch.abs(xy[0] - x0) < dminx
             )
-    #print(ix.nonzero()[:,0])
     igood = ix[PID].nonzero()[:,0]
 
     if len(igood)==0:
@@ -612,16 +605,14 @@ def get_data_cpu(ops, xy, iC, PID, tF, ycenter, xcenter, dmin=20, dminx=32,
     pid = PID[igood]
     data = tF[igood]
     nspikes, nchanraw, nfeatures = data.shape
-    ichan = torch.unique(iC[:, ix])
-    ch_min = torch.min(ichan)
-    ch_max = torch.max(ichan)+1
-    nchan = ch_max - ch_min
+    ichan, imap = torch.unique(iC[:, ix], return_inverse=True)
+    print(ichan)
+    nchan = ichan.nelement()
 
     dd = torch.zeros((nspikes, nchan, nfeatures))
-    for j in ix.nonzero()[:,0]:
+    for k,j in enumerate(ix.nonzero()[:,0]):
         ij = torch.nonzero(pid==j)[:, 0]
-        #print(ij.sum())
-        dd[ij.unsqueeze(-1), iC[:,j]-ch_min] = data[ij]
+        dd[ij.unsqueeze(-1), imap[:,k]] = data[ij]
 
     if merge_dim:
         Xd = torch.reshape(dd, (nspikes, -1))
@@ -629,8 +620,7 @@ def get_data_cpu(ops, xy, iC, PID, tF, ycenter, xcenter, dmin=20, dminx=32,
         # Keep channels and features separate
         Xd = dd
 
-    return Xd, ch_min, ch_max, igood
-
+    return Xd, igood, ichan
 
 
 def assign_clust(rows_neigh, iclust, kn, tones2, nclust):    

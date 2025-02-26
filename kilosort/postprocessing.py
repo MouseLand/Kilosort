@@ -102,7 +102,7 @@ def make_pc_features(ops, spike_templates, spike_clusters, tF):
         ix[iunq] = True
         # Get PC features for all spikes detected with those templates (Xd),
         # and the indices in tF where those spikes occur (igood).
-        Xd, ch_min, ch_max, igood = get_data_cpu(
+        Xd, igood, ichan = get_data_cpu(
             ops, xy, iC, spike_templates, tF, None, None,
             dmin=ops['dmin'], dminx=ops['dminx'], ix=ix, merge_dim=False
             )
@@ -114,7 +114,7 @@ def make_pc_features(ops, spike_templates, spike_clusters, tF):
         # Assign features to overwrite tF in-place
         tF[igood,:] = Xd[:, ind[:n_chans], :]
         # Save channel inds for phy
-        feature_ind[i,:] = ind[:n_chans].numpy() + ch_min.cpu().numpy()
+        feature_ind[i,:] = ichan[ind[:n_chans]].cpu().numpy()
 
     # Swap last 2 dimensions to get ordering Phy expects
     tF = torch.permute(tF, (0, 2, 1))
