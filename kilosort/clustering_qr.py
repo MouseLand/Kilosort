@@ -606,7 +606,6 @@ def get_data_cpu(ops, xy, iC, PID, tF, ycenter, xcenter, dmin=20, dminx=32,
     data = tF[igood]
     nspikes, nchanraw, nfeatures = data.shape
     ichan, imap = torch.unique(iC[:, ix], return_inverse=True)
-    print(ichan)
     nchan = ichan.nelement()
 
     dd = torch.zeros((nspikes, nchan, nfeatures))
