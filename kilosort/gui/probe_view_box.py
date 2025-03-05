@@ -295,7 +295,7 @@ def create_label(label, size):
     # Create QPainterPath to use as custom symbol shape
     symbol = QtGui.QPainterPath()
     f = QtGui.QFont()
-    f.setPointSize(size*5)
+    f.setPointSize(int(size*5))
     # For pyqtgraph, custom symbol shapes must be centered at (0,0)
     p = QtCore.QPointF(0,0)
     symbol.addText(p, f, label)
