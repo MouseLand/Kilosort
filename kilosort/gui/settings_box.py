@@ -867,12 +867,12 @@ class ExtraParametersWindow(QtWidgets.QWidget):
                 heading = p['step']
                 heading_label = QtWidgets.QLabel(heading)
                 heading_label.setFont(QtGui.QFont('Arial', 14))
-                self.heading_labels.append(heading_label)
-                if len(self.heading_labels) % 4 == 0:
+                if heading in ['spike detection', 'clustering']:
                     hgap = QtWidgets.QLabel('         ')
-                    layout.addWidget(hgap, row_count, 5, 1, 1)
+                    layout.addWidget(hgap, row_count, col+5, 1, 1)
                     row_count = 0
-                    col = 6
+                    col += 6
+                self.heading_labels.append(heading_label)
                 row_count += 1
                 gap = QtWidgets.QLabel('')
                 gap.setFont(QtGui.QFont('Arial', 4))
