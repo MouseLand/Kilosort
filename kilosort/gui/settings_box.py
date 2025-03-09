@@ -284,7 +284,10 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.update_settings()
 
     def set_default_field_values(self):
+        self.bad_channels_input.setText('')
+        self.bad_channels_input.editingFinished.emit()
         self.dtype_selector.setCurrentText(_DEFAULT_DTYPE)
+        self.dtype_selector.currentTextChanged.emit(_DEFAULT_DTYPE)
         epw = self.extra_parameters_window
         for k, p in MAIN_PARAMETERS.items():
             getattr(self, f'{k}_input').setText(str(p['default']))
