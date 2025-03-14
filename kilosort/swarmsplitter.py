@@ -93,7 +93,7 @@ def split(Xd, xtree, tstat, iclust, my_clus, verbose = True, meta = None):
         ix2 = np.isin(iclust, my_clus[xtree[kk, 1]])
 
         criterion = 0
-        score = np.NaN
+        score = np.nan
         if criterion==0:
             # first mutation is global modularity
             if tstat[kk,0] < 0.2:
