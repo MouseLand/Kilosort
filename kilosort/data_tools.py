@@ -111,7 +111,7 @@ def get_spike_waveforms(spikes, results_dir, bfile=None, chan=None):
 
     waves = []
     for t in spikes:
-        tmin = t - bfile.nt0min
+        tmin = max(t - bfile.nt0min, 0)
         tmax = t + (bfile.nt - bfile.nt0min)
         w = bfile[tmin:tmax].cpu().numpy()
         if whitening_mat_inv is not None:
