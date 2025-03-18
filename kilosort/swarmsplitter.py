@@ -54,9 +54,9 @@ def check_CCG(st1, st2=None, nbins = 500, tbin  = 1/1000):
     if st2 is None:
         st2 = st1.copy()
     K , T= compute_CCG(st1, st2, nbins = nbins, tbin = tbin)
-    Q12, R12, R00 = CCG_metrics(st1, st2, K, T,  nbins = nbins, tbin = tbin)
-    is_refractory    = Q12<.1  and (R12<.2  or R00<.25)
-    cross_refractory = Q12<.25 and (R12<.05 or R00<.25)
+    R12, Q12, Q00 = CCG_metrics(st1, st2, K, T,  nbins = nbins, tbin = tbin)
+    is_refractory    = R12<.1  and (Q12<.2  or Q00<.25)
+    cross_refractory = R12<.25 and (Q12<.05 or Q00<.25)
     return is_refractory, cross_refractory
 
 def refractoriness(st1, st2):

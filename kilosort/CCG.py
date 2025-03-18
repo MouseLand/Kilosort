@@ -89,7 +89,7 @@ def check_CCG(st1, st2=None, nbins = 500, tbin  = 1/1000, acg_threshold=0.2,
     R12, Q12, Q00 = CCG_metrics(st1, st2, K, T,  nbins = nbins, tbin = tbin)
     is_refractory    = R12<acg_threshold  and (Q12<.2)#  or Q00<.25)
     cross_refractory = R12<ccg_threshold and (Q12<.05)# or Q00<.25)
-    return is_refractory, cross_refractory, Q12
+    return is_refractory, cross_refractory, R12
 
 def similarity(Wall, W, nt=61):
     WtW = conv1d(W.reshape(-1, 1,nt), W.reshape(-1, 1 ,nt), padding = nt) 
@@ -107,15 +107,15 @@ def refract(iclust2, st0, acg_threshold=0.2, ccg_threshold=0.25):
 
     is_refractory    = np.zeros(Nfilt, )
     cross_refractory = np.zeros(Nfilt, )
-    Q12 = np.zeros(Nfilt, )
+    R12 = np.zeros(Nfilt, )
 
     for kk in range(Nfilt):    
         ix = iclust2==kk
         st1 = st0[ix]
 
         if (len(st1) > 10) and ((st1.max() - st1.min()) != 0):
-            is_refractory[kk], cross_refractory[kk], Q12[kk] = check_CCG(
+            is_refractory[kk], cross_refractory[kk], R12[kk] = check_CCG(
                 st1, acg_threshold=acg_threshold, ccg_threshold=ccg_threshold
                 )
 
-    return is_refractory, Q12
+    return is_refractory, R12
