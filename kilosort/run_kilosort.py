@@ -371,6 +371,7 @@ def setup_logger(results_dir, verbose_console=False):
 def close_logger():
     ks_log = logging.getLogger('kilosort')
     for handler in ks_log.handlers:
+        ks_log.removeHandler(handler)
         handler.close()
 
 
