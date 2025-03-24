@@ -478,6 +478,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                     continue
                 else:
                     t += 1
+                ix = (nearest_center == ii)
+                ntemp = ix.sum()
 
                 v = False
                 if t % 10 == 0:
@@ -488,12 +490,13 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                     if verbose:
                         v = True
 
-                ix = (nearest_center == ii)
-                ntemp = ix.sum()
                 Xd, igood, ichan = get_data_cpu(
                     ops, xy, iC, iclust_template, tF, ycent[kk], xcent[jj],
                     dmin=dmin, dminx=dminx, ix=ix,
                     )
+                if Xd is None:
+                    nearby_chans_empty += 1
+                    continue
 
                 logger.debug(f'Center {ii} | Xd shape: {Xd.shape} | ntemp: {ntemp}')
                 if verbose and Xd.nelement() > 10**8:
@@ -502,10 +505,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
                         torch.cuda.reset_peak_memory_stats(device)
                     v = True
 
-                if Xd is None:
-                    nearby_chans_empty += 1
-                    continue
-                elif Xd.shape[0] < 1000:
+                if Xd.shape[0] < 1000:
                     iclust = torch.zeros((Xd.shape[0],))
                 else:
                     if mode == 'template':
@@ -599,8 +599,8 @@ def get_data_cpu(ops, xy, iC, PID, tF, ycenter, xcenter, dmin=20, dminx=32,
             )
     igood = ix[PID].nonzero()[:,0]
 
-    if len(igood)==0:
-        return None, None,  None, None
+    if len(igood) == 0:
+        return None, None, None
 
     pid = PID[igood]
     data = tF[igood]

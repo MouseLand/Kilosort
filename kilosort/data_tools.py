@@ -30,6 +30,11 @@ def mean_waveform(cluster_id, results_dir, n_spikes=np.inf, bfile=None, best=Tru
     mean_wave : np.ndarray
         Mean waveform with shape (nt,) if `best = True`, or shape (n_chans,nt)
         otherwise.
+    spike_subset : np.ndarray
+        Indices for randomly selected spikes, relative to the list of spike
+        times assigned to this cluster. In other words, `spike_subset = [0,1,2]`
+        would indicate that the first, second and third spikes from this cluster
+        were used (in ascending order of spike time).
     
     """
     results_dir = Path(results_dir)
@@ -38,11 +43,12 @@ def mean_waveform(cluster_id, results_dir, n_spikes=np.inf, bfile=None, best=Tru
     else:
         chan = None
 
-    spikes = get_cluster_spikes(cluster_id, results_dir, n_spikes=n_spikes)
-    waves = get_spike_waveforms(spikes, results_dir, chan=chan)
+    spike_times, spike_subset = get_cluster_spikes(cluster_id, results_dir,
+                                                   n_spikes=n_spikes)
+    waves = get_spike_waveforms(spike_times, results_dir, bfile=bfile, chan=chan)
     mean_wave = waves.mean(axis=-1)
 
-    return mean_wave
+    return mean_wave, spike_subset
 
 
 def get_best_channels(results_dir):
@@ -58,14 +64,18 @@ def get_cluster_spikes(cluster_id, results_dir, n_spikes=np.inf):
     """Get `n_spikes` random spike times assigned to `cluster_id`."""
     spike_times = np.load(results_dir / 'spike_times.npy')
     spike_clusters = np.load(results_dir / 'spike_clusters.npy')
-    spikes = spike_times[spike_clusters == cluster_id]
+    spike_idx = (spike_clusters == cluster_id).nonzero()[0]
     if n_spikes != np.inf:
-        spikes = np.random.choice(
-            spikes, min(spikes.size, n_spikes), replace=False
+        spike_subset = np.random.choice(
+            np.arange(spike_idx.size), min(spike_idx.size, n_spikes), replace=False
             )
-        spikes.sort()
+    else:
+        spike_subset = np.arange(spike_idx.size)
+    spike_idx = spike_idx[spike_subset]
+    spike_idx.sort()
+    spikes = spike_times[spike_idx]
 
-    return spikes
+    return spikes, spike_subset
 
 
 def get_spike_waveforms(spikes, results_dir, bfile=None, chan=None):
@@ -101,7 +111,7 @@ def get_spike_waveforms(spikes, results_dir, bfile=None, chan=None):
 
     waves = []
     for t in spikes:
-        tmin = t - bfile.nt0min
+        tmin = max(t - bfile.nt0min, 0)
         tmax = t + (bfile.nt - bfile.nt0min)
         w = bfile[tmin:tmax].cpu().numpy()
         if whitening_mat_inv is not None:
@@ -120,36 +130,41 @@ def get_spike_waveforms(spikes, results_dir, bfile=None, chan=None):
     return waves
 
 
-def cluster_templates(cluster_id, results_dir, mean=False, best=True):
-    """Get templates assigned to all spikes assigned this `cluster_id.`
+def cluster_templates(cluster_id, results_dir, mean=False, best=False):
+    """Get template-like centroid for this `cluster_id`, scaled for each spike.
     
+    Note that template here actually refers to the final clusters. The
+    template-like structure is obtained from the multi-channel waveforms of all
+    spikes assigned to the cluster. The 'template' is scaled separately for each
+    spike based on its amplitude.
+
     Parameters
     ----------
     cluster_id : int
         Cluster index to reference from `spike_clusters.npy` in the results
-        directory. Only waveforms from spikes assigned to this cluster will
-        be used.
+        directory.
     results_dir : str or Path
         Path to directory where Kilosort4 sorting results were saved.
     mean : bool; default=False
-        If True, return the mean across templates.
-    best : bool; default=True
-        If True, return single channel template(s) for this cluster_id using
+        If True, return the mean 'template' across spikes.
+    best : bool; default=False
+        If True, return single channel 'template(s)' for this cluster_id using
         the channel with the largest norm.
 
     Return
     ------
-    mean_temps : np.ndarray
-        Array of templates with shape `(n_templates, nt, n_channels)`, or
-        with shape `(nt, n_channels)` if `mean=True`.
+    temps : np.ndarray
+        Array of templates with shape `(n_spikes, nt, n_channels)`, or
+        with shape `(nt, n_channels)` if `mean=True`. If `best=True`,
+        then `n_channels=1`.
         
     """
     results_dir = Path(results_dir)
     spike_clusters = np.load(results_dir / 'spike_clusters.npy')
-    spike_idx = spike_clusters[spike_clusters == cluster_id]
+    spike_idx = (spike_clusters == cluster_id).nonzero()[0]
     temps = get_templates(spike_idx, results_dir)
     if best:
-        chan = (temps**2).sum(axis=1).sum(axis=0).argmax(axis=-1)
+        chan = get_best_channel(results_dir, cluster_id)
         temps = temps[:,:,chan]
     if mean:
         return temps.mean(axis=0)
@@ -158,7 +173,7 @@ def cluster_templates(cluster_id, results_dir, mean=False, best=True):
 
 
 def get_templates(spike_idx, results_dir):
-    """Get learned templates assigned to one or more spikes.
+    """Get template-like centroids for clusters assigned to one or more spikes.
     
     Parameters
     ----------
@@ -179,9 +194,9 @@ def get_templates(spike_idx, results_dir):
     if isinstance(spike_idx, int):
         spike_idx = [spike_idx]
     templates = np.load(results_dir / 'templates.npy')
-    spike_templates = np.load(results_dir / 'spike_templates.npy')
+    # Note that spike_clusters.npy is identical to spike_templates.npy for KS4
+    spike_templates = np.load(results_dir / 'spike_clusters.npy')
     amplitudes = np.load(results_dir / 'amplitudes.npy')
-
     template_idx = spike_templates[spike_idx]
     temps = templates[template_idx, :, :]
     scaled = amplitudes[spike_idx, np.newaxis, np.newaxis] * temps
