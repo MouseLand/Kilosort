@@ -247,7 +247,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
             ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
             clear_cache=clear_cache, verbose=verbose_log
             )
-        clu, Wall = cluster_spikes(
+        clu, Wall, st = cluster_spikes(
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
             clear_cache=clear_cache, verbose=verbose_log
             )
@@ -756,8 +756,10 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info(' ')
     logger.info('Merging clusters')
     logger.info('-'*40)
-    Wall, clu, is_ref = template_matching.merging_function(ops, Wall, clu, st[:,0],
-                                                           device=device)
+    Wall, clu, is_ref, st2 = template_matching.merging_function(
+        ops, Wall, clu, st[:,0], device=device
+        )
+    st[:,0] = st2
     clu = clu.astype('int32')
     logger.info(f'{clu.max()+1} units found, in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
@@ -769,7 +771,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     log_performance(logger, 'info', 'Resource usage after clustering')
     log_cuda_details(logger)
 
-    return clu, Wall
+    return clu, Wall, st
 
 
 def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,

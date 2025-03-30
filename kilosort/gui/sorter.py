@@ -118,7 +118,7 @@ class KiloSortWorker(QtCore.QThread):
                 self.clu0 = clu0
                 self.plotDataReady.emit('diagnostics')
 
-                clu, Wall = cluster_spikes(
+                clu, Wall, _ = cluster_spikes(
                     st, tF, ops, self.device, bfile, tic0=tic0,
                     progress_bar=self.progress_bar, clear_cache=clear_cache,
                     verbose=verbose

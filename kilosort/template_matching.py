@@ -143,7 +143,7 @@ def align_U(U, ops, device=torch.device('cuda')):
 def postprocess_templates(Wall, ops, clu, st, device=torch.device('cuda')):
     Wall2, _ = align_U(Wall, ops, device=device)
     #Wall3, _= remove_duplicates(ops, Wall2)
-    Wall3, _, _ = merging_function(ops, Wall2.transpose(1,2), clu, st[:,0],
+    Wall3, _, _, _ = merging_function(ops, Wall2.transpose(1,2), clu, st[:,0],
                                    0.9, 'mu', device=device)
     Wall3 = Wall3.transpose(1,2).to(device)
     return Wall3
@@ -287,7 +287,7 @@ def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.
         UtU = torch.einsum('lk, jlm -> jkm',  Wnorm[kk], Wnorm)
         ctc = torch.einsum('jkm, kml -> jl', UtU, WtW)
 
-        cmax = ctc.max(1)[0]
+        cmax, imax = ctc.max(1)
         cmax[kk] = 0
 
         jsort = np.argsort(cmax.cpu().numpy())[::-1]
@@ -311,9 +311,14 @@ def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.
 
             if is_ccg:
                 is_merged[jj] = 1
+                dt = (imax[kk] - imax[jj]).item()
+                if dt != 0:
+                    idx = (clu2 == jj)
+                    st[idx] -= dt
+                    st.sort()
+                
                 Ww[kk] = ns[kk]/(ns[kk]+ns[jj]) * Ww[kk] + ns[jj]/(ns[kk]+ns[jj]) * Ww[jj]            
                 Ww[jj] = 0
-
                 ns[kk] += ns[jj]
                 ns[jj] = 0
                 clu2[clu2==jj] = kk            
@@ -337,4 +342,4 @@ def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.
     else:
         is_ref = None
 
-    return Ww.cpu(), clu2, is_ref
+    return Ww.cpu(), clu2, is_ref, st
