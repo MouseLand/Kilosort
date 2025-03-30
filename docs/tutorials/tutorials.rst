@@ -6,3 +6,4 @@
     load_data
     good_unit_criteria
     plotting_example
+    improve_sorting

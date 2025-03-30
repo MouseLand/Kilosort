@@ -173,8 +173,9 @@ def log_performance(log=None, level=None, header=None):
     getattr(log, level)('*'*56)
 
 
-def log_cuda_details(log):
+def log_cuda_details(log=None):
     """Log a detailed summary of cuda stats from `torch.cuda.memory_summary`."""
+    if log is None: log = logger
     if torch.cuda.is_available():
         log.debug(f'\n\n{torch.cuda.memory_summary(abbreviated=True)}\n')
 

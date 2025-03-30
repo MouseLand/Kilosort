@@ -30,7 +30,7 @@ RECOGNIZED_SETTINGS = list(DEFAULT_SETTINGS.keys())
 RECOGNIZED_SETTINGS.extend([
     'filename', 'data_dir', 'results_dir', 'probe_name', 'probe_path',
     'data_file_path', 'probe', 'data_dtype', 'save_preprocessed_copy',
-    'clear_cache', 'do_CAR', 'invert_sign'
+    'clear_cache', 'do_CAR', 'invert_sign', 'verbose_log'
 ])
 
 
@@ -39,7 +39,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False, clear_cache=False,
                  save_preprocessed_copy=False, bad_channels=None,
-                 verbose_console=False):
+                 verbose_console=False, verbose_log=False):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -112,6 +112,10 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         If True, set logging level for console output to `DEBUG` instead
         of `INFO`, so that additional information normally only saved to the
         log file will also show up in real time while sorting.
+    verbose_log : bool; default=False.
+        If True, include additional debug-level logging statements for some
+        steps. This provides more detail for debugging, but may impact
+        performance.
     
     Raises
     ------
@@ -124,8 +128,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     ops : dict
         Dictionary storing settings and results for all algorithmic steps.
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
-        each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st[:,0]`.
@@ -214,10 +218,9 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
 
         tic0 = time.time()
         ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
-                            device, save_preprocessed_copy)
+                             device, save_preprocessed_copy)
         
-        # Remove some stuff that doesn't need to be printed twice, then pretty-print
-        # format for log file.
+        # Pretty-print ops and probe for log
         logger.debug(f"Initial ops:\n\n{ops_as_string(ops)}\n")
         logger.debug(f"Probe dictionary:\n\n{probe_as_string(ops['probe'])}\n")
 
@@ -229,6 +232,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         ops, bfile, st0 = compute_drift_correction(
             ops, device, tic0=tic0, progress_bar=progress_bar,
             file_object=file_object, clear_cache=clear_cache,
+            verbose=verbose_log
             )
 
         # Check scale of data for log file
@@ -241,11 +245,11 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         # Sort spikes and save results
         st,tF, _, _ = detect_spikes(
             ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
-            clear_cache=clear_cache
+            clear_cache=clear_cache, verbose=verbose_log
             )
         clu, Wall = cluster_spikes(
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
-            clear_cache=clear_cache
+            clear_cache=clear_cache, verbose=verbose_log
             )
         ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
             save_sorting(
@@ -332,21 +336,23 @@ def set_files(settings, filename, probe, probe_name,
 
 
 def setup_logger(results_dir, verbose_console=False):
+    results_dir = Path(results_dir)
+    
     # Get root logger for Kilosort application
     ks_log = logging.getLogger('kilosort')
     ks_log.setLevel(logging.DEBUG)
 
+    # Add file handler at debug level, include timestamps and logging level
+    # in text output.
+    file = logging.FileHandler(results_dir / 'kilosort4.log', mode='w')
+    file.setLevel(logging.DEBUG)
+    text_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    file_formatter = logging.Formatter(text_format)
+    file.setFormatter(file_formatter)
+
     # Skip this if the handlers were already added, like when running multiple
     # times in a single session.
     if not ks_log.handlers:
-        # Add file handler at debug level, include timestamps and logging level
-        # in text output.
-        file = logging.FileHandler(results_dir / 'kilosort4.log', mode='w')
-        file.setLevel(logging.DEBUG)
-        text_format = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-        file_formatter = logging.Formatter(text_format)
-        file.setFormatter(file_formatter)
-
         # Add console handler at info level with shorter messages,
         # unless verbose is requested.
         console = logging.StreamHandler()
@@ -357,14 +363,16 @@ def setup_logger(results_dir, verbose_console=False):
             console.setLevel(logging.INFO)
             console_formatter = logging.Formatter('%(name)-12s: %(message)s')
             console.setFormatter(console_formatter)
-
-        ks_log.addHandler(file)
         ks_log.addHandler(console)
+
+    # Always add file handler since log file might change locations
+    ks_log.addHandler(file)
 
 
 def close_logger():
     ks_log = logging.getLogger('kilosort')
-    for handler in ks_log.handlers:
+    for handler in ks_log.handlers.copy():
+        ks_log.removeHandler(handler)
         handler.close()
 
 
@@ -526,7 +534,7 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
 
 
 def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
-                             file_object=None, clear_cache=False):
+                             file_object=None, clear_cache=False, verbose=False):
     """Compute drift correction parameters and save them to `ops`.
 
     Parameters
@@ -543,6 +551,11 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         Must have 'shape' and 'dtype' attributes and support array-like
         indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
         array or memmap.
+    clear_cache : bool; False.
+        If True, force pytorch to clear cached cuda memory after some
+        memory-intensive steps in the pipeline.
+    verbose : bool; False.
+        If true, include additional debug-level logging statements.
 
     Returns
     -------
@@ -575,7 +588,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         )
 
     ops, st = datashift.run(ops, bfile, device=device, progress_bar=progress_bar,
-                            clear_cache=clear_cache)
+                            clear_cache=clear_cache, verbose=verbose)
     bfile.close()
     logger.info(f'drift computed in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
@@ -601,7 +614,7 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
 
 
 def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
-                  clear_cache=False):
+                  clear_cache=False, verbose=False):
     """Detect spikes via template deconvolution.
     
     Parameters
@@ -616,12 +629,17 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
         Start time of `run_kilosort`.
     progress_bar : TODO; optional.
         Informs `tqdm` package how to report progress, type unclear.
+    clear_cache : bool; False.
+        If True, force pytorch to clear cached cuda memory after some
+        memory-intensive steps in the pipeline.
+    verbose : bool; False.
+        If true, include additional debug-level logging statements.
 
     Returns
     -------
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
-        each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st`.
@@ -640,7 +658,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info('-'*40)
     st0, tF, ops = spikedetect.run(
         ops, bfile, device=device, progress_bar=progress_bar,
-        clear_cache=clear_cache
+        clear_cache=clear_cache, verbose=verbose
         )
     tF = torch.from_numpy(tF)
     logger.info(f'{len(st0)} spikes extracted in {time.time()-tic : .2f}s; ' + 
@@ -656,7 +674,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info('-'*40)
     clu, Wall = clustering_qr.run(
         ops, st0, tF, mode='spikes', device=device, progress_bar=progress_bar,
-        clear_cache=clear_cache
+        clear_cache=clear_cache, verbose=verbose
         )
     Wall3 = template_matching.postprocess_templates(Wall, ops, clu, st0, device=device)
     logger.info(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' +
@@ -684,14 +702,14 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
 
 
 def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
-                   clear_cache=False):
+                   clear_cache=False, verbose=False):
     """Cluster spikes using graph-based methods.
     
     Parameters
     ----------
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
-        each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     tF : torch.Tensor
         PC features for each spike, with shape
         (n_spikes, nearest_chans, n_pcs)
@@ -705,6 +723,11 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
         Start time of `run_kilosort`.
     progress_bar : TODO; optional.
         Informs `tqdm` package how to report progress, type unclear.
+    clear_cache : bool; False.
+        If True, force pytorch to clear cached cuda memory after some
+        memory-intensive steps in the pipeline.
+    verbose : bool; False.
+        If True, include additional debug-level logging statements.
 
     Returns
     -------
@@ -722,7 +745,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info('-'*40)
     clu, Wall = clustering_qr.run(
         ops, st, tF,  mode = 'template', device=device, progress_bar=progress_bar,
-        clear_cache=clear_cache
+        clear_cache=clear_cache, verbose=verbose
         )
     logger.info(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
@@ -760,8 +783,8 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     results_dir : pathlib.Path
         Directory where results should be saved.
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
-        each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st[:,0]`.
@@ -887,7 +910,7 @@ def load_sorting(results_dir, device=None, load_extra_vars=False):
         (n_clusters, n_channels, n_pcs).
     full_st : np.ndarray.
         Only returned if `load_extra_vars` is True.
-        3-column array of peak time (in samples), template, and amplitude for
+        3-column array of peak time (in samples), template, and threshold amplitude for
         each spike.
         Includes spikes removed by `kilosort.postprocessing.remove_duplicate_spikes`.
     full_clu : np.ndarray.

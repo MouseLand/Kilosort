@@ -1,5 +1,4 @@
 import time
-import pprint
 import logging
 logger = logging.getLogger(__name__)
 
@@ -7,16 +6,15 @@ import numpy as np
 import torch
 from qtpy import QtCore
 
-#from kilosort.gui.logger import setup_logger
 import kilosort
 from kilosort.run_kilosort import (
     setup_logger, initialize_ops, compute_preprocessing, compute_drift_correction,
     detect_spikes, cluster_spikes, save_sorting, close_logger
     )
 from kilosort.io import save_preprocessing
-from kilosort.utils import log_performance, log_cuda_details
-
-#logger = setup_logger(__name__)
+from kilosort.utils import (
+    log_performance, log_cuda_details, ops_as_string, probe_as_string
+    )
 
 
 class KiloSortWorker(QtCore.QThread):
@@ -48,6 +46,7 @@ class KiloSortWorker(QtCore.QThread):
                 results_dir.mkdir(parents=True)
             
             setup_logger(results_dir)
+            verbose = settings['verbose_log']
 
             try:
                 logger.info(f"Kilosort version {kilosort.__version__}")
@@ -77,13 +76,10 @@ class KiloSortWorker(QtCore.QThread):
 
                 ops = initialize_ops(settings, probe, data_dtype, do_CAR,
                                      invert_sign, device, save_preprocessed_copy)
-                # Remove some stuff that doesn't need to be printed twice,
-                # then pretty-print format for log file.
-                ops_copy = ops.copy()
-                _ = ops_copy.pop('settings')
-                _ = ops_copy.pop('probe')
-                print_ops = pprint.pformat(ops_copy, indent=4, sort_dicts=False)
-                logger.debug(f"Initial ops:\n{print_ops}\n")
+
+                # Pretty-print ops and probe for log
+                logger.debug(f"Initial ops:\n\n{ops_as_string(ops)}\n")
+                logger.debug(f"Probe dictionary:\n\n{probe_as_string(ops['probe'])}\n")
 
                 # TODO: add support for file object through data conversion
                 # Set preprocessing and drift correction parameters
@@ -113,7 +109,8 @@ class KiloSortWorker(QtCore.QThread):
                 # Sort spikes and save results
                 st, tF, Wall0, clu0 = detect_spikes(
                     ops, self.device, bfile, tic0=tic0,
-                    progress_bar=self.progress_bar, clear_cache=clear_cache
+                    progress_bar=self.progress_bar, clear_cache=clear_cache,
+                    verbose=verbose
                     )
 
                 self.Wall0 = Wall0
@@ -123,7 +120,8 @@ class KiloSortWorker(QtCore.QThread):
 
                 clu, Wall = cluster_spikes(
                     st, tF, ops, self.device, bfile, tic0=tic0,
-                    progress_bar=self.progress_bar, clear_cache=clear_cache
+                    progress_bar=self.progress_bar, clear_cache=clear_cache,
+                    verbose=verbose
                     )
                 ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
                     save_sorting(ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0)

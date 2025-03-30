@@ -226,8 +226,8 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     Parameters
     ----------
     st : np.ndarray
-        3-column array of peak time (in samples), template, and amplitude for
-        each spike.
+        3-column array of peak time (in samples), template, and thresold
+        amplitude for each spike.
     clu : np.ndarray
         1D vector of cluster ids indicating which spike came from which cluster,
         same shape as `st[:,0]`.
@@ -317,6 +317,11 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         `kilosort.io.load_ops`.
     params.py : shape N/A
         Settings used by Phy, like data location and sampling rate.
+    pc_features.npy : shape (n_spikes, n_pcs, nearest_chans)
+        Temporal features for each spike on the nearest channels for the
+        template the spike was assigned to.
+    pc_feature_ind.npy : shape (n_templates, nearest_chans)
+        Channel indices of the nearest channels for each template.
     similar_templates.npy : shape (n_templates, n_templates)
         Similarity score between each pair of templates, computed as correlation
         between templates.
@@ -592,14 +597,19 @@ class BinaryRWFile:
             array or memmap.
 
         """
-        self.fs = fs
+        # Extra casting statements to ensure that 64-bit values are used
+        # for time samples on very long recordings.
+        self.fs = np.float64(fs)
         self.n_chan_bin = n_chan_bin
         self.filename = filename
-        self.NT = NT 
-        self.nt = nt 
-        self.nt0min = nt0min
+        self.NT = np.int64(NT) 
+        self.nt = np.int64(nt) 
+        self.nt0min = np.int64(nt0min)
         self.shift = shift
         self.scale = scale
+        tmin = np.float64(tmin)
+        tmax = np.float64(tmax)
+
         if device is None:
             if torch.cuda.is_available():
                 device = torch.device('cuda')
@@ -631,13 +641,15 @@ class BinaryRWFile:
             assert c == n_chan_bin
             total_samples = n
 
-        self.imin = max(int(tmin*fs), 0)
-        self.imax = total_samples if tmax==np.inf else min(int(tmax*fs), total_samples)
-        self.n_batches = int(np.ceil(self.n_samples / self.NT))
+
+        self.imin = max(np.int64(tmin*self.fs), 0)
+        self.imax = total_samples if tmax==np.inf \
+                    else min(np.int64(tmax*self.fs), total_samples)
+        self.n_batches = np.int64(np.ceil(self.n_samples / self.NT))
 
         # Check if last batch is too small. If so, drop those samples.
         a, b = self.get_batch_edges(self.n_batches-1)
-        batch_size = int(b - a - self.nt)  # Unclear why this casts to float
+        batch_size = b - a - self.nt
         if batch_size < self.nt:
             self.n_batches -= 1
             self.imax -= batch_size
@@ -764,12 +776,12 @@ class BinaryRWFile:
             bstart = self.imin
             bend = self.imin + self.NT + self.nt
         else:
-            # Casting to uint64 is to prevent overflow for long recordings.
+            # Casting to int64 is to prevent overflow for long recordings.
             # It's done multiple times because python is stubborn about
             # switching things back to default types.
-            ibatch = np.uint64(ibatch)
-            bstart = np.uint64(self.imin + (ibatch * self.NT) - self.nt)
-            bend = min(self.imax, np.uint64(bstart + self.NT + 2*self.nt))
+            ibatch = np.int64(ibatch)
+            bstart = np.int64(self.imin + (ibatch * self.NT) - self.nt)
+            bend = min(self.imax, np.int64(bstart + self.NT + 2*self.nt))
 
         return bstart, bend
 
@@ -825,7 +837,7 @@ def get_total_samples(filename, n_channels, dtype=np.int16):
     bytes_per_value = np.dtype(dtype).itemsize
     bytes_per_sample = np.int64(bytes_per_value * n_channels)
     total_bytes = os.path.getsize(filename)
-    samples = (total_bytes / bytes_per_sample)
+    samples = np.float64(total_bytes / bytes_per_sample)
 
     if samples%1 != 0:
         raise ValueError(
@@ -833,7 +845,7 @@ def get_total_samples(filename, n_channels, dtype=np.int16):
             "incorrect n_chan_bin ('number of channels' in GUI)."
         )
     else:
-        return int(samples)
+        return np.int64(samples)
 
 
 class BinaryFileGroup:

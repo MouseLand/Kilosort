@@ -72,15 +72,18 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, Th_single_ch=6, nskip=25,
     wPCA = torch.from_numpy(model.components_).to(device).float()
 
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message="")
-        # Prevents memory leak for KMeans when using MKL on Windows
         msg = 'KMeans is known to have a memory leak on Windows with MKL'
-        nthread = os.environ.get('OMP_NUM_THREADS', msg)
+        warnings.filterwarnings("ignore", message=msg)
+        # Prevents memory leak for KMeans when using MKL on Windows
+        nthread = os.environ.get('OMP_NUM_THREADS')
         os.environ['OMP_NUM_THREADS'] = '7'
         model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
         wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
         wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5
-        os.environ['OMP_NUM_THREADS'] = nthread
+        if nthread is not None:
+            os.environ['OMP_NUM_THREADS'] = nthread
+        else:
+            os.environ.pop('OMP_NUM_THREADS')
 
     return wPCA, wTEMP
 
@@ -190,7 +193,7 @@ def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):
     return yct
 
 def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
-        clear_cache=False):        
+        clear_cache=False, verbose=False):        
     sig = ops['settings']['min_template_size']
     nsizes = ops['settings']['template_sizes'] 
 
@@ -243,9 +246,11 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     logger.info('Detecting spikes...')
     prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
                 mininterval=60 if progress_bar else None)
+    # repeat performance log after every 10 minutes of data
+    log_skip = int(600 / (ops['batch_size'] / ops['fs']))
     try:
         for ibatch in prog:
-            if ibatch % 100 == 0:
+            if ibatch % log_skip == 0:
                 log_performance(logger, 'debug', f'Batch {ibatch}')
 
             X = bfile.padded_batch_to_torch(ibatch, ops)

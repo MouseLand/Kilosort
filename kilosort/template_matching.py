@@ -11,18 +11,56 @@ from kilosort.utils import log_performance
 logger = logging.getLogger(__name__)
 
 
-def prepare_extract(ops, U, nC, device=torch.device('cuda')):
-    ds = (ops['xc'] - ops['xc'][:, np.newaxis])**2 +  (ops['yc'] - ops['yc'][:, np.newaxis])**2 
+def prepare_extract(xc, yc, U, nC, position_limit, device=torch.device('cuda')):
+    """Identify desired channels based on distances and template norms.
+    
+    Parameters
+    ----------
+    xc : np.ndarray
+        X-coordinates of contact positions on probe.
+    yc : np.ndarray
+        Y-coordinates of contact positions on probe.
+    U : torch.Tensor
+        TODO
+    nC : int
+        Number of nearest channels to use.
+    position_limit : float
+        Max distance (in microns) between channels that are used to estimate
+        spike positions in `postprocessing.compute_spike_positions`.
+
+    Returns
+    -------
+    iCC : np.ndarray
+        For each channel, indices of nC nearest channels.
+    iCC_mask : np.ndarray
+        For each channel, a 1 if the channel is within 100um and a 0 otherwise.
+        Used to control spike position estimate in post-processing.
+    iU : torch.Tensor
+        For each template, index of channel with greatest norm.
+    Ucc : torch.Tensor
+        For each template, spatial PC features corresponding to iCC.
+    
+    """
+    ds = (xc - xc[:, np.newaxis])**2 +  (yc - yc[:, np.newaxis])**2 
     iCC = np.argsort(ds, 0)[:nC]
     iCC = torch.from_numpy(iCC).to(device)
+    iCC_mask = np.sort(ds, 0)[:nC]
+    iCC_mask = iCC_mask < position_limit**2
+    iCC_mask = torch.from_numpy(iCC_mask).to(device)
     iU = torch.argmax((U**2).sum(1), -1)
     Ucc = U[torch.arange(U.shape[0]),:,iCC[:,iU]]
-    return iCC, iU, Ucc
+
+    return iCC, iCC_mask, iU, Ucc
+
 
 def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     nC = ops['settings']['nearest_chans']
-    iCC, iU, Ucc = prepare_extract(ops, U, nC, device=device)
+    position_limit = ops['settings']['position_limit']
+    iCC, iCC_mask, iU, Ucc = prepare_extract(
+        ops['xc'], ops['yc'], U, nC, position_limit, device=device
+        )
     ops['iCC'] = iCC
+    ops['iCC_mask'] = iCC_mask
     ops['iU'] = iU
     nt = ops['nt']
     
@@ -43,7 +81,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
                 log_performance(logger, 'debug', f'Batch {ibatch}')
 
             X = bfile.padded_batch_to_torch(ibatch, ops)
-            stt, amps, Xres = run_matching(ops, X, U, ctc, device=device)
+            stt, amps, th_amps, Xres = run_matching(ops, X, U, ctc, device=device)
             xfeat = Xres[iCC[:, iU[stt[:,1:2]]],stt[:,:1] + tiwave] @ ops['wPCA'].T
             xfeat += amps * Ucc[:,stt[:,1]]
 
@@ -54,6 +92,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
                 stt = stt[~neg_spikes,:]
                 xfeat = xfeat[:,~neg_spikes,:]
                 amps = amps[~neg_spikes,:]
+                th_amps = th_amps[~neg_spikes,:]
 
             nsp = len(stt) 
             if k+nsp>st.shape[0]:                     
@@ -63,7 +102,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
             stt = stt.double()
             st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['batch_size'])).cpu().numpy() - nt//2 + ops['nt0min']
             st[k:k+nsp,1] = stt[:,1].cpu().numpy()
-            st[k:k+nsp,2] = amps[:,0].cpu().numpy()
+            st[k:k+nsp,2] = th_amps.cpu().numpy().squeeze()
             
             tF[k:k+nsp]  = xfeat.transpose(0,1).cpu()
 
@@ -84,6 +123,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     tF = tF[isort]
 
     return st, tF, ops
+
 
 def align_U(U, ops, device=torch.device('cuda')):
     Uex = torch.einsum('xyz, zt -> xty', U.to(device), ops['wPCA'])
@@ -108,6 +148,7 @@ def postprocess_templates(Wall, ops, clu, st, device=torch.device('cuda')):
     Wall3 = Wall3.transpose(1,2).to(device)
     return Wall3
 
+
 def prepare_matching(ops, U):
     nt = ops['nt']
     W = ops['wPCA'].contiguous()
@@ -122,9 +163,11 @@ def prepare_matching(ops, U):
 
     return ctc
 
+
 def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
     Th = ops['Th_learned']
     nt = ops['nt']
+    max_peels = ops['max_peels']
     W = ops['wPCA'].contiguous()
 
     nm = (U**2).sum(-1).sum(-1)
@@ -139,13 +182,15 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
 
     st = torch.zeros((100000,2), dtype = torch.int64, device = device)
     amps = torch.zeros((100000,1), dtype = torch.float, device = device)
+    th_amps = torch.zeros((100000,1), dtype = torch.float, device = device)
     k = 0
 
     Xres = X.clone()
     lam = 20
 
-    for t in range(100):
+    for t in range(max_peels):
         # Cf = 2 * B - nm.unsqueeze(-1) 
+        # Cf is shape (n_units, n_times)
         Cf = torch.relu(B)**2 /nm.unsqueeze(-1)
         #a = 1 + lam
         #b = torch.relu(B) + lam * mu.unsqueeze(-1)
@@ -155,7 +200,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
         Cf[:, -nt:] = 0
 
         Cfmax, imax = torch.max(Cf, 0)
-        Cmax  = max_pool1d(Cfmax.unsqueeze(0).unsqueeze(0), (2*nt+1), stride = 1, padding = (nt))
+        Cmax  = max_pool1d(Cfmax.unsqueeze(0).unsqueeze(0), (2*nt+1), stride=1, padding=(nt))
 
         #print(Cfmax.shape)
         #import pdb; pdb.set_trace()
@@ -163,6 +208,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
         cnd2 = torch.abs(Cmax[0,0] - Cfmax) < 1e-9
         xs = torch.nonzero(cnd1 * cnd2)
 
+        
         if len(xs)==0:
             #print('iter %d'%t)
             break
@@ -177,6 +223,7 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
         st[k:k+nsp, 1] = iY[:,0]
         amps[k:k+nsp] = B[iY,iX] / nm[iY]
         amp = amps[k:k+nsp]
+        th_amps[k:k+nsp] = Cmax[0, 0, iX[:,0], None]**.5
 
         k+= nsp
 
@@ -189,8 +236,9 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
 
     st = st[:k]
     amps = amps[:k]
+    th_amps = th_amps[:k]
 
-    return  st, amps, Xres
+    return  st, amps, th_amps, Xres
 
 
 def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.device('cuda')):

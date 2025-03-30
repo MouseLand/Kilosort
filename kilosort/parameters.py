@@ -298,6 +298,16 @@ EXTRA_PARAMETERS = {
             """
     },
 
+    'max_peels': {
+        'gui_name': 'max peels', 'type': int, 'min': 1, 'max': 10000, 'exclude': [],
+        'default': 100, 'step': 'spike detection',
+        'description':
+        """
+        Number of iterations to do over each batch of data in the matching
+        pursuit step. More iterations may detect more overlapping spikes.
+        """
+    },
+
     'templates_from_data': {
         'gui_name': 'templates from data', 'type': bool, 'min': None, 'max': None,
         'exclude': [], 'default': True, 'step': 'spike detection',
@@ -419,6 +429,18 @@ EXTRA_PARAMETERS = {
             NOTE: this was formerly handled by `duplicate_spike_bins`, which has
             been deprecated. The new default of 0.25ms is equivalent to the old
             default of 7 bins for a 30kHz sampling rate.
+            """
+    },
+
+    'position_limit': {
+        'gui_name': 'position limit', 'type': float, 'min': 0, 'max': np.inf,
+        'exclude': [], 'default': 100, 'step': 'postprocessing',
+        'description':
+            """
+            Maximum distance (in microns) between channels that can be used
+            to estimate spike positions in `postprocessing.compute_spike_positions`.
+            This does not affect spike sorting, only how positions are estimated
+            after sorting is complete.
             """
     },
 }

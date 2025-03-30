@@ -12,13 +12,16 @@ from scipy.io.matlab.miobase import MatReadError
 from kilosort.gui.logger import setup_logger
 from kilosort.gui.minor_gui_elements import ProbeBuilder, create_prb
 from kilosort.io import load_probe, BinaryRWFile
-from kilosort.parameters import MAIN_PARAMETERS, EXTRA_PARAMETERS
+from kilosort.parameters import MAIN_PARAMETERS, EXTRA_PARAMETERS, compare_settings
 
 
 logger = setup_logger(__name__)
 
 _DEFAULT_DTYPE = 'int16'
 _ALLOWED_FILE_TYPES = ['.bin', '.dat', '.bat', '.raw']  # For binary data
+_PROBE_SETTINGS = [
+    'nearest_chans', 'dmin', 'dminx', 'max_channel_distance', 'x_centers'
+    ]
 
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.Signal()
@@ -99,6 +102,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         self.extra_parameters_window = ExtraParametersWindow(self)
         self.extra_parameters_button = QtWidgets.QPushButton('Extra settings')
+        self.revert_parameters_button = QtWidgets.QPushButton('Use default settings')
         self.import_settings_button = QtWidgets.QPushButton('Import')
         self.export_settings_button = QtWidgets.QPushButton('Export')
 
@@ -203,7 +207,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         row_count += rspan
         layout.addWidget(self.probe_layout_selector, row_count, col1, rspan, dbl)
-        self.probe_layout_selector.currentTextChanged.connect(
+        self.probe_layout_selector.textActivated.connect(
             self.on_probe_layout_selected
         )
 
@@ -247,14 +251,22 @@ class SettingsBox(QtWidgets.QGroupBox):
                 )
             inp = getattr(self, f'{k}_input')
             inp.editingFinished.connect(self.update_parameter)
+            if k in _PROBE_SETTINGS:
+                inp.editingFinished.connect(self.show_probe_layout())
 
         row_count += rspan
         layout.addWidget(
-            self.extra_parameters_button, row_count, col1, rspan, dbl
+            self.extra_parameters_button, row_count, col1, rspan, cspan1
             )
         self.extra_parameters_button.clicked.connect(
             lambda x: self.extra_parameters_window.show()
             )
+        layout.addWidget(
+            self.revert_parameters_button, row_count, col2, rspan, cspan2
+        )
+        self.revert_parameters_button.clicked.connect(
+            self.set_default_field_values
+        )
         
         row_count += rspan
         layout.addWidget(
@@ -272,7 +284,10 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.update_settings()
 
     def set_default_field_values(self):
+        self.bad_channels_input.setText('')
+        self.bad_channels_input.editingFinished.emit()
         self.dtype_selector.setCurrentText(_DEFAULT_DTYPE)
+        self.dtype_selector.currentTextChanged.emit(_DEFAULT_DTYPE)
         epw = self.extra_parameters_window
         for k, p in MAIN_PARAMETERS.items():
             getattr(self, f'{k}_input').setText(str(p['default']))
@@ -512,9 +527,13 @@ class SettingsBox(QtWidgets.QGroupBox):
             "data_dtype": self.data_dtype,
             }
         for k in list(MAIN_PARAMETERS.keys()):
-            self.settings[k] = getattr(self, k)
+            v = getattr(self, k)
+            self.settings[k] = v
+            self.update_setting_color(k, v, MAIN_PARAMETERS)
         for k in list(EXTRA_PARAMETERS.keys()):
-            self.settings[k] = getattr(self.extra_parameters_window, k)
+            v = getattr(self.extra_parameters_window, k)
+            self.settings[k] = v
+            self.update_setting_color(k, v, EXTRA_PARAMETERS, extras=True)
 
         if not self.check_valid_binary_path(self.data_file_path):
             return False
@@ -527,6 +546,15 @@ class SettingsBox(QtWidgets.QGroupBox):
                 logger.info(f'`None` not allowed for parameter {k}.')
                 return False
         return True
+
+    def update_setting_color(self, k, v, d, extras=False):
+        o = self.extra_parameters_window if extras else self
+        if v != d[k]['default']:
+            c = "color : yellow"
+        else:
+            c = "color : white"
+        getattr(o, f'{k}_text').setStyleSheet(c)
+        getattr(o, f'{k}_input').setStyleSheet(c)
     
     @QtCore.Slot()
     def update_parameter(self):
@@ -550,10 +578,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def get_probe_template_args(self):
         epw = self.extra_parameters_window
-        template_args = [
-            epw.nearest_chans, epw.dmin, epw.dminx, 
-            epw.max_channel_distance, epw.x_centers, self.gui.device
-            ]
+        template_args = [getattr(epw, k) for k in _PROBE_SETTINGS]
         return template_args
 
     @QtCore.Slot()
@@ -845,12 +870,12 @@ class ExtraParametersWindow(QtWidgets.QWidget):
                 heading = p['step']
                 heading_label = QtWidgets.QLabel(heading)
                 heading_label.setFont(QtGui.QFont('Arial', 14))
-                self.heading_labels.append(heading_label)
-                if len(self.heading_labels) % 4 == 0:
+                if heading in ['spike detection', 'clustering']:
                     hgap = QtWidgets.QLabel('         ')
-                    layout.addWidget(hgap, row_count, 5, 1, 1)
+                    layout.addWidget(hgap, row_count, col+5, 1, 1)
                     row_count = 0
-                    col = 6
+                    col += 6
+                self.heading_labels.append(heading_label)
                 row_count += 1
                 gap = QtWidgets.QLabel('')
                 gap.setFont(QtGui.QFont('Arial', 4))
@@ -862,6 +887,8 @@ class ExtraParametersWindow(QtWidgets.QWidget):
             layout.addWidget(getattr(self, f'{k}_input'), row_count, col+3, 1, 2)
             inp = getattr(self, f'{k}_input')
             inp.editingFinished.connect(self.update_parameter)
+            if k in _PROBE_SETTINGS:
+                inp.editingFinished.connect(self.main_settings.show_probe_layout)
 
         self.setLayout(layout)
 

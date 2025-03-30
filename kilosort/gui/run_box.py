@@ -27,6 +27,7 @@ class RunBox(QtWidgets.QGroupBox):
         self.clear_cache_check = QtWidgets.QCheckBox("Clear PyTorch Cache")
         self.do_CAR_check = QtWidgets.QCheckBox("CAR")
         self.invert_sign_check = QtWidgets.QCheckBox("Invert Sign")
+        self.verbose_check = QtWidgets.QCheckBox("Verbose Log")
 
         self.buttons = [
             self.run_all_button
@@ -47,7 +48,7 @@ class RunBox(QtWidgets.QGroupBox):
         self.remote_widgets = None
 
         self.progress_bar = QtWidgets.QProgressBar()
-        self.layout.addWidget(self.progress_bar, 5, 0, 3, 4)
+        self.layout.addWidget(self.progress_bar, 5, 0, 3, 6)
 
         self.setup()
 
@@ -92,11 +93,20 @@ class RunBox(QtWidgets.QGroupBox):
             """
         self.invert_sign_check.setToolTip(invert_sign_text)
 
-        self.layout.addWidget(self.run_all_button, 0, 0, 3, 4)
-        self.layout.addWidget(self.save_preproc_check, 3, 0, 1, 2)
-        self.layout.addWidget(self.clear_cache_check, 3, 2, 1, 2)
-        self.layout.addWidget(self.do_CAR_check, 4, 0, 1, 2)
+        self.verbose_check.setCheckState(QtCore.Qt.CheckState.Unchecked)
+        verbose_text = """
+            If True, include additional debug-level logging statements for some
+            steps. This provides more detail for debugging, but may impact
+            performance.
+            """
+        self.verbose_check.setToolTip(verbose_text)
+
+        self.layout.addWidget(self.run_all_button, 0, 0, 3, 6)
+        self.layout.addWidget(self.save_preproc_check, 3, 0, 1, 3)
+        self.layout.addWidget(self.clear_cache_check, 3, 3, 1, 3)
+        self.layout.addWidget(self.verbose_check, 4, 0, 1, 2)
         self.layout.addWidget(self.invert_sign_check, 4, 2, 1, 2)
+        self.layout.addWidget(self.do_CAR_check, 4, 4, 1, 2)
         
         self.setLayout(self.layout)
 
