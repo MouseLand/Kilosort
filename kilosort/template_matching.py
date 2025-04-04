@@ -144,7 +144,7 @@ def postprocess_templates(Wall, ops, clu, st, device=torch.device('cuda')):
     Wall2, _ = align_U(Wall, ops, device=device)
     #Wall3, _= remove_duplicates(ops, Wall2)
     Wall3, _, _, _ = merging_function(ops, Wall2.transpose(1,2), clu, st[:,0],
-                                   0.9, 'mu', device=device)
+                                   0.9, 'mu', check_dt=False, device=device)
     Wall3 = Wall3.transpose(1,2).to(device)
     return Wall3
 
@@ -241,7 +241,8 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
     return  st, amps, th_amps, Xres
 
 
-def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.device('cuda')):
+def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', check_dt=True,
+                     device=torch.device('cuda')):
     clu2 = clu.copy()
     clu_unq, ns = np.unique(clu2, return_counts = True)
 
@@ -312,7 +313,7 @@ def merging_function(ops, Wall, clu, st, r_thresh=0.5, mode='ccg', device=torch.
             if is_ccg:
                 is_merged[jj] = 1
                 dt = (imax[kk] - imax[jj]).item()
-                if dt != 0:
+                if dt != 0 and check_dt:
                     idx = (clu2 == jj)
                     st[idx] -= dt
                     st.sort()

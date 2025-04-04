@@ -39,7 +39,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False, clear_cache=False,
                  save_preprocessed_copy=False, bad_channels=None,
-                 verbose_console=False, verbose_log=False):
+                 verbose_console=False, verbose_log=False, check_dt=True):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -249,7 +249,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
             )
         clu, Wall, st = cluster_spikes(
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
-            clear_cache=clear_cache, verbose=verbose_log
+            clear_cache=clear_cache, verbose=verbose_log, check_dt=check_dt
             )
         ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
             save_sorting(
@@ -702,7 +702,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
 
 
 def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
-                   clear_cache=False, verbose=False):
+                   clear_cache=False, verbose=False, check_dt=True):
     """Cluster spikes using graph-based methods.
     
     Parameters
@@ -757,7 +757,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info('Merging clusters')
     logger.info('-'*40)
     Wall, clu, is_ref, st2 = template_matching.merging_function(
-        ops, Wall, clu, st[:,0], device=device
+        ops, Wall, clu, st[:,0], device=device, check_dt=check_dt
         )
     st[:,0] = st2
     clu = clu.astype('int32')
