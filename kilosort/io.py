@@ -34,7 +34,6 @@ def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
             '*.bin, *.bat, *.dat, or *.raw.'
             )
 
-    # TODO: Why give this preference? Not all binary files will have this tag.
     # If there are multiple binary files, find one with "ap" tag
     if len(filenames) > 1:
         filenames = [f for f in filenames if 'ap.bin' in f.as_posix()]
@@ -602,6 +601,7 @@ class BinaryRWFile:
         self.fs = np.float64(fs)
         self.n_chan_bin = n_chan_bin
         self.filename = filename
+        self.file_object = file_object
         self.NT = np.int64(NT) 
         self.nt = np.int64(nt) 
         self.nt0min = np.int64(nt0min)
@@ -618,6 +618,7 @@ class BinaryRWFile:
         self.device = device
         self.uint_set_warning = True
         self.writable = write
+        self.mode = 'w+' if write else 'r'
 
         if file_object is not None:
             dtype = file_object.dtype
@@ -635,16 +636,15 @@ class BinaryRWFile:
 
         # Must come after dtype since dtype is necessary for nbytesread
         if file_object is None:
-            total_samples = get_total_samples(filename, n_chan_bin, dtype)
+            self.total_samples = get_total_samples(filename, n_chan_bin, dtype)
         else:
             n, c = file_object.shape
             assert c == n_chan_bin
-            total_samples = n
-
+            self.total_samples = n
 
         self.imin = max(np.int64(tmin*self.fs), 0)
-        self.imax = total_samples if tmax==np.inf \
-                    else min(np.int64(tmax*self.fs), total_samples)
+        self.imax = self.total_samples if tmax==np.inf \
+                    else min(np.int64(tmax*self.fs), self.total_samples)
         self.n_batches = np.int64(np.ceil(self.n_samples / self.NT))
 
         # Check if last batch is too small. If so, drop those samples.
@@ -654,16 +654,6 @@ class BinaryRWFile:
             self.n_batches -= 1
             self.imax -= batch_size
 
-        mode = 'w+' if write else 'r'
-        # Must use total samples for file shape, otherwise the end of the data
-        # gets cut off if tmin,tmax are set.
-        if file_object is not None:
-            # For an already-loaded array-like file object,
-            # such as a NumPy memmap
-            self.file = file_object
-        else:
-            self.file = np.memmap(self.filename, mode=mode, dtype=self.dtype,
-                                  shape=(total_samples, self.n_chan_bin))
 
     @property
     def n_samples(self) -> int:
@@ -693,19 +683,19 @@ class BinaryRWFile:
         size: int
         """
         return np.prod(np.array(self.shape).astype(np.int64))
-
-    def close(self) -> None:
-        """
-        Closes the file.
-        """
-        del(self.file)
-        self.file = None
+    
+    @property
+    def file(self):
+        """Get reference to in-memory file object or open a memmap to file."""
+        if self.file_object is not None:
+            file = self.file_object
+        else:
+            file = np.memmap(self.filename, mode=self.mode, dtype=self.dtype,
+                             shape=(self.total_samples, self.n_chan_bin))
+        return file
         
     def __enter__(self):
         return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
 
     def __setitem__(self, *items):
         if not self.writable:
@@ -727,12 +717,13 @@ class BinaryRWFile:
                 self.uint_set_warning = False
         # Convert back from float to file dtype
         data = data.astype(self.dtype)
-        self.file[sample_indices] = data
-        
-    def __getitem__(self, *items):
-        if self.file is None:
-            raise ValueError('Binary file has been closed, data not accessible.')
 
+        self.file[sample_indices] = data
+        if self.file_object is None:
+            self.file.flush()
+
+
+    def __getitem__(self, *items):
         idx, *crop = items
         # Shift indices by minimum sample index.
         sample_indices = self._get_shifted_indices(idx)
@@ -750,6 +741,7 @@ class BinaryRWFile:
             samples = samples + self.shift
 
         return samples
+    
     
     def _get_shifted_indices(self, idx):
         if not isinstance(idx, tuple): idx = tuple([idx])
@@ -787,8 +779,6 @@ class BinaryRWFile:
 
     def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
-        if self.file is None:
-            raise ValueError('Binary file has been closed, data not accessible.')
 
         bstart, bend = self.get_batch_edges(ibatch)
         data = self.file[bstart : bend]
