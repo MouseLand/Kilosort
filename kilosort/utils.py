@@ -136,15 +136,15 @@ def log_performance(log=None, level=None, header=None):
         getattr(log, level)(f'{header}')
 
     getattr(log, level)('*'*56)
-    # TODO: This part is slow, on the order of ms versus micro-seconds for GPU check.
-    #       Find a faster way to check main memory and cpu usage.
     getattr(log, level)(f'CPU usage:    {psutil.cpu_percent():5.2f} %')
 
     memory = psutil.virtual_memory()
-    used = memory.used / 2**30
+    avail = memory.available / 2**30
     total = memory.total / 2**30
-    pct = (used / total) * 100
-    getattr(log, level)(f'Memory:       {pct:5.2f} %     |{used:10.2f}   / {total:8.2f} GB')
+    used = total - avail
+    pct = memory.percent
+    getattr(log, level)(f'Mem used:     {pct:5.2f} %     | {used:10.2f} GB')
+    getattr(log, level)(f'Mem avail:    {avail:5.2f} / {total:5.2f} GB')
     getattr(log, level)('-'*54)
 
     if torch.cuda.is_available():
