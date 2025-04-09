@@ -30,8 +30,6 @@ def make_bfile_with_dtype(dtype, fill, directory, device):
         assert x.dtype == torch.float32
         assert y.dtype == torch.float32
 
-        bfile.close()
-
     finally:
         # Delete memmap file and re-raise exception
         path.unlink()

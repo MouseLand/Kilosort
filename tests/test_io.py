@@ -101,8 +101,6 @@ def test_bat_extension(torch_device, data_directory):
         bfile = io.BinaryFiltered(filename, C, device=torch_device)
         x = bfile[0:100]  # Test data retrieval
 
-        bfile.close()
-
     finally:
         # Delete memmap file and re-raise exception
         path.unlink()
@@ -127,8 +125,6 @@ def test_dat_extension(torch_device, data_directory):
         assert filename == path
         bfile = io.BinaryFiltered(filename, C, device=torch_device)
         x = bfile[0:100]  # Test data retrieval
-
-        bfile.close()
 
     finally:
         # Delete memmap file and re-raise exception
@@ -172,11 +168,8 @@ def test_tmin_tmax(torch_device, data_directory):
         assert X2.min() == 100 + 2*NT - nt
         assert X2.max() == 849
 
-        bfile.close()
-
     finally:
         # Delete memmap file and re-raise exception
-        bfile.close()
         path.unlink()
 
 
@@ -205,11 +198,8 @@ def test_tmin_only(torch_device, data_directory):
         assert bfile[400:].max() == 999
         assert bfile.n_batches == 2
 
-        bfile.close()
-
     finally:
         # Delete memmap file and re-raise exception
-        bfile.close()
         path.unlink()
 
 
@@ -238,9 +228,6 @@ def test_tmax_only(torch_device, data_directory):
         assert bfile[700:].max() == 779
         assert bfile.n_batches == 3
 
-        bfile.close()
-
     finally:
         # Delete memmap file and re-raise exception
-        bfile.close()
         path.unlink()
