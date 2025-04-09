@@ -124,8 +124,6 @@ def get_spike_waveforms(spikes, results_dir, bfile=None, chan=None):
 
     if chan is not None:
         waves = waves[chan,:]
-    
-    bfile.close()
 
     return waves
 

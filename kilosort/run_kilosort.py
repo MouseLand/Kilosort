@@ -513,7 +513,6 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     whiten_mat = preprocessing.get_whitening_matrix(bfile, xc, yc, nskip=nskip,
                                                     nrange=whitening_range)
 
-    bfile.close()
 
     # Save results
     ops['Nbatches'] = bfile.n_batches
@@ -578,7 +577,6 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         _, _, tmin, tmax, artifact, shift, scale = get_run_parameters(ops)
     hp_filter = ops['preprocessing']['hp_filter']
     whiten_mat = ops['preprocessing']['whiten_mat']
-
     bfile = io.BinaryFiltered(
         ops['filename'], n_chan_bin, fs, NT, nt, twav_min, chan_map, 
         hp_filter=hp_filter, whiten_mat=whiten_mat, device=device, do_CAR=do_CAR,
@@ -589,7 +587,6 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
 
     ops, st = datashift.run(ops, bfile, device=device, progress_bar=progress_bar,
                             clear_cache=clear_cache, verbose=verbose)
-    bfile.close()
     logger.info(f'drift computed in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
     if st is not None:
@@ -765,8 +762,6 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
                 f'total {time.time()-tic0 : .2f}s')
     logger.debug(f'clu shape: {clu.shape}')
     logger.debug(f'Wall shape: {Wall.shape}')
-
-    bfile.close()
 
     log_performance(logger, 'info', 'Resource usage after clustering')
     log_cuda_details(logger)
