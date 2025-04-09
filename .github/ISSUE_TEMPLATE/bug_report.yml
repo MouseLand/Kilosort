@@ -6,14 +6,9 @@ body:
 - type: markdown
   attributes:
     value: >
-      Thank you for taking the time to file a bug report.
-      **Please take a few minutes to try these steps before creating a new issue**:
-      1. Check if the issue has already been brought up.
-      1. Try upgrading to the latest version of Kilosort4.
-      1. Check for relevant documentation at kilosort.readthedocs.io.
-      1. If you are using SpikeInterface, please try running Kilosort by itself.
-      1. Check that your data and probe look like they are loaded correctly in
-         the Kilosort GUI.
+      Thank you for taking the time to file a bug report. Before creating a new issue,
+      please try updating to the newest version of Kilosort4. If you are using
+      spikeinterface, try running Kilosort4 on its own.
 
 - type: markdown
   attributes:
