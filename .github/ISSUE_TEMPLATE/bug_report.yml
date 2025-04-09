@@ -6,20 +6,15 @@ body:
 - type: markdown
   attributes:
     value: >
-      Thank you for taking the time to file a bug report.
-      **Please take a few minutes to try these steps before creating a new issue**:
-      1) Check if the issue has already been brought up.
-      2) Try upgrading to the latest version of Kilosort4.
-      3) Check for relevant documentation at kilosort.readthedocs.io.
-      4) If you are using SpikeInterface, please try running Kilosort by itself.
-      5) Check that your data and probe look like they are loaded correctly in
-         the Kilosort GUI.
+      Thank you for taking the time to file a bug report. Before creating a new issue,
+      please try updating to the newest version of Kilosort4. If you are using
+      spikeinterface, try running Kilosort4 on its own.
 
 - type: markdown
   attributes:
     value: >
-      If the bug occurred during sorting, please also upload the kilosort.log
-      file located in the results directory (v4.0.8 or later).
+      If the bug occurred during sorting, please also **upload kilosort4.log**
+      located in the results directory (v4.0.8 or later).
     
 - type: textarea
   attributes: 
