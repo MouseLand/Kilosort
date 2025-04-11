@@ -541,18 +541,7 @@ class KilosortGUI(QtWidgets.QMainWindow):
         self.data_view_box.prepare_for_new_context()
         self.probe_view_box.prepare_for_new_context()
         self.message_log_box.prepare_for_new_context()
-
-        self.close_binary_files()
-
         self.context = None
-
-    def close_binary_files(self):
-        if self.context is not None:
-            if self.context.binary_file is not None:
-                self.context.binary_file.close()
-
-            if self.context.filt_binary_file is not None:
-                self.context.filt_binary_file.close()
 
     @QtCore.Slot()
     def reset_gui(self):
@@ -577,7 +566,6 @@ class KilosortGUI(QtWidgets.QMainWindow):
         self.run_box.current_worker.terminate()
         if self.converter.conversion_thread is not None:
             self.converter.conversion_thread.terminate()
-        self.close_binary_files()
 
         event.accept()
 
