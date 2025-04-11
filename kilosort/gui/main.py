@@ -547,7 +547,6 @@ class KilosortGUI(QtWidgets.QMainWindow):
     def reset_gui(self):
         self.num_channels = None
         self.context = None
-        self.close_binary_files()
         self.probe_view_box.reset()
         self.data_view_box.reset()
         self.settings_box.reset()
