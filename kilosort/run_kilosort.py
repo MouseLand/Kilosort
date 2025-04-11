@@ -39,7 +39,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False, clear_cache=False,
                  save_preprocessed_copy=False, bad_channels=None,
-                 verbose_console=False, verbose_log=False, check_dt=True):
+                 verbose_console=False, verbose_log=False):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -247,9 +247,9 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
             ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
             clear_cache=clear_cache, verbose=verbose_log
             )
-        clu, Wall, st = cluster_spikes(
+        clu, Wall, st, tF = cluster_spikes(
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
-            clear_cache=clear_cache, verbose=verbose_log, check_dt=check_dt
+            clear_cache=clear_cache, verbose=verbose_log,
             )
         ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
             save_sorting(
@@ -673,7 +673,9 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
         ops, st0, tF, mode='spikes', device=device, progress_bar=progress_bar,
         clear_cache=clear_cache, verbose=verbose
         )
-    Wall3 = template_matching.postprocess_templates(Wall, ops, clu, st0, device=device)
+    Wall3 = template_matching.postprocess_templates(
+        Wall, ops, clu, st0, tF, device=device
+        )
     logger.info(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' +
                 f'total {time.time()-tic0 : .2f}s')
     logger.debug(f'clu shape: {clu.shape}')
@@ -683,8 +685,9 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info(' ')
     logger.info('Extracting spikes using cluster waveforms')
     logger.info('-'*40)
-    st, tF, ops = template_matching.extract(ops, bfile, Wall3, device=device,
-                                                 progress_bar=progress_bar)
+    st, tF, ops = template_matching.extract(
+        ops, bfile, Wall3, device=device, progress_bar=progress_bar
+        )
     logger.info(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
                 f'total {time.time()-tic0 : .2f}s')
     logger.debug(f'st shape: {st.shape}')
@@ -699,7 +702,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
 
 
 def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
-                   clear_cache=False, verbose=False, check_dt=True):
+                   clear_cache=False, verbose=False):
     """Cluster spikes using graph-based methods.
     
     Parameters
@@ -753,10 +756,9 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.info(' ')
     logger.info('Merging clusters')
     logger.info('-'*40)
-    Wall, clu, is_ref, st2 = template_matching.merging_function(
-        ops, Wall, clu, st[:,0], device=device, check_dt=check_dt
+    Wall, clu, is_ref, st, tF = template_matching.merging_function(
+        ops, Wall, clu, st, tF, device=device, check_dt=True
         )
-    st[:,0] = st2
     clu = clu.astype('int32')
     logger.info(f'{clu.max()+1} units found, in {time.time()-tic : .2f}s; ' + 
                 f'total {time.time()-tic0 : .2f}s')
@@ -766,7 +768,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     log_performance(logger, 'info', 'Resource usage after clustering')
     log_cuda_details(logger)
 
-    return clu, Wall, st
+    return clu, Wall, st, tF
 
 
 def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
