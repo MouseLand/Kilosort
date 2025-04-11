@@ -20,7 +20,7 @@ MAIN_PARAMETERS = {
     # NOTE: n_chan_bin must be specified by user when running through API
     'n_chan_bin': {  
         'gui_name': 'number of channels', 'type': int, 'min': 0, 'max': np.inf,
-        'exclude': [0], 'default': 385, 'step': 'data',
+        'exclude': [0], 'default': None, 'step': 'data',
         'description':
             """
             Total number of channels in the binary file, which may be different

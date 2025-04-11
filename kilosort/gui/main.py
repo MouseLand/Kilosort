@@ -105,10 +105,10 @@ class KilosortGUI(QtWidgets.QMainWindow):
 
         self.header_box = HeaderBox(self)
         self.converter = DataConversionBox(self)
+        self.run_box = RunBox(self)
         self.settings_box = SettingsBox(self)
         self.probe_view_box = ProbeViewBox(self)
         self.data_view_box = DataViewBox(self)
-        self.run_box = RunBox(self)
         self.message_log_box = MessageLogBox(self)
 
         self.setAcceptDrops(True)

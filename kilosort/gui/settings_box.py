@@ -22,6 +22,9 @@ _ALLOWED_FILE_TYPES = ['.bin', '.dat', '.bat', '.raw']  # For binary data
 _PROBE_SETTINGS = [
     'nearest_chans', 'dmin', 'dminx', 'max_channel_distance', 'x_centers'
     ]
+_NONE_ALLOWED = [
+    'dmin', 'nt0min', 'x_centers', 'shift', 'scale', 'max_channel_distance'
+    ]
 
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.Signal()
@@ -34,6 +37,9 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.gui = parent
         self.load_enabled = False
         self.use_file_object = False
+        # Toggled to avoid excessive settings checks, like when resetting all
+        # parameters to their defaults.
+        self.pause_checks = False
         self.path_check = None
         
         self.select_data_file = QtWidgets.QPushButton("Select Binary File")
@@ -135,8 +141,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         if self.probe_layout is not None:
             self.enable_preview_probe()
         if self.check_valid_binary_path(self.data_file_path):
-            if self.check_settings():
-                self.enable_load()
+            self.check_load()
 
 
     def setup(self):
@@ -284,6 +289,8 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.update_settings()
 
     def set_default_field_values(self):
+        self.pause_checks = True
+
         self.bad_channels_input.setText('')
         self.bad_channels_input.editingFinished.emit()
         self.dtype_selector.setCurrentText(_DEFAULT_DTYPE)
@@ -296,8 +303,13 @@ class SettingsBox(QtWidgets.QGroupBox):
             getattr(epw, f'{k}_input').setText(str(p['default']))
             getattr(epw, f'{k}_input').editingFinished.emit()
 
+        self.pause_checks = False
+        self.check_load()
+        
+
     def set_cached_field_values(self):
         # Only run during setup, so that resetting gui always goes to defaults.
+        self.pause_checks = True
         if self.gui.qt_settings.contains('data_dtype'):
             dtype = self.gui.qt_settings.value('data_dtype')
             self.dtype_selector.setCurrentText(dtype)
@@ -326,6 +338,9 @@ class SettingsBox(QtWidgets.QGroupBox):
                 d = str(p['default'])
             getattr(epw, f'{k}_input').setText(d)
             getattr(epw, f'{k}_input').editingFinished.emit()
+
+        self.pause_checks = False
+        self.check_load()
 
     @QtCore.Slot()
     def import_settings(self):
@@ -448,10 +463,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.results_directory_path = results_directory
         self.gui.qt_settings.setValue('results_dir', results_directory)
 
-        if self.check_settings():
-            self.enable_load()
-        else:
-            self.disable_load()
+        self.check_load()
 
     def on_data_file_path_changed(self):
         self.path_check = None
@@ -469,6 +481,8 @@ class SettingsBox(QtWidgets.QGroupBox):
             if self.check_settings():
                 self.enable_load()
                 self.dataChanged.emit()
+            else:
+                self.disable_load()
 
         except AssertionError:
             logger.exception("Please select a valid binary file path.")
@@ -510,7 +524,8 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def disable_load(self):
         self.load_settings_button.setDisabled(True)
-        self.load_disabled = True
+        self.load_enabled = False
+        self.gui.disable_run()
 
     def enable_preview_probe(self):
         self.probe_preview_button.setEnabled(True)
@@ -535,21 +550,22 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.settings[k] = v
             self.update_setting_color(k, v, EXTRA_PARAMETERS, extras=True)
 
+        if self.probe_layout is None:
+            return False
         if not self.check_valid_binary_path(self.data_file_path):
             return False
 
-        none_allowed = [
-            'dmin', 'nt0min', 'x_centers', 'shift', 'scale', 'max_channel_distance'
-            ]
         for k, v in self.settings.items():
-            if v is None and k not in none_allowed:
+            if v is None and k not in _NONE_ALLOWED:
                 logger.info(f'`None` not allowed for parameter {k}.')
                 return False
         return True
 
     def update_setting_color(self, k, v, d, extras=False):
         o = self.extra_parameters_window if extras else self
-        if v != d[k]['default']:
+        if v is None and k not in _NONE_ALLOWED:
+            c = "color : red"
+        elif v != d[k]['default']:
             c = "color : yellow"
         else:
             c = "color : white"
@@ -575,6 +591,8 @@ class SettingsBox(QtWidgets.QGroupBox):
 
             else:
                 self.settingsUpdated.emit()
+        else:
+            self.disable_load()
 
     def get_probe_template_args(self):
         epw = self.extra_parameters_window
@@ -583,7 +601,9 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     @QtCore.Slot()
     def show_probe_layout(self):
-        if self.check_settings:
+        if self.probe_layout is None:
+            pass
+        elif not self.pause_checks and self.check_settings:
             self.previewProbe.emit()
         else:
             logger.info("Cannot preview probe layout, invalid settings.")
@@ -602,9 +622,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                 self.n_chan_bin_input.editingFinished.emit()
 
                 self.enable_preview_probe()
-
-                if self.check_settings():
-                    self.enable_load()
+                self.check_load()
             except MatReadError:
                 logger.exception("Invalid probe file!")
                 self.disable_load()
@@ -692,9 +710,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                         self.n_chan_bin_input.editingFinished.emit()
 
                         self.enable_preview_probe()
-
-                        if self.check_settings():
-                            self.enable_load()
+                        self.check_load()
 
                 except AssertionError:
                     logger.exception(
@@ -733,17 +749,17 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.bad_channels = self.get_bad_channels()
         self.gui.qt_settings.setValue('bad_channels', self.bad_channels)
 
-        # Trigger update so that probe layout in main gets updated, then
-        # refresh probe view.
-        self.update_settings()
-        self.previewProbe.emit()
+        if not self.pause_checks:
+            # Trigger update so that probe layout in main gets updated, then
+            # refresh probe view.
+            self.update_settings()
+            self.previewProbe.emit()
 
 
     def on_data_dtype_selected(self, data_dtype):
         self.data_dtype = data_dtype
         self.gui.qt_settings.setValue('data_dtype', data_dtype)
-        if self.check_settings():
-            self.enable_load()
+        self.check_load()
 
     def on_device_selected(self, device):
         num_gpus = torch.cuda.device_count()
@@ -753,8 +769,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         else:
             device_id = f'cuda:{selector_index}'
         self.gui.device = torch.device(device_id)
-        if self.check_settings():
-            self.enable_load()
+        self.check_load()
 
     def populate_probe_selector(self):
         self.probe_layout_selector.clear()
@@ -778,6 +793,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.probe_layout_selector.setCurrentIndex(0)
         self.gui.qt_settings.setValue('probe_layout', None)
         self.gui.qt_settings.setValue('probe_name', None)
+        self.gui.probe_layout = None
         self.disable_preview_probe()
 
     def populate_dtype_selector(self):
@@ -830,17 +846,19 @@ class SettingsBox(QtWidgets.QGroupBox):
     def reset(self):
         self.data_file_path_input.clear()
         self.data_file_path = None
+        self.gui.data_path = None
         self.path_check = None
         self.gui.qt_settings.setValue('data_file_path', None)
         self.results_directory_input.clear()
         self.results_directory_path = None
+        self.gui.results_directory = None
         self.gui.qt_settings.setValue('results_dir', None)
         self.clear_probe_selection()
         self.set_default_field_values()
         self.disable_load()
 
     def check_load(self):
-        if self.check_settings():
+        if not self.pause_checks and self.check_settings():
             self.enable_load()
         else:
             self.disable_load()
@@ -922,14 +940,10 @@ def _check_parameter(sender_obj, main_obj, k, p):
         main_obj.gui.qt_settings.setValue(k, v)
         reset = False
 
-        if main_obj.check_settings() and not main_obj.load_enabled:
-            main_obj.enable_load()
-
     except ValueError:
         logger.exception(
             f"Invalid input!\n {p['gui_name']} must be of type: {p['type']}."
         )
-        main_obj.disable_load()
 
     except AssertionError:
         logger.exception(
@@ -937,13 +951,14 @@ def _check_parameter(sender_obj, main_obj, k, p):
             f"{p['min']} <= {p['gui_name']} <= {p['max']},\n"
             f"{p['gui_name']} != {p['exclude']}"
         )
-        main_obj.disable_load()
 
     finally:
         if reset:
             # Invalid input, change back to what it was before.
             v = getattr(sender_obj, k)
             getattr(sender_obj, f'{k}_input').setText(str(v))
+
+        main_obj.check_load()
 
 
 def _str_to_type(string, dtype):
