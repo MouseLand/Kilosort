@@ -1,4 +1,5 @@
 import os
+import gc
 import logging
 import warnings
 logger = logging.getLogger(__name__)
@@ -275,7 +276,10 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
             st[k:k+nsp,5] = xy[:,0].cpu().numpy()
 
             k = k + nsp
-            
+            if clear_cache:
+                gc.collect()
+                torch.cuda.empty_cache()
+
             if progress_bar is not None:
                 progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
     except:
