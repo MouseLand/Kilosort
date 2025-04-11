@@ -325,12 +325,9 @@ class KilosortGUI(QtWidgets.QMainWindow):
         self.run_box.disable_all_input(value)
 
     def load_data(self):
-        try:
-            self.set_parameters()
-            self.do_load()
-            self.enable_run()
-        except Exception as e:
-            print(e)
+        self.set_parameters()
+        self.do_load()
+        self.enable_run()
 
     def set_parameters(self):
         settings = self.settings_box.settings
@@ -383,74 +380,44 @@ class KilosortGUI(QtWidgets.QMainWindow):
         shift = self.params['shift']
         scale = self.params['scale']
 
+        args = [self.data_path, n_channels]
+        kwargs = {
+            'fs': sample_rate, 'chan_map': chan_map, 'device': self.device,
+            'tmin': tmin, 'tmax': tmax, 'shift': shift, 'scale': scale,
+            'artifact_threshold': artifact, 'dtype': data_dtype,
+            'file_object': self.file_object
+        }
+
         if chan_map.max() >= n_channels:
             raise ValueError(
                 f'Largest value of chanMap exceeds channel count of data, '
                 'make sure chanMap is 0-indexed.'
             )
 
-        binary_file = BinaryFiltered(
-            filename=self.data_path,
-            n_chan_bin=n_channels,
-            fs=sample_rate,
-            chan_map=chan_map,
-            device=self.device,
-            dtype=data_dtype,
-            tmin=tmin,
-            tmax=tmax,
-            artifact_threshold=artifact,
-            shift=shift,
-            scale=scale,
-            file_object=self.file_object
-        )
-
+        # Load raw data
+        binary_file = BinaryFiltered(*args, **kwargs)
         self.context.binary_file = binary_file
 
+        # Load high-pass filtered data to compute whitening matrix
         self.context.highpass_filter = preprocessing.get_highpass_filter(
-            fs=sample_rate,
-            cutoff=cutoff,
-            device=self.device
-        )
-
-        with BinaryFiltered(
-            filename=self.data_path,
-            n_chan_bin=n_channels,
-            fs=sample_rate,
-            chan_map=chan_map,
+            fs=sample_rate, cutoff=cutoff, device=self.device
+            )
+        bfile_whiten = BinaryFiltered(
+            *args, **kwargs,
             hp_filter=self.context.highpass_filter,
-            device=self.device,
-            dtype=data_dtype,
-            tmin=tmin,
-            tmax=tmax,
-            artifact_threshold=artifact,
-            shift=shift,
-            scale=scale,
-            file_object=self.file_object
-        ) as bin_file:
-            self.context.whitening_matrix = preprocessing.get_whitening_matrix(
-                f=bin_file,
-                xc=xc,
-                yc=yc,
-                nskip=nskip,
             )
 
+        # Load high-pass filtered and whitened data
+        self.context.whitening_matrix = preprocessing.get_whitening_matrix(
+            f=bfile_whiten, xc=xc, yc=yc, nskip=nskip,
+            )
+        del bfile_whiten  # only used for computing whitening matrix
+
         filt_binary_file = BinaryFiltered(
-            filename=self.data_path,
-            n_chan_bin=n_channels,
-            fs=sample_rate,
-            chan_map=chan_map,
+            *args, **kwargs,
             hp_filter=self.context.highpass_filter,
             whiten_mat=self.context.whitening_matrix,
-            device=self.device,
-            dtype=data_dtype,
-            tmin=tmin,
-            tmax=tmax,
-            artifact_threshold=artifact,
-            shift=shift,
-            scale=scale,
-            file_object=self.file_object
-        )
-
+            )
         self.context.filt_binary_file = filt_binary_file
 
         self.data_view_box.set_whitening_matrix(self.context.whitening_matrix)
