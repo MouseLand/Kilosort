@@ -325,9 +325,12 @@ class KilosortGUI(QtWidgets.QMainWindow):
         self.run_box.disable_all_input(value)
 
     def load_data(self):
-        self.set_parameters()
-        self.do_load()
-        self.enable_run()
+        try:
+            self.set_parameters()
+            self.do_load()
+            self.enable_run()
+        except Exception as e:
+            print(e)
 
     def set_parameters(self):
         settings = self.settings_box.settings
@@ -361,8 +364,6 @@ class KilosortGUI(QtWidgets.QMainWindow):
             self.setup_data_view()
             self.update_run_box()
             self.data_view_box.whitened_button.click()
-        except Exception as e:
-            print(e)
         finally:
             self.disable_all_input(False)
             QtWidgets.QApplication.restoreOverrideCursor()
