@@ -105,10 +105,10 @@ class KilosortGUI(QtWidgets.QMainWindow):
 
         self.header_box = HeaderBox(self)
         self.converter = DataConversionBox(self)
+        self.run_box = RunBox(self)
         self.settings_box = SettingsBox(self)
         self.probe_view_box = ProbeViewBox(self)
         self.data_view_box = DataViewBox(self)
-        self.run_box = RunBox(self)
         self.message_log_box = MessageLogBox(self)
 
         self.setAcceptDrops(True)
@@ -361,8 +361,6 @@ class KilosortGUI(QtWidgets.QMainWindow):
             self.setup_data_view()
             self.update_run_box()
             self.data_view_box.whitened_button.click()
-        except Exception as e:
-            print(e)
         finally:
             self.disable_all_input(False)
             QtWidgets.QApplication.restoreOverrideCursor()
@@ -382,74 +380,44 @@ class KilosortGUI(QtWidgets.QMainWindow):
         shift = self.params['shift']
         scale = self.params['scale']
 
+        args = [self.data_path, n_channels]
+        kwargs = {
+            'fs': sample_rate, 'chan_map': chan_map, 'device': self.device,
+            'tmin': tmin, 'tmax': tmax, 'shift': shift, 'scale': scale,
+            'artifact_threshold': artifact, 'dtype': data_dtype,
+            'file_object': self.file_object
+        }
+
         if chan_map.max() >= n_channels:
             raise ValueError(
                 f'Largest value of chanMap exceeds channel count of data, '
                 'make sure chanMap is 0-indexed.'
             )
 
-        binary_file = BinaryFiltered(
-            filename=self.data_path,
-            n_chan_bin=n_channels,
-            fs=sample_rate,
-            chan_map=chan_map,
-            device=self.device,
-            dtype=data_dtype,
-            tmin=tmin,
-            tmax=tmax,
-            artifact_threshold=artifact,
-            shift=shift,
-            scale=scale,
-            file_object=self.file_object
-        )
-
+        # Load raw data
+        binary_file = BinaryFiltered(*args, **kwargs)
         self.context.binary_file = binary_file
 
+        # Load high-pass filtered data to compute whitening matrix
         self.context.highpass_filter = preprocessing.get_highpass_filter(
-            fs=sample_rate,
-            cutoff=cutoff,
-            device=self.device
-        )
-
-        with BinaryFiltered(
-            filename=self.data_path,
-            n_chan_bin=n_channels,
-            fs=sample_rate,
-            chan_map=chan_map,
+            fs=sample_rate, cutoff=cutoff, device=self.device
+            )
+        bfile_whiten = BinaryFiltered(
+            *args, **kwargs,
             hp_filter=self.context.highpass_filter,
-            device=self.device,
-            dtype=data_dtype,
-            tmin=tmin,
-            tmax=tmax,
-            artifact_threshold=artifact,
-            shift=shift,
-            scale=scale,
-            file_object=self.file_object
-        ) as bin_file:
-            self.context.whitening_matrix = preprocessing.get_whitening_matrix(
-                f=bin_file,
-                xc=xc,
-                yc=yc,
-                nskip=nskip,
             )
 
+        # Load high-pass filtered and whitened data
+        self.context.whitening_matrix = preprocessing.get_whitening_matrix(
+            f=bfile_whiten, xc=xc, yc=yc, nskip=nskip,
+            )
+        del bfile_whiten  # only used for computing whitening matrix
+
         filt_binary_file = BinaryFiltered(
-            filename=self.data_path,
-            n_chan_bin=n_channels,
-            fs=sample_rate,
-            chan_map=chan_map,
+            *args, **kwargs,
             hp_filter=self.context.highpass_filter,
             whiten_mat=self.context.whitening_matrix,
-            device=self.device,
-            dtype=data_dtype,
-            tmin=tmin,
-            tmax=tmax,
-            artifact_threshold=artifact,
-            shift=shift,
-            scale=scale,
-            file_object=self.file_object
-        )
-
+            )
         self.context.filt_binary_file = filt_binary_file
 
         self.data_view_box.set_whitening_matrix(self.context.whitening_matrix)
@@ -541,24 +509,12 @@ class KilosortGUI(QtWidgets.QMainWindow):
         self.data_view_box.prepare_for_new_context()
         self.probe_view_box.prepare_for_new_context()
         self.message_log_box.prepare_for_new_context()
-
-        self.close_binary_files()
-
         self.context = None
-
-    def close_binary_files(self):
-        if self.context is not None:
-            if self.context.binary_file is not None:
-                self.context.binary_file.close()
-
-            if self.context.filt_binary_file is not None:
-                self.context.filt_binary_file.close()
 
     @QtCore.Slot()
     def reset_gui(self):
         self.num_channels = None
         self.context = None
-        self.close_binary_files()
         self.probe_view_box.reset()
         self.data_view_box.reset()
         self.settings_box.reset()
@@ -577,7 +533,6 @@ class KilosortGUI(QtWidgets.QMainWindow):
         self.run_box.current_worker.terminate()
         if self.converter.conversion_thread is not None:
             self.converter.conversion_thread.terminate()
-        self.close_binary_files()
 
         event.accept()
 

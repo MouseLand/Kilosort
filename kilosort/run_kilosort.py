@@ -224,6 +224,9 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         logger.debug(f"Initial ops:\n\n{ops_as_string(ops)}\n")
         logger.debug(f"Probe dictionary:\n\n{probe_as_string(ops['probe'])}\n")
 
+        # Baseline performance metrics
+        log_performance(logger, 'info', 'Resource usage before sorting')
+
         # Set preprocessing and drift correction parameters
         ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
         np.random.seed(1)
