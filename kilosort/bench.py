@@ -1,10 +1,20 @@
-import torch, os
-from kilosort import preprocessing
-dev = torch.device('cuda:0')
+import os
+
+import torch
 import numpy as np
 from torch.fft import fft, ifft, fftshift
 from scipy.interpolate import interp1d
 from tqdm import trange
+
+from kilosort import preprocessing
+from kilosort.io import BinaryFiltered
+
+
+if torch.cuda.is_available():
+    dev = torch.device('cuda:0')
+else:
+    dev = torch.device('cpu')
+
 
 def get_drift_matrix(ops, dshift):
     """ for a given dshift drift, computes the linear drift matrix for interpolation
@@ -31,89 +41,19 @@ def get_drift_matrix(ops, dshift):
 
     return M
 
-def load_transform(filename, ibatch, ops, fwav=None, Wrot = None, dshift = None) :
-    """ this function loads a batch of data ibatch and optionally:
-     - if chanMap is present, then the channels are subsampled
-     - if fwav is present, then the data is high-pass filtered
-     - if Wrot is present,  then the data is whitened
-     - if dshift is present, then the data is drift-corrected    
-    """
-    nt = ops['nt']
-    NT = ops['batch_size']
-    NTbuff   = ops['NTbuff']
-    chanMap  = ops['chanMap']
-    n_chan_bin = ops['n_chan_bin']
-    iKxx = ops['iKxx']
-    yblk = ops['yblk']
-
-    with open(filename, mode='rb') as f: 
-        # seek the beginning of the batch
-        f.seek(2*NT*n_chan_bin*ibatch , 0)
-
-        # go back "NTbuff" samples, unless this is the first batch
-        if ibatch==0:
-            buff = f.read((NTbuff-nt) * n_chan_bin * 2)
-        else:    
-            f.seek(- 2*nt*n_chan_bin , 1)
-            buff = f.read(NTbuff * n_chan_bin * 2)          
-
-        # read and transpose data
-        # this gives a warning, but it's much faster than the alternatives... 
-        data = np.frombuffer(buff, dtype=np.int16, offset=0)
-        data = np.reshape(data, (-1, n_chan_bin)).T
-
-    nsamp = data.shape[-1]
-    X = torch.zeros((n_chan_bin, NTbuff), device = dev)
-
-    # fix the data at the edges for the first and last batch
-    if ibatch==0:
-        X[:, nt:nt+nsamp] = torch.from_numpy(data).to(dev).float()
-        X[:, :nt] = X[:, nt:nt+1]
-    elif ibatch==ops['Nbatches']-1:
-        X[:, :nsamp] = torch.from_numpy(data).to(dev).float()
-        X[:, nsamp:] = X[:, nsamp-1:nsamp]
-    else:
-        X[:] = torch.from_numpy(data).to(dev).float()
-
-    # pick only the channels specified in the chanMap
-    if chanMap is not None:
-        X = X[chanMap]
-
-    # remove the mean of each channel, and the median across channels
-    X = X - X.mean(1).unsqueeze(1)
-    X = X - torch.median(X, 0)[0]
-  
-    # high-pass filtering in the Fourier domain (much faster than filtfilt etc)
-    if fwav is not None:
-        if isinstance(fwav, np.ndarray):
-            #fwav = torch.from_numpy(fwav).to(dev)
-            hp_filter = preprocessing.get_highpass_filter()
-            fwav = preprocessing.fft_highpass(hp_filter, X.shape[1])
-        X = torch.real(ifft(fft(X) * torch.conj(fwav)))
-        X = fftshift(X, dim = -1)
-
-    # whitening, with optional drift correction
-    if Wrot is not None:
-        if isinstance(Wrot, np.ndarray):
-            Wrot = torch.from_numpy(Wrot).to(dev)
-        if dshift is not None:
-            if isinstance(iKxx, np.ndarray):
-                ops['iKxx'] = torch.from_numpy(iKxx).to(dev)
-            M = get_drift_matrix(ops, dshift[ibatch])
-            X = (M @ Wrot) @ X
-        else:
-            X = Wrot @ X
-
-    return X
 
 def avg_wav(filename, Wsub, nn, ops, ibatch, st_i, clu, Nfilt):
+    fs = ops['fs']
+    n_chan_bin = ops['n_chan_bin']
     nt = ops['nt']
     NT = ops['batch_size']
     if isinstance(ops['wPCA'], np.ndarray):
         ops['wPCA'] = torch.from_numpy(ops['wPCA']).to(dev)
 
-    X = load_transform(filename, ibatch, ops, fwav = ops['fwav'], 
-                                Wrot = ops['Wrot'], dshift = ops['dshift'])
+    bf = BinaryFiltered(filename, n_chan_bin=n_chan_bin, fs=fs, NT=NT, nt=nt,
+                        hp_filter=ops['fwav'], whiten_mat=ops['Wrot'],
+                        dshift=ops['dshift'], chan_map=ops['chanMap'])
+    X = bf.padded_batch_to_torch(ibatch, ops)
 
     ix = (st_i - NT * ibatch) * (st_i - NT * (1+ibatch)) < 0
     st_sub = st_i[ix] + nt - NT * ibatch
@@ -130,9 +70,10 @@ def avg_wav(filename, Wsub, nn, ops, ibatch, st_i, clu, Nfilt):
 
     return Wsub, nn
 
+
 def clu_ypos(filename, ops, st_i, clu):
     Nfilt = clu.max()+1
-    Wsub = torch.zeros((Nfilt, ops['nwaves'], ops['Nchan']), device = dev)
+    Wsub = torch.zeros((Nfilt, ops['n_pcs'], ops['Nchan']), device = dev)
     nn   = torch.zeros((Nfilt, ), device = dev)
 
     for ibatch in range(0, ops['Nbatches'], 10):
@@ -146,6 +87,7 @@ def clu_ypos(filename, ops, st_i, clu):
     yclu = ops['yc'][ichan]
 
     return yclu, Wsub
+
 
 def nmatch(ss0, ss, dt=6):
     i = 0
@@ -167,6 +109,7 @@ def nmatch(ss0, ss, dt=6):
 
         i+= 1
     return n0, is_matched, is_matched0
+
 
 def match_neuron(kk, clu, yclu, st_i, clu0, yclu0, st0_i, n_check=20, dt=6):
     ss = st_i[clu==kk]
@@ -200,6 +143,7 @@ def match_neuron(kk, clu, yclu, st_i, clu0, yclu0, st0_i, n_check=20, dt=6):
 
     return fmax, miss, fpos, best_ind, matched_all, top_inds
 
+
 def compare_recordings(st_gt, clu_gt, yclu_gt, st_new, clu_new, yclu_new):
     NN = len(yclu_gt)
 
@@ -216,6 +160,7 @@ def compare_recordings(st_gt, clu_gt, yclu_gt, st_new, clu_new, yclu_new):
         fmax[kk], fmiss[kk], fpos[kk], best_ind[kk], matched_all[kk], top_inds[kk] = out
 
     return fmax, fmiss, fpos, best_ind, matched_all, top_inds
+
 
 def load_GT(filename, ops, gt_path, toff = 20, nmax = 600):
     #gt_path = os.path.join(ops['data_folder'] , "sim.imec0.ap_params.npz")
