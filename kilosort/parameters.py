@@ -380,6 +380,18 @@ EXTRA_PARAMETERS = {
             """
     },
 
+    'cluster_neighbors': {
+        'gui_name': 'cluster neighbors', 'type': int, 'min': 2, 'max': np.inf,
+        'exclude': [], 'default': 10, 'step': 'clustering',
+        'description':
+            """
+            Number of nearest spike neighbors to search for in
+            `clustering_qr.neigh_mat` when building the adjacency matrix that
+            defines the graph for clustering. Note that changes to this parameter
+            will affect resource usage and sorting time.
+            """ 
+    },
+
     'x_centers': {
         'gui_name': 'x centers', 'type': int, 'min': 1,
         'max': np.inf, 'exclude': [], 'default': None, 'step': 'clustering',

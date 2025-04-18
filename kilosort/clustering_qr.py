@@ -17,7 +17,7 @@ from kilosort.utils import log_performance
 logger = logging.getLogger(__name__)
 
 
-def neigh_mat(Xd, nskip=10, n_neigh=30):
+def neigh_mat(Xd, nskip=10, n_neigh=10):
     # Xd is spikes by PCA features in a local neighborhood
     # finding n_neigh neighbors of each spike to a subset of every nskip spike
 
@@ -437,7 +437,7 @@ def get_nearest_centers(xy, xcent, ycent):
     return minimum_distance, xcent_pos, ycent_pos
 
 
-def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
+def run(ops, st, tF, mode='template', device=torch.device('cuda'),
         progress_bar=None, clear_cache=False, verbose=False):
 
     if mode == 'template':
@@ -452,6 +452,7 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
     dmin = ops['dmin']
     dminx = ops['dminx']
     nskip = ops['settings']['cluster_downsampling']
+    n_neigh = ops['settings']['cluster_neighbors']
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
@@ -515,8 +516,8 @@ def run(ops, st, tF,  mode = 'template', device=torch.device('cuda'),
 
                     # find new clusters
                     iclust, iclust0, M, _ = cluster(
-                        Xd, nskip=nskip, lam=1, seed=5, device=device,
-                        verbose=v
+                        Xd, nskip=nskip, n_neigh=n_neigh, lam=1, seed=5,
+                        device=device, verbose=v
                         )
 
                     if clear_cache:
