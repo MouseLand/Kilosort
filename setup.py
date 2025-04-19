@@ -9,7 +9,8 @@ install_deps = [
     'torch>=1.6',
     'numba',
     'faiss-cpu',
-    'psutil'
+    'psutil',
+    'matplotlib'
 ]
 
 gui_deps = [
@@ -17,7 +18,6 @@ gui_deps = [
     'qtpy',
     'pyqt6',
     'pyqt6.sip',
-    'matplotlib'
 ]
 
 docs_deps = [
