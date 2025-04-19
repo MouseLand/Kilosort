@@ -886,7 +886,9 @@ class BinaryFileGroup:
             n_samples = f.shape[0]
             if time_idx.start < k:
                 # At least part of the data is in this file
-                t = slice(int(time_idx.start - shift), int(time_idx.stop - shift))
+                ii = max(int(time_idx.start - shift), 0)
+                jj = max(int(time_idx.stop - shift), 0)
+                t = slice(ii, jj)
                 data.append(f[t, channel_idx])
                 if time_idx.stop <= k:
                     # This is the end of the data to be retrieved
