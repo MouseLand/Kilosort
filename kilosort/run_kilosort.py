@@ -1,6 +1,5 @@
 import time
 from pathlib import Path
-import pprint
 import logging
 import warnings
 import platform
@@ -25,6 +24,7 @@ from kilosort.parameters import DEFAULT_SETTINGS
 from kilosort.utils import (
     log_performance, log_cuda_details, probe_as_string, ops_as_string
     )
+import kilosort.plots as kplots
 
 RECOGNIZED_SETTINGS = list(DEFAULT_SETTINGS.keys())
 RECOGNIZED_SETTINGS.extend([
@@ -255,15 +255,11 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             verbose=verbose_log
             )
 
-        # Check scale of data for log file
-        b1 = bfile.padded_batch_to_torch(0).cpu().numpy()
-        logger.debug(f"First batch min, max: {b1.min(), b1.max()}")
-
         # Save preprocessing steps
         if save_preprocessed_copy:
             io.save_preprocessing(results_dir / 'temp_wh.dat', ops, bfile)
 
-        # Generate drift plots
+        logger.info('Generating drift plots ...')
         # st0 will be None if nblocks = 0 (no drift correction)
         if st0 is not None:
             if gui_sorter is not None:
@@ -271,8 +267,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
                 gui_sorter.st0 = st0
                 gui_sorter.plotDataReady.emit('drift')
             else:
-                # TODO: save non-GUI version of plot to results.
-                pass
+                kplots.plot_drift_amount(ops, results_dir)
+                kplots.plot_drift_scatter(st0, results_dir)
 
         # Sort spikes and save results
         st,tF, Wall0, clu0 = detect_spikes(
@@ -280,15 +276,14 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             clear_cache=clear_cache, verbose=verbose_log
             )
 
-        # Generate diagnosic plots
+        logger.info('Generating diagnostic plots ...')
         if gui_sorter is not None:
             gui_sorter.Wall0 = Wall0
             gui_sorter.wPCA = torch.clone(ops['wPCA'].cpu()).numpy()
             gui_sorter.clu0 = clu0
             gui_sorter.plotDataReady.emit('diagnostics')
         else:
-            # TODO: save non-GUI version of plot to results.
-            pass
+            kplots.plot_diagnostics(Wall0, clu0, ops, results_dir)
 
         clu, Wall, st, tF = cluster_spikes(
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
@@ -301,19 +296,14 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
                 save_preprocessed_copy=save_preprocessed_copy
                 )
 
-        # Generate spike positions plot
+        logger.info('Generating spike position plot ...')
         if gui_sorter is not None:
-            # TODO: re-use spike positions saved by `save_sorting` instead of
-            #       computing them again in `kilosort.gui.sanity_plots`.
-            gui_sorter.ops = ops
-            gui_sorter.st = st[kept_spikes]
             gui_sorter.clu = clu[kept_spikes]
-            gui_sorter.tF = tF[kept_spikes]
             gui_sorter.is_refractory = is_ref
             gui_sorter.plotDataReady.emit('probe')
         else:
-            # TODO: save non-GUI version of plot to results.
-            pass
+            kplots.plot_spike_positions(clu[kept_spikes], is_ref, results_dir)
+        logger.info('Sorting finished.')
         
     except Exception as e:
         if isinstance(e, torch.cuda.OutOfMemoryError):
@@ -585,6 +575,9 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
                 f'total {time.time()-tic0 : .2f}s')
     logger.debug(f'hp_filter shape: {hp_filter.shape}')
     logger.debug(f'whiten_mat shape: {whiten_mat.shape}')
+    # Check scale of data for log file
+    b1 = bfile.padded_batch_to_torch(0).cpu().numpy()
+    logger.debug(f"First batch min, max: {b1.min(), b1.max()}")
 
     log_performance(logger, 'info', 'Resource usage after preprocessing')
 

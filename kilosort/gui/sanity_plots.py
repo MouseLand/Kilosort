@@ -8,9 +8,8 @@ import torch
 from qtpy import QtWidgets
 
 from kilosort.postprocessing import compute_spike_positions
-from kilosort.gui.palettes import PROBE_PLOT_COLORS
+from kilosort.plots import COLOR_CODES, PROBE_PLOT_COLORS
 
-_COLOR_CODES = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
 
 class PlotWindow(QtWidgets.QWidget):
     def __init__(self, *args, title=None, width=500, height=400,
@@ -44,7 +43,7 @@ def plot_drift_amount(plot_window, dshift, settings):
     t = np.arange(dshift.shape[0])*(NT/fs)
 
     for i in range(dshift.shape[1]):
-        color = _COLOR_CODES[i % len(_COLOR_CODES)]
+        color = COLOR_CODES[i % len(COLOR_CODES)]
         p1.plot(t, dshift[:,i], pen=color)
 
     plot_window.show()
@@ -109,7 +108,7 @@ def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
     p1.setTitle('Temporal Features')
     t = np.arange(wPCA.shape[1])/(settings['fs']/1000)
     for i in range(wPCA.shape[0]):
-        color = _COLOR_CODES[i % len(_COLOR_CODES)]
+        color = COLOR_CODES[i % len(COLOR_CODES)]
         p1.plot(t, wPCA[i,:], pen=color)
 
     # Spatial features (top right)
@@ -152,7 +151,7 @@ def plot_diagnostics(plot_window, wPCA, Wall0, clu0, settings):
     pg.exporters.ImageExporter(plot_window.plot_widget.scene()).export(save_path)
 
 
-def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory, settings):
+def plot_spike_positions(plot_window, clu, is_refractory, settings):
 
     p1 = plot_window.plot_widget.addPlot(
         row=0, col=0, labels={'bottom': 'Depth (um)', 'left': 'Lateral (um)'}
@@ -165,7 +164,7 @@ def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory, settings)
     bad_idx = np.in1d(clu, bad_units)
     clu = np.mod(clu, 9)
     clu[bad_idx] = 9
-    cm = PROBE_PLOT_COLORS
+    cm = (PROBE_PLOT_COLORS*255).astype('int')  # convert to pyqtgraph format
 
     # Map modded cluster ids to brushes & pens
     brushes = np.empty_like(clu, dtype=object)
@@ -179,10 +178,12 @@ def plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory, settings)
         pens[subset] = pen
 
     # Get x, y positions, add to scatterplot
-    xs, ys = compute_spike_positions(st, tF, ops)
+    results_dir = Path(settings['results_dir'])
+    positions = np.load(results_dir / 'spike_positions.npy')
+    xs, ys = positions[:,0], positions[:,1]
     scatter = pg.ScatterPlotItem(ys, xs, symbol='o', size=3, pen=None,
                                  brush=brushes)
     p1.addItem(scatter)
     plot_window.show()
-    save_path = str(Path(settings['results_dir']) / 'spike_positions.png')
+    save_path = str(results_dir / 'spike_positions.png')
     pg.exporters.ImageExporter(plot_window.plot_widget.scene()).export(save_path)

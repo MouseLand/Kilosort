@@ -260,10 +260,6 @@ class RunBox(QtWidgets.QGroupBox):
 
         elif plot_type == 'probe':
             plot_window = self.plots['probe']
-            ops = self.current_worker.ops
-            st = self.current_worker.st
             clu = self.current_worker.clu
-            tF = self.current_worker.tF
             is_refractory = self.current_worker.is_refractory
-            plot_spike_positions(plot_window, ops, st, clu, tF, is_refractory,
-                                 settings)
+            plot_spike_positions(plot_window, clu, is_refractory, settings)
