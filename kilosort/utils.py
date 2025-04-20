@@ -23,15 +23,15 @@ _DOWNLOADS_DIR_ENV = os.environ.get("KILOSORT_LOCAL_DOWNLOADS_PATH")
 _DOWNLOADS_DIR_DEFAULT = pathlib.Path.home().joinpath('.kilosort')
 DOWNLOADS_DIR = pathlib.Path(_DOWNLOADS_DIR_ENV) if _DOWNLOADS_DIR_ENV else _DOWNLOADS_DIR_DEFAULT
 PROBE_DIR = DOWNLOADS_DIR.joinpath('probes')
+PROBE_URLS = {
+    # Same as Linear16x1_kilosortChanMap.mat
+    'Linear16x1_test.mat': 'https://osf.io/download/67f012cbc56bef203cb25416/',
+    # Same as neuropixPhase3B1_kilosortChanMap.mat
+    'NeuroPix1_default.mat': 'https://osf.io/download/67f012cc7e1fd38cad82980a/',
+    # Same as NP2_kilosortChanMap.mat
+    'NeuroPix2_default.mat': 'https://osf.io/download/67f012ce033d25194f829812/'
+}
 
-# use mat file probes because they enable disconnected channels
-probe_names = [
-    'neuropixPhase3A_kilosortChanMap.mat',
-    'neuropixPhase3B1_kilosortChanMap.mat',\
-    'neuropixPhase3B2_kilosortChanMap.mat',
-    'NP2_kilosortChanMap.mat', 
-    'Linear16x1_kilosortChanMap.mat',
-    ]
 
 def template_path(basename='wTEMP.npz'):
     """ currently only one set of example templates to use"""
@@ -50,8 +50,7 @@ def download_probes(probe_dir=None):
     if probe_dir is None:
         probe_dir = PROBE_DIR
     probe_dir.mkdir(parents=True, exist_ok=True)
-    for probe_name in probe_names:
-        url = f'{_DOWNLOADS_URL}/{probe_name}'
+    for probe_name, url in PROBE_URLS.items():
         cached_file = os.fspath(probe_dir.joinpath(probe_name)) 
         if not os.path.exists(cached_file):
             logger.info('Downloading: "{}" to {}\n'.format(url, cached_file))

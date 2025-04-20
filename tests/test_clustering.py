@@ -6,11 +6,10 @@ from kilosort.utils import PROBE_DIR
 
 
 def random_np2(n_chans=384, n_shanks=4):
-    # Generates a probe containing *all* neuropixels 2 contact positions,
+    # Generates xc,yc for a probe containing *all* neuropixels 2 contact positions,
     # then randomly subsamples from those positions to get a probe layout
     # corresponding to 384-channel output data.
 
-    probe = {}
     # 12um square contacts with 32um lateral spacing,
     # 15um vertical spacing,
     # 1280 contacts per shank
@@ -45,7 +44,7 @@ class TestCenters:
     def test_linear(self, data_directory):
         # NOTE: The `data_directory` argument is only there to make sure probes are
         # downloaded before these tests are run.
-        probe = load_probe(PROBE_DIR/'Linear16x1_kilosortChanMap.mat')
+        probe = load_probe(PROBE_DIR/'Linear16x1_test.mat')
         self.ops['xc'] = probe['xc']
         centers = x_centers(self.ops)
         # X positions are all 1um
@@ -53,7 +52,7 @@ class TestCenters:
         assert np.abs(centers[0] - 1) < 5
 
     def test_np1(self):
-        probe = load_probe(PROBE_DIR/'neuropixPhase3B1_kilosortChanMap.mat')
+        probe = load_probe(PROBE_DIR/'NeuroPix1_default.mat')
         self.ops['xc'] = probe['xc']
         centers = x_centers(self.ops)
         # One shank from 11um to 59um, should be 1 center near 35um
@@ -61,7 +60,7 @@ class TestCenters:
         assert np.abs(centers[0] - 35) < 5
 
     def test_np2_1shank(self):
-        probe = load_probe(PROBE_DIR/'NP2_kilosortChanMap.mat')
+        probe = load_probe(PROBE_DIR/'NeuroPix2_default.mat')
         self.ops['xc'] = probe['xc']
         centers = x_centers(self.ops)
         # One shank from 0 to 32um, should be 1 center near 16um

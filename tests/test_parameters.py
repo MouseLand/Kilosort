@@ -17,7 +17,7 @@ def test_dmin():
     assert ops['settings']['dmin'] is None  # shouldn't change
     
     # Neuropixels 1 3B1 (4 columns with stagger)
-    np1_probe = load_probe(PROBE_DIR / 'neuropixPhase3B1_kilosortChanMap.mat')
+    np1_probe = load_probe(PROBE_DIR / 'NeuroPix1_default.mat')
     ops = {'xc': np1_probe['xc'], 'yc': np1_probe['yc'], 
            'kcoords': np1_probe['kcoords'], 'settings': settings}
     ops = template_centers(ops)
@@ -25,7 +25,7 @@ def test_dmin():
     assert ops['xup'].size == 4  # Number of lateral pos for universal templates
 
     # Just one shank of NP2
-    np2_probe = load_probe(PROBE_DIR / 'NP2_kilosortChanMap.mat')
+    np2_probe = load_probe(PROBE_DIR / 'NeuroPix2_default.mat')
     ops = {'xc': np2_probe['xc'], 'yc': np2_probe['yc'],
            'kcoords': np2_probe['kcoords'], 'settings': settings}
     ops = template_centers(ops)
@@ -33,7 +33,7 @@ def test_dmin():
     assert ops['xup'].size == 3
 
     # Linear probe
-    lin_probe = load_probe(PROBE_DIR / 'Linear16x1_kilosortChanMap.mat')
+    lin_probe = load_probe(PROBE_DIR / 'Linear16x1_test.mat')
     ops = {'xc': lin_probe['xc'], 'yc': lin_probe['yc']*20,
            'kcoords': lin_probe['kcoords'], 'settings': settings}
     ops = template_centers(ops)
