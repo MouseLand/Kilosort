@@ -424,6 +424,7 @@ class KilosortGUI(QtWidgets.QMainWindow):
         self.data_view_box.set_highpass_filter(self.context.highpass_filter)
 
     def add_file_object(self):
+        # Only needed for file objects loaded through data conversion tool.
         self.file_object = self.converter.file_object
         # NOTE: This filename will not actually be loaded the usual way, it's
         #       just there to keep track of where the data is coming from

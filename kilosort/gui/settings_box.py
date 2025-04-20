@@ -11,7 +11,7 @@ from scipy.io.matlab.miobase import MatReadError
 
 from kilosort.gui.logger import setup_logger
 from kilosort.gui.minor_gui_elements import ProbeBuilder, create_prb
-from kilosort.io import load_probe, BinaryRWFile
+from kilosort.io import load_probe, BinaryRWFile, BinaryFileGroup
 from kilosort.parameters import MAIN_PARAMETERS, EXTRA_PARAMETERS, compare_settings
 
 
@@ -403,17 +403,17 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def on_select_data_file_clicked(self):
         file_dialog_options = QtWidgets.QFileDialog.DontUseNativeDialog
-        data_file_name, _ = QtWidgets.QFileDialog.getOpenFileName(
+        data_file_name, _ = QtWidgets.QFileDialog.getOpenFileNames(
             parent=self,
-            caption="Choose data file to load...",
+            caption="Choose data file(s) to load...",
             directory=self.gui.qt_settings.value('last_data_location'),
             options=file_dialog_options,
         )
         if data_file_name:
-            self.data_file_path_input.setText(data_file_name)
+            self.data_file_path_input.setText(str(data_file_name))
             self.data_file_path_input.editingFinished.emit()
             # Cache data folder for the next time a file is selected
-            data_folder = Path(data_file_name).parent.as_posix()
+            data_folder = Path(data_file_name[0]).parent.as_posix()
             self.gui.qt_settings.setValue('last_data_location', data_folder)
 
     def set_data_file_path_from_drag_and_drop(self, filename):
@@ -466,17 +466,37 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.check_load()
 
     def on_data_file_path_changed(self):
-        self.path_check = None
-        data_file_path = Path(self.data_file_path_input.text())
+        text = self.data_file_path_input.text()[1:-1]
+        # Remove whitespace and single or double quotes
+        file_string = ''.join(text.split()).replace("'","").replace('"','')
+        # Get it back in list form
+        file_list = file_string.split(',')
+        data_paths = [Path(f) for f in file_list]
         try:
-            assert self.check_valid_binary_path(data_file_path)
-            self.data_file_path = data_file_path
-            self.gui.qt_settings.setValue('data_file_path', data_file_path)
-
-            parent_folder = data_file_path.parent
+            for p in data_paths:
+                self.path_check = None
+                assert self.check_valid_binary_path(p)
+            parent_folder = data_paths[0].parent
             results_folder = parent_folder / "kilosort4"
             self.results_directory_input.setText(results_folder.as_posix())
             self.results_directory_input.editingFinished.emit()
+
+            if len(data_paths) == 1:
+                self.data_file_path = data_paths[0]
+                self.gui.qt_settings.setValue('data_file_path', data_paths[0])
+            else:
+                # TODO: actually no, we *do* want to save the full list as
+                #       data_file_path and ultimately save it in params.py.
+                #       So, will need to make sure everything along the way
+                #       is updated to tolerate lists instead of strings/paths.
+                self.data_file_path = parent_folder
+                self.gui.qt_settings.setValue('data_file_path', None)  # TODO
+                file_object = BinaryFileGroup.from_filenames(
+                    data_paths, n_channels=self.settings['n_chan_bin'],
+                    dtype=self.settings['data_dtype']
+                    )
+                self.use_file_object = True
+                self.gui.file_object = file_object
 
             if self.check_settings():
                 self.enable_load()
@@ -485,7 +505,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                 self.disable_load()
 
         except AssertionError:
-            logger.exception("Please select a valid binary file path.")
+            logger.exception("Please select a valid binary file path(s).")
             self.disable_load()
 
     def check_valid_binary_path(self, filename):
