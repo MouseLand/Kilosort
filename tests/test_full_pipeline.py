@@ -13,7 +13,7 @@ def test_pipeline(data_directory, results_directory, saved_ops, torch_device, ca
         # Should result in an error, since `n_chan_bin` isn't specified.
         ops, st, clu, _, _, _, _, _, kept_spikes = run_kilosort(
             settings={}, filename=bin_file, device=torch_device,
-            probe_name='neuropixPhase3B1_kilosortChanMap.mat',
+            probe_name='NeuroPix1_default.mat',
             )
 
     with capture_mgr.global_and_fixture_disabled():
@@ -21,7 +21,7 @@ def test_pipeline(data_directory, results_directory, saved_ops, torch_device, ca
         ops, st, clu, _, _, _, _, _, kept_spikes = run_kilosort(
             filename=bin_file, device=torch_device,
             settings={'n_chan_bin': 385},
-            probe_name='neuropixPhase3B1_kilosortChanMap.mat',
+            probe_name='NeuroPix1_default.mat',
             verbose_console=True
             )
 
