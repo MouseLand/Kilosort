@@ -459,10 +459,13 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         params['hp_filtered'] = True
         params['dat_path'] = f"'{dat_path.resolve().as_posix()}'"
     else:
-        dat_path = Path(ops['settings']['filename'])
+        f = ops['settings']['filename']
+        if not isinstance(f, list): f = [f]
+        dat_path = [Path(p).resolve().as_posix() for p in f]
         params['dtype'] = dtype
         params['hp_filtered'] = False
-        params['dat_path'] = f"'{dat_path.resolve().as_posix()}'"
+        params['dat_path'] = dat_path
+        #params['dat_path'] = f"'{dat_path.resolve().as_posix()}'"
 
     with open((results_dir / 'params.py'), 'w') as f: 
         for key in params.keys():
@@ -572,7 +575,7 @@ class BinaryRWFile:
 
     supported_dtypes = ['int16', 'uint16', 'int32', 'float32']
 
-    def __init__(self, filename: str, n_chan_bin: int, fs: int = 30000, 
+    def __init__(self, filename, n_chan_bin: int, fs: int = 30000, 
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = None, write: bool = False,
                  dtype: str = None, tmin: float = 0.0, tmax: float = np.inf,
@@ -586,14 +589,15 @@ class BinaryRWFile:
         
         Parameters
         ----------
-        filename : str or Path
-            The filename of the file to read from or write to
+        filename : Path-like or list of Path-likes.
+            The filename of the file(s) to read from or write to
         n_chan_bin : int
             number of channels
         file_object : array-like file object; optional.
             Must have 'shape' and 'dtype' attributes and support array-like
             indexing (e.g. [:100,:], [5, 7:10], etc). For example, a numpy
             array or memmap.
+            Note: `filename` is effectively ignored if `file_object` is not None.
 
         """
         # Extra casting statements to ensure that 64-bit values are used
@@ -601,7 +605,6 @@ class BinaryRWFile:
         self.fs = np.float64(fs)
         self.n_chan_bin = n_chan_bin
         self.filename = filename
-        self.file_object = file_object
         self.NT = np.int64(NT) 
         self.nt = np.int64(nt) 
         self.nt0min = np.int64(nt0min)
@@ -619,6 +622,13 @@ class BinaryRWFile:
         self.uint_set_warning = True
         self.writable = write
         self.mode = 'w+' if write else 'r'
+
+        if isinstance(filename, list) and len(filename) > 1:
+            if file_object is not None:
+                raise ValueError('Cannot specify both file_object and a list of files.')
+            f = BinaryFileGroup.from_filenames(filename, n_chan_bin, dtype)
+            file_object = f
+        self.file_object = file_object
 
         if file_object is not None:
             dtype = file_object.dtype
@@ -690,7 +700,10 @@ class BinaryRWFile:
         if self.file_object is not None:
             file = self.file_object
         else:
-            file = np.memmap(self.filename, mode=self.mode, dtype=self.dtype,
+            f = self.filename
+            if isinstance(f, list):
+                f = f[0]
+            file = np.memmap(f, mode=self.mode, dtype=self.dtype,
                              shape=(self.total_samples, self.n_chan_bin))
         return file
         
@@ -824,6 +837,8 @@ class BinaryRWFile:
 
 def get_total_samples(filename, n_channels, dtype=np.int16):
     """Count samples in binary file given dtype and number of channels."""
+    if isinstance(filename, list):
+        filename = filename[0]
     bytes_per_value = np.dtype(dtype).itemsize
     bytes_per_sample = np.int64(bytes_per_value * n_channels)
     total_bytes = os.path.getsize(filename)

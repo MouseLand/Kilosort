@@ -58,9 +58,10 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         `probe is None`. Alternatively, the full filepath to a probe stored in
         any directory can be specified with `settings = {'probe_path': ...}`.
         See `kilosort.utils` for default `PROBE_DIR` definition.
-    filename: str or Path; optional.
-        Full path to binary data file. If specified, will also set
-        `data_dir = filename.parent`.
+    filename: Path-like or list of Path-likes; optional.
+        Full path to binary data file(s). If specified, will also set
+        `data_dir = filename.parent`. If `filename` is a list, files will be
+        treated as a single recording concatenated in time in the order provided.
     data_dir : str or Path; optional.
         Specifies directory where binary data file is stored. Kilosort will
         attempt to find the binary file. This works best if there is exactly one
@@ -188,7 +189,14 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
 def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
           clear_cache, invert_sign, save_preprocessed_copy, verbose_log,
           save_extra_vars, file_object, progress_bar, gui_sorter=None):
-    """Run sorting pipeline. See `run_kilosort` for documentation."""
+    """Run sorting pipeline. See `run_kilosort` for documentation.
+    
+    Notes
+    -----
+    filename is expected to be a list of Paths at this point, even if it's
+    a singleton list.
+    
+    """
 
     try:
         logger.info(f"Kilosort version {kilosort.__version__}")
@@ -213,7 +221,10 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             logger.info(f'Using CUDA device: {torch.cuda.get_device_name()} {memory:.2f}GB')
 
         logger.info('-'*40)
-        logger.info(f"Sorting {filename}")
+        if len(filename) == 1:
+            logger.info(f"Sorting {filename}")
+        else:
+            logger.info(f"Sorting {filename[0].parent}/... (multiple files)")
 
         if data_dtype is None:
             logger.info(
@@ -344,10 +355,13 @@ def set_files(settings, filename, probe, probe_name,
         # Find binary file in the folder
         filename  = io.find_binary(data_dir=data_dir)
     else:
-        filename = Path(filename)
-        if not filename.exists():
-            raise FileExistsError(f"filename '{filename}' does not exist")
-        data_dir = filename.parent
+        if not isinstance(filename, list):
+            filename = [filename]
+        filename = [Path(f) for f in filename]
+        for f in filename:
+            if not f.exists():
+                raise FileExistsError(f"filename '{filename}' does not exist")
+        data_dir = filename[0].parent
         
     # Convert paths to strings when saving to ops, otherwise ops can only
     # be loaded on the operating system that originally ran the code.
