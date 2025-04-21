@@ -626,7 +626,8 @@ class BinaryRWFile:
         if isinstance(filename, list) and len(filename) > 1:
             if file_object is not None:
                 raise ValueError('Cannot specify both file_object and a list of files.')
-            f = BinaryFileGroup.from_filenames(filename, n_chan_bin, dtype)
+            f = BinaryFileGroup(filenames=filename, n_channels=n_chan_bin,
+                                dtype=dtype)
             file_object = f
         self.file_object = file_object
 
@@ -854,24 +855,61 @@ def get_total_samples(filename, n_channels, dtype=np.int16):
 
 
 class BinaryFileGroup:
-    def __init__(self, file_objects):
-        # NOTE: Assumes list order of files matches temporal order for
-        #       concatenation.
-        self.file_objects = file_objects
-        self.dtype = file_objects[0].dtype
-        self.n_chans = file_objects[0].shape[1]
-        for f in file_objects[1:]:
-            assert f.dtype == self.dtype, 'All files must have the same dtype'
-            assert f.shape[1] == self.n_chans, \
-                'All files must have the same number of channels'
+    def __init__(self, file_objects=None, filenames=None,
+                 n_channels=None, dtype=None):
+        # NOTE: Assumes list order of files or objects matches temporal order
+        #       for concatenation.
+        self._file_objects = None
+        self._filenames = None
+        self.n_files = 0
+
+        if file_objects is not None:
+            self._file_objects = file_objects
+            self.dtype = file_objects[0].dtype
+            self.n_chans = file_objects[0].shape[1]
+            self.n_files = len(file_objects)
+            for f in file_objects[1:]:
+                assert f.dtype == self.dtype, 'All files must have the same dtype'
+                assert f.shape[1] == self.n_chans, \
+                    'All files must have the same number of channels'
+        elif filenames is not None:
+            # Must specify n_channels, dtype
+            if n_channels is None or dtype is None:
+                raise ValueError("BinaryFileGroup requires n_channels and dtype "
+                                 "when using filenames option.")
+            self._filenames = filenames
+            self.dtype = dtype
+            self.n_chans = n_channels
+            self.n_files = len(filenames)
+        else:
+            raise ValueError("Must specify either file_objects or filenames")
 
         # Track indices that represent boundary between files. Each entry
         # is the starting index of the subsequent file.
         i = 0
         self.split_indices = []
-        for f in file_objects:
-            i += f.shape[0]
+        for j in range(self.n_files):
+            i += self.get_file_size(j)
             self.split_indices.append(i)
+
+    def get_file(self, i):
+        if self._file_objects is not None:
+            file = self._file_objects[i]
+        else:
+            name = self._filenames[i]
+            n_samples = get_total_samples(name, self.n_chans, self.dtype)
+            file = np.memmap(name, mode='r', dtype=self.dtype,
+                                shape=(n_samples, self.n_chans))
+
+        return file
+    
+    def get_file_size(self, i):
+        if self._file_objects is not None:
+            size = self._file_objects[i].shape[0]
+        else:
+            size = get_total_samples(self._filenames[i], self.n_chans, self.dtype)
+
+        return size
 
     def __getitem__(self, *items):
         # Index into appropriate individual object based on index.
@@ -897,7 +935,8 @@ class BinaryFileGroup:
 
         data = []
         shift = 0
-        for k,f in zip(self.split_indices, self.file_objects):
+        for idx, k in enumerate(self.split_indices):
+            f = self.get_file(idx)
             n_samples = f.shape[0]
             if time_idx.start < k:
                 # At least part of the data is in this file
@@ -924,15 +963,11 @@ class BinaryFileGroup:
         return self.split_indices[-1], self.n_chans
     
     @staticmethod
-    def from_filenames(filenames, n_channels, dtype=np.int16, mode='r'):
-        files = []
-        for name in filenames:
-            n_samples = get_total_samples(name, n_channels, dtype)
-            f = np.memmap(name, mode=mode, dtype=dtype,
-                          shape=(n_samples, n_channels))
-            files.append(f)
-        
-        return BinaryFileGroup(files)
+    def from_filenames(filenames, n_channels, dtype=np.int16):
+        # NOTE: This is just an alias now for the below command, retained
+        #       for backwards compatibility.
+        return BinaryFileGroup(filenames=filenames, n_channels=n_channels,
+                               dtype=dtype)
 
 
 class BinaryFiltered(BinaryRWFile):
