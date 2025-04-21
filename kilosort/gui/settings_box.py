@@ -480,15 +480,8 @@ class SettingsBox(QtWidgets.QGroupBox):
             results_folder = parent_folder / "kilosort4"
             self.results_directory_input.setText(results_folder.as_posix())
             self.results_directory_input.editingFinished.emit()
-
             self.data_file_path = data_paths
             self.gui.qt_settings.setValue('data_file_path', data_paths)
-            file_object = BinaryFileGroup.from_filenames(
-                data_paths, n_channels=self.settings['n_chan_bin'],
-                dtype=self.settings['data_dtype']
-                )
-            self.use_file_object = True
-            self.gui.file_object = file_object
 
             if self.check_settings():
                 self.enable_load()
