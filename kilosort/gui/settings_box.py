@@ -45,10 +45,11 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.select_data_file = QtWidgets.QPushButton("Select Binary File")
         self.data_file_path = self.gui.data_path
         if self.data_file_path is not None:
-            self.data_file_path = self.data_file_path.resolve()
+            path = self.data_file_path
+            if not isinstance(path, list): path = [path]
+            path = [p.resolve().as_posix() for p in path]
         self.data_file_path_input = QtWidgets.QLineEdit(
-            self.data_file_path.as_posix()
-            if self.data_file_path is not None else None
+            str(path) if path is not None else None
             )
         
         if not self.gui.qt_settings.contains('last_data_location'):
@@ -60,7 +61,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         self.results_directory_path = self.gui.results_directory
         if self.data_file_path is not None and self.results_directory_path is None:
-            self.results_directory_path = self.data_file_path.parent.joinpath('kilosort4/')
+            self.results_directory_path = self.data_file_path[0].parent.joinpath('kilosort4/')
 
         self.select_results_directory = QtWidgets.QPushButton(
             "Select Results Dir."
@@ -466,6 +467,7 @@ class SettingsBox(QtWidgets.QGroupBox):
         self.check_load()
 
     def on_data_file_path_changed(self):
+        self.path_check = None
         text = self.data_file_path_input.text()[1:-1]
         # Remove whitespace and single or double quotes
         file_string = ''.join(text.split()).replace("'","").replace('"','')
@@ -473,30 +475,20 @@ class SettingsBox(QtWidgets.QGroupBox):
         file_list = file_string.split(',')
         data_paths = [Path(f) for f in file_list]
         try:
-            for p in data_paths:
-                self.path_check = None
-                assert self.check_valid_binary_path(p)
+            self.check_valid_binary_path(data_paths)
             parent_folder = data_paths[0].parent
             results_folder = parent_folder / "kilosort4"
             self.results_directory_input.setText(results_folder.as_posix())
             self.results_directory_input.editingFinished.emit()
 
-            if len(data_paths) == 1:
-                self.data_file_path = data_paths[0]
-                self.gui.qt_settings.setValue('data_file_path', data_paths[0])
-            else:
-                # TODO: actually no, we *do* want to save the full list as
-                #       data_file_path and ultimately save it in params.py.
-                #       So, will need to make sure everything along the way
-                #       is updated to tolerate lists instead of strings/paths.
-                self.data_file_path = parent_folder
-                self.gui.qt_settings.setValue('data_file_path', None)  # TODO
-                file_object = BinaryFileGroup.from_filenames(
-                    data_paths, n_channels=self.settings['n_chan_bin'],
-                    dtype=self.settings['data_dtype']
-                    )
-                self.use_file_object = True
-                self.gui.file_object = file_object
+            self.data_file_path = data_paths
+            self.gui.qt_settings.setValue('data_file_path', data_paths)
+            file_object = BinaryFileGroup.from_filenames(
+                data_paths, n_channels=self.settings['n_chan_bin'],
+                dtype=self.settings['data_dtype']
+                )
+            self.use_file_object = True
+            self.gui.file_object = file_object
 
             if self.check_settings():
                 self.enable_load()
@@ -518,16 +510,21 @@ class SettingsBox(QtWidgets.QGroupBox):
             print('Binary path is None.')
             check = False
         else:
-            f = Path(filename)
-            if f.exists() and f.is_file():
-                if f.suffix in _ALLOWED_FILE_TYPES or self.use_file_object:
-                    check = True
+            if not isinstance(filename, list): filename = [filename]
+            for p in filename:
+                f = Path(p)
+                if f.exists() and f.is_file():
+                    if f.suffix in _ALLOWED_FILE_TYPES or self.use_file_object:
+                        check = True
+                    else:
+                        print(f"Binary file has invalid suffix. "
+                               "Must be {_ALLOWED_FILE_TYPES}")
+                        check = False
+                        break
                 else:
-                    print(f'Binary file has invalid suffix. Must be {_ALLOWED_FILE_TYPES}')
+                    print('Binary file does not exist at that path.')
                     check = False
-            else:
-                print('Binary file does not exist at that path.')
-                check = False
+                    break
         
         self.path_check = check
         return check
@@ -836,7 +833,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             if self.use_file_object:
                 return self.gui.file_object.c
             
-            memmap_data = np.memmap(self.data_file_path, dtype=self.data_dtype)
+            memmap_data = np.memmap(self.data_file_path[0], dtype=self.data_dtype)
             data_size = memmap_data.size
 
             test_n_channels = np.arange(num_channels, num_channels + 31)
@@ -859,9 +856,6 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         else:
             return num_channels
-
-    def preapre_for_new_context(self):
-        pass
 
     def reset(self):
         self.data_file_path_input.clear()

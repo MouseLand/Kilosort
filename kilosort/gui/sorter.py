@@ -40,7 +40,7 @@ class KiloSortWorker(QtCore.QThread):
         if "spikesort" in self.steps:
             settings = self.context.params
             probe = self.context.probe
-            settings["data_dir"] = self.data_path.parent
+            settings["data_dir"] = self.data_path[0].parent
             settings["filename"] = self.data_path
             results_dir = self.results_directory
             if not results_dir.exists():
