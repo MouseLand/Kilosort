@@ -527,7 +527,6 @@ class KilosortGUI(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent):
         # Make sure all threads and pop-out windows are closed as well.
-        self.message_log_box.save_log_file()
         self.message_log_box.popout_window.close()
         for _, p in self.run_box.plots.items():
             p.close()
