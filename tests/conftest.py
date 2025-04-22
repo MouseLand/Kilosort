@@ -221,5 +221,3 @@ def bfile(saved_ops, torch_device, data_directory):
     bfile = io.bfile_from_ops(ops, filename=filename, device=torch_device)
     
     return bfile
-
-### End
