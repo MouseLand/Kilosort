@@ -1,4 +1,6 @@
 import os, tempfile, shutil, pathlib, psutil
+import time
+import urllib
 import importlib.util
 import logging
 import pprint
@@ -18,7 +20,6 @@ if importlib.util.find_spec('pynvml') is not None:
 else:
     _NVML_EXISTS = False
 
-_DOWNLOADS_URL = 'https://www.kilosort.org/downloads'
 _DOWNLOADS_DIR_ENV = os.environ.get("KILOSORT_LOCAL_DOWNLOADS_PATH")
 _DOWNLOADS_DIR_DEFAULT = pathlib.Path.home().joinpath('.kilosort')
 DOWNLOADS_DIR = pathlib.Path(_DOWNLOADS_DIR_ENV) if _DOWNLOADS_DIR_ENV else _DOWNLOADS_DIR_DEFAULT
@@ -37,14 +38,15 @@ def template_path(basename='wTEMP.npz'):
     """ currently only one set of example templates to use"""
     return cache_template_path(basename)
 
+
 def cache_template_path(basename):
-    DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    url = f'{_DOWNLOADS_URL}/{basename}'
     cached_file = os.fspath(DOWNLOADS_DIR.joinpath(basename)) 
     if not os.path.exists(cached_file):
+        url = 'https://osf.io/download/6807fb5958b763aae139aa60/'
         logger.info('Downloading: "{}" to {}\n'.format(url, cached_file))
         download_url_to_file(url, cached_file, progress=True)
     return cached_file
+
 
 def download_probes(probe_dir=None):
     if probe_dir is None:
@@ -61,6 +63,25 @@ def download_probes(probe_dir=None):
                 logger.info(e)
 
 
+def retry_download(func, n_tries=10):
+    def retry(*args, **kwargs):
+        i = 0
+        while True:
+            try:
+                func(*args, **kwargs)
+                break
+            except urllib.error.HTTPerror as e:
+                # Try it several times, wait a couple seconds between attempts.
+                if i < n_tries:
+                    i += 1
+                    time.sleep(2)
+                else:
+                    raise e
+    
+    return retry
+
+
+@retry_download
 def download_url_to_file(url, dst, progress=True):
     r"""Download object at the given URL to a local path.
             Thanks to torch, slightly modified

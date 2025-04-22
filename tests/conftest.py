@@ -1,12 +1,14 @@
 from pathlib import Path
 import shutil
 import os
+import urllib
+import time
 
 import pytest
 import torch
 
 from kilosort import io, DEFAULT_SETTINGS
-from kilosort.utils import download_probes, DOWNLOADS_DIR
+from kilosort.utils import download_probes, DOWNLOADS_DIR, retry_download
 
 
 @pytest.fixture(scope='session')
@@ -109,14 +111,13 @@ def download_data(local, remote):
     import zipfile
 
     zip_file = local.with_suffix('.zip')
-    download_url_to_file(remote, zip_file)  
+    download_url_to_file(remote, zip_file)
     with zipfile.ZipFile(zip_file, "r") as zip_ref:
         zip_ref.extractall(local.parent)
     zip_file.unlink()  # delete zip archive after extracting data
 
-# TODO: look at tenacity package, determine if this is necessary, would introduce
-#       another dependency
-# @retry
+
+@retry_download
 def download_url_to_file(url, dst, progress=True):
     """Download object at the given URL to a local path.
     
@@ -151,13 +152,12 @@ def download_url_to_file(url, dst, progress=True):
     else:
         file_size = None
 
-    # We deliberately save to a temp file and move it after
-    # TODO: explain why
+    # We deliberately save to a temp file and move it after download is finished,
+    # so that any failed downloads don't leave behind partial data.
     dst = dst.expanduser()
     dst_dir = dst.parent
     f = tempfile.NamedTemporaryFile(delete=False, dir=dst_dir)
     print(f"\nDownloading: {url}")
-
     try:
         with tqdm(total=file_size, disable=(not progress),
                   unit='B', unit_scale=True, unit_divisor=1024) as pbar:
