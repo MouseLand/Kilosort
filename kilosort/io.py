@@ -623,6 +623,12 @@ class BinaryRWFile:
         self.writable = write
         self.mode = 'w+' if write else 'r'
 
+        if file_object is not None:
+            dtype = file_object.dtype
+        if dtype is None:
+            dtype = 'int16'
+        self.dtype = dtype
+
         if isinstance(filename, list) and len(filename) > 1:
             if file_object is not None:
                 raise ValueError('Cannot specify both file_object and a list of files.')
@@ -630,12 +636,6 @@ class BinaryRWFile:
                                 dtype=dtype)
             file_object = f
         self.file_object = file_object
-
-        if file_object is not None:
-            dtype = file_object.dtype
-        if dtype is None:
-            dtype = 'int16'
-        self.dtype = dtype
 
         if str(self.dtype) not in self.supported_dtypes:
             message = f"""
@@ -991,7 +991,7 @@ class BinaryFiltered(BinaryRWFile):
         self.invert_sign=invert_sign
         self.artifact_threshold = artifact_threshold
 
-    def filter(self, X, ops=None, ibatch=None):
+    def filter(self, X, ops=None, ibatch=None, skip_preproc=False):
         # pick only the channels specified in the chanMap
         if self.chan_map is not None:
             X = X[self.chan_map]
@@ -1004,6 +1004,9 @@ class BinaryFiltered(BinaryRWFile):
             # remove the mean of each channel, and the median across channels
             X = X - torch.median(X, 0)[0]
     
+        if skip_preproc:
+            return X
+
         # high-pass filtering in the Fourier domain (much faster than filtfilt etc)
         if self.hp_filter is not None:
             fwav = fft_highpass(self.hp_filter, NT=X.shape[1])
@@ -1035,13 +1038,14 @@ class BinaryFiltered(BinaryRWFile):
             X = torch.from_numpy(samples.T).to(self.device).float()
         return self.filter(X)
         
-    def padded_batch_to_torch(self, ibatch, ops=None, return_inds=False):
+    def padded_batch_to_torch(self, ibatch, ops=None, return_inds=False,
+                              skip_preproc=False):
         if return_inds:
             X, inds = super().padded_batch_to_torch(ibatch, return_inds=return_inds)
-            return self.filter(X, ops, ibatch), inds
+            return self.filter(X, ops, ibatch, skip_preproc=skip_preproc), inds
         else:
             X = super().padded_batch_to_torch(ibatch)
-            return self.filter(X, ops, ibatch)
+            return self.filter(X, ops, ibatch, skip_preproc=skip_preproc)
 
 
 def save_preprocessing(filename, ops, bfile=None, bfile_path=None):
