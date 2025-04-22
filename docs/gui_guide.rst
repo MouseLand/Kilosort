@@ -7,7 +7,7 @@ This page explains how to use the basic functions of Kilosort4 GUI, in order of 
 
 Select data
 -----------
-Start by selecting a binary data file (.bin, .bat, .dat, or .raw) to load, by clicking on the "Select Binary File" button near the top-left of the GUI. This will open a file dialog that will populate the neighboring text field after a file is selected. You can also paste a filepath directly into the text field.
+Start by selecting a binary data file (.bin, .bat, .dat, or .raw) to load by clicking on the "Select Binary File" button near the top-left of the GUI. This will open a file dialog that will populate the neighboring text field after a file is selected. You can also paste a filepath directly into the text field. If you select/enter multiple data files, they will be treated as if concatenated in time in the order provided.
 
 .. image:: https://www.kilosort.org/static/images/gui_select_binary.png
    :width: 600
