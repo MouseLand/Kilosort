@@ -185,28 +185,7 @@ class KilosortGUI(QtWidgets.QMainWindow):
 
     def dropEvent(self, event):
         files = [u.toLocalFile() for u in event.mimeData().urls()]
-        filename = files[0]
-        self.settings_box.set_data_file_path_from_drag_and_drop(filename)
-
-        # NOTE: May choose to re-enable this at some point, but for now I don't
-        #       think it's necessary and the repeated dialog popups are pretty
-        #       intrusive.
-
-        # if self.context is None:
-        #     self.settings_box.set_data_file_path_from_drag_and_drop(filename)
-        # else:
-        #     response = QtWidgets.QMessageBox.warning(
-        #         self,
-        #         "Are you sure?",
-        #         "You are attempting to load a new file while another file "
-        #         "is already loaded. Are you sure you want to proceed?",
-        #         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-        #         QtWidgets.QMessageBox.No
-        #         )
-        #        
-        #     if response == QtWidgets.QMessageBox.Yes:
-        #         self.settings_box.set_data_file_path_from_drag_and_drop(filename)
-
+        self.settings_box.set_data_file_path_from_drag_and_drop(files)
 
     def setup(self):
         self.setWindowTitle(f"Kilosort4")

@@ -418,15 +418,14 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.gui.qt_settings.setValue('last_data_location', data_folder)
 
     def set_data_file_path_from_drag_and_drop(self, filename):
-        if Path(filename).suffix in ['.bin', '.dat', '.bat', '.raw']:
-            self.data_file_path_input.setText(filename)
+        if not isinstance(filename, list): filename = [filename]
+        if Path(filename[0]).suffix in ['.bin', '.dat', '.bat', '.raw']:
+            self.data_file_path_input.setText(str(filename))
             self.data_file_path_input.editingFinished.emit()
-            logger.info(f"File at location: {filename} is ready to load!")
-
         else:
             message = (
-                "Only .bin, .dat, .bat, and .raw files accepted as binary, "
-                "the data conversion tool will be opened instead..."
+                "Only .bin, .dat, .bat, and .raw files accepted. Use the "
+                "file conversion tool instead."
                 )
             QtWidgets.QMessageBox.warning(
                 self.parent(),
@@ -435,9 +434,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                 QtWidgets.QMessageBox.StandardButton.Ok,
                 QtWidgets.QMessageBox.StandardButton.Ok,
             )
-            self.gui.converter.filename = filename
-            self.gui.converter.filename_input.setText(filename)
-            self.gui.converter.show()
+
 
     def open_data_converter(self):
         self.gui.converter.show()
