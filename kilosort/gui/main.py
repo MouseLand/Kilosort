@@ -11,7 +11,7 @@ from kilosort.gui import (
     DataConversionBox
 )
 from kilosort.gui.logger import setup_logger
-from kilosort.io import BinaryFiltered, remove_bad_channels
+from kilosort.io import BinaryFiltered, remove_bad_channels, select_shank
 from kilosort.utils import DOWNLOADS_DIR, download_probes
 from qtpy import QtCore, QtGui, QtWidgets
 
@@ -311,10 +311,14 @@ class KilosortGUI(QtWidgets.QMainWindow):
     def set_parameters(self):
         settings = self.settings_box.settings
         bad_channels = self.settings_box.bad_channels
+        shank_idx = self.settings_box.shank_idx
 
         self.data_path = settings["data_file_path"]
         self.results_directory = settings["results_dir"]
-        self.probe_layout = remove_bad_channels(settings["probe"], bad_channels)
+        probe = remove_bad_channels(settings["probe"], bad_channels)
+        if shank_idx is not None:
+            probe = select_shank(probe, shank_idx)
+        self.probe_layout = probe
         self.probe_name = settings["probe_name"]
         self.num_channels = settings["n_chan_bin"]
 
@@ -324,9 +328,6 @@ class KilosortGUI(QtWidgets.QMainWindow):
         params['do_CAR'] = self.run_box.do_CAR_check.isChecked()
         params['invert_sign'] = self.run_box.invert_sign_check.isChecked()
         params['verbose_log'] = self.run_box.verbose_check.isChecked()
-
-        assert params
-
         self.params = params
 
     def do_load(self):

@@ -173,6 +173,13 @@ class ProbeViewBox(QtWidgets.QGroupBox):
         self.center_spots = []
         self.number_spots = []
         bad_channels = self.gui.settings_box.get_bad_channels()
+        shank_idx = self.gui.settings_box.shank_idx
+        chan_map = self.active_layout['chanMap']
+        if shank_idx is None:
+            shank_channels = chan_map
+        else:
+            shank_map = (self.active_layout['kcoords'] == shank_idx).nonzero()[0]
+            shank_channels = chan_map[shank_map]
         channel_size = 10 * self.spot_scale.value()/4
         template_size = 5 * self.spot_scale.value()/4
         center_size = 20 * self.spot_scale.value()/4
@@ -182,7 +189,7 @@ class ProbeViewBox(QtWidgets.QGroupBox):
             for x_pos, y_pos in zip(self.xc, self.yc):
                 index = self.channel_map_dict[(x_pos, y_pos)]
                 channel = self.channel_map[index]
-                if channel in bad_channels:
+                if (channel in bad_channels) or (channel not in shank_channels):
                     color = "b"
                 else:
                     color = "g"

@@ -89,6 +89,21 @@ class SettingsBox(QtWidgets.QGroupBox):
         else:
             self.bad_channels = []
 
+        self.shank_idx_text = QtWidgets.QLabel("Shank Index:")
+        self.shank_idx_input = QtWidgets.QLineEdit()
+        if self.gui.qt_settings.contains('shank_idx'):
+            idx = self.gui.qt_settings.value('shank_idx')
+            if isinstance(idx, str):
+                self.shank_idx = float(idx)
+            elif isinstance(idx, list):
+                self.shank_idx = [float(s) for s in idx]
+            else:
+                self.shank_idx = idx
+        else:
+            self.shank_idx = None
+        self.shank_idx_input.setText(str(self.shank_idx))
+
+
         self.dtype_selector_text = QtWidgets.QLabel("Data dtype:")
         self.dtype_selector = QtWidgets.QComboBox()
         self.populate_dtype_selector()
@@ -225,6 +240,18 @@ class SettingsBox(QtWidgets.QGroupBox):
             "A list of channel indices (rows in the binary file) that should "
             "not be included in sorting.\nListing channels here is equivalent to "
             "excluding them from the probe dictionary."
+            )
+
+        row_count += rspan
+        layout.addWidget(self.shank_idx_text, row_count, col1, rspan, cspan1)
+        layout.addWidget(self.shank_idx_input, row_count, col2, rspan, cspan2)
+        self.shank_idx_input.editingFinished.connect(self.update_shank_idx)
+        self.shank_idx_text.setToolTip(
+            "If not None, only channels from the specified shank index will be used. "
+            "If a list is provided, each shank will be sorted sequentially and results "
+            "will be saved in separate subfolders. Note that the shank_idx value(s) "
+            "must match the actual value specified in `probe['kcoords']`. For example, "
+            "`probe_idx=0` will not work if `probe['kcoords']` uses 1,2,3,4."
             )
 
 
@@ -755,13 +782,23 @@ class SettingsBox(QtWidgets.QGroupBox):
         # Remove brackets and white space if present, convert to list of ints.
         self.bad_channels = self.get_bad_channels()
         self.gui.qt_settings.setValue('bad_channels', self.bad_channels)
-
         if not self.pause_checks:
-            # Trigger update so that probe layout in main gets updated, then
-            # refresh probe view.
-            self.update_settings()
             self.previewProbe.emit()
 
+    @QtCore.Slot()
+    def update_shank_idx(self):
+        # Remove brackets and white space if present, convert to list of floats.
+        text = self.shank_idx_input.text()
+        text = text.replace(']','').replace('[','').replace(' ','')
+        if len(text) > 0 and text.lower() != 'none':
+            idx = float(text)
+        else:
+            idx = None
+        self.shank_idx = idx
+        self.gui.qt_settings.setValue('shank_idx', self.shank_idx)
+
+        if not self.pause_checks:
+            self.previewProbe.emit()
 
     def on_data_dtype_selected(self, data_dtype):
         self.data_dtype = data_dtype
