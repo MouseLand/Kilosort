@@ -38,7 +38,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dir=None, file_object=None, results_dir=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False, clear_cache=False,
-                 save_preprocessed_copy=False, bad_channels=None,
+                 save_preprocessed_copy=False, bad_channels=None, shank_idx=None,
                  verbose_console=False, verbose_log=False):
     """Run full spike sorting pipeline on specified data.
     
@@ -109,6 +109,12 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         A list of channel indices (rows in the binary file) that should not be
         included in sorting. Listing channels here is equivalent to excluding
         them from the probe dictionary.
+    shank_idx : float or list; optional.
+        If not None, only channels from the specified shank index will be used.
+        If a list is provided, each shank will be sorted sequentially and results
+        will be saved in separate subfolders. Note that the shank_idx value(s)
+        must match the actual value specified in `probe['kcoords']`. For example,
+        `probe_idx=0` will not work if `probe['kcoords']` uses 1,2,3,4.
     verbose_console : bool; default=False.
         If True, set logging level for console output to `DEBUG` instead
         of `INFO`, so that additional information normally only saved to the
@@ -170,17 +176,19 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
             )
     settings = {**DEFAULT_SETTINGS, **settings}
     # NOTE: This modifies settings in-place
-    filename, data_dir, results_dir, probe = \
-        set_files(settings, filename, probe, probe_name, data_dir,
-                  results_dir, bad_channels)
-    setup_logger(results_dir, verbose_console=verbose_console)
+    if not isinstance(shank_idx, list): shank_idx = [shank_idx]
+    for idx in shank_idx:
+        _filename, _data_dir, _results_dir, _probe = \
+            set_files(settings, filename, probe, probe_name, data_dir,
+                      results_dir, bad_channels, idx)
+        setup_logger(_results_dir, verbose_console=verbose_console)
 
-    ops, st, clu, tF, Wall, similar_templates, \
-        is_ref, est_contam_rate, kept_spikes = _sort(
-            filename, results_dir, probe, settings, data_dtype, device, do_CAR,
-            clear_cache, invert_sign, save_preprocessed_copy, verbose_log,
-            save_extra_vars, file_object, progress_bar
-        )
+        ops, st, clu, tF, Wall, similar_templates, \
+            is_ref, est_contam_rate, kept_spikes = _sort(
+                _filename, _results_dir, _probe, settings, data_dtype, device,
+                do_CAR, clear_cache, invert_sign, save_preprocessed_copy,
+                verbose_log, save_extra_vars, file_object, progress_bar,
+            )
 
     return ops, st, clu, tF, Wall, similar_templates, \
            is_ref, est_contam_rate, kept_spikes
@@ -245,8 +253,10 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             )
 
         tic0 = time.time()
-        ops = initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
-                                device, save_preprocessed_copy)
+        ops, settings = initialize_ops(
+            settings, probe, data_dtype, do_CAR, invert_sign,
+            device, save_preprocessed_copy
+            )
         
         # Pretty-print ops and probe for log
         logger.debug(f"Initial ops:\n\n{ops_as_string(ops)}\n")
@@ -259,7 +269,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
         ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
         np.random.seed(1)
         torch.cuda.manual_seed_all(1)
-        torch.random.manual_seed(1)
+        torch.random.manual_seed(1) 
         ops, bfile, st0 = compute_drift_correction(
             ops, device, tic0=tic0, progress_bar=progress_bar,
             file_object=file_object, clear_cache=clear_cache,
@@ -336,8 +346,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
            is_ref, est_contam_rate, kept_spikes
 
 
-def set_files(settings, filename, probe, probe_name,
-              data_dir, results_dir, bad_channels):
+def set_files(settings, filename, probe, probe_name, data_dir, results_dir,
+              bad_channels, shank_idx):
     """Parse file and directory information for data, probe, and results."""
 
     # Check for filename 
@@ -373,6 +383,8 @@ def set_files(settings, filename, probe, probe_name,
     results_dir = Path(results_dir).resolve() if results_dir is not None else None
     if results_dir is None:
         results_dir = data_dir / 'kilosort4'
+    if shank_idx is not None:
+        results_dir = results_dir / f'shank_{shank_idx}'
     # Make sure results directory exists
     results_dir.mkdir(exist_ok=True)
     
@@ -394,6 +406,8 @@ def set_files(settings, filename, probe, probe_name,
 
     if bad_channels is not None:
         probe = io.remove_bad_channels(probe, bad_channels)
+    if shank_idx is not None:
+        probe = io.select_shank(probe, shank_idx)
 
     return filename, data_dir, results_dir, probe
 
@@ -443,6 +457,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
                    device, save_preprocessed_copy) -> dict:
     """Package settings and probe information into a single `ops` dictionary."""
 
+    settings = settings.copy()
     if settings['nt0min'] is None:
         settings['nt0min'] = int(20 * settings['nt']/61)
     if settings['max_channel_distance'] is None:
@@ -500,7 +515,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
 
     ops = {**ops, **probe}
 
-    return ops
+    return ops, settings
 
 def get_run_parameters(ops) -> list:
     """Get `ops` dict values needed by `run_kilosort` subroutines."""

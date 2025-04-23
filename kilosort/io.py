@@ -183,7 +183,7 @@ def save_probe(probe_dict, filepath):
 
 
 def remove_bad_channels(probe, bad_channels):
-    """Creates a new probe dictionary with listed channels (data rows) removed.
+    """Create a probe dictionary with listed channels (data rows) removed.
     
     Parameters
     ----------
@@ -208,11 +208,38 @@ def remove_bad_channels(probe, bad_channels):
         except IndexError:
             raise IndexError(f"Channel '{k}' was not in probe['chanMap']")
         bad_idx[i] = idx
-    probe['xc'] = np.delete(probe['xc'], bad_idx)
-    probe['yc'] = np.delete(probe['yc'], bad_idx)
-    probe['kcoords'] = np.delete(probe['kcoords'], bad_idx)
-    probe['chanMap'] = np.delete(probe['chanMap'], bad_idx)
+    
+    for k in ['xc', 'yc', 'chanMap', 'kcoords']:
+        probe[k] = np.delete(probe[k], bad_idx)
     probe['n_chan'] = probe['n_chan'] - bad_idx.size
+
+    return probe
+
+
+def select_shank(probe, shank_idx):
+    """Create a probe dictionary containing channels from shank `shank_idx` only.
+    
+    Parameters
+    ----------
+    probe : dict.
+        A Kilosort4 probe dictionary, as returned by `kilosort.io.load_probe`.
+    shank_idx : float.
+        If not None, only channels from the specified shank index will be used.
+
+    Returns
+    -------
+    probe : dict.
+
+    """
+    probe = probe.copy()
+    keep = (probe['kcoords'] == shank_idx)
+    n = keep.sum()
+    if n == 0:
+        raise ValueError(f"Selected empty shank index: {shank_idx}, can't sort.")
+    else:
+        probe['n_chan'] = n
+        for k in ['xc', 'yc', 'chanMap', 'kcoords']:
+            probe[k] = probe[k][keep]
 
     return probe
 
