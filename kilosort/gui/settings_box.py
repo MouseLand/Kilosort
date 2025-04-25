@@ -48,6 +48,8 @@ class SettingsBox(QtWidgets.QGroupBox):
             path = self.data_file_path
             if not isinstance(path, list): path = [path]
             path = [p.resolve().as_posix() for p in path]
+        else:
+            path = None
         self.data_file_path_input = QtWidgets.QLineEdit(
             str(path) if path is not None else None
             )
