@@ -8,8 +8,6 @@ logger = logging.getLogger(__name__)
 
 import numpy as np
 from tqdm import tqdm
-from urllib.request import urlopen
-from urllib.error import HTTPError
 
 import torch
 
@@ -58,23 +56,24 @@ def download_probes(probe_dir=None):
             logger.info('Downloading: "{}" to {}\n'.format(url, cached_file))
             try:
                 download_url_to_file(url, cached_file, progress=True)
-            except HTTPError as e:
+            except urllib.error.HTTPError as e:
                 logger.info(f'Unable to download probe {probe_name}, error:')
                 logger.info(e)
 
 
-def retry_download(func, n_tries=10):
+def retry_download(func, n_tries=5):
     def retry(*args, **kwargs):
         i = 0
         while True:
             try:
                 func(*args, **kwargs)
                 break
-            except urllib.error.HTTPerror as e:
+            except urllib.error.HTTPError as e:
                 # Try it several times, wait a couple seconds between attempts.
                 if i < n_tries:
+                    print(f'Download failed, retrying... {i}/{n_tries-1}')
                     i += 1
-                    time.sleep(2)
+                    time.sleep(1)
                 else:
                     raise e
     
@@ -94,7 +93,7 @@ def download_url_to_file(url, dst, progress=True):
     file_size = None
     import ssl
     ssl._create_default_https_context = ssl._create_unverified_context
-    u = urlopen(url)
+    u = urllib.request.urlopen(url)
     meta = u.info()
     if hasattr(meta, 'getheaders'):
         content_length = meta.getheaders("Content-Length")
