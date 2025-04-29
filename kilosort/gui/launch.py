@@ -1,5 +1,5 @@
 import sys
-from urllib.error import HTTPError
+import urllib
 
 import pyqtgraph as pg
 from kilosort.gui import DarkPalette, KilosortGUI
@@ -30,10 +30,10 @@ def launcher(filename=None, reset=False, skip_load=False):
         print("downloading logo...")
         try:
             download_url_to_file(
-                "https://www.kilosort.org/static/downloads/kilosort_logo_small.png",
+                "https://osf.io/download/67f0132e7cd1c79b16829846/",
                 icon_path, progress=True
                 )
-        except HTTPError as e:
+        except urllib.error.HTTPError as e:
             print('Unable to download logo')
             print(e)
 
