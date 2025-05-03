@@ -364,6 +364,7 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir,
 
         # Find binary file in the folder
         filename  = io.find_binary(data_dir=data_dir)
+        filename = [filename]
     else:
         if not isinstance(filename, list):
             filename = [filename]
