@@ -405,6 +405,14 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir,
         probe['xc'] = probe['xc'].astype(np.float32)
         probe['yc'] = probe['yc'].astype(np.float32)
 
+    # Let user know if there are too many dimensions in probe entries.
+    # Don't want to automatically flatten them incase they've made assumptions
+    # about higher-D ordering.
+    for k in ['xc', 'yc', 'kcoords', 'chanMap']:
+        if probe[k].ndim > 1:
+            raise ValueError(f"Array-valued probe entries should have 1 dim, "
+                             f"but key: {k} has ndim == {probe[k].ndim}.")
+
     if bad_channels is not None:
         probe = io.remove_bad_channels(probe, bad_channels)
     if shank_idx is not None:
