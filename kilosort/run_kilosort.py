@@ -29,9 +29,14 @@ import kilosort.plots as kplots
 RECOGNIZED_SETTINGS = list(DEFAULT_SETTINGS.keys())
 RECOGNIZED_SETTINGS.extend([
     'filename', 'data_dir', 'results_dir', 'probe_name', 'probe_path',
+])
+# These get mixed in with the other parameters when running through the GUI.
+# When using the API, these should NOT be included in a settings dictionary
+# even if they share a name with run_kilosort options.
+GUI_SETTINGS = [
     'data_file_path', 'probe', 'data_dtype', 'save_preprocessed_copy',
     'clear_cache', 'do_CAR', 'invert_sign', 'verbose_log'
-])
+]
 
 
 def run_kilosort(settings, probe=None, probe_name=None, filename=None,
@@ -255,7 +260,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
         tic0 = time.time()
         ops, settings = initialize_ops(
             settings, probe, data_dtype, do_CAR, invert_sign,
-            device, save_preprocessed_copy
+            device, save_preprocessed_copy, gui_mode=(gui_sorter is not None)
             )
         
         # Pretty-print ops and probe for log
@@ -463,7 +468,7 @@ def close_logger():
 
 
 def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
-                   device, save_preprocessed_copy) -> dict:
+                   device, save_preprocessed_copy, gui_mode=False) -> dict:
     """Package settings and probe information into a single `ops` dictionary."""
 
     settings = settings.copy()
@@ -492,11 +497,17 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
         warnings.warn(msg, DeprecationWarning)
     dup_bins = int(settings['duplicate_spike_ms'] * (settings['fs']/1000))
 
+    # If running through GUI, also allow some additional relevant keys in
+    # settings dictionary.
+    recognized = RECOGNIZED_SETTINGS.copy()
+    if gui_mode:
+        recognized.extend(GUI_SETTINGS.copy())
+
     # Raise an error if there are unrecognized settings entries to make users
     # aware if they've made a typo, are using a deprecated setting, etc.
     unrecognized = []
     for k, _ in settings.items():
-        if k not in RECOGNIZED_SETTINGS:
+        if k not in recognized:
             unrecognized.append(k)
     if len(unrecognized) > 0:
         logger.info('Unrecognized keys found in `settings`')
