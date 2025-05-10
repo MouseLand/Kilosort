@@ -246,8 +246,11 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     nt = ops['nt']
     tarange = torch.arange(-(nt//2),nt//2+1, device = device)
     logger.info('Detecting spikes...')
-    prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
-                mininterval=60 if progress_bar else None)
+    if verbose:
+        prog = tqdm(np.arange(bfile.n_batches), miniters=200 if progress_bar else None, 
+                    mininterval=60 if progress_bar else None)
+    else:
+        prog = np.arange(bfile.n_batches)
     # repeat performance log after every 10 minutes of data
     log_skip = int(600 / (ops['batch_size'] / ops['fs']))
     try:
@@ -280,7 +283,7 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
                 gc.collect()
                 torch.cuda.empty_cache()
 
-            if progress_bar is not None:
+            if progress_bar is not None and verbose:
                 progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
     except:
         logger.exception(f'Error in spikedetect.run on batch {ibatch}')

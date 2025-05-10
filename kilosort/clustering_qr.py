@@ -464,8 +464,11 @@ def run(ops, st, tF, mode='template', device=torch.device('cuda'),
     Nfilt = None
     nearby_chans_empty = 0
     nmax = 0
-    prog = tqdm(np.arange(len(xcent)), miniters=20 if progress_bar else None,
-                mininterval=10 if progress_bar else None)
+    if verbose:
+        prog = tqdm(np.arange(len(xcent)), miniters=20 if progress_bar else None,
+                    mininterval=10 if progress_bar else None)
+    else:
+        prog = np.arange(len(xcent))
     t = 0
     v = False
     
@@ -551,7 +554,7 @@ def run(ops, st, tF, mode='template', device=torch.device('cuda'),
                 
                 Wall = torch.cat((Wall, W), 0)
 
-                if progress_bar is not None:
+                if progress_bar is not None and verbose:
                     progress_bar.emit(int((kk+1) / len(ycent) * 100))
     except:
         logger.exception(f'Error in clustering_qr.run on center {ii}')
