@@ -392,7 +392,7 @@ def set_files(settings, filename, probe, probe_name, data_dir, results_dir,
     if shank_idx is not None:
         results_dir = results_dir / f'shank_{shank_idx}'
     # Make sure results directory exists
-    results_dir.mkdir(exist_ok=True)
+    results_dir.mkdir(exist_ok=True, parents=True)
     
     # find probe configuration file and load
     if probe is None:
