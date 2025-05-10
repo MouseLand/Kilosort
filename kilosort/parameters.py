@@ -370,16 +370,6 @@ EXTRA_PARAMETERS = {
             """
     },
 
-    'cluster_downsampling': {
-        'gui_name': 'cluster downsampling', 'type': int, 'min': 1, 'max': np.inf,
-        'exclude': [], 'default': 20, 'step': 'clustering',
-        'description':
-            """
-            Inverse fraction of nodes used as landmarks during clustering
-            (can be 1, but that slows down the optimization). 
-            """
-    },
-
     'cluster_neighbors': {
         'gui_name': 'cluster neighbors', 'type': int, 'min': 2, 'max': np.inf,
         'exclude': [], 'default': 10, 'step': 'clustering',
@@ -391,6 +381,37 @@ EXTRA_PARAMETERS = {
             will affect resource usage and sorting time.
             """ 
     },
+
+    'cluster_downsampling': {
+        'gui_name': 'cluster downsampling', 'type': int, 'min': 1, 'max': np.inf,
+        'exclude': [], 'default': 20, 'step': 'clustering',
+        'description':
+            """
+            Inverse fraction of nodes used as landmarks during clustering
+            (can be 1, but that slows down the optimization). 
+            """
+    },
+
+    'max_cluster_subset': {
+        'gui_name': 'max cluster subset', 'type': int, 'min': 1, 'max': np.inf,
+        'exclude': [], 'default': None, 'step': 'clustering',
+        'description':
+            """
+            Maximum number of spikes to use when searching for nearest neighbors
+            to build the graph used for clustering. Within each clustering center,
+            only a subset of spikes is searched with the size determined by
+            `cluster_downsampling` and the total number of spikes. This sets
+            a maximum on the size of that subset, so that it will not grow without
+            bound for very long recordings. Using a very large number of spikes
+            is not necessary and causes performance bottlenecks.
+
+            Note: In practice, the actual number of spikes used may increase or
+            decrease slightly while staying under the maximum. This happens
+            because the maximum is set by adjusting `cluster_downsampling` on the
+            fly so that it results in a set no larger than the given size.
+            """
+    },
+    # TODO: Add suggested values after more testing on different datasets.
 
     'x_centers': {
         'gui_name': 'x centers', 'type': int, 'min': 1,

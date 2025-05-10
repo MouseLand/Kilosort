@@ -17,16 +17,22 @@ from kilosort.utils import log_performance
 logger = logging.getLogger(__name__)
 
 
-def neigh_mat(Xd, nskip=20, n_neigh=10):
+def neigh_mat(Xd, nskip=20, n_neigh=10, max_sub=None):
     # Xd is spikes by PCA features in a local neighborhood
     # finding n_neigh neighbors of each spike to a subset of every nskip spike
-
-    # subsampling the feature matrix 
-    Xsub = Xd[::nskip]
 
     # n_samples is the number of spikes, dim is number of features
     n_samples, dim = Xd.shape
 
+    # subsampling the feature matrix
+    if max_sub is not None:
+        # NOTE: Rather than selecting a fixed-size subset, we adjust nskip.
+        #       This is much faster than the alternatives we've tried since it's
+        #       more-or-less constant speed for arbitrarily large tensors, and it
+        #       keeps the logic simple elsewhere in the code.
+        new_nskip = int(np.ceil((n_samples-1)/(max_sub-1)))
+        if new_nskip > nskip: nskip = new_nskip
+    Xsub = Xd[::nskip]
     # n_nodes are the # subsampled spikes
     n_nodes = Xsub.shape[0]
 
@@ -106,14 +112,15 @@ def Mstats(M, device=torch.device('cuda')):
     return m, ki, kj
 
 
-def cluster(Xd, iclust=None, kn=None, nskip=20, n_neigh=10, nclust=200, seed=1,
-            niter=200, lam=0, device=torch.device('cuda'), verbose=False):    
+def cluster(Xd, iclust=None, kn=None, nskip=20, n_neigh=10, max_sub=np.inf,
+            nclust=200, seed=1, niter=200, lam=0, device=torch.device('cuda'),
+            verbose=False):    
 
     if kn is None:
         # kn: n_spikes by n_neigh with integer indices into the spike subset
         #     used for neighbor-finding determined by nskip.
         # M:  n_spikes by nsub, adjacency matrix representation of kn.
-        kn, M = neigh_mat(Xd, nskip=nskip, n_neigh=n_neigh)
+        kn, M = neigh_mat(Xd, nskip=nskip, n_neigh=n_neigh, max_sub=max_sub)
     m, ki, kj = Mstats(M, device=device)
 
     if verbose:
@@ -290,6 +297,7 @@ def subsample_idx(n1, n2):
     array([1, 3, 4], dtype=int64)
 
     """
+
     remove = np.round(np.linspace(0, n1-1, n2)).astype(int)
     idx = np.ones(n1, dtype=bool)
     idx[remove] = False
@@ -414,6 +422,7 @@ def run(ops, st, tF, mode='template', device=torch.device('cuda'),
     dminx = ops['dminx']
     nskip = ops['settings']['cluster_downsampling']
     n_neigh = ops['settings']['cluster_neighbors']
+    max_sub = ops['settings']['max_cluster_subset']
     ycent = y_centers(ops)
     xcent = x_centers(ops)
     nsp = st.shape[0]
@@ -477,8 +486,8 @@ def run(ops, st, tF, mode='template', device=torch.device('cuda'),
 
                     # find new clusters
                     iclust, iclust0, M, _ = cluster(
-                        Xd, nskip=nskip, n_neigh=n_neigh, lam=1, seed=5,
-                        device=device, verbose=v
+                        Xd, nskip=nskip, n_neigh=n_neigh, max_sub=max_sub,
+                        lam=1, seed=5, device=device, verbose=v
                         )
 
                     if clear_cache:
