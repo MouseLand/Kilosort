@@ -496,11 +496,13 @@ class SettingsBox(QtWidgets.QGroupBox):
 
     def on_data_file_path_changed(self):
         self.path_check = None
-        text = self.data_file_path_input.text()[1:-1]
+        text = self.data_file_path_input.text()
+        #text = self.data_file_path_input.text()[1:-1]
         # Remove whitespace and single or double quotes
-        file_string = ''.join(text.split()).replace("'","").replace('"','')
+        #file_string = ''.join(text.split()).replace("'","").replace('"','')
         # Get it back in list form
-        file_list = file_string.split(',')
+        #file_list = file_string.split(',')
+        file_list = ast.literal_eval(text)
         data_paths = [Path(f) for f in file_list]
 
         if self.check_valid_binary_path(data_paths):
