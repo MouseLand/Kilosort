@@ -23,8 +23,10 @@ _PROBE_SETTINGS = [
     'nearest_chans', 'dmin', 'dminx', 'max_channel_distance', 'x_centers'
     ]
 _NONE_ALLOWED = [
-    'dmin', 'nt0min', 'x_centers', 'shift', 'scale', 'max_channel_distance'
+    'dmin', 'nt0min', 'x_centers', 'shift', 'scale', 'max_channel_distance',
+    'max_cluster_subset'
     ]
+
 
 class SettingsBox(QtWidgets.QGroupBox):
     settingsUpdated = QtCore.Signal()
