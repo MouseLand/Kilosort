@@ -502,8 +502,8 @@ class SettingsBox(QtWidgets.QGroupBox):
         # Get it back in list form
         file_list = file_string.split(',')
         data_paths = [Path(f) for f in file_list]
-        try:
-            self.check_valid_binary_path(data_paths)
+
+        if self.check_valid_binary_path(data_paths):
             parent_folder = data_paths[0].parent
             results_folder = parent_folder / "kilosort4"
             self.results_directory_input.setText(results_folder.as_posix())
@@ -516,9 +516,8 @@ class SettingsBox(QtWidgets.QGroupBox):
                 self.dataChanged.emit()
             else:
                 self.disable_load()
-
-        except AssertionError:
-            logger.exception("Please select a valid binary file path(s).")
+        else:
+            print("Please select a valid binary file path(s).")
             self.disable_load()
 
     def check_valid_binary_path(self, filename):
@@ -534,7 +533,15 @@ class SettingsBox(QtWidgets.QGroupBox):
             if not isinstance(filename, list): filename = [filename]
             for p in filename:
                 f = Path(p)
-                if f.exists() and f.is_file():
+                if not f.exists():
+                    print(f'Binary file does not exist at:\n{f}.')
+                    check = False
+                    break
+                elif not f.is_file():
+                    print(f'Path for binary file is not a file:\n{f}.')
+                    check = False
+                    break
+                else:
                     if f.suffix in _ALLOWED_FILE_TYPES or self.use_file_object:
                         check = True
                     else:
@@ -542,11 +549,7 @@ class SettingsBox(QtWidgets.QGroupBox):
                                "Must be {_ALLOWED_FILE_TYPES}")
                         check = False
                         break
-                else:
-                    print('Binary file does not exist at that path.')
-                    check = False
-                    break
-        
+
         self.path_check = check
         return check
 
