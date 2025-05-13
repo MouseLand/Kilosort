@@ -277,8 +277,8 @@ class ProbeViewBox(QtWidgets.QGroupBox):
     @QtCore.Slot(object, object)
     def on_points_clicked(self, points, event):
         selected_point = points.ptsClicked[0]
-        x_pos = int(selected_point.pos().x())
-        y_pos = int(selected_point.pos().y())
+        x_pos = selected_point.pos().x()
+        y_pos = selected_point.pos().y()
 
         # Get channel number corresponding to clicked position, use that
         # to update the list of bad channels before refreshing plot.
