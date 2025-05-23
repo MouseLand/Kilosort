@@ -9,20 +9,12 @@ import numpy as np
 import torch
 
 import kilosort
-from kilosort import (
-    preprocessing,
-    datashift,
-    template_matching,
-    clustering_qr,
-    clustering_qr,
-    io,
-    spikedetect,
-    CCG,
-    PROBE_DIR
-)
+from kilosort import (preprocessing, datashift, template_matching, clustering_qr, 
+                      clustering_qr, io, spikedetect, CCG, PROBE_DIR)
 from kilosort.parameters import DEFAULT_SETTINGS
 from kilosort.utils import (
-    log_performance, log_cuda_details, probe_as_string, ops_as_string
+    log_performance, log_cuda_details, probe_as_string, ops_as_string,
+    get_performance, log_sorting_summary
     )
 import kilosort.plots as kplots
 
@@ -321,6 +313,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
                 save_extra_vars=save_extra_vars,
                 save_preprocessed_copy=save_preprocessed_copy
                 )
+        if torch.cuda.is_available():
+            ops['cuda_postproc'] = torch.cuda.memory_stats(device)
 
         logger.info('Generating spike position plot ...')
         if gui_sorter is not None:
@@ -330,6 +324,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
         else:
             kplots.plot_spike_positions(clu[kept_spikes], is_ref, results_dir)
         logger.info('Sorting finished.')
+        log_sorting_summary(ops, log=logger, level='info')
         
     except Exception as e:
         if isinstance(e, torch.cuda.OutOfMemoryError):
@@ -620,8 +615,12 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     ops['Wrot'] = whiten_mat
     ops['fwav'] = hp_filter
 
-    logger.info(f'Preprocessing filters computed in {time.time()-tic : .2f}s; ' +
-                f'total {time.time()-tic0 : .2f}s')
+    elapsed = time.time() - tic
+    total = time.time() - tic0
+    ops['runtime_preproc'] = elapsed
+    ops['usage_preproc'] = get_performance()
+    logger.info(f'Preprocessing filters computed in {elapsed:.2f}s; ' +
+                f'total {total:.2f}s')
     logger.debug(f'hp_filter shape: {hp_filter.shape}')
     logger.debug(f'whiten_mat shape: {whiten_mat.shape}')
     # Check scale of data for log file
@@ -688,8 +687,15 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
 
     ops, st = datashift.run(ops, bfile, device=device, progress_bar=progress_bar,
                             clear_cache=clear_cache, verbose=verbose)
-    logger.info(f'drift computed in {time.time()-tic : .2f}s; ' + 
-                f'total {time.time()-tic0 : .2f}s')
+    
+    elapsed = time.time() - tic
+    total = time.time() - tic0
+    ops['runtime_drift'] = elapsed
+    ops['usage_drift'] = get_performance()
+    if torch.cuda.is_available():
+        ops['cuda_drift'] = torch.cuda.memory_stats()
+    logger.info(f'drift computed in {elapsed:.2f}s; total {total:.2f}s')
+
     if st is not None:
         logger.debug(f'st shape: {st.shape}')
         logger.debug(f'yblk shape: {ops["yblk"].shape}')
@@ -759,8 +765,15 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
         clear_cache=clear_cache, verbose=verbose
         )
     tF = torch.from_numpy(tF)
-    logger.info(f'{len(st0)} spikes extracted in {time.time()-tic : .2f}s; ' + 
-                f'total {time.time()-tic0 : .2f}s')
+
+    elapsed = time.time() - tic
+    total = time.time() - tic0
+    ops['runtime_st0'] = elapsed
+    ops['usage_st0'] = get_performance()
+    if torch.cuda.is_available():
+        ops['cuda_st0'] = torch.cuda.memory_stats(device)
+    logger.info(f'{len(st0)} spikes extracted in {elapsed:.2f}s; ' + 
+                f'total {total:.2f}s')
     logger.debug(f'st0 shape: {st0.shape}')
     logger.debug(f'tF shape: {tF.shape}')
     if len(st0) == 0:
@@ -777,8 +790,15 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     Wall3 = template_matching.postprocess_templates(
         Wall, ops, clu, st0, tF, device=device
         )
-    logger.info(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' +
-                f'total {time.time()-tic0 : .2f}s')
+
+    elapsed = time.time() - tic
+    total = time.time() - tic0
+    ops['runtime_clu0'] = elapsed
+    ops['usage_clu0'] = get_performance()
+    if torch.cuda.is_available():
+        ops['cuda_clu0'] = torch.cuda.memory_stats(device)
+    logger.info(f'{clu.max()+1} clusters found, in {elapsed:.2f}s; ' +
+                f'total {total:.2f}s')
     logger.debug(f'clu shape: {clu.shape}')
     logger.debug(f'Wall shape: {Wall.shape}')
     
@@ -789,8 +809,15 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     st, tF, ops = template_matching.extract(
         ops, bfile, Wall3, device=device, progress_bar=progress_bar
         )
-    logger.info(f'{len(st)} spikes extracted in {time.time()-tic : .2f}s; ' +
-                f'total {time.time()-tic0 : .2f}s')
+    
+    elapsed = time.time() - tic
+    total = time.time() - tic0
+    ops['runtime_st'] = elapsed
+    ops['usage_st'] = get_performance()
+    if torch.cuda.is_available():
+        ops['cuda_st'] = torch.cuda.memory_stats(device)
+    logger.info(f'{len(st)} spikes extracted in {elapsed:.2f}s; ' +
+                f'total {total:.2f}s')
     logger.debug(f'st shape: {st.shape}')
     logger.debug(f'tF shape: {tF.shape}')
     logger.debug(f'iCC shape: {ops["iCC"].shape}')
@@ -848,8 +875,15 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
         ops, st, tF,  mode = 'template', device=device, progress_bar=progress_bar,
         clear_cache=clear_cache, verbose=verbose
         )
-    logger.info(f'{clu.max()+1} clusters found, in {time.time()-tic : .2f}s; ' + 
-                f'total {time.time()-tic0 : .2f}s')
+    
+    elapsed = time.time() - tic
+    total = time.time() - tic0
+    ops['runtime_clu'] = elapsed
+    ops['usage_clu'] = get_performance()
+    if torch.cuda.is_available():
+        ops['cuda_clu'] = torch.cuda.memory_stats(device)
+    logger.info(f'{clu.max()+1} clusters found, in {elapsed:.2f}s; ' + 
+                f'total {total:.2f}s')
     logger.debug(f'clu shape: {clu.shape}')
     logger.debug(f'Wall shape: {Wall.shape}')
 
@@ -861,8 +895,15 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
         ops, Wall, clu, st, tF, device=device, check_dt=True
         )
     clu = clu.astype('int32')
-    logger.info(f'{clu.max()+1} units found, in {time.time()-tic : .2f}s; ' + 
-                f'total {time.time()-tic0 : .2f}s')
+
+    elapsed = time.time() - tic
+    total = time.time() - tic0
+    ops['runtime_merge'] = elapsed
+    ops['usage_merge'] = get_performance()
+    if torch.cuda.is_available():
+        ops['cuda_merge'] = torch.cuda.memory_stats(device)
+    logger.info(f'{clu.max()+1} units found, in {elapsed:.2f}s; ' + 
+                f'total {total:.2f}s')
     logger.debug(f'clu shape: {clu.shape}')
     logger.debug(f'Wall shape: {Wall.shape}')
 
@@ -932,6 +973,7 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
 
     """
 
+    tic = time.time()
     logger.info(' ')
     logger.info('Saving to phy and computing refractory periods')
     logger.info('-'*40)
@@ -943,6 +985,16 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
             )
     logger.info(f'{int(is_ref.sum())} units found with good refractory periods')
     
+    ops['n_units_total'] = np.unique(clu).size
+    ops['n_units_good'] = int(is_ref.sum())
+    ops['n_spikes'] = st.shape[0]
+    ops['mean_drift'] = np.abs(ops['dshift']).mean(axis=0)[0]
+
+    elapsed = elapsed = time.time() - tic
+    ops['runtime_postproc'] = elapsed
+    ops['usage_postproc'] = get_performance()
+    logger.info(f'Exporting to Phy took: {elapsed:.2f}s')
+
     runtime = time.time()-tic0
     seconds = runtime % 60
     mins = runtime // 60
