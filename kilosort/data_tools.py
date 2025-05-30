@@ -1,6 +1,6 @@
 from pathlib import Path
 import numpy as np
-from kilosort import io
+from kilosort import io, CCG
 
 
 def mean_waveform(cluster_id, results_dir, n_spikes=np.inf, bfile=None, best=True):
@@ -237,3 +237,19 @@ def get_labels(results_dir):
     labels = [r.split('\t') for r in rows[1:]][:-1]
 
     return labels
+
+
+def get_refractory(results_dir):
+    """Get list of refractory (good) units and their estimated contamination."""
+
+    clu = np.load(results_dir / 'spike_clusters.npy')
+    st = np.load(results_dir / 'spike_times.npy')
+    ops = io.load_ops(results_dir / 'ops.npy')
+
+    is_ref, est_contam_rate = CCG.refract(
+        clu, st/ops['fs'],
+        acg_threshold=ops['acg_threshold'],
+        ccg_threshold=ops['ccg_threshold']
+        )
+    
+    return is_ref.astype(bool), est_contam_rate
