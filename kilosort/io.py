@@ -18,6 +18,7 @@ from kilosort.preprocessing import get_drift_matrix, fft_highpass
 from kilosort.postprocessing import (
     remove_duplicates, compute_spike_positions, make_pc_features
     )
+from kilosort.utils import log_performance
 
 _torch_warning = ".*PyTorch does not support non-writable tensors"
 
@@ -1075,7 +1076,7 @@ class BinaryFiltered(BinaryRWFile):
             return self.filter(X, ops, ibatch, skip_preproc=skip_preproc)
 
 
-def save_preprocessing(filename, ops, bfile=None, bfile_path=None):
+def save_preprocessing(filename, ops, bfile=None, bfile_path=None, verbose=False):
     """Save a preprocessed copy of data, including drift correction.
 
     Parameters
@@ -1124,16 +1125,14 @@ def save_preprocessing(filename, ops, bfile=None, bfile_path=None):
     W = np.vstack([weights, np.flip(weights)])
     W = np.tile(W, n_chans_used).reshape(2, n_chans_used, 2*nt)
 
-    # NOTE: dtype for new file is always int16, float32 data returned by preproc
-    #       steps is scaled by 200 and then converted.
-    z = np.memmap(filename, dtype='int16', mode='w+', shape=(NT*n_batches, n_chans))
-
     logger.info(' ')
     logger.info('='*40)
     logger.info(f'Saving drift-corrected copy of data to: {filename}...')
     for i in range(n_batches):
         if i % 100 == 0:
             logger.info(f'Writing batch {i}/{n_batches}...')
+        if i > 0 and i % 500 == 0:
+            log_performance(logger, level='debug', header=None)
 
         if i == 0:
             # Initialize with first batch
@@ -1141,6 +1140,12 @@ def save_preprocessing(filename, ops, bfile=None, bfile_path=None):
         else:
             # Re-use batch2 from previous iteration
             batch1 = batch2
+
+        # NOTE: dtype for new file is always int16, float32 data returned by
+        #       preproc steps is scaled by 200 and then converted.
+        mode = 'w+' if i == 0 else 'r+'
+        z = np.memmap(filename, dtype='int16', mode=mode,
+                      shape=(NT*n_batches, n_chans))
 
         if i == n_batches-1:
             # Skip first 2*nt of real data, it was added in previous iter.
@@ -1170,6 +1175,7 @@ def save_preprocessing(filename, ops, bfile=None, bfile_path=None):
             z[((i+1)*NT)-nt : ((i+1)*NT)+nt, chan_map] = (y2*200).astype('int16')
 
         z.flush()
+        del(z)
 
     logger.info('='*40)
     logger.info('Copying finished.')

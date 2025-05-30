@@ -276,6 +276,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
         # Save preprocessing steps
         if save_preprocessed_copy:
             io.save_preprocessing(results_dir / 'temp_wh.dat', ops, bfile)
+            log_performance(logger, 'info', 'Resource usage after saving preprocessing.')
 
         logger.info('Generating drift plots ...')
         # st0 will be None if nblocks = 0 (no drift correction)
