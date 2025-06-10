@@ -189,7 +189,7 @@ def get_performance():
     return perf
 
 
-def log_performance(log=None, level=None, header=None):
+def log_performance(log=None, level=None, header=None, reset=False):
     """Log usage information for cpu, memory, gpu, and gpu memory.
 
     Parameters
@@ -203,6 +203,8 @@ def log_performance(log=None, level=None, header=None):
     header : str; optional.
         Text to output before usage information. For example, an iteration number
         when logging within a loop.
+    reset : bool; default=False.
+        If True, reset peak cuda memory stats after logging report.
 
     Notes
     -----
@@ -258,6 +260,9 @@ def log_performance(log=None, level=None, header=None):
         getattr(log, level)('GPU memory:   N/A')
 
     getattr(log, level)('*'*56)
+
+    if reset and torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
 
 
 def log_cuda_details(log=None):

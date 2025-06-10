@@ -276,7 +276,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
         # Save preprocessing steps
         if save_preprocessed_copy:
             io.save_preprocessing(results_dir / 'temp_wh.dat', ops, bfile)
-            log_performance(logger, 'info', 'Resource usage after saving preprocessing.')
+            log_performance(logger, 'info', 'Resource usage after saving preprocessing.',
+                            reset=True)
 
         logger.info('Generating drift plots ...')
         # st0 will be None if nblocks = 0 (no drift correction)
@@ -330,8 +331,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
     except Exception as e:
         if isinstance(e, torch.cuda.OutOfMemoryError):
             logger.exception('Out of memory error, printing performance...')
-            log_performance(logger, level='info')
             log_cuda_details(logger)
+            log_performance(logger, level='info')
 
         # This makes sure the full traceback is written to log file.
         logger.exception('Encountered error in `run_kilosort`:')
@@ -628,7 +629,8 @@ def compute_preprocessing(ops, device, tic0=np.nan, file_object=None):
     b1 = bfile.padded_batch_to_torch(0).cpu().numpy()
     logger.debug(f"First batch min, max: {b1.min(), b1.max()}")
 
-    log_performance(logger, 'info', 'Resource usage after preprocessing')
+    log_performance(logger, 'info', 'Resource usage after preprocessing',
+                    reset=True)
 
     return ops
 
@@ -712,8 +714,9 @@ def compute_drift_correction(ops, device, tic0=np.nan, progress_bar=None,
         file_object=file_object
         )
 
-    log_performance(logger, 'info', 'Resource usage after drift correction')
     log_cuda_details(logger)
+    log_performance(logger, 'info', 'Resource usage after drift correction',
+                    reset=True)
 
     return ops, bfile, st
 
@@ -779,6 +782,8 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.debug(f'tF shape: {tF.shape}')
     if len(st0) == 0:
         raise ValueError('No spikes detected, cannot continue sorting.')
+    log_performance(logger, 'info', 'Resource usage after spike detect (univ)',
+                    reset=True)
 
     tic = time.time()
     logger.info(' ')
@@ -802,6 +807,8 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
                 f'total {total:.2f}s')
     logger.debug(f'clu shape: {clu.shape}')
     logger.debug(f'Wall shape: {Wall.shape}')
+    log_performance(logger, 'info', 'Resource usage after first clustering',
+                    reset=True)
     
     tic = time.time()
     logger.info(' ')
@@ -824,8 +831,9 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.debug(f'iCC shape: {ops["iCC"].shape}')
     logger.debug(f'iU shape: {ops["iU"].shape}')
 
-    log_performance(logger, 'info', 'Resource usage after spike detection')
     log_cuda_details(logger)
+    log_performance(logger, 'info', 'Resource usage after spike detect (learned)',
+                    reset=True)
 
     return st, tF, Wall, clu
 
@@ -908,8 +916,9 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.debug(f'clu shape: {clu.shape}')
     logger.debug(f'Wall shape: {Wall.shape}')
 
-    log_performance(logger, 'info', 'Resource usage after clustering')
     log_cuda_details(logger)
+    log_performance(logger, 'info', 'Resource usage after clustering',
+                    reset=True)
 
     return clu, Wall, st, tF
 
@@ -1008,8 +1017,9 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     io.save_ops(ops, results_dir)
     logger.info(f'Sorting output saved in: {results_dir}.')
 
-    log_performance(logger, 'info', 'Resource usage after saving')
     log_cuda_details(logger)
+    log_performance(logger, 'info', 'Resource usage after saving',
+                    reset=True)
 
     return ops, similar_templates, is_ref, est_contam_rate, kept_spikes
 

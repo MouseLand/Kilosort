@@ -283,6 +283,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         If True, save a pre-processed copy of the data (including drift
         correction) to `temp_wh.dat` in the results directory and format Phy
         output to use that copy of the data.
+
     
     Returns
     -------
@@ -403,6 +404,8 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         )
     np.save((results_dir / 'whitening_mat.npy'), whitening_mat.cpu())
     np.save((results_dir / 'whitening_mat_inv.npy'), whitening_mat_inv.cpu())
+    log_performance(logger, level='debug', header='save_to_phy, whitening',
+                    reset=True)
 
     # spike properties
     spike_times = st[:,0].astype('int64') + imin  # shift by minimum sample index
@@ -411,6 +414,9 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     xs, ys = compute_spike_positions(st, tF, ops)
     spike_positions = np.vstack([xs, ys]).T
     amplitudes = ((tF**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
+    log_performance(logger, level='debug', header='save_to_phy, spike positions',
+                    reset=True)
+
     # remove duplicate (artifact) spikes
     spike_times, spike_clusters, kept_spikes = remove_duplicates(
         spike_times, spike_clusters, dt=ops['duplicate_spike_bins']
@@ -427,6 +433,8 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     # Save spike mask so that it can be applied to other variables if needed
     # when loading results.
     np.save((results_dir / 'kept_spikes.npy'), kept_spikes)
+    log_performance(logger, level='debug', header='save_to_phy, remove duplicates',
+                    reset=True)
 
     # template properties
     similar_templates = CCG.similarity(Wall, ops['wPCA'].contiguous(), nt=ops['nt'])
@@ -437,6 +445,8 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     np.save((results_dir / 'similar_templates.npy'), similar_templates)
     np.save((results_dir / 'templates.npy'), templates)
     np.save((results_dir / 'templates_ind.npy'), templates_ind)
+    log_performance(logger, level='debug', header='save_to_phy, template props',
+                    reset=True)
     
     # pc features
     if save_extra_vars:
@@ -450,6 +460,8 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         )
     np.save(results_dir / 'pc_features.npy', pc_features)
     np.save(results_dir / 'pc_feature_ind.npy', pc_feature_ind)
+    log_performance(logger, level='debug', header='save_to_phy, pc features',
+                    reset=True)
 
     # contamination ratio
     acg_threshold = ops['settings']['acg_threshold']
@@ -457,6 +469,8 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     is_ref, est_contam_rate = CCG.refract(spike_clusters, spike_times / ops['fs'],
                                           acg_threshold=acg_threshold,
                                           ccg_threshold=ccg_threshold)
+    log_performance(logger, level='debug', header='save_to_phy, est contam',
+                    reset=True)
 
     # write properties to *.tsv
     stypes = ['ContamPct', 'Amplitude', 'KSLabel']
