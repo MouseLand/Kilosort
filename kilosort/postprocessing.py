@@ -35,21 +35,29 @@ def compute_spike_positions(st, tF, ops):
     # Determine channel weightings for nearest channels
     # based on norm of PC features. Channels that are far away have 0 weight,
     # determined by `ops['settings']['position_limit']`.
-    tmass = (tF**2).sum(-1)
-    tmask = ops['iCC_mask'][:, ops['iU'][st[:,1]]].T.to(tmass.device)
+
+    # Get indexing variables from ops and move to CPU (same as tF).
+    cpu = torch.device('cpu')
+    icc_mask = ops['iCC_mask'].to(cpu)
+    iU = ops['iU'].to(cpu)
+    iCC = ops['iCC'].to(cpu)
+
+    # Weightings from norm of temporal features
+    tmass = torch.norm(tF, 2, dim=-1)
+    tmask = icc_mask[:, iU[st[:,1]]].T
     tmass = tmass * tmask
     tmass = tmass / tmass.sum(1, keepdim=True)
 
     # Get x,y coordinates of nearest channels.
-    xc = torch.from_numpy(ops['xc']).to(tmass.device)
-    yc = torch.from_numpy(ops['yc']).to(tmass.device)
-    chs = ops['iCC'][:, ops['iU'][st[:,1]]].cpu()
+    xc = torch.from_numpy(ops['xc'])
+    yc = torch.from_numpy(ops['yc'])
+    chs = iCC[:, iU[st[:,1]]]
     xc0 = xc[chs.T]
     yc0 = yc[chs.T]
 
     # Estimate spike positions as weighted sum of coordinates of nearby channels.
-    xs = (xc0 * tmass).sum(1).cpu().numpy()
-    ys = (yc0 * tmass).sum(1).cpu().numpy()
+    xs = (xc0 * tmass).sum(1).numpy()
+    ys = (yc0 * tmass).sum(1).numpy()
 
     return xs, ys
 
