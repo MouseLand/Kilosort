@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from kilosort.postprocessing import compute_spike_positions
-
 
 COLOR_CODES = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
 # This is matplotlib tab10 with gray moved to the last position and all 0.5 alpha
