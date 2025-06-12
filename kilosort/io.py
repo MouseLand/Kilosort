@@ -413,7 +413,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     spike_clusters = clu
     xs, ys = compute_spike_positions(st, tF, ops)
     spike_positions = np.vstack([xs, ys]).T
-    amplitudes = ((tF**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
+    amplitudes = torch.norm(tF, dim=[-2,-1]).cpu().numpy()
     log_performance(logger, level='debug', header='save_to_phy, spike positions',
                     reset=True)
 
@@ -438,7 +438,7 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
 
     # template properties
     similar_templates = CCG.similarity(Wall, ops['wPCA'].contiguous(), nt=ops['nt'])
-    template_amplitudes = ((Wall**2).sum(axis=(-2,-1))**0.5).cpu().numpy()
+    template_amplitudes = torch.norm(Wall, dim=[-2,-1]).cpu().numpy()
     templates = (Wall.unsqueeze(-1).cpu() * ops['wPCA'].cpu()).sum(axis=-2).numpy()
     templates = templates.transpose(0,2,1)
     templates_ind = np.tile(np.arange(Wall.shape[1])[np.newaxis, :], (templates.shape[0],1))
