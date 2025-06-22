@@ -384,7 +384,7 @@ EXTRA_PARAMETERS = {
 
     'cluster_downsampling': {
         'gui_name': 'cluster downsampling', 'type': int, 'min': 1, 'max': np.inf,
-        'exclude': [], 'default': 20, 'step': 'clustering',
+        'exclude': [], 'default': 1, 'step': 'clustering',
         'description':
             """
             Inverse fraction of nodes used as landmarks during clustering
@@ -394,7 +394,7 @@ EXTRA_PARAMETERS = {
 
     'max_cluster_subset': {
         'gui_name': 'max cluster subset', 'type': int, 'min': 1, 'max': np.inf,
-        'exclude': [], 'default': None, 'step': 'clustering',
+        'exclude': [], 'default': 25000, 'step': 'clustering',
         'description':
             """
             Maximum number of spikes to use when searching for nearest neighbors

@@ -17,22 +17,25 @@ from kilosort.utils import log_performance
 logger = logging.getLogger(__name__)
 
 
-def neigh_mat(Xd, nskip=20, n_neigh=10, max_sub=None):
+def neigh_mat(Xd, nskip=1, n_neigh=10, max_sub=None):
     # Xd is spikes by PCA features in a local neighborhood
     # finding n_neigh neighbors of each spike to a subset of every nskip spike
 
     # n_samples is the number of spikes, dim is number of features
     n_samples, dim = Xd.shape
 
-    # subsampling the feature matrix
-    if max_sub is not None:
-        # NOTE: Rather than selecting a fixed-size subset, we adjust nskip.
-        #       This is much faster than the alternatives we've tried since it's
-        #       more-or-less constant speed for arbitrarily large tensors, and it
-        #       keeps the logic simple elsewhere in the code.
-        new_nskip = int(np.ceil((n_samples-1)/(max_sub-1)))
-        if new_nskip > nskip: nskip = new_nskip
+    # Downsample feature matrix by selecting every `nskip`-th spike
     Xsub = Xd[::nskip]
+    n1 = Xsub.shape[0]
+    # If the downsampled matrix is still larger than max_sub,
+    # downsample it further by selecting `max_sub` evenly distributed spikes.
+    if (max_sub is not None) and (n1 > max_sub):
+        n2 = n1 - max_sub
+        idx, rev_idx = subsample_idx(n1, n2)
+        Xsub = Xsub[idx]
+    else:
+        rev_idx = None
+
     # n_nodes are the # subsampled spikes
     n_nodes = Xsub.shape[0]
 
@@ -55,7 +58,10 @@ def neigh_mat(Xd, nskip=20, n_neigh=10, max_sub=None):
                      (kn.shape[0], n_nodes))                  # (shape)
 
     # self connections are set to 0
-    M[np.arange(0,n_samples,nskip), np.arange(n_nodes)] = 0
+    skip_idx = np.arange(0, n_samples, nskip)
+    if rev_idx is not None:
+        skip_idx = skip_idx[rev_idx]
+    M[skip_idx, np.arange(n_nodes)] = 0
 
     return kn, M
 
