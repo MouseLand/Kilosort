@@ -411,9 +411,14 @@ class KilosortGUI(QtWidgets.QMainWindow):
         #       (and because `run_kilosort` expects a filename that exists).
         filename = self.converter.filename
         self.settings_box.use_file_object = True
-        self.settings_box.data_file_path = Path(filename)
+        self.settings_box.data_file_path = [Path(filename)]
         self.settings_box.data_file_path_input.setText(filename)
         self.settings_box.path_check = True
+        # Remove cached reference to binary filepath, it no longer matches
+        # the last data loaded.
+        # TODO: Cache external file instead, use it to re-run the conversion
+        #       wrapper.
+        self.qt_settings.remove('data_file_path')
 
     def setup_data_view(self):
         self.data_view_box.setup_seek(self.context)
