@@ -998,7 +998,10 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
     ops['n_units_total'] = np.unique(clu).size
     ops['n_units_good'] = int(is_ref.sum())
     ops['n_spikes'] = st[kept_spikes].shape[0]
-    ops['mean_drift'] = np.abs(ops['dshift']).mean(axis=0)[0]
+    if ops.get('dshift', None) is not None:
+        ops['mean_drift'] = np.abs(ops['dshift']).mean(axis=0)[0]
+    else:
+        ops['mean_drift'] = np.nan
 
     elapsed = elapsed = time.time() - tic
     ops['runtime_postproc'] = elapsed
