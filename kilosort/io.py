@@ -672,11 +672,15 @@ class BinaryRWFile:
         self.dtype = dtype
 
         if isinstance(filename, list) and len(filename) > 1:
-            if file_object is not None:
-                raise ValueError('Cannot specify both file_object and a list of files.')
-            f = BinaryFileGroup(filenames=filename, n_channels=n_chan_bin,
-                                dtype=dtype)
-            file_object = f
+            if file_object is None:
+                file_object = BinaryFileGroup(
+                    filenames=filename, n_channels=n_chan_bin, dtype=dtype
+                    )
+            else:
+                logger.info(
+                    "`file_object is not None`, "
+                    "it will be used instead of loading from filename."
+                    )
         self.file_object = file_object
 
         if str(self.dtype) not in self.supported_dtypes:
