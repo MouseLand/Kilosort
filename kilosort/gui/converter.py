@@ -67,14 +67,28 @@ class DataConversionBox(QtWidgets.QWidget):
         self.filetype_selector.currentTextChanged.connect(self.select_filetype)
         layout.addWidget(self.filetype_text, 2, 0, 1, 3)
         layout.addWidget(self.filetype_selector, 2, 3, 1, 3)
+        if self.gui.qt_settings.contains('filetype'):
+            filetype = self.gui.qt_settings.value('filetype')
+            if filetype is not None:
+                self.filetype_selector.setCurrentText(filetype)
 
         # Top right: kwargs for spikeinterface loader, dtype
         self.stream_id_text = QtWidgets.QLabel('stream_id (optional)')
         self.stream_id_input = QtWidgets.QLineEdit()
         self.stream_id_input.editingFinished.connect(self.set_stream_id)
+        if self.gui.qt_settings.contains('stream_id'):
+            stream_id = self.gui.qt_settings.value('stream_id')
+            if stream_id is not None:
+                self.stream_id_input.setText(stream_id)
+
         self.stream_name_text = QtWidgets.QLabel('stream_name (optional)')
         self.stream_name_input = QtWidgets.QLineEdit()
         self.stream_name_input.editingFinished.connect(self.set_stream_name)
+        if self.gui.qt_settings.contains('stream_name'):
+            stream_name = self.gui.qt_settings.value('stream_name')
+            if stream_name is not None:
+                self.stream_name_input.setText(stream_name)
+
         self.dtype_text = QtWidgets.QLabel("Data dtype (required):")
         self.dtype_note = QtWidgets.QLabel(
             "NOTE: this is the dtype for the new .bin file.\nIf the existing file"
@@ -83,10 +97,11 @@ class DataConversionBox(QtWidgets.QWidget):
         self.dtype_selector = QtWidgets.QComboBox()
         supported_dtypes = BinaryRWFile.supported_dtypes
         self.dtype_selector.addItems([''] + supported_dtypes)
-        #self.dtype_selector.setSizeAdjustPolicy(
-        #    QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLength
-        #)
         self.dtype_selector.currentTextChanged.connect(self.set_dtype)
+        if self.gui.qt_settings.contains('converter_dtype'):
+            dtype = self.gui.qt_settings.value('converter_dtype')
+            if dtype is not None:
+                self.dtype_selector.setCurrentText(dtype)
     
         layout.addWidget(self.stream_id_text, 0, 10, 1, 3)
         layout.addWidget(self.stream_id_input, 0, 13, 1, 3)
@@ -140,15 +155,17 @@ class DataConversionBox(QtWidgets.QWidget):
     @QtCore.Slot()
     def select_file(self):
         options = QtWidgets.QFileDialog.DontUseNativeDialog
-        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+        filename, _ = QtWidgets.QFileDialog.getOpenFileNames(
             parent=self,
             caption="Choose file to load data from...",
             directory=self.gui.qt_settings.value('last_data_location'),
             options=options,
         )
         self.filename = filename
-        self.filename_input.setText(filename)
-        data_location = Path(filename).parent.as_posix()
+        if not isinstance(self.filename, list):
+            self.filename = [self.filename]
+        self.filename_input.setText(str(filename))
+        data_location = Path(filename[0]).parent.as_posix()
         self.gui.qt_settings.setValue('last_data_location', data_location)
 
     @QtCore.Slot()
@@ -168,6 +185,7 @@ class DataConversionBox(QtWidgets.QWidget):
     @QtCore.Slot()
     def select_filetype(self):
         self.filetype = self.filetype_selector.currentText()
+        self.gui.qt_settings.setValue('filetype', self.filetype)
 
     @QtCore.Slot()
     def set_stream_id(self):
@@ -177,6 +195,7 @@ class DataConversionBox(QtWidgets.QWidget):
         else:
             stream_id = stream_id
         self.stream_id = stream_id
+        self.gui.qt_settings.setValue('stream_id', stream_id)
 
     @QtCore.Slot()
     def set_stream_name(self):
@@ -184,13 +203,25 @@ class DataConversionBox(QtWidgets.QWidget):
         if stream_name == '':
             stream_name = None
         self.stream_name = stream_name
+        self.gui.qt_settings.setValue('stream_name', stream_name)
 
     @QtCore.Slot()
     def set_dtype(self):
         self.data_dtype = self.dtype_selector.currentText()
+        self.gui.qt_settings.setValue('converter_dtype', self.data_dtype)
+
+    def load_cached_wrapper(self):
+        logger.info('Loading cached file with external format as wrapper...')
+        filename = self.gui.qt_settings.value('data_file_path')
+        self.filename = [str(f) for f in filename]
+        self.filetype = self.gui.qt_settings.value('filetype')
+        self.data_dtype = self.gui.qt_settings.value('converter_dtype')
+        self.stream_id = self.gui.qt_settings.value('stream_id')
+        self.stream_name = self.gui.qt_settings.value('stream_name')
+        self.load_as_wrapper(keep_probe=True)
 
     @QtCore.Slot()
-    def load_as_wrapper(self):
+    def load_as_wrapper(self, keep_probe=False):
         if None in [self.filename, self.filetype, self.data_dtype]:
             logger.exception(
                 'File name, file type, and data dtype must be specified.'
@@ -223,7 +254,7 @@ class DataConversionBox(QtWidgets.QWidget):
         from probeinterface import write_prb
         try:
             pg = recording.get_probegroup()
-            probe_filename = Path(self.filename).parent / 'probe.prb'
+            probe_filename = Path(self.filename[0]).parent / 'probe.prb'
             write_prb(probe_filename, pg)
             add_probe_to_settings(self.gui.settings_box, probe_filename)
         except ValueError:
@@ -231,9 +262,11 @@ class DataConversionBox(QtWidgets.QWidget):
                 'SpikeInterface recording contains no probe information,\n'
                 'could not write .prb file.'
             )
-            self.gui.settings_box.clear_probe_selection()
+            if not keep_probe:
+                self.gui.settings_box.clear_probe_selection()
 
         self.gui.settings_box.check_load()
+        self.gui.qt_settings.setValue('load_as_wrapper', True)
 
     @QtCore.Slot()
     def convert_to_binary(self):
@@ -243,7 +276,7 @@ class DataConversionBox(QtWidgets.QWidget):
                 'File name, file type, and data dtype must be specified.'
             )
             logger.exception(
-                f'File name: {self.filename}\nFile type: {self.filetype}\n'
+                f'File name: {self.filename[0]}\nFile type: {self.filetype}\n'
                 f'Dtype: {self.data_dtype}'
             )
             return
@@ -299,13 +332,20 @@ class DataConversionBox(QtWidgets.QWidget):
 def get_recording_extractor(filename, filetype, stream_id=None, stream_name=None):
     '''Load recording by importing an extractor from spikeinterface.'''
     extractor_name = _SPIKEINTERFACE_IMPORTS[filetype]
-    extractors = importlib.import_module('spikeinterface.extractors')
+    import spikeinterface as si
+    import spikeinterface.extractors as si_ex
+    #extractor_module = importlib.import_module('spikeinterface.extractors')
     if filetype == 'NWB':
         kwargs = {}
     else:
         kwargs = {'stream_id': stream_id, 'stream_name': stream_name}
 
-    return getattr(extractors, extractor_name)(filename, **kwargs)
+    if not isinstance(filename, list): filename = [filename]
+    extractors = [
+        getattr(si_ex, extractor_name)(f, **kwargs)
+        for f in filename
+        ]
+    return si.concatenate_recordings(extractors)
 
 
 def update_settings_box(settings, n_chans, fs, dtype):

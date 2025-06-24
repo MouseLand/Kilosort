@@ -38,7 +38,7 @@ class SettingsBox(QtWidgets.QGroupBox):
 
         self.gui = parent
         self.load_enabled = False
-        self.use_file_object = False
+        self.use_file_object = self.gui.qt_settings.value('load_as_wrapper')
         # Toggled to avoid excessive settings checks, like when resetting all
         # parameters to their defaults.
         self.pause_checks = False
@@ -160,6 +160,9 @@ class SettingsBox(QtWidgets.QGroupBox):
             self.probe_layout_selector.setCurrentText(self.probe_name)
         if self.probe_layout is not None:
             self.enable_preview_probe()
+        if self.gui.qt_settings.value('load_as_wrapper'):
+            # Don't try to validate binary path if it's an external file format.
+            self.path_check = True
         if self.check_valid_binary_path(self.data_file_path):
             self.check_load()
 
@@ -518,6 +521,9 @@ class SettingsBox(QtWidgets.QGroupBox):
                 self.dataChanged.emit()
             else:
                 self.disable_load()
+            self.gui.qt_settings.setValue('load_as_wrapper', False)
+            self.gui.file_object = None
+            self.use_file_object = False
         else:
             print("Please select a valid binary file path(s).")
             self.disable_load()

@@ -120,6 +120,8 @@ class KilosortGUI(QtWidgets.QMainWindow):
         self.move(100, 100)
 
         if self.auto_load and not skip_load:
+            if self.qt_settings.value('load_as_wrapper'):
+                self.converter.load_cached_wrapper()
             self.settings_box.update_settings()
 
 
@@ -410,15 +412,18 @@ class KilosortGUI(QtWidgets.QMainWindow):
         #       just there to keep track of where the data is coming from
         #       (and because `run_kilosort` expects a filename that exists).
         filename = self.converter.filename
+        if not isinstance(filename, list): filename = [filename]
         self.settings_box.use_file_object = True
-        self.settings_box.data_file_path = [Path(filename)]
-        self.settings_box.data_file_path_input.setText(filename)
+        as_path = [Path(f) for f in filename]
+        self.settings_box.data_file_path = as_path
+        #self.settings_box.data_file_path_input.setText(str(filename))
+        self.settings_box.data_file_path_input.clear()
+        self.settings_box.results_directory_input.setText(
+            str(as_path[0].parent / 'kilosort4')
+            )
+        self.settings_box.results_directory_input.editingFinished.emit()
+        self.qt_settings.setValue('data_file_path', as_path)
         self.settings_box.path_check = True
-        # Remove cached reference to binary filepath, it no longer matches
-        # the last data loaded.
-        # TODO: Cache external file instead, use it to re-run the conversion
-        #       wrapper.
-        self.qt_settings.remove('data_file_path')
 
     def setup_data_view(self):
         self.data_view_box.setup_seek(self.context)
