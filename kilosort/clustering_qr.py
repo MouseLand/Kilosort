@@ -187,6 +187,7 @@ def kmeans_plusplus(Xg, niter=200, seed=1, device=torch.device('cuda'), verbose=
         # using this to sample some spikes, so it's fine to not use all of them.
         n2 = n1 - 2**24   # number of spikes to remove before sampling
         idx, rev_idx = subsample_idx(n1, n2)
+        rev_idx = torch.from_numpy(rev_idx).to(device)
         subsample = True
     else:
         subsample = False
