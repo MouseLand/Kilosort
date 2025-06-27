@@ -390,6 +390,10 @@ def ops_as_string(ops):
     probe_keys = list(ops['probe'].keys())
     for k in ['settings', 'probe'] + probe_keys:
         _ = ops_copy.pop(k)
+    n_files = len(ops_copy['filename'])
+    if n_files > 5:
+        ops_copy['filename'] = ops_copy['filename'][:5] + [f'... ({n_files} total files)']
+
     ops_text = "ops = "
     p = pprint.pformat(ops_copy, indent=4, sort_dicts=False)
     # Put curly braces on separate lines
