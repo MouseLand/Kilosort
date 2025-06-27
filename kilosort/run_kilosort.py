@@ -313,7 +313,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             save_sorting(
                 ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0,
                 save_extra_vars=save_extra_vars,
-                save_preprocessed_copy=save_preprocessed_copy
+                save_preprocessed_copy=save_preprocessed_copy,
+                skip_dat_path=(file_object is not None)
                 )
         if torch.cuda.is_available():
             ops['cuda_postproc'] = torch.cuda.memory_stats(device)
@@ -924,7 +925,8 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
 
 
 def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
-                 save_extra_vars=False, save_preprocessed_copy=False):  
+                 save_extra_vars=False, save_preprocessed_copy=False,
+                 skip_dat_path=False):  
     """Save sorting results, and format them for use with Phy
 
     Parameters
@@ -957,6 +959,12 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
         If True, save a pre-processed copy of the data (including drift
         correction) to `temp_wh.dat` in the results directory and format Phy
         output to use that copy of the data.
+    skip_dat_path : bool; default=False.
+        If True, will save `dat_path = 'no_path.bin'` in `params.py` in place
+        of a real filename. This is done to prevent an error in Phy when filename
+        has an unexpected format, like when using a `file_object` loaded from
+        an external data format through SpikeInterface. The full filename(s) will
+        still be included in `params.py` for reference, but will be commented out.
 
     Returns
     -------
@@ -991,7 +999,8 @@ def save_sorting(ops, results_dir, st, clu, tF, Wall, imin, tic0=np.nan,
         io.save_to_phy(
             st, clu, tF, Wall, ops['probe'], ops, imin, results_dir=results_dir,
             data_dtype=ops['data_dtype'], save_extra_vars=save_extra_vars,
-            save_preprocessed_copy=save_preprocessed_copy
+            save_preprocessed_copy=save_preprocessed_copy,
+            skip_dat_path=skip_dat_path
             )
     logger.info(f'{int(is_ref.sum())} units found with good refractory periods')
     

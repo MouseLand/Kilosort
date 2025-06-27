@@ -247,7 +247,7 @@ def select_shank(probe, shank_idx):
 
 def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
                 data_dtype=None, save_extra_vars=False,
-                save_preprocessed_copy=False):
+                save_preprocessed_copy=False, skip_dat_path=False):
     """Save sorting results to disk in a format readable by Phy.
 
     Parameters
@@ -283,6 +283,12 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         If True, save a pre-processed copy of the data (including drift
         correction) to `temp_wh.dat` in the results directory and format Phy
         output to use that copy of the data.
+    skip_dat_path : bool; default=False.
+        If True, will save `dat_path = 'no_path.bin'` in `params.py` in place
+        of a real filename. This is done to prevent an error in Phy when filename
+        has an unexpected format, like when using a `file_object` loaded from
+        an external data format through SpikeInterface. The full filename(s) will
+        still be included in `params.py` for reference, but will be commented out.
 
     
     Returns
@@ -507,10 +513,12 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
         params['dtype'] = dtype
         params['hp_filtered'] = False
         params['dat_path'] = dat_path
-        #params['dat_path'] = f"'{dat_path.resolve().as_posix()}'"
 
     with open((results_dir / 'params.py'), 'w') as f: 
         for key in params.keys():
+            if (key == 'dat_path') and skip_dat_path:
+                f.write(f'dat_path = "no_path.bin"\n')
+                f.write('# ')
             f.write(f'{key} = {params[key]}\n')
 
     if save_extra_vars:
