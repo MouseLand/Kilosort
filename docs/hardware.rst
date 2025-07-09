@@ -15,7 +15,7 @@ Check for read/write speed. A good SATA SSD is around 500MB/s, and PCI-based (NV
 
 Other
 ^^^^^
-At least 32GB of RAM is recommended, and an 8-core CPU. A faster CPU is not likely to noticeably affect sorting time, but you may need more RAM for large datasets (more than about 6 hours of NeuroPixels data, for example).
+At least 32GB of RAM is recommended, and an 8-core CPU. A faster CPU is not likely to noticeably affect sorting time. Note, however, that the amount of memory needed will depend on the number of spikes present in the data, so 64GB of RAM is preferable. For very long recordings, like 6 or more hours of Neuropixels data, more RAM will likely be needed. For example, two ~13 hour Neuropixels recordings from different labs each required around 300 GB of RAM.
 
 
 Additional recommendations
