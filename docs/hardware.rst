@@ -15,7 +15,7 @@ Check for read/write speed. A good SATA SSD is around 500MB/s, and PCI-based (NV
 
 Other
 ^^^^^
-At least 32GB of RAM is recommended, and an 8-core CPU. A faster CPU is not likely to noticeably affect sorting time. Note, however, that the amount of memory needed will depend on the number of spikes present in the data, so 64GB of RAM is preferable. For very long recordings, like 6 or more hours of Neuropixels data, more RAM will likely be needed. For example, two ~13 hour Neuropixels recordings from different labs each required around 300 GB of RAM.
+At least 32GB of RAM is recommended, and an 8-core CPU. A faster CPU is not likely to noticeably affect sorting time. Note, however, that the amount of memory needed will depend on the number of spikes present in the data, so 64GB of RAM is preferable. For very long recordings, like 6 or more hours of Neuropixels data, more RAM will likely be needed.
 
 
 Additional recommendations
@@ -23,7 +23,7 @@ Additional recommendations
 
 Longer recordings (more than 6 hours)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Assuming an equal number of channels, a longer dataset typically requires more RAM (64GB or more). Kilosort splits the data into small batches (default = 2s) and sorts each separately. However, a few steps (like spike extraction and clustering) require keeping some information from each batch in RAM before it is used or saved at the end of the run through the entire dataset.
+Assuming an equal number of channels, a longer dataset may require more RAM (128GB or more). Kilosort splits the data into small batches (default = 2s) and sorts each separately. However, a few steps (like spike extraction and clustering) require keeping some information from each batch in RAM before it is used or saved at the end of the run through the entire dataset. For example, two ~13 hour Neuropixels recordings from different labs each required around 300 GB of RAM.
 
 High channel count
 ^^^^^^^^^^^^^^^^^^
