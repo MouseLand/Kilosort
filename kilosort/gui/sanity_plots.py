@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pyqtgraph as pg
+import pyqtgraph.exporters
 import numpy as np
 import matplotlib
 import torch
