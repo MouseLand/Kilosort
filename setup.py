@@ -6,7 +6,7 @@ install_deps = [
     'scipy',
     'scikit-learn',
     'tqdm',
-    'torch>=1.6',
+    'torch>=2.1.0',
     'numba',
     'faiss-cpu',
     'psutil',
