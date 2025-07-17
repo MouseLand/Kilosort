@@ -17,7 +17,7 @@ from kilosort.utils import log_performance
 logger = logging.getLogger(__name__)
 
 
-def neigh_mat(Xd, nskip=1, n_neigh=10, max_sub=None):
+def neigh_mat(Xd, nskip=1, n_neigh=10, max_sub=25000):
     # Xd is spikes by PCA features in a local neighborhood
     # finding n_neigh neighbors of each spike to a subset of every nskip spike
 
@@ -118,7 +118,7 @@ def Mstats(M, device=torch.device('cuda')):
     return m, ki, kj
 
 
-def cluster(Xd, iclust=None, kn=None, nskip=20, n_neigh=10, max_sub=np.inf,
+def cluster(Xd, iclust=None, kn=None, nskip=1, n_neigh=10, max_sub=25000,
             nclust=200, seed=1, niter=200, lam=0, device=torch.device('cuda'),
             verbose=False):    
 
