@@ -1,3 +1,6 @@
+Files exported for Phy
+======================
+
 The following files will be saved in the results directory. Note that 'template'
 here does *not* refer to the universal or learned templates used for spike
 detection, as it did in some past versions of Kilosort. Instead, it refers
