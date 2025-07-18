@@ -384,17 +384,21 @@ EXTRA_PARAMETERS = {
 
     'cluster_downsampling': {
         'gui_name': 'cluster downsampling', 'type': int, 'min': 1, 'max': np.inf,
-        'exclude': [], 'default': 20, 'step': 'clustering',
+        'exclude': [], 'default': 1, 'step': 'clustering',
         'description':
             """
-            Inverse fraction of nodes used as landmarks during clustering
-            (can be 1, but that slows down the optimization). 
+            Inverse fraction of spikes used as landmarks during clustering. By
+            default, all spikes are used up to a maximum of
+            `max_cluster_subset=25000`.
+
+            The old default behavior (version < 4.1.0) is
+            equivalent to `max_cluster_subset=None, cluster_downsampling=20`.
             """
     },
 
     'max_cluster_subset': {
         'gui_name': 'max cluster subset', 'type': int, 'min': 1, 'max': np.inf,
-        'exclude': [], 'default': None, 'step': 'clustering',
+        'exclude': [np.inf], 'default': 25000, 'step': 'clustering',
         'description':
             """
             Maximum number of spikes to use when searching for nearest neighbors
@@ -405,13 +409,16 @@ EXTRA_PARAMETERS = {
             bound for very long recordings. Using a very large number of spikes
             is not necessary and causes performance bottlenecks.
 
+            Use `max_cluster_subset = None` if you do not want a limit on
+            the subset size. The old default behavior (version < 4.1.0) is
+            equivalent to `max_cluster_subset=None, cluster_downsampling=20`.
+
             Note: In practice, the actual number of spikes used may increase or
             decrease slightly while staying under the maximum. This happens
             because the maximum is set by adjusting `cluster_downsampling` on the
             fly so that it results in a set no larger than the given size.
             """
     },
-    # TODO: Add suggested values after more testing on different datasets.
 
     'x_centers': {
         'gui_name': 'x centers', 'type': int, 'min': 1,
