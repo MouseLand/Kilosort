@@ -70,6 +70,8 @@ After installation, activate your Phy environment and navigate to the results di
 ~~~
 phy template-gui params.py
 ~~~
+For documentation of Kilosort4's output for use by Phy, see
+https://kilosort.readthedocs.io/en/latest/export_files.html
 
 
 ## Debugging PyTorch installation 
