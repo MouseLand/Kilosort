@@ -2,7 +2,6 @@ import setuptools
 from setuptools import setup
 
 install_deps = [
-    'python>=3.9',
     'numpy>=1.20.0',
     'scipy',
     'scikit-learn',
@@ -69,6 +68,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="kilosort",
+    python_requires='>=3.9',
     license="BSD",
     author="Marius Pachitariu",
     author_email="pachitarium@janelia.hhmi.org",
