@@ -2,6 +2,7 @@ import setuptools
 from setuptools import setup
 
 install_deps = [
+    'python>=3.9',
     'numpy>=1.20.0',
     'scipy',
     'scikit-learn',

@@ -39,12 +39,14 @@ These instructions are written for use with Anaconda distributions of python and
 
 1. Install an [Anaconda](https://www.anaconda.com/products/distribution) distribution of Python. Note you might need to use an anaconda prompt if you did not add anaconda to the path.
 2. Open an anaconda prompt / command prompt which has `conda` for **python 3** in the path.
-3. Create a new environment with `conda create --name kilosort python=3.9`. Python 3.10 should work as well. If you have an older `kilosort` environment you can remove it with `conda env remove -n kilosort` before creating a new one.
+3. Create a new environment with `conda create --name kilosort python=3.11` (or any Python >= 3.9). If you have an older `kilosort` environment you can remove it with `conda env remove -n kilosort` before creating a new one.
 4. To activate this new environment, run `conda activate kilosort`.
 5. To install kilosort and the GUI, run `python -m pip install kilosort[gui]`. If you're on a zsh server, you may need to use `python -m pip install "kilosort[gui]" `.
 6. Instead of step 5, you can install the minimal version of kilosort with `python -m pip install kilosort`.
 7. To run Kilosort on GPU (strongly recommended), remove the CPU version of PyTorch with `pip uninstall torch` and proceed to 8. Otherwise, stop here.
 8. Install the GPU version of PyTorch (for CUDA 11.8) with `pip3 install torch --index-url https://download.pytorch.org/whl/cu118`.
+
+You may need to install a different version depending on which CUDA version your graphics card supports. For example, GeForce RTX 5000 series cards seem to work best with CUDA 12.8.
 
 Note you will always have to run `conda activate kilosort` before you run kilosort. If you want to run jupyter notebooks in this environment, you will also need to `conda install jupyter` or `pip install notebook`.
 
