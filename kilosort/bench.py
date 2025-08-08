@@ -162,12 +162,18 @@ def compare_recordings(st_gt, clu_gt, yclu_gt, st_new, clu_new, yclu_new):
     return fmax, fmiss, fpos, best_ind, matched_all, top_inds
 
 
-def load_GT(filename, ops, gt_path, toff = 20, nmax = 600):
+def load_GT(filename, ops, gt_path, toff=20, nmax=600, tmax=None):
     #gt_path = os.path.join(ops['data_folder'] , "sim.imec0.ap_params.npz")
     dd = np.load(gt_path, allow_pickle = True)
 
     st_gt = dd['st'].astype('int64')
     clu_gt = dd['cl'].astype('int64')
+    
+    if tmax is not None:
+        imax = int(tmax * ops['fs'])
+        idx = st_gt < imax
+        st_gt = st_gt[idx]
+        clu_gt = clu_gt[idx]
 
     ix = clu_gt<nmax
     st_gt  = st_gt[ix]
