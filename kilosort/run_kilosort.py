@@ -524,7 +524,7 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
 
 
     # TODO: Clean this up during refactor. Lots of confusing duplication here.
-    ops = settings  
+    ops = settings.copy()
     ops['settings'] = settings
     ops['probe'] = probe
     ops['data_dtype'] = data_dtype

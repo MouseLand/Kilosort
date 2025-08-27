@@ -482,7 +482,6 @@ def run(ops, st, tF, mode='template', device=torch.device('cuda'),
                     if device == torch.device('cuda'):
                         torch.cuda.reset_peak_memory_stats(device)
                     v = True
-
                 if Xd.shape[0] < 1000:
                     iclust = torch.zeros((Xd.shape[0],))
                 else:
@@ -542,7 +541,7 @@ def run(ops, st, tF, mode='template', device=torch.device('cuda'),
             pass
         raise
 
-    if nearby_chans_empty == len(ycent):
+    if nearby_chans_empty == total_centers:
         raise ValueError(
             f'`get_data_cpu` never found suitable channels in `clustering_qr.run`.'
             f'\ndmin, dminx, and xcenter are: {dmin, dminx, xcup.mean()}'
