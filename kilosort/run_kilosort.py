@@ -36,7 +36,7 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
                  data_dtype=None, do_CAR=True, invert_sign=False, device=None,
                  progress_bar=None, save_extra_vars=False, clear_cache=False,
                  save_preprocessed_copy=False, bad_channels=None, shank_idx=None,
-                 verbose_console=False, verbose_log=False):
+                 verbose_console=False, verbose_log=False, torch_thread_lim=None):
     """Run full spike sorting pipeline on specified data.
     
     Parameters
@@ -120,6 +120,9 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
         If True, include additional debug-level logging statements for some
         steps. This provides more detail for debugging, but may impact
         performance.
+    torch_thread_lim : int; optional.
+        If set, this will limit the number of pytorch threads on CPU.
+        See docs for `torch.set_num_threads`.
     
     Raises
     ------
@@ -163,6 +166,8 @@ def run_kilosort(settings, probe=None, probe_name=None, filename=None,
     For documentation of saved files, see `kilosort.io.save_to_phy`.
 
     """
+    if torch_thread_lim is not None:
+        torch.set_num_threads(torch_thread_lim)
 
     # Configure settings, ops, and file paths
     if settings is None or settings.get('n_chan_bin', None) is None:
