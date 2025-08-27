@@ -14,7 +14,7 @@ from kilosort import (preprocessing, datashift, template_matching, clustering_qr
 from kilosort.parameters import DEFAULT_SETTINGS
 from kilosort.utils import (
     log_performance, log_cuda_details, probe_as_string, ops_as_string,
-    get_performance, log_sorting_summary
+    get_performance, log_sorting_summary, log_thread_count
     )
 import kilosort.plots as kplots
 
@@ -261,6 +261,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
 
         # Baseline performance metrics
         log_performance(logger, 'info', 'Resource usage before sorting')
+        log_thread_count(logger)
 
         # Set preprocessing and drift correction parameters
         ops = compute_preprocessing(ops, device, tic0=tic0, file_object=file_object)
@@ -272,6 +273,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             file_object=file_object, clear_cache=clear_cache,
             verbose=verbose_log
             )
+
+        log_thread_count(logger)
 
         # Save preprocessing steps
         if save_preprocessed_copy:
@@ -296,6 +299,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             clear_cache=clear_cache, verbose=verbose_log
             )
 
+        log_thread_count(logger)
+
         logger.info('Generating diagnostic plots ...')
         if gui_sorter is not None:
             gui_sorter.Wall0 = Wall0
@@ -309,6 +314,9 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
             clear_cache=clear_cache, verbose=verbose_log,
             )
+
+        log_thread_count(logger)
+
         ops, similar_templates, is_ref, est_contam_rate, kept_spikes = \
             save_sorting(
                 ops, results_dir, st, clu, tF, Wall, bfile.imin, tic0,
@@ -318,6 +326,8 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
                 )
         if torch.cuda.is_available():
             ops['cuda_postproc'] = torch.cuda.memory_stats(device)
+
+        log_thread_count(logger)
 
         logger.info('Generating spike position plot ...')
         if gui_sorter is not None:
@@ -785,6 +795,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
         raise ValueError('No spikes detected, cannot continue sorting.')
     log_performance(logger, 'info', 'Resource usage after spike detect (univ)',
                     reset=True)
+    log_thread_count(logger)
 
     tic = time.time()
     logger.info(' ')
@@ -810,7 +821,9 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     logger.debug(f'Wall shape: {Wall.shape}')
     log_performance(logger, 'info', 'Resource usage after first clustering',
                     reset=True)
-    
+   
+    log_thread_count(logger)
+
     tic = time.time()
     logger.info(' ')
     logger.info('Extracting spikes using cluster waveforms')
@@ -818,7 +831,9 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     st, tF, ops = template_matching.extract(
         ops, bfile, Wall3, device=device, progress_bar=progress_bar
         )
-    
+   
+    log_thread_count(logger)
+
     elapsed = time.time() - tic
     total = time.time() - tic0
     ops['runtime_st'] = elapsed
@@ -896,6 +911,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
                 f'total {total:.2f}s')
     logger.debug(f'clu shape: {clu.shape}')
     logger.debug(f'Wall shape: {Wall.shape}')
+    log_thread_count(logger)
 
     tic = time.time()
     logger.info(' ')

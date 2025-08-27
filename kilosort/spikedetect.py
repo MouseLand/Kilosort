@@ -77,7 +77,10 @@ def extract_wPCA_wTEMP(ops, bfile, nt=61, twav_min=20, Th_single_ch=6, nskip=25,
         warnings.filterwarnings("ignore", message=msg)
         # Prevents memory leak for KMeans when using MKL on Windows
         nthread = os.environ.get('OMP_NUM_THREADS')
-        os.environ['OMP_NUM_THREADS'] = '7'
+        new_nthread = 7
+        if nthread is not None:
+            new_nthread = min(int(nthread), new_nthread)
+        os.environ['OMP_NUM_THREADS'] = str(new_nthread)
         model = KMeans(n_clusters=ops['settings']['n_templates'], n_init = 10).fit(clips)
         wTEMP = torch.from_numpy(model.cluster_centers_).to(device).float()
         wTEMP = wTEMP / (wTEMP**2).sum(1).unsqueeze(1)**.5

@@ -1,4 +1,5 @@
-import os, tempfile, shutil, pathlib, psutil
+import os, sys, tempfile, shutil, pathlib, psutil
+import subprocess
 import time
 import urllib
 import importlib.util
@@ -352,6 +353,23 @@ def _format_usage(ops, name, key, gpu):
     else:
         s += f"gpu  {'N/A':>7}   "
     return s
+
+
+def log_thread_count(log=None):
+    if log is None:
+        log = logger
+
+    if sys.platform == 'linux':
+        result = subprocess.run(['ps', '-o', 'thcount', f'{os.getpid()}'], stdout=subprocess.PIPE)
+        thread_count = result.stdout.decode('utf-8').replace('\n','').replace(' ','').strip('THCNT')
+    else:
+        thread_count = 'N/A (linux only)'
+
+    log.debug('')
+    log.debug('--------------------')
+    log.debug(f'Process thread count: {thread_count}')
+    log.debug(f'num torch threads: {torch.get_num_threads()}')
+    log.debug('--------------------\n')
 
 
 def probe_as_string(probe):
