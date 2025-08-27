@@ -53,7 +53,7 @@ def prepare_extract(xc, yc, U, nC, position_limit, device=torch.device('cuda')):
     return iCC, iCC_mask, iU, Ucc
 
 
-def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
+def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None, verbose=False):
     nC = ops['settings']['nearest_chans']
     position_limit = ops['settings']['position_limit']
     iCC, iCC_mask, iU, Ucc = prepare_extract(
@@ -69,11 +69,14 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     st = np.zeros((10**6, 3), 'float64')
     tF  = torch.zeros((10**6, nC , ops['settings']['n_pcs']))
     k = 0
-    prog = tqdm(
-        np.arange(bfile.n_batches, dtype=np.int64),
-        miniters=200 if progress_bar else None, 
-        mininterval=60 if progress_bar else None
-        )
+    if verbose:
+        prog = tqdm(
+            np.arange(bfile.n_batches, dtype=np.int64),
+            miniters=200 if progress_bar else None, 
+            mininterval=60 if progress_bar else None
+            )
+    else:
+        prog = np.arange(bfile.n_batches, dtype=np.int64)
     
     try:
         for ibatch in prog:
@@ -108,7 +111,7 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
 
             k+= nsp
             
-            if progress_bar is not None:
+            if progress_bar is not None and verbose:
                 progress_bar.emit(int((ibatch+1) / bfile.n_batches * 100))
     except:
         logger.exception(f'Error in template_matching.extract on batch {ibatch}')
