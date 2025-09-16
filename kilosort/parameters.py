@@ -433,6 +433,16 @@ EXTRA_PARAMETERS = {
             """
     },
 
+    'cluster_init_seed': {
+        'gui_name': 'cluster init seed', 'type': int, 'min': 1, 'max': np.inf,
+        'exclude': [], 'default': 5, 'step': 'clustering',
+        'description':
+            """
+            Random seed for kmeans++ algorithm used to initialize the graph
+            for clustering.
+            """
+    },
+
 
     ### POSTPROCESSING
     'duplicate_spike_ms': {
