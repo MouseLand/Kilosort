@@ -560,7 +560,7 @@ class BinaryRWFile:
                  NT: int = 60000, nt: int = 61, nt0min: int = 20,
                  device: torch.device = None, write: bool = False,
                  dtype: str = None, tmin: float = 0.0, tmax: float = np.inf,
-                 shift=None, scale=None, file_object=None):
+                 shift=None, scale=None, file_object=None, batch_downsampling=1):
         """
         Creates/Opens a BinaryFile for reading and/or writing data that acts like numpy array
 
@@ -641,14 +641,15 @@ class BinaryRWFile:
         self.imin = max(np.int64(tmin*self.fs), 0)
         self.imax = self.total_samples if tmax==np.inf \
                     else min(np.int64(tmax*self.fs), self.total_samples)
-        self.n_batches = np.int64(np.ceil(self.n_samples / self.NT))
-
+        self.n_batches_raw = np.int64(np.ceil(self.n_samples / self.NT))
         # Check if last batch is too small. If so, drop those samples.
-        a, b = self.get_batch_edges(self.n_batches-1)
+        a, b = self._get_batch_edges(self.n_batches_raw-1)
         batch_size = b - a - self.nt
         if batch_size < self.nt:
             self.n_batches -= 1
             self.imax -= batch_size
+
+        self.set_downsampling(batch_downsampling)
 
 
     @property
@@ -762,7 +763,7 @@ class BinaryRWFile:
 
         return tuple(new_idx)
 
-    def get_batch_edges(self, ibatch):
+    def _get_batch_edges(self, ibatch):
         if ibatch==0:
             bstart = self.imin
             bend = self.imin + self.NT + self.nt
@@ -775,11 +776,15 @@ class BinaryRWFile:
             bend = min(self.imax, np.int64(bstart + self.NT + 2*self.nt))
 
         return bstart, bend
+    
+    def set_downsampling(self, downsampling):
+        self.batch_downsampling = downsampling
+        self.n_batches = np.int64(self.n_batches_raw / self.batch_downsampling)
 
     def padded_batch_to_torch(self, ibatch, return_inds=False):
         """ read batches from file """
-
-        bstart, bend = self.get_batch_edges(ibatch)
+        ibatch *= self.batch_downsampling
+        bstart, bend = self._get_batch_edges(ibatch)
         data = self.file[bstart : bend]
         data = data.T
 
@@ -963,11 +968,12 @@ class BinaryFiltered(BinaryRWFile):
                  device: torch.device = None, do_CAR: bool = True,
                  artifact_threshold: float = np.inf, invert_sign: bool = False,
                  dtype=None, tmin: float = 0.0, tmax: float = np.inf,
-                 shift=None, scale=None, file_object=None):
+                 shift=None, scale=None, file_object=None, batch_downsampling=1):
 
         super().__init__(filename, n_chan_bin, fs, NT, nt, nt0min, device,
                          dtype=dtype, tmin=tmin, tmax=tmax, shift=shift,
-                         scale=scale, file_object=file_object) 
+                         scale=scale, file_object=file_object,
+                         batch_downsampling=batch_downsampling) 
         self.chan_map = chan_map
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter

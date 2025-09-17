@@ -99,8 +99,9 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
                 st = np.concatenate((st, np.zeros_like(st)), 0)
                 tF  = torch.cat((tF,  torch.zeros_like(tF)), 0)
 
+            t_shift = ibatch * bfile.batch_downsampling * (ops['batch_size'])
             stt = stt.double()
-            st[k:k+nsp,0] = ((stt[:,0]-nt) + ibatch * (ops['batch_size'])).cpu().numpy() - nt//2 + ops['nt0min']
+            st[k:k+nsp,0] = ((stt[:,0]-nt) + t_shift).cpu().numpy() - nt//2 + ops['nt0min']
             st[k:k+nsp,1] = stt[:,1].cpu().numpy()
             st[k:k+nsp,2] = th_amps.cpu().numpy().squeeze()
             

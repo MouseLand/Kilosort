@@ -140,6 +140,17 @@ EXTRA_PARAMETERS = {
             """
     },
 
+    'batch_downsampling': {
+        'gui_name': 'batch downsampling', 'type': int, 'min': 1, 'max': np.inf,
+        'exclude': [], 'default': 1, 'step': 'data',
+        'description':
+            """
+            Number of batches skipped for each batch used for sorting. For example,
+            if `batch_downsampling = 10`, then only every 10th batch will be used.
+            In general, this should be left as the default (using all batches).
+            """
+    },
+
     ### PREPROCESSING
     'artifact_threshold': {
         'gui_name': 'artifact threshold', 'type': float, 'min': 0, 'max': np.inf,

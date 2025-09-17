@@ -271,3 +271,22 @@ def test_file_group(torch_device, data_directory, bfile):
         b1 = bfile.padded_batch_to_torch(i, skip_preproc=True)
         b2 = bfile3.padded_batch_to_torch(j)
         assert torch.allclose(b1, b2)
+
+
+def test_downsampling(bfile):
+    b0a = bfile.padded_batch_to_torch(0)
+    b5a = bfile.padded_batch_to_torch(5)
+    b15a = bfile.padded_batch_to_torch(15)
+    nba = bfile.n_batches
+    bfile.set_downsampling(3)
+    b0b = bfile.padded_batch_to_torch(0)
+    b5b = bfile.padded_batch_to_torch(5)
+    nbb = bfile.n_batches
+
+    # First batch should be the same for both.
+    assert torch.allclose(b0a, b0b)
+    # Same batch index should be different since the latter skips batches.
+    assert not torch.allclose(b5a, b5b)
+    # But batch(i) should be the same as batch(j*3)
+    assert torch.allclose(b15a, b5b)
+    assert nbb <= 3*nba
