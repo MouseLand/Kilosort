@@ -57,7 +57,7 @@ exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
-html_logo = 'https://osf.io/download/67f0132e7cd1c79b16829846/'
+html_logo = 'https://github.com/MouseLand/Kilosort/blob/main/docs/kilosort_logo_small.png'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
