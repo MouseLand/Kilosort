@@ -1,5 +1,7 @@
 # Kilosort4
 
+<img src="https://github.com/MouseLand/Kilosort/blob/main/docs/kilosort_logo_small.png" alt="logo" width="300"/>
+
 [![Documentation Status](https://readthedocs.org/projects/kilosort/badge/?version=latest)](https://kilosort.readthedocs.io/en/latest/?badge=latest)
 ![tests](https://github.com/mouseland/kilosort/actions/workflows/test_and_deploy.yml/badge.svg)
 [![PyPI version](https://badge.fury.io/py/kilosort.svg)](https://badge.fury.io/py/kilosort)
