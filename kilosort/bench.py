@@ -185,12 +185,7 @@ def load_GT(filename, ops, gt_path, toff=20, nmax=600, tmin=0.0, tmax=np.inf):
     st_gt = dd['st'].astype('int64')
     clu_gt = dd['cl'].astype('int64')
 
-    imin = int(tmin * ops['fs'])
-    if tmax < np.inf:
-        imax = int(tmax * ops['fs'])
-    else:
-        imax = np.inf
-    idx = np.logical_and(st_gt >= imin, st_gt < imax)
+    idx = get_valid_times(st_gt, tmin, tmax, ops['fs'])
     st_gt = st_gt[idx]
     clu_gt = clu_gt[idx]
 
@@ -227,7 +222,22 @@ def load_phy(filename, fpath, ops, tmin=0.0, tmax=np.inf):
     if clu_new.ndim==2:
         clu_new = clu_new[:,0]
 
+    idx = get_valid_times(st_new, tmin, tmax, ops['fs'])
+    st_new = st_new[idx]
+    clu_new = clu_new[idx]
+
     yclu_new, Wsub = clu_ypos(filename, ops, st_new - 20, clu_new,
                               tmin=tmin, tmax=tmax)
 
     return st_new, clu_new, yclu_new, Wsub
+
+
+def get_valid_times(st, tmin, tmax, fs):
+    imin = int(tmin * fs)
+    if tmax < np.inf:
+        imax = int(tmax * fs)
+    else:
+        imax = np.inf
+    idx = np.logical_and(st >= imin, st < imax)
+
+    return idx
