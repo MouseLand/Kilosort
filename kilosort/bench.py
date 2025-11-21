@@ -5,6 +5,7 @@ import numpy as np
 from torch.fft import fft, ifft, fftshift
 from scipy.interpolate import interp1d
 from tqdm import trange
+from numba import njit
 
 from kilosort import preprocessing
 from kilosort.io import BinaryFiltered
@@ -93,6 +94,7 @@ def clu_ypos(filename, ops, st_i, clu, tmin=0.0, tmax=np.inf):
     return yclu, Wsub
 
 
+@njit
 def nmatch(ss0, ss, dt=6):
     i = 0
     j = 0
@@ -241,3 +243,9 @@ def get_valid_times(st, tmin, tmax, fs):
     idx = np.logical_and(st >= imin, st < imax)
 
     return idx
+
+
+def num_correct(fpos, fmiss):
+    score = 1 - fpos - fmiss
+    num_correct = (score >= 0.8).sum()
+    return num_correct
