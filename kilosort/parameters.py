@@ -395,7 +395,7 @@ EXTRA_PARAMETERS = {
 
     'cluster_downsampling': {
         'gui_name': 'cluster downsampling', 'type': int, 'min': 1, 'max': np.inf,
-        'exclude': [], 'default': 1, 'step': 'clustering',
+        'exclude': [], 'default': 20, 'step': 'clustering',
         'description':
             """
             Inverse fraction of spikes used as landmarks during clustering. By
@@ -404,6 +404,12 @@ EXTRA_PARAMETERS = {
 
             The old default behavior (version < 4.1.0) is
             equivalent to `max_cluster_subset=None, cluster_downsampling=20`.
+            Versions 4.1.0 through 4.1.2 defaulted to
+            `max_cluster_subset=25000, cluster_downsampling=1`.
+
+            The default value was reverted to 20 in version 4.1.3 because many
+            users reported memory issues with the new default. We have found
+            that values betwen 5-20 also work well in most cases.
             """
     },
 
@@ -421,8 +427,12 @@ EXTRA_PARAMETERS = {
             is not necessary and causes performance bottlenecks.
 
             Use `max_cluster_subset = None` if you do not want a limit on
-            the subset size. The old default behavior (version < 4.1.0) is
+            the subset size.
+            
+            The old default behavior (version < 4.1.0) is
             equivalent to `max_cluster_subset=None, cluster_downsampling=20`.
+            Versions 4.1.0 through 4.1.2 defaulted to
+            `max_cluster_subset=25000, cluster_downsampling=1`.
 
             Note: In practice, the actual number of spikes used may increase or
             decrease slightly while staying under the maximum. This happens
