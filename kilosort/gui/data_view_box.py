@@ -414,11 +414,17 @@ class DataViewBox(QtWidgets.QGroupBox):
         self.seek_range = (min_time, max_time)
 
     def update_seek_text(self, seek):
-        position = seek.pos()[0]
+        try:
+            position = seek.pos()[0]
+        except TypeError:
+            position = seek.pos().x()
         self.time_label.setText("t={0:.2f} s".format(position))
 
     def update_seek_position(self, seek):
-        position = seek.pos()[0]
+        try:
+            position = seek.pos()[0]
+        except TypeError:
+            position = seek.pos().x()
         self.current_time = position - self.tmin
         try:
             self.update_plot()
