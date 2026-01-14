@@ -5,32 +5,6 @@ from qtpy import QtGui, QtWidgets, QtCore
 logger = setup_logger(__name__)
 
 
-def create_prb(probe):
-    chan_map = np.array(probe["chanMap"])
-    xc, yc = np.array(probe["xc"]), np.array(probe["yc"])
-    probe_prb = {}
-    unique_channel_groups = np.unique(np.array(probe["kcoords"]))
-
-    for channel_group in unique_channel_groups:
-        probe_prb[channel_group] = {}
-
-        channel_group_pos = np.where(probe["kcoords"] == channel_group)
-        group_channels = chan_map[channel_group_pos]
-        group_xc = xc[channel_group_pos]
-        group_yc = yc[channel_group_pos]
-
-        probe_prb[channel_group]['channels'] = np.asarray(group_channels).tolist()
-        geometry = {}
-
-        for c, channel in enumerate(group_channels):
-            geometry[channel] = (group_xc[c], group_yc[c])
-
-        probe_prb[channel_group]['geometry'] = geometry
-        probe_prb[channel_group]['graph'] = []
-
-    return probe_prb
-
-
 class ProbeBuilder(QtWidgets.QDialog):
     def __init__(self, parent, *args, **kwargs):
         super(ProbeBuilder, self).__init__(parent=parent, *args, **kwargs)

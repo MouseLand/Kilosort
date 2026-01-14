@@ -10,9 +10,9 @@ from qtpy import QtCore, QtWidgets, QtGui
 from scipy.io.matlab.miobase import MatReadError
 
 from kilosort.gui.logger import setup_logger
-from kilosort.gui.minor_gui_elements import ProbeBuilder, create_prb
-from kilosort.io import load_probe, BinaryRWFile, BinaryFileGroup
-from kilosort.parameters import MAIN_PARAMETERS, EXTRA_PARAMETERS, compare_settings
+from kilosort.gui.minor_gui_elements import ProbeBuilder
+from kilosort.io import load_probe, save_probe, BinaryRWFile
+from kilosort.parameters import MAIN_PARAMETERS, EXTRA_PARAMETERS
 
 
 logger = setup_logger(__name__)
@@ -500,11 +500,6 @@ class SettingsBox(QtWidgets.QGroupBox):
     def on_data_file_path_changed(self):
         self.path_check = None
         text = self.data_file_path_input.text()
-        #text = self.data_file_path_input.text()[1:-1]
-        # Remove whitespace and single or double quotes
-        #file_string = ''.join(text.split()).replace("'","").replace('"','')
-        # Get it back in list form
-        #file_list = file_string.split(',')
         file_list = ast.literal_eval(text)
         data_paths = [Path(f) for f in file_list]
 
@@ -684,15 +679,9 @@ class SettingsBox(QtWidgets.QGroupBox):
                 probe_name = dialog.get_map_name()
                 probe_layout = dialog.get_probe()
 
-                probe_name = probe_name + ".prb"
-                probe_prb = create_prb(probe_layout)
-                probe_path = Path(self.gui.new_probe_files_path).joinpath(probe_name)
-                with open(probe_path, "w+") as probe_file:
-                    str_dict = pprint.pformat(
-                        probe_prb, indent=4, compact=False,
-                    )
-                    str_prb = f"""channel_groups = {str_dict}"""
-                    probe_file.write(str_prb)
+                probe_name = probe_name + ".json"
+                probe_path = Path(self.gui.new_probe_files_path) / probe_name
+                save_probe(probe_layout, probe_path)
                 assert probe_path.exists()
 
                 self.populate_probe_selector()
@@ -729,20 +718,12 @@ class SettingsBox(QtWidgets.QGroupBox):
                     )
 
                     if save_probe_file == QtWidgets.QMessageBox.Yes:
-                        probe_prb = create_prb(probe_layout)
-
-                        probe_name = probe_path.with_suffix(".prb").name
+                        probe_name = probe_path.with_suffix(".json").name
                         new_probe_path = (
                             Path(self.gui.new_probe_files_path) / probe_name
                         )
-
                         if not new_probe_path.exists():
-                            with open(new_probe_path, "w+") as probe_file:
-                                str_dict = pprint.pformat(
-                                    probe_prb, indent=4, compact=False
-                                )
-                                str_prb = f"""channel_groups = {str_dict}"""
-                                probe_file.write(str_prb)
+                            save_probe(probe_layout, new_probe_path)
 
                             self.populate_probe_selector()
                             self.probe_layout_selector.setCurrentText(probe_name)
@@ -840,7 +821,7 @@ class SettingsBox(QtWidgets.QGroupBox):
             probes = [
                 probe
                 for probe in probes
-                if probe.endswith(".mat") or probe.endswith(".prb")
+                if probe.endswith(".mat") or probe.endswith(".prb") or probe.endswith(".json")
             ]
             probes_list.extend(probes)
 
@@ -873,7 +854,11 @@ class SettingsBox(QtWidgets.QGroupBox):
     def estimate_total_channels(self, num_channels):
         if self.check_valid_binary_path(self.data_file_path):
             if self.use_file_object:
-                return self.gui.file_object.c
+                try:
+                    c = self.gui.file_object.c
+                except:
+                    c = None
+                return c
             
             memmap_data = np.memmap(self.data_file_path[0], dtype=self.data_dtype)
             data_size = memmap_data.size
