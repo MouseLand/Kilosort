@@ -107,8 +107,8 @@ EXTRA_PARAMETERS = {
         'exclude': [], 'default': 61, 'step': 'data',
         'description':
             """
-            Number of samples per waveform. Also size of symmetric padding
-            for filtering.
+            Number of samples per waveform and the size of symmetric padding
+            for filtering. Note that `nt` must be an odd number.
             """
     },
 

@@ -485,6 +485,8 @@ def initialize_ops(settings, probe, data_dtype, do_CAR, invert_sign,
     """Package settings and probe information into a single `ops` dictionary."""
 
     settings = settings.copy()
+    if settings['nt'] % 2 == 0:
+        raise ValueError(f'`nt` must be odd, but got nt={settings["nt"]}')
     if settings['nt0min'] is None:
         settings['nt0min'] = int(20 * settings['nt']/61)
     if settings['max_channel_distance'] is None:

@@ -1,7 +1,9 @@
 '''Check that configurable parameters are propagated correctly.'''
+import pytest
 
 import numpy as np
 
+from kilosort import run_kilosort
 from kilosort.spikedetect import template_centers
 from kilosort.io import load_probe
 from kilosort.utils import PROBE_DIR
@@ -46,3 +48,14 @@ def test_dmin():
     ops = template_centers(ops)
     assert ops['dmin'] == 5
     assert ops['dminx'] == 7
+
+
+def test_nt(data_directory, torch_device):
+    bin_file = data_directory / 'ZFM-02370_mini.imec0.ap.short.bin'
+    with pytest.raises(ValueError):
+        # nt must be an odd number
+        settings = {'nt': 60, 'n_chan_bin': 385}
+        ops, st, clu, _, _, _, _, _, kept_spikes = run_kilosort(
+            settings={}, filename=bin_file, device=torch_device,
+            probe_name='NeuroPix1_default.mat',
+            )
