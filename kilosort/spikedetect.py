@@ -120,7 +120,7 @@ def template_centers(ops):
         yc_i = yc[shank_idx == i]
         xmin, xmax, ymin, ymax = xc_i.min(), xc_i.max(), yc_i.min(), yc_i.max()
 
-        yup = np.concatenate([yup, np.arange(ymin, ymax+.00001, dmin/2)])
+        yup = np.concatenate([yup, np.arange(ymin, ymax+.01, dmin/2)])
         nx = np.round((xmax - xmin) / (dminx/2)) + 1
         xup = np.concatenate([xup, np.linspace(xmin, xmax, int(nx))])
 
