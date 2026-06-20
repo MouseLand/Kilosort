@@ -1,8 +1,57 @@
 import numpy as np
+import pytest
+import torch
 
-from kilosort.clustering_qr import x_centers
+from kilosort.clustering_qr import assign_iclust, x_centers
 from kilosort.io import load_probe
 from kilosort.utils import PROBE_DIR
+
+
+def _synth_assign_inputs(n_spikes, nsub, nclust, n_neigh, seed, device):
+    """Build a valid, self-consistent input set for ``assign_iclust``.
+
+    Shapes mirror what ``clustering_qr.cluster`` passes: ``rows_neigh`` and
+    ``tones2`` are (n_spikes, n_neigh); ``kn`` indexes the (nsub) graph nodes;
+    ``isub`` is the per-node cluster label; ``ki``/``kj`` are the per-spike and
+    per-node degrees (len(kj) must equal nsub == len(isub)).
+    """
+    g = torch.Generator(device=device).manual_seed(seed)
+    rows_neigh = torch.arange(n_spikes, device=device).unsqueeze(-1).tile((1, n_neigh))
+    tones2 = torch.ones((n_spikes, n_neigh), device=device)
+    kn = torch.randint(0, nsub, (n_spikes, n_neigh), generator=g, device=device)
+    isub = torch.randint(0, nclust, (nsub,), generator=g, device=device)
+    ki = torch.rand(n_spikes, generator=g, device=device) + 0.5
+    kj = torch.rand(nsub, generator=g, device=device) + 0.5
+    m = float(n_spikes * n_neigh)
+    return rows_neigh, isub, kn, tones2, ki, kj, m
+
+
+class TestAssignIclustChunking:
+    """The chunked ``assign_iclust`` path must be identical to the unchunked path."""
+
+    @pytest.mark.parametrize("lam", [0, 1])
+    @pytest.mark.parametrize("chunk", [1, 7, 333, 999, 1000, 1024, 5000, 5001])
+    def test_chunked_matches_unchunked(self, lam, chunk):
+        device = torch.device("cpu")
+        n_spikes, nsub, nclust, n_neigh = 5000, 800, 60, 10
+        rows_neigh, isub, kn, tones2, ki, kj, m = _synth_assign_inputs(
+            n_spikes, nsub, nclust, n_neigh, seed=0, device=device
+        )
+
+        full = assign_iclust(
+            rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj,
+            device=device, chunk=None,
+        )
+        chunked = assign_iclust(
+            rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj,
+            device=device, chunk=chunk,
+        )
+
+        assert chunked.shape == full.shape
+        assert chunked.dtype == full.dtype
+        # chunk >= n_spikes falls through to the fast path; smaller chunks exercise
+        # the row loop (including a ragged final chunk for non-divisor sizes).
+        assert torch.equal(full, chunked)
 
 
 def random_np2(n_chans=384, n_shanks=4):
