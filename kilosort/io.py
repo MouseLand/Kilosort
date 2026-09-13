@@ -48,6 +48,60 @@ def find_binary(data_dir: Union[str, os.PathLike]) -> Path:
     return filenames[0]
 
 
+def load_drift_segments(source):
+    """Load segment start samples for chronic drift correction.
+
+    Parameters
+    ----------
+    source : str, Path, or sequence of int.
+        Path to a text file listing the start sample of each recording segment,
+        separated by whitespace, newlines, or commas. Alternatively the values
+        themselves, which is convenient when running through the API.
+
+    Returns
+    -------
+    starts : np.ndarray
+        Start samples as int64, strictly increasing and beginning at 0.
+
+    """
+
+    if isinstance(source, (str, Path)):
+        path = Path(source)
+        if not path.exists():
+            raise FileExistsError(f"drift segment file '{path}' does not exist")
+        tokens = path.read_text().replace(',', ' ').split()
+        if len(tokens) == 0:
+            raise ValueError(f'No segment starts found in {path}')
+        try:
+            values = np.array([float(tok) for tok in tokens])
+        except ValueError as e:
+            raise ValueError(
+                f'Could not parse segment starts from {path}. Expected sample '
+                'indices separated by whitespace, newlines, or commas.'
+                ) from e
+    else:
+        values = np.asarray(source, dtype='float64').ravel()
+        if values.size == 0:
+            raise ValueError('No segment starts given.')
+
+    if np.any(values != np.round(values)):
+        raise ValueError('Segment starts must be integer sample indices.')
+    starts = values.astype('int64')
+
+    if np.any(starts < 0):
+        raise ValueError('Segment starts must be non-negative.')
+    if np.any(np.diff(starts) <= 0):
+        raise ValueError('Segment starts must be strictly increasing.')
+    if starts[0] != 0:
+        logger.warning(
+            f'First segment start was {starts[0]}, not 0. Prepending 0 so that '
+            'the data before it forms its own segment.'
+            )
+        starts = np.concatenate([[0], starts])
+
+    return starts
+
+
 def load_probe(probe_path):
     """Load a .mat probe file from Kilosort2, or a PRB file and returns a dictionary
     
@@ -983,6 +1037,9 @@ class BinaryFiltered(BinaryRWFile):
         self.whiten_mat = whiten_mat
         self.hp_filter = hp_filter
         self.dshift = dshift
+        # Cache of `M @ whiten_mat` keyed by segment, only used in chronic
+        # drift mode where every batch of a segment has the same shift.
+        self._drift_cache = {}
         self.do_CAR = do_CAR
         self.invert_sign=invert_sign
         self.artifact_threshold = artifact_threshold
@@ -1018,12 +1075,31 @@ class BinaryFiltered(BinaryRWFile):
         # whitening, with optional drift correction
         if self.whiten_mat is not None:
             if self.dshift is not None and ops is not None and ibatch is not None:
-                M = get_drift_matrix(ops, self.dshift[ibatch], device=self.device)
-                #logger.info(M.dtype, X.dtype, self.whiten_mat.dtype)
-                X = (M @ self.whiten_mat) @ X
+                X = self._drift_whiten(ops, ibatch) @ X
             else:
                 X = self.whiten_mat @ X
         return X
+
+    def _drift_whiten(self, ops, ibatch):
+        """Combined drift correction and whitening matrix for one batch.
+
+        In chronic drift mode every batch within a segment has the same shift,
+        so the matrix only needs to be computed once per segment.
+
+        """
+        row = self.dshift[ibatch]
+        seg = ops.get('batch_to_segment', None)
+        if seg is None:
+            # Standard per-batch drift, every batch has a different shift.
+            return get_drift_matrix(ops, row, device=self.device) @ self.whiten_mat
+
+        key = int(seg[ibatch])
+        MW = self._drift_cache.get(key, None)
+        if MW is None:
+            MW = get_drift_matrix(ops, row, device=self.device) @ self.whiten_mat
+            self._drift_cache[key] = MW
+
+        return MW
 
     def __getitem__(self, *items):
         samples = super().__getitem__(*items)

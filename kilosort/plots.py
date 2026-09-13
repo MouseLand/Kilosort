@@ -33,12 +33,85 @@ def plot_drift_amount(ops, results_dir, tmin=0):
         color = COLOR_CODES[i % len(COLOR_CODES)]
         ax.plot(t, dshift[:,i], c=color)
 
+    for b in _segment_boundaries(ops, t):
+        ax.axvline(b, c='gray', ls='--', lw=0.75)
+
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Depth shift (um)')
     fig.suptitle('Drift amount per probe section, across batches')
     fig.tight_layout()
 
     save_path = results_dir / 'drift_amount.png'
+    fig.savefig(save_path, dpi=300)
+    plt.style.use('default')
+    plt.close(fig)
+
+
+def _segment_boundaries(ops, t):
+    """Segment start times in seconds, for chronic drift mode.
+
+    Returns an empty list when chronic drift mode was not used. The first
+    segment starts at the beginning of the data, so it is not marked.
+
+    """
+    if ops.get('batch_to_segment', None) is None:
+        return []
+
+    fs = ops['settings']['fs']
+    starts = np.asarray(ops['drift_segment_starts_used'])/fs
+    return [s for s in starts[1:] if t[0] < s < t[-1]]
+
+
+def plot_chronic_drift(ops, results_dir, tmin=0):
+    """Plot per-segment drift and the residual within each segment.
+
+    Only meaningful when chronic drift mode was used, i.e. when
+    `drift_segment_starts` was specified.
+
+    """
+    plt.style.use('dark_background')
+    dshift = ops['dshift']
+    settings = ops['settings']
+    fs = settings['fs']
+    NT = settings['batch_size']
+    t = np.arange(dshift.shape[0])*(NT/fs) + tmin
+    boundaries = _segment_boundaries(ops, t)
+    residual = ops.get('drift_residual', None)
+
+    nrows = 1 if residual is None else 2
+    fig, axes = plt.subplots(nrows, 1, figsize=(12, 4*nrows), sharex=True,
+                             squeeze=False)
+    axes = axes[:,0]
+
+    ax = axes[0]
+    for i in range(dshift.shape[1]):
+        color = COLOR_CODES[i % len(COLOR_CODES)]
+        ax.plot(t, dshift[:,i], c=color, label=f'block {i}')
+    for b in boundaries:
+        ax.axvline(b, c='gray', ls='--', lw=0.75)
+    ax.set_ylabel('Depth shift (um)')
+    ax.set_title('Drift per segment, constant within each segment')
+    if dshift.shape[1] <= 10:
+        ax.legend(loc='upper right', fontsize=7, ncol=2)
+
+    if residual is not None:
+        ax = axes[1]
+        tr = ops['drift_residual_batches']*(NT/fs) + tmin
+        for i in range(residual.shape[1]):
+            color = COLOR_CODES[i % len(COLOR_CODES)]
+            ax.plot(tr, residual[:,i], c=color, lw=0.5, alpha=0.7)
+        dd = settings['binning_depth']
+        ax.axhspan(-dd, dd, color='w', alpha=0.12, zorder=0)
+        for b in boundaries:
+            ax.axvline(b, c='gray', ls='--', lw=0.75)
+        ax.set_ylabel('Residual shift (um)')
+        ax.set_title('Within-segment residual drift '
+                     f'(shaded band: +/- binning_depth = {dd} um)')
+
+    axes[-1].set_xlabel('Time (s)')
+    fig.tight_layout()
+
+    save_path = results_dir / 'drift_segments.png'
     fig.savefig(save_path, dpi=300)
     plt.style.use('default')
     plt.close(fig)

@@ -971,7 +971,8 @@ def _check_parameter(sender_obj, main_obj, k, p):
             v = None
         else:
             v = _str_to_type(value, p['type'])
-            if isinstance(v, bool) or isinstance(v, list):
+            if isinstance(v, (bool, list, str)):
+                # No numeric range to check for these.
                 pass
             else:
                 assert v >= p['min']

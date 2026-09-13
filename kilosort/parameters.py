@@ -215,10 +215,48 @@ EXTRA_PARAMETERS = {
         'description':
             """
             Amount of gaussian smoothing to apply to the spatiotemporal drift
-            estimation, for correlation, time (units of registration blocks),
-            and y (units of batches) axes. The y smoothing has no effect
-            for `nblocks = 1`. Adjusting smoothing for the correlation axis
-            is not recommended.
+            estimation, for the correlation, time (units of batches), and
+            y (units of registration blocks) axes. The y smoothing has no
+            effect for `nblocks = 1`. Adjusting smoothing for the correlation
+            axis is not recommended.
+
+            The time axis is ignored when `drift_segment_starts` is set, since
+            a shift between two segments is a step rather than noise.
+            """
+    },
+
+    'drift_segment_starts': {
+        'gui_name': 'drift segment starts', 'type': str, 'min': None,
+        'max': None, 'exclude': [], 'default': None, 'step': 'preprocessing',
+        'description':
+            """
+            Path to a text file listing the start sample of each recording
+            segment, for example one per day of a concatenated chronic
+            recording, separated by whitespace, newlines, or commas. Sample
+            indices are relative to the start of the data, and are independent
+            of `tmin` and `tmax`. If the first value is not 0, a 0 is prepended.
+
+            When set, drift is estimated once per segment instead of once per
+            batch: the vertical shift is held constant within each segment,
+            while remaining non-rigid across depth according to `nblocks`. This
+            is intended for chronic recordings where day-to-day shifts dominate
+            and within-day drift is negligible. Leave as None for the standard
+            per-batch drift correction.
+
+            When running through the API, a list of integers may be given
+            instead of a file path.
+            """
+    },
+
+    'drift_segment_diagnostics': {
+        'gui_name': 'drift segment diagnostics', 'type': bool, 'min': None,
+        'max': None, 'exclude': [], 'default': True, 'step': 'preprocessing',
+        'description':
+            """
+            When `drift_segment_starts` is set, also estimate the residual
+            per-batch shift within each segment and report it. This checks the
+            assumption that drift is constant within a segment. Has no effect
+            otherwise.
             """
     },
 
