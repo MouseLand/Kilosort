@@ -53,8 +53,14 @@ def bimod_score(xproj):
 def check_CCG(st1, st2=None, nbins = 500, tbin  = 1/1000):
     if st2 is None:
         st2 = st1.copy()
+    # Empty trains must be checked before compute_CCG (it calls .max() on
+    # both arrays). len(st2) == 0, not len(st2 == 0): the latter is the size
+    # of a boolean array, which is truthy for every non-empty st2 and made
+    # this guard fire on all real inputs, disabling the refractoriness gate.
+    if len(st1) == 0 or len(st2) == 0:
+        return False, False
     K , T = compute_CCG(st1, st2, nbins = nbins, tbin = tbin)
-    if len(st1) == 0 or len(st2 == 0) or T == 0:
+    if T == 0:
         return False, False
     R12, Q12, Q00 = CCG_metrics(st1, st2, K, T,  nbins = nbins, tbin = tbin)
     is_refractory    = R12<.1  and (Q12<.2  or Q00<.25)
