@@ -835,6 +835,12 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
    
     log_thread_count(logger)
 
+    # Free large intermediates before template matching
+    del st0, tF
+    import gc
+    gc.collect()
+    torch.cuda.empty_cache()
+
     tic = time.time()
     logger.info(' ')
     logger.info('Extracting spikes using cluster waveforms')

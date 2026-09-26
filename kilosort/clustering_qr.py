@@ -442,14 +442,16 @@ def run(ops, st, tF, mode='template', device=torch.device('cuda'),
     Nfilt = None
     nearby_chans_empty = 0
     nmax = 0
-    prog = tqdm(np.arange(len(xcent)), miniters=20 if progress_bar else None,
+    n_total = len(xcent) * len(ycent)
+    prog = tqdm(total=n_total, miniters=20 if progress_bar else None,
                 mininterval=10 if progress_bar else None)
     t = 0
     v = False
-    
+
     try:
-        for jj in prog:
+        for jj in np.arange(len(xcent)):
             for kk in np.arange(len(ycent)):
+                prog.update(1)
                 # Get data for all templates that were closest to this x,y center.
                 ii = kk + jj*ycent.size
                 if ii not in nearest_center:
@@ -541,6 +543,8 @@ def run(ops, st, tF, mode='template', device=torch.device('cuda'),
             logger.debug('iclust not yet assigned')
             pass
         raise
+    finally:
+        prog.close()
 
     if nearby_chans_empty == total_centers:
         raise ValueError(
