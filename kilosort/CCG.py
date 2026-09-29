@@ -107,9 +107,13 @@ def refract(iclust2, st0, acg_threshold=0.2, ccg_threshold=0.25):
 
     is_refractory    = np.zeros(Nfilt, )
     cross_refractory = np.zeros(Nfilt, )
-    R12 = np.zeros(Nfilt, )
+    # Clusters that are too small (or too short-lived) to evaluate keep the
+    # default contamination of 1, so they export as ContamPct = 100 rather
+    # than 0 (the best possible score). This matches Kilosort 2.5/3, where
+    # est_contam_rate defaulted to 1 for units that could not be evaluated.
+    R12 = np.ones(Nfilt, )
 
-    for kk in range(Nfilt):    
+    for kk in range(Nfilt):
         ix = iclust2==kk
         st1 = st0[ix]
 
