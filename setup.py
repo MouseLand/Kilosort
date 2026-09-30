@@ -99,6 +99,9 @@ setup(
     ],
     entry_points={
         'console_scripts': [
+        ],
+        'gui_scripts': [
+            'kilosort-gui = kilosort.gui.launch:launcher',
         ]
     }
 )
