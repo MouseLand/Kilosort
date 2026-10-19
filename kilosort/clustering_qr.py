@@ -69,6 +69,8 @@ def neigh_mat(Xd, nskip=1, n_neigh=10, max_sub=25000):
 def assign_iclust(rows_neigh, isub, kn, tones2, nclust, lam, m, ki, kj,
                   device=torch.device('cuda'), chunk=None):
     n_spikes = kn.shape[0]
+    if chunk is not None and chunk < 1:
+        raise ValueError(f'`chunk` must be None or a positive integer, but got {chunk!r}')
 
     # Single-shot path: Used when chunking is disabled (chunk is None) or the center is already small.
     if chunk is None or n_spikes <= chunk:
