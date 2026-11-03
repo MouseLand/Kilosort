@@ -102,16 +102,28 @@ def make_pc_features(ops, spike_templates, spike_clusters, tF):
     n_chans = ops['nearest_chans']
     feature_ind = np.zeros((n_clusters, n_chans), dtype=np.uint32)
 
-    for i in np.unique(spike_clusters):
+    # Spike indices of each cluster, in increasing order.
+    order = np.argsort(spike_clusters, kind='stable')
+    clusters, starts = np.unique(spike_clusters[order], return_index=True)
+    bounds = np.append(starts, order.size)
+
+    for i, a, b in zip(clusters, bounds[:-1], bounds[1:]):
+        # Only this cluster's own spikes. A template's spikes can be split
+        # across several clusters, so selecting by template would also pick
+        # up (and overwrite) spikes of other clusters, which Phy then reads
+        # with the wrong channel indices. Each spike is read and written
+        # exactly once, by its own cluster.
+        own = torch.from_numpy(order[a:b])
+        own_templates = spike_templates[order[a:b]]
         # Get templates associated with cluster (often just 1)
-        iunq = np.unique(spike_templates[spike_clusters==i]).astype(int)
+        iunq = np.unique(own_templates).astype(int)
         # Get boolean mask with size (n_templates,), True if they match cluster
         ix = torch.from_numpy(np.zeros(n_templates, bool))
         ix[iunq] = True
-        # Get PC features for all spikes detected with those templates (Xd),
-        # and the indices in tF where those spikes occur (igood).
+        # Get PC features of the cluster's spikes on the union of their
+        # templates' channels (Xd), and their indices within `own` (igood).
         Xd, igood, ichan = get_data_cpu(
-            ops, xy, iC, spike_templates, tF, None, None,
+            ops, xy, iC, own_templates, tF[own], None, None,
             dmin=ops['dmin'], dminx=ops['dminx'], ix=ix, merge_dim=False
             )
 
@@ -120,7 +132,7 @@ def make_pc_features(ops, spike_templates, spike_clusters, tF):
         chan_norm = torch.linalg.norm(spike_mean, dim=1)
         sorted_chans, ind = torch.sort(chan_norm, descending=True)
         # Assign features to overwrite tF in-place
-        tF[igood,:] = Xd[:, ind[:n_chans], :]
+        tF[own[igood],:] = Xd[:, ind[:n_chans], :]
         # Save channel inds for phy
         feature_ind[i,:] = ichan[ind[:n_chans]].cpu().numpy()
 
