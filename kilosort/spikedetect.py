@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import TruncatedSVD
 from tqdm import tqdm
 
-from kilosort.utils import template_path, log_performance
+from kilosort.utils import template_path, log_performance, BlockBuffer
 
 
 def my_max2d(X, dt):
@@ -197,7 +197,14 @@ def yweighted(yc, iC, adist, xy, device=torch.device('cuda')):
     return yct
 
 def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
-        clear_cache=False, verbose=False):        
+        clear_cache=False, verbose=False, save_features=True):
+    """Detect spikes with the universal templates.
+
+    If `save_features` is False, PC features are not collected and `tF` is
+    returned as None. Drift estimation only needs `st`, and the features
+    (nearest_chans * n_pcs floats per spike) are the largest array here.
+
+    """
     sig = ops['settings']['min_template_size']
     nsizes = ops['settings']['template_sizes']
     nb = ops['Nbatches']
@@ -242,8 +249,12 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
     weigh = torch.permute(weigh, (2, 0, 1)).contiguous()
     weigh = weigh / (weigh**2).sum(1).unsqueeze(1)**.5
 
-    st = np.zeros((10**6, 6), 'float64')
-    tF = np.zeros((10**6, nC , ops['settings']['n_pcs']), 'float32')
+    # Per-batch results are collected in block buffers and assembled once at
+    # the end. Growing a preallocated buffer by doubling briefly needs ~4x the
+    # final size, and leaves up to 2x allocated after trimming.
+    n_pcs = ops['settings']['n_pcs']
+    st_buf = BlockBuffer((6,), 'float64')
+    tF_buf = BlockBuffer((nC, n_pcs), 'float32') if save_features else None
 
     k = 0
     nt = ops['nt']
@@ -263,21 +274,20 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
             yct = yweighted(yc, iC, adist, xy, device=device)
             nsp = len(xy)
 
-            if k+nsp>st.shape[0]:
-                st = np.concatenate((st, np.zeros_like(st)), 0)
-                tF = np.concatenate((tF, np.zeros_like(tF)), 0)
+            if save_features:
+                xsub = X[iC[:,xy[:,:1]], xy[:,1:2] + tarange]
+                xfeat = xsub @ ops['wPCA'].T
+                tF_buf.append(xfeat.transpose(0,1).cpu().numpy())
 
-            xsub = X[iC[:,xy[:,:1]], xy[:,1:2] + tarange]
-            xfeat = xsub @ ops['wPCA'].T
-            tF[k:k+nsp] = xfeat.transpose(0,1).cpu().numpy()
-
+            stb = np.zeros((nsp, 6), 'float64')
             t_shift = ibatch * bfile.batch_downsampling * (ops['batch_size']/ops['fs'])
-            st[k:k+nsp,0] = ((xy[:,1].cpu().numpy()-nt)/ops['fs'] + t_shift)
-            st[k:k+nsp,1] = yct.cpu().numpy()
-            st[k:k+nsp,2] = amp.cpu().numpy()
-            st[k:k+nsp,3] = imax.cpu().numpy()
-            st[k:k+nsp,4] = ibatch
-            st[k:k+nsp,5] = xy[:,0].cpu().numpy()
+            stb[:,0] = ((xy[:,1].cpu().numpy()-nt)/ops['fs'] + t_shift)
+            stb[:,1] = yct.cpu().numpy()
+            stb[:,2] = amp.cpu().numpy()
+            stb[:,3] = imax.cpu().numpy()
+            stb[:,4] = ibatch
+            stb[:,5] = xy[:,0].cpu().numpy()
+            st_buf.append(stb)
 
             k = k + nsp
             if clear_cache:
@@ -299,8 +309,8 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
             
     log_performance(logger, 'debug', f'Batch {ibatch} of {nb-1} ({100*(ibatch/nb):.1f}%)')
 
-    st = st[:k]
-    tF = tF[:k]
+    st = st_buf.finalize()
+    tF = tF_buf.finalize() if save_features else None
     ops['iC'] = iC
     ops['iC2'] = iC2
     ops['weigh'] = weigh

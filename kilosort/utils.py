@@ -19,6 +19,85 @@ if importlib.util.find_spec('pynvml') is not None:
 else:
     _NVML_EXISTS = False
 
+class BlockBuffer:
+    """Append-only array of rows, stored in large fixed-size numpy blocks.
+
+    Used to collect per-batch spike data whose total size is not known in
+    advance. Compared with growing one buffer by doubling, this never copies
+    while appending (doubling briefly needs ~4x the final size), and
+    `finalize` frees each block right after copying it, so peak memory is the
+    output plus one block.
+
+    The blocks are deliberately numpy (not torch) allocations: on Windows,
+    PyTorch's CPU allocator keeps freed memory reserved for a while, so freeing
+    torch blocks during `finalize` would not lower the peak.
+
+    Parameters
+    ----------
+    tail_shape : tuple
+        Shape of each row.
+    dtype : np.dtype
+        Storage dtype; appended rows are cast to it.
+    block_bytes : int; default=2**27 (128 MiB).
+        Approximate size of each block.
+
+    """
+
+    def __init__(self, tail_shape, dtype, block_bytes=2**27):
+        self.tail_shape = tuple(tail_shape)
+        self.dtype = np.dtype(dtype)
+        row_bytes = max(1, int(np.prod(self.tail_shape)) * self.dtype.itemsize)
+        self.block_rows = max(1, int(block_bytes) // row_bytes)
+        self.blocks = []
+        self.n = 0
+
+    def __len__(self):
+        return self.n
+
+    def append(self, x):
+        """Append rows `x` (numpy array or CPU torch tensor), shape (n, *tail_shape)."""
+        x = np.asarray(x)
+        j = 0
+        while j < x.shape[0]:
+            fill = self.n - (len(self.blocks) - 1) * self.block_rows
+            if not self.blocks or fill == self.block_rows:
+                self.blocks.append(
+                    np.empty((self.block_rows, *self.tail_shape), self.dtype)
+                    )
+                fill = 0
+            m = min(self.block_rows - fill, x.shape[0] - j)
+            self.blocks[-1][fill:fill+m] = x[j:j+m]
+            self.n += m
+            j += m
+
+    def finalize(self, dest_index=None):
+        """Return all rows as one contiguous array and empty the buffer.
+
+        Parameters
+        ----------
+        dest_index : np.ndarray; optional.
+            If given, row i is written to `out[dest_index[i]]` (a permutation
+            of range(len(self))). Equivalent to `out = out[isort]` with
+            `dest_index[isort] = arange(len(self))`, without an extra copy.
+
+        """
+        out = np.empty((self.n, *self.tail_shape), self.dtype)
+        k = 0
+        for i in range(len(self.blocks)):
+            b = self.blocks[i]
+            self.blocks[i] = None
+            m = min(self.block_rows, self.n - k)
+            if dest_index is None:
+                out[k:k+m] = b[:m]
+            else:
+                out[dest_index[k:k+m]] = b[:m]
+            k += m
+            del b
+        self.blocks = []
+        self.n = 0
+        return out
+
+
 _DOWNLOADS_DIR_ENV = os.environ.get("KILOSORT_LOCAL_DOWNLOADS_PATH")
 _DOWNLOADS_DIR_DEFAULT = pathlib.Path.home().joinpath('.kilosort')
 DOWNLOADS_DIR = pathlib.Path(_DOWNLOADS_DIR_ENV) if _DOWNLOADS_DIR_ENV else _DOWNLOADS_DIR_DEFAULT
