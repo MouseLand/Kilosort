@@ -245,6 +245,78 @@ def select_shank(probe, shank_idx):
     return probe
 
 
+def save_pc_features(filename, ops, spike_templates, spike_clusters, tF,
+                     kept_spikes, chunk_size=2**18):
+    """Compute Phy's PC features and save them to `filename` (.npy).
+
+    Writes the same file as::
+
+        pc_features, ind = make_pc_features(ops, spike_templates,
+                                            spike_clusters, tF[kept_spikes])
+        np.save(filename, pc_features)
+
+    but `make_pc_features` works directly on a memory-mapped copy of the
+    output file instead of on `tF[kept_spikes]` in RAM, which for long
+    recordings is a copy of the largest array in the pipeline. `tF` itself is
+    not modified.
+
+    Parameters
+    ----------
+    filename : str or pathlib.Path
+        Path of the .npy file to write.
+    ops : dict
+        Dictionary storing settings and results for all algorithmic steps.
+    spike_templates, spike_clusters : np.ndarray
+        Template and cluster id of each kept spike, as passed to
+        `kilosort.postprocessing.make_pc_features`.
+    tF : torch.Tensor
+        PC features for all spikes, with shape (n_spikes, nearest_chans, n_pcs).
+    kept_spikes : np.ndarray
+        Boolean mask with shape (n_spikes,) of the spikes to export.
+    chunk_size : int; default=2**18.
+        Number of spikes copied into the output file at a time.
+
+    Returns
+    -------
+    pc_feature_ind : np.ndarray
+        Channel indices associated with the features of each cluster, as
+        returned by `make_pc_features`.
+
+    """
+    kept_idx = np.flatnonzero(kept_spikes)
+    if kept_idx.size == 0:
+        # Nothing to map; keep the original in-memory path for this edge case.
+        pc_features, pc_feature_ind = make_pc_features(
+            ops, spike_templates, spike_clusters, tF[kept_spikes]
+            )
+        np.save(filename, pc_features)
+        return pc_feature_ind
+
+    n_chans, n_pcs = tF.shape[1], tF.shape[2]
+    dtype = torch.empty(0, dtype=tF.dtype).numpy().dtype
+    # Phy expects shape (n_spikes, n_pcs, nearest_chans), which is what
+    # np.save writes for `make_pc_features` output.
+    mm = np.lib.format.open_memmap(
+        filename, mode='w+', dtype=dtype, shape=(kept_idx.size, n_pcs, n_chans)
+        )
+    try:
+        # View of the file with tF's (n_spikes, nearest_chans, n_pcs) layout.
+        feats = torch.from_numpy(mm).permute(0, 2, 1)
+        for i in range(0, kept_idx.size, chunk_size):
+            idx = torch.from_numpy(kept_idx[i:i+chunk_size]).to(tF.device)
+            feats[i:i+chunk_size] = tF[idx].cpu()
+        feats, pc_feature_ind = make_pc_features(
+            ops, spike_templates, spike_clusters, feats
+            )
+        del feats
+        mm.flush()
+    finally:
+        # Close the mapping (the tensor views above hold references to it).
+        del mm
+
+    return pc_feature_ind
+
+
 def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
                 data_dtype=None, save_extra_vars=False,
                 save_preprocessed_copy=False, skip_dat_path=False):
@@ -389,13 +461,10 @@ def save_to_phy(st, clu, tF, Wall, probe, ops, imin, results_dir=None,
     if save_extra_vars:
         # Save tF first since it gets updated in-place
         np.save(results_dir / 'tF.npy', tF.cpu().numpy())
-    # This will momentarily copy tF which is pretty large, but it's on CPU
-    # so the extra memory hopefully won't be an issue.
-    tF = tF[kept_spikes]
-    pc_features, pc_feature_ind = make_pc_features(
-        ops, spike_templates, spike_clusters, tF
+    pc_feature_ind = save_pc_features(
+        results_dir / 'pc_features.npy', ops, spike_templates, spike_clusters,
+        tF, kept_spikes
         )
-    np.save(results_dir / 'pc_features.npy', pc_features)
     np.save(results_dir / 'pc_feature_ind.npy', pc_feature_ind)
     log_performance(logger, level='debug', header='save_to_phy, pc features',
                     reset=True)

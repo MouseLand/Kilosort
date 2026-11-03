@@ -30,7 +30,7 @@ def remove_duplicates(spike_times, spike_clusters, dt=15):
     return spike_times[keep], spike_clusters[keep], keep
 
 
-def compute_spike_positions(st, tF, ops):
+def compute_spike_positions(st, tF, ops, chunk_size=2**18):
     '''Get x,y positions of spikes relative to probe.'''
     # Determine channel weightings for nearest channels
     # based on norm of PC features. Channels that are far away have 0 weight,
@@ -41,23 +41,41 @@ def compute_spike_positions(st, tF, ops):
     icc_mask = ops['iCC_mask'].to(cpu)
     iU = ops['iU'].to(cpu)
     iCC = ops['iCC'].to(cpu)
-
-    # Weightings from norm of temporal features
-    tmass = torch.norm(tF, 2, dim=-1)
-    tmask = icc_mask[:, iU[st[:,1]]].T
-    tmass = tmass * tmask
-    tmass = tmass / tmass.sum(1, keepdim=True)
-
-    # Get x,y coordinates of nearest channels.
     xc = torch.from_numpy(ops['xc'])
     yc = torch.from_numpy(ops['yc'])
-    chs = iCC[:, iU[st[:,1]]]
-    xc0 = xc[chs.T]
-    yc0 = yc[chs.T]
 
-    # Estimate spike positions as weighted sum of coordinates of nearby channels.
-    xs = (xc0 * tmass).sum(1).numpy()
-    ys = (yc0 * tmass).sum(1).numpy()
+    # Each spike's position only depends on its own row, so process spikes in
+    # chunks: the intermediate (n_spikes, nearest_chans) arrays below would
+    # otherwise take several times the memory of tF itself.
+    # Chunks are kept a multiple of 1024 spikes: torch's vectorized row
+    # reductions handle the last few rows of an array differently, so with
+    # arbitrary chunk boundaries results could differ in the last bit from
+    # processing all spikes at once.
+    chunk_size = -(-max(int(chunk_size), 1) // 1024) * 1024
+    n_spikes = st.shape[0]
+    xs, ys = [], []
+    for i in range(0, max(n_spikes, 1), chunk_size):
+        st_i = st[i:i+chunk_size]
+        tF_i = tF[i:i+chunk_size]
+
+        # Weightings from norm of temporal features
+        tmass = torch.norm(tF_i, 2, dim=-1)
+        tmask = icc_mask[:, iU[st_i[:,1]]].T
+        tmass = tmass * tmask
+        tmass = tmass / tmass.sum(1, keepdim=True)
+
+        # Get x,y coordinates of nearest channels.
+        chs = iCC[:, iU[st_i[:,1]]]
+        xc0 = xc[chs.T]
+        yc0 = yc[chs.T]
+
+        # Estimate spike positions as weighted sum of coordinates of nearby
+        # channels.
+        xs.append((xc0 * tmass).sum(1).numpy())
+        ys.append((yc0 * tmass).sum(1).numpy())
+
+    xs = np.concatenate(xs) if len(xs) > 1 else xs[0]
+    ys = np.concatenate(ys) if len(ys) > 1 else ys[0]
 
     return xs, ys
 
