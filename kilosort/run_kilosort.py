@@ -303,6 +303,9 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
                 if ops.get('batch_to_segment', None) is not None:
                     kplots.plot_chronic_drift(ops, results_dir,
                                               tmin=settings['tmin'])
+        # Drift-pass spikes are only needed for the plots above; don't keep
+        # them in memory for the rest of the run.
+        del st0
 
         # Sort spikes and save results
         st,tF, Wall0, clu0 = detect_spikes(
@@ -320,6 +323,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             gui_sorter.plotDataReady.emit('diagnostics')
         else:
             kplots.plot_diagnostics(Wall0, clu0, ops, results_dir)
+        del Wall0, clu0
 
         clu, Wall, st, tF = cluster_spikes(
             st, tF, ops, device, bfile, tic0=tic0, progress_bar=progress_bar,
@@ -876,6 +880,10 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     Wall3 = template_matching.postprocess_templates(
         Wall, ops, clu, st0, tF, device=device
         )
+    # Spikes and features from the universal templates are no longer needed.
+    # Free them before template matching builds the new (larger) set, instead
+    # of holding both until this function returns.
+    del st0, tF
 
     elapsed = time.time() - tic
     total = time.time() - tic0

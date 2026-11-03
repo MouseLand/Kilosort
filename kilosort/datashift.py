@@ -1079,10 +1079,11 @@ def run(ops, bfile, device=torch.device('cuda'), progress_bar=None,
         logger.info('nblocks = 0, skipping drift correction')
         return ops, None
 
-    # the first step is to extract all spikes using the universal templates
+    # the first step is to extract all spikes using the universal templates.
+    # PC features are not needed for drift estimation, so don't store them.
     st, _, ops  = spikedetect.run(
         ops, bfile, device=device, progress_bar=progress_bar,
-        clear_cache=clear_cache, verbose=verbose
+        clear_cache=clear_cache, verbose=verbose, save_features=False
         )
 
     segment_starts = ops.get('drift_segment_starts', None)
