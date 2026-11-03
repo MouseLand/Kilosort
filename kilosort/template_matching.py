@@ -1,5 +1,6 @@
 import logging
 
+from numba import njit
 import numpy as np
 import torch 
 from torch.nn.functional import conv1d, max_pool2d, max_pool1d
@@ -265,6 +266,10 @@ def merging_function(ops, Wall, clu, st, tF, r_thresh=0.5, mode='ccg', check_dt=
     If `reorder` is False, the returned `st`, `clu` and `tF` are not re-sorted
     by spike time; use this when only the merged templates are needed.
 
+    Note that `st` and `tF` are modified in place (spike-time shifts, feature
+    rolling and the final re-sort), so the passed-in arrays should not be
+    reused afterwards.
+
     """
     clu2 = clu.copy()
     clu_unq, ns = np.unique(clu2, return_counts = True)
@@ -374,13 +379,65 @@ def merging_function(ops, Wall, clu, st, tF, r_thresh=0.5, mode='ccg', check_dt=
         # Shifting spike times by `dt` above can change their order. If it
         # didn't, skip the copies (tF is the largest array in the pipeline).
         if not np.array_equal(sorted_idx, np.arange(sorted_idx.size)):
-            st = np.take_along_axis(st, sorted_idx[..., np.newaxis], axis=0)
+            # Same result as `st[sorted_idx]` and `tF[sorted_idx]`, but done
+            # in place: the caller still holds the unsorted arrays, so a
+            # gather would keep two full copies of tF alive at once.
+            st = permute_rows(st, sorted_idx)
             clu2 = clu2[sorted_idx]
-            tensor_idx = torch.from_numpy(sorted_idx)
-            tF = tF[tensor_idx]
+            tF = permute_rows(tF, sorted_idx)
 
     return Ww.cpu(), clu2, is_ref, st, tF
 
+
+@njit
+def _permute_rows_inplace(a, order):
+    """Set a[j] = a_old[order[j]] for every j by following permutation cycles,
+    using one row of scratch memory."""
+    n = a.shape[0]
+    done = np.zeros(n, np.bool_)
+    tmp = np.empty(a.shape[1], a.dtype)
+    for i in range(n):
+        if done[i]:
+            continue
+        done[i] = True
+        if order[i] == i:
+            continue
+        tmp[:] = a[i, :]
+        j = i
+        while True:
+            k = order[j]
+            if k == i:
+                a[j, :] = tmp
+                break
+            a[j, :] = a[k, :]
+            done[k] = True
+            j = k
+
+
+def permute_rows(x, order):
+    """Return `x[order]` for a permutation `order`, reordering `x` in place
+    when possible.
+
+    `x` is a numpy array or a CPU torch tensor. If `x` is not contiguous (or
+    is on GPU), a reordered copy is returned instead and `x` is not modified.
+
+    """
+    order = np.asarray(order, dtype=np.int64)
+    if x.shape[0] != order.size:
+        raise ValueError('`order` must have one entry per row of `x`.')
+    if order.size == 0:
+        return x
+    if isinstance(x, torch.Tensor):
+        if x.device.type != 'cpu' or not x.is_contiguous() or x.requires_grad:
+            return x[torch.from_numpy(order).to(x.device)]
+        rows = x.view(x.shape[0], -1).numpy()
+    else:
+        if not x.flags.c_contiguous or not x.flags.writeable:
+            return x[order]
+        rows = x.reshape(x.shape[0], -1)
+    if rows.shape[0] > 0 and rows.shape[1] > 0:
+        _permute_rows_inplace(rows, order)
+    return x
 
 
 def _roll_with_edge(x, dt):
