@@ -339,7 +339,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
                 save_preprocessed_copy=save_preprocessed_copy,
                 skip_dat_path=(file_object is not None)
                 )
-        if torch.cuda.is_available():
+        if torch.device(device).type == 'cuda':
             ops['cuda_postproc'] = torch.cuda.memory_stats(device)
 
         log_thread_count(logger)
@@ -857,7 +857,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     total = time.time() - tic0
     ops['runtime_st0'] = elapsed
     ops['usage_st0'] = get_performance()
-    if torch.cuda.is_available():
+    if torch.device(device).type == 'cuda':
         ops['cuda_st0'] = torch.cuda.memory_stats(device)
     logger.info(f'{len(st0)} spikes extracted in {elapsed:.2f}s; ' + 
                 f'total {total:.2f}s')
@@ -889,7 +889,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     total = time.time() - tic0
     ops['runtime_clu0'] = elapsed
     ops['usage_clu0'] = get_performance()
-    if torch.cuda.is_available():
+    if torch.device(device).type == 'cuda':
         ops['cuda_clu0'] = torch.cuda.memory_stats(device)
     logger.info(f'{clu.max()+1} clusters found, in {elapsed:.2f}s; ' +
                 f'total {total:.2f}s')
@@ -914,7 +914,7 @@ def detect_spikes(ops, device, bfile, tic0=np.nan, progress_bar=None,
     total = time.time() - tic0
     ops['runtime_st'] = elapsed
     ops['usage_st'] = get_performance()
-    if torch.cuda.is_available():
+    if torch.device(device).type == 'cuda':
         ops['cuda_st'] = torch.cuda.memory_stats(device)
     logger.info(f'{len(st)} spikes extracted in {elapsed:.2f}s; ' +
                 f'total {total:.2f}s')
@@ -981,7 +981,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     total = time.time() - tic0
     ops['runtime_clu'] = elapsed
     ops['usage_clu'] = get_performance()
-    if torch.cuda.is_available():
+    if torch.device(device).type == 'cuda':
         ops['cuda_clu'] = torch.cuda.memory_stats(device)
     logger.info(f'{clu.max()+1} clusters found, in {elapsed:.2f}s; ' + 
                 f'total {total:.2f}s')
@@ -1002,7 +1002,7 @@ def cluster_spikes(st, tF, ops, device, bfile, tic0=np.nan, progress_bar=None,
     total = time.time() - tic0
     ops['runtime_merge'] = elapsed
     ops['usage_merge'] = get_performance()
-    if torch.cuda.is_available():
+    if torch.device(device).type == 'cuda':
         ops['cuda_merge'] = torch.cuda.memory_stats(device)
     logger.info(f'{clu.max()+1} units found, in {elapsed:.2f}s; ' + 
                 f'total {total:.2f}s')
