@@ -1,12 +1,13 @@
 import logging
 
+from numba import njit
 import numpy as np
 import torch 
 from torch.nn.functional import conv1d, max_pool2d, max_pool1d
 from tqdm import tqdm
 
 from kilosort import CCG
-from kilosort.utils import log_performance
+from kilosort.utils import log_performance, BlockBuffer
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +67,13 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
     
     tiwave = torch.arange(-(nt//2), nt//2+1, device=device) 
     ctc = prepare_matching(ops, U)
-    st = np.zeros((10**6, 3), 'float64')
-    tF  = torch.zeros((10**6, nC , ops['settings']['n_pcs']))
+    n_pcs = ops['settings']['n_pcs']
+    # Per-batch results are collected in block buffers and assembled once at
+    # the end, see below. Growing a preallocated buffer by doubling briefly
+    # needs ~4x the final size.
+    st_buf = BlockBuffer((3,), 'float64')
+    tF_dtype = torch.empty(0).numpy().dtype   # torch default dtype, as before
+    tF_buf = BlockBuffer((nC, n_pcs), tF_dtype)
     k = 0
     prog = tqdm(
         np.arange(bfile.n_batches, dtype=np.int64),
@@ -95,17 +101,15 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
                 th_amps = th_amps[~neg_spikes,:]
 
             nsp = len(stt) 
-            if k+nsp>st.shape[0]:                     
-                st = np.concatenate((st, np.zeros_like(st)), 0)
-                tF  = torch.cat((tF,  torch.zeros_like(tF)), 0)
-
             t_shift = ibatch * bfile.batch_downsampling * (ops['batch_size'])
             stt = stt.double()
-            st[k:k+nsp,0] = ((stt[:,0]-nt) + t_shift).cpu().numpy() - nt//2 + ops['nt0min']
-            st[k:k+nsp,1] = stt[:,1].cpu().numpy()
-            st[k:k+nsp,2] = th_amps.cpu().numpy().squeeze()
-            
-            tF[k:k+nsp]  = xfeat.transpose(0,1).cpu()
+            stb = np.zeros((nsp, 3), 'float64')
+            stb[:,0] = ((stt[:,0]-nt) + t_shift).cpu().numpy() - nt//2 + ops['nt0min']
+            stb[:,1] = stt[:,1].cpu().numpy()
+            stb[:,2] = th_amps.cpu().numpy().squeeze()
+            st_buf.append(stb)
+
+            tF_buf.append(xfeat.transpose(0,1).cpu().numpy())
 
             k+= nsp
             
@@ -119,9 +123,18 @@ def extract(ops, bfile, U, device=torch.device('cuda'), progress_bar=None):
 
     log_performance(logger, 'debug', f'Batch {ibatch}')
 
-    isort = np.argsort(st[:k,0])
+    st = st_buf.finalize()
+    isort = np.argsort(st[:,0])
     st = st[isort]
-    tF = tF[isort]
+
+    # Equivalent to assembling tF and then `tF = tF[isort]`, but each block is
+    # written directly to its sorted position and then freed, so the full
+    # unsorted copy of tF never exists.
+    # tF_sorted[j] = tF[isort[j]]  <=>  tF_sorted[inv[i]] = tF[i]
+    inv = np.empty_like(isort)
+    inv[isort] = np.arange(isort.size, dtype=isort.dtype)
+    del isort
+    tF = torch.from_numpy(tF_buf.finalize(dest_index=inv))
 
     return st, tF, ops
 
@@ -144,9 +157,11 @@ def align_U(U, ops, device=torch.device('cuda')):
 def postprocess_templates(Wall, ops, clu, st, tF, device=torch.device('cuda')):
     Wall2, _ = align_U(Wall, ops, device=device)
     #Wall3, _= remove_duplicates(ops, Wall2)
+    # Only the merged templates are used here, so skip re-sorting st and tF
+    # (which would copy all spike features just to discard them).
     Wall3, _, _, _, _ = merging_function(
         ops, Wall2.transpose(1,2), clu, st, tF,
-        0.9, 'mu', check_dt=False, device=device
+        0.9, 'mu', check_dt=False, device=device, reorder=False
         )
     Wall3 = Wall3.transpose(1,2).to(device)
     return Wall3
@@ -245,7 +260,17 @@ def run_matching(ops, X, U, ctc, device=torch.device('cuda')):
 
 
 def merging_function(ops, Wall, clu, st, tF, r_thresh=0.5, mode='ccg', check_dt=True,
-                     device=torch.device('cuda')):
+                     device=torch.device('cuda'), reorder=True):
+    """Merge clusters with similar templates.
+
+    If `reorder` is False, the returned `st`, `clu` and `tF` are not re-sorted
+    by spike time; use this when only the merged templates are needed.
+
+    Note that `st` and `tF` are modified in place (spike-time shifts, feature
+    rolling and the final re-sort), so the passed-in arrays should not be
+    reused afterwards.
+
+    """
     clu2 = clu.copy()
     clu_unq, ns = np.unique(clu2, return_counts = True)
 
@@ -349,31 +374,98 @@ def merging_function(ops, Wall, clu, st, tF, r_thresh=0.5, mode='ccg', check_dt=
     else:
         is_ref = None
 
-    sorted_idx = np.argsort(st[:,0])
-    st = np.take_along_axis(st, sorted_idx[..., np.newaxis], axis=0)
-    clu2 = clu2[sorted_idx]
-    tensor_idx = torch.from_numpy(sorted_idx)
-    tF = tF[tensor_idx]
+    if reorder:
+        sorted_idx = np.argsort(st[:,0])
+        # Shifting spike times by `dt` above can change their order. If it
+        # didn't, skip the copies (tF is the largest array in the pipeline).
+        if not np.array_equal(sorted_idx, np.arange(sorted_idx.size)):
+            # Same result as `st[sorted_idx]` and `tF[sorted_idx]`, but done
+            # in place: the caller still holds the unsorted arrays, so a
+            # gather would keep two full copies of tF alive at once.
+            st = permute_rows(st, sorted_idx)
+            clu2 = clu2[sorted_idx]
+            tF = permute_rows(tF, sorted_idx)
 
     return Ww.cpu(), clu2, is_ref, st, tF
 
 
-def roll_features(wPCA, tF, Wall, spike_idx, clust_idx, dt):
-    W = wPCA.cpu()
-    # Project from PC space back to sample time, shift by dt
-    feats = torch.roll(tF[spike_idx] @ W, shifts=dt, dims=2)
-    temps = torch.roll(Wall[clust_idx:clust_idx+1] @ wPCA, shifts=dt, dims=2)
+@njit
+def _permute_rows_inplace(a, order):
+    """Set a[j] = a_old[order[j]] for every j by following permutation cycles,
+    using one row of scratch memory."""
+    n = a.shape[0]
+    done = np.zeros(n, np.bool_)
+    tmp = np.empty(a.shape[1], a.dtype)
+    for i in range(n):
+        if done[i]:
+            continue
+        done[i] = True
+        if order[i] == i:
+            continue
+        tmp[:] = a[i, :]
+        j = i
+        while True:
+            k = order[j]
+            if k == i:
+                a[j, :] = tmp
+                break
+            a[j, :] = a[k, :]
+            done[k] = True
+            j = k
 
-    # For values that "rolled over the edge," set equal to next closest bin
+
+def permute_rows(x, order):
+    """Return `x[order]` for a permutation `order`, reordering `x` in place
+    when possible.
+
+    `x` is a numpy array or a CPU torch tensor. If `x` is not contiguous (or
+    is on GPU), a reordered copy is returned instead and `x` is not modified.
+
+    """
+    order = np.asarray(order, dtype=np.int64)
+    if x.shape[0] != order.size:
+        raise ValueError('`order` must have one entry per row of `x`.')
+    if order.size == 0:
+        return x
+    if isinstance(x, torch.Tensor):
+        if x.device.type != 'cpu' or not x.is_contiguous() or x.requires_grad:
+            return x[torch.from_numpy(order).to(x.device)]
+        rows = x.view(x.shape[0], -1).numpy()
+    else:
+        if not x.flags.c_contiguous or not x.flags.writeable:
+            return x[order]
+        rows = x.reshape(x.shape[0], -1)
+    if rows.shape[0] > 0 and rows.shape[1] > 0:
+        _permute_rows_inplace(rows, order)
+    return x
+
+
+def _roll_with_edge(x, dt):
+    """Roll along the last axis by dt, filling wrapped-around bins with the
+    nearest valid bin."""
+    x = torch.roll(x, shifts=dt, dims=2)
     if dt > 0:
-        feats[:,:,:dt] = feats[:,:,dt].unsqueeze(-1)
-        temps[:,:,:dt] = temps[:,:,dt].unsqueeze(-1)
+        x[:,:,:dt] = x[:,:,dt].unsqueeze(-1)
     elif dt < 0:
-        feats[:,:,dt:] = feats[:,:,dt-1].unsqueeze(-1)
-        temps[:,:,dt:] = temps[:,:,dt-1].unsqueeze(-1)
+        x[:,:,dt:] = x[:,:,dt-1].unsqueeze(-1)
+    return x
 
-    # Project back to PC space and update tF
-    tF[spike_idx] = feats @ W.T
+
+def roll_features(wPCA, tF, Wall, spike_idx, clust_idx, dt, chunk_size=2**16):
+    W = wPCA.cpu()
+    # Project from PC space back to sample time, shift by dt, and project
+    # back to PC space. Spikes are processed in chunks because the
+    # sample-time representation is nt/n_pcs (~10x) larger than tF, which
+    # for a unit with millions of spikes would need many GB at once.
+    spike_idx = np.asarray(spike_idx)
+    if spike_idx.dtype == bool:
+        spike_idx = np.flatnonzero(spike_idx)
+    for i in range(0, spike_idx.size, chunk_size):
+        ci = torch.from_numpy(spike_idx[i:i+chunk_size])
+        feats = _roll_with_edge(tF[ci] @ W, dt)
+        tF[ci] = feats @ W.T
+
+    temps = _roll_with_edge(Wall[clust_idx:clust_idx+1] @ wPCA, dt)
     Wall[clust_idx] = temps @ wPCA.T
 
     return tF, Wall
