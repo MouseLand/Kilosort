@@ -20,6 +20,27 @@ PROBE_PLOT_COLORS = np.array([
     ])
 
 
+def _block_colors(ops, n_blocks):
+    """One color per non-rigid block, ordered by depth, plus depth labels.
+
+    Neighbouring blocks get neighbouring colors from a sequential colormap
+    (truncated so the darkest end stays visible on the dark background).
+
+    """
+    colors = matplotlib.colormaps['plasma'](np.linspace(0.25, 1, n_blocks))
+    yblk = ops.get('yblk', None)
+    if yblk is None or len(yblk) != n_blocks:
+        labels = [f'block {i}' for i in range(n_blocks)]
+    else:
+        labels = [f'{y:.0f} um' for y in yblk]
+    return colors, labels
+
+
+def _block_legend(ax, n_blocks):
+    ax.legend(title='Block depth', fontsize='x-small', title_fontsize='small',
+              ncol=int(np.ceil(n_blocks / 10)), loc='upper left')
+
+
 def plot_drift_amount(ops, results_dir, tmin=0):
     plt.style.use('dark_background')
     fig, ax = plt.subplots(1, 1, figsize=(8,8))
@@ -29,9 +50,10 @@ def plot_drift_amount(ops, results_dir, tmin=0):
     fs = settings['fs']
     NT = settings['batch_size']
     t = np.arange(dshift.shape[0])*(NT/fs) + tmin
+    colors, labels = _block_colors(ops, dshift.shape[1])
     for i in range(dshift.shape[1]):
-        color = COLOR_CODES[i % len(COLOR_CODES)]
-        ax.plot(t, dshift[:,i], c=color)
+        ax.plot(t, dshift[:,i], c=colors[i], label=labels[i])
+    _block_legend(ax, dshift.shape[1])
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Depth shift (um)')
