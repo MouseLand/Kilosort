@@ -293,6 +293,7 @@ def _sort(filename, results_dir, probe, settings, data_dtype, device, do_CAR,
             if gui_sorter is not None:
                 gui_sorter.dshift = ops['dshift']
                 gui_sorter.st0 = st0
+                gui_sorter.ops = ops
                 gui_sorter.plotDataReady.emit('drift')
             else:
                 kplots.plot_drift_amount(ops, results_dir, tmin=settings['tmin'])

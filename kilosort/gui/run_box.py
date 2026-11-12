@@ -248,7 +248,8 @@ class RunBox(QtWidgets.QGroupBox):
             plot_window2 = self.plots['drift_scatter']
             dshift = self.current_worker.dshift
             st0 = self.current_worker.st0
-            plot_drift_amount(plot_window1, dshift, settings)
+            ops = getattr(self.current_worker, 'ops', None)
+            plot_drift_amount(plot_window1, dshift, settings, ops=ops)
             plot_drift_scatter(plot_window2, st0, settings)
 
         elif plot_type == 'diagnostics':

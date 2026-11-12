@@ -7,7 +7,7 @@ import matplotlib
 import torch
 from qtpy import QtWidgets
 
-from kilosort.plots import COLOR_CODES, PROBE_PLOT_COLORS
+from kilosort.plots import COLOR_CODES, PROBE_PLOT_COLORS, _block_colors
 
 
 class PlotWindow(QtWidgets.QWidget):
@@ -31,7 +31,13 @@ class PlotWindow(QtWidgets.QWidget):
 
 # TODO: Axis labels don't actually show up anywhere, still debugging
 
-def plot_drift_amount(plot_window, dshift, settings):
+def _qt_colors(rgba):
+    """Matplotlib RGBA colors (floats in [0, 1]) as 0-255 RGB tuples for
+    pyqtgraph pens."""
+    return [tuple(int(round(255*c)) for c in col[:3]) for col in rgba]
+
+
+def plot_drift_amount(plot_window, dshift, settings, ops=None):
     # Drift amount for each block of probe over time
     p1 = plot_window.plot_widget.addPlot(
         row=0, col=0, labels={'left': 'Depth shift (um)', 'bottom': 'Time (s)'}
@@ -41,9 +47,13 @@ def plot_drift_amount(plot_window, dshift, settings):
     NT = settings['batch_size']
     t = np.arange(dshift.shape[0])*(NT/fs) + settings['tmin']
 
+    # Color blocks by depth, as in kilosort.plots.plot_drift_amount.
+    colors, labels = _block_colors(ops if ops is not None else {},
+                                   dshift.shape[1])
+    colors = _qt_colors(colors)
+    p1.addLegend(offset=(10, 10), labelTextSize='7pt')
     for i in range(dshift.shape[1]):
-        color = COLOR_CODES[i % len(COLOR_CODES)]
-        p1.plot(t, dshift[:,i], pen=color)
+        p1.plot(t, dshift[:,i], pen=colors[i], name=labels[i])
 
     plot_window.show()
     save_path = str(Path(settings['results_dir']) / 'drift_amount.png')
