@@ -22,7 +22,9 @@ jobs:
     runs-on: ${{ matrix.platform }}
     strategy:
       matrix:
-        platform: [ubuntu-latest, macos-latest, windows-latest]
+        # Ubuntu 24.04, not ubuntu-latest: ubuntu-latest is Ubuntu 26.04, which has no Python 3.9 build
+        # for actions/setup-python. Also update tox.ini's [gh-actions:env] when changing this.
+        platform: [ubuntu-24.04, macos-latest, windows-latest]
         python: ["3.9", "3.10"]
       fail-fast: false
 
